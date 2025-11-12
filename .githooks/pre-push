@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Pre-push hook: run quick local checks before allowing a push
+
+echo "Running pre-push checks..."
+
+echo "Checking recent commit messages..."
+./Scripts/check-commit-messages.sh 20
+rc=$?
+if [ $rc -ne 0 ]; then
+  echo "Commit message checks failed. Aborting push." >&2
+  exit $rc
+fi
+
+echo "Building quick checks (core + tests)..."
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./Scripts/BuildEngine.ps1 -Target AltinaEngineTests
+rc=$?
+if [ $rc -ne 0 ]; then
+  echo "Build failed. Aborting push." >&2
+  exit $rc
+fi
+
+TEST_EXE="out/build/windows-msvc-relwithdebinfo/Test/AltinaEngineTests.exe"
+if [ -f "$TEST_EXE" ]; then
+  echo "Running tests (fast)..."
+  "$TEST_EXE"
+  rc=$?
+  if [ $rc -ne 0 ]; then
+    echo "Tests failed (exit $rc). Aborting push." >&2
+    exit $rc
+  fi
+fi
+
+echo "All pre-push checks passed."
+exit 0

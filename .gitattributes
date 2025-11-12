@@ -1,0 +1,20 @@
+# Set core.autocrlf behavior via attributes to keep scripts consistent across platforms
+* text=auto
+
+# Force LF for shell scripts and most source files
+*.sh text eol=lf
+*.cmake text eol=lf
+*.mk text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.cpp text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+
+# PowerShell scripts should keep CRLF on Windows
+*.ps1 text eol=crlf
+
+# Ensure text files are normalized
+*.txt text eol=lf

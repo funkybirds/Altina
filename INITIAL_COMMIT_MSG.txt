@@ -1,7 +1,0 @@
-chore(repo): initial import of AltinaEngine skeleton
-
-- Add engine core skeleton (Source/Engine/Core: Public/Private headers+sources)
-- Add demo (Demo/Minimal) and test harness (Test/)
-- Add build configuration (CMakeLists, CMakePresets.json) and vcpkg manifests
-- Add developer scripts (Scripts/) and local commit hooks (.githooks/)
-- Add docs and coding style notes

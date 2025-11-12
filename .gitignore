@@ -66,6 +66,9 @@ __pycache__/
 # Local temp commit message files created by scripts
 temp_*.txt
 
+# Explicitly ignore temporary commit message file
+COMMIT_MSG.txt
+
 # CMake output folders
 out/
 out/*

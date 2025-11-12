@@ -1,5 +1,0 @@
-﻿chore(repo): add gitattributes and pre-push build/test checks
-
-- Add .gitattributes to normalize line endings
-- Add pre-push hooks (bash + PowerShell)
-- Add RunPrePushChecks.ps1 convenience runner

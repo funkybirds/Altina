@@ -14,9 +14,10 @@ chore(repo): add gitattributes and pre-push build/test checks
 '@
 }
 
-$repoRoot = Resolve-Path -Path (Join-Path $PSScriptRoot '..')
-$msgPath = Join-Path $repoRoot 'COMMIT_MSG.txt'
 
+# Use a temp file outside the repository root to avoid accidentally committing it
+$tempPath = [System.IO.Path]::GetTempPath()
+$msgPath = Join-Path $tempPath ("altina_commit_msg_{0}.txt" -f ([System.Guid]::NewGuid().ToString('N')))
 Set-Content -Path $msgPath -Value $Message -Encoding UTF8
 
 try {

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Commit message hook (bash)
+# Validates the first line of the commit message against the project's commit format.
+
+MSG_FILE="$1"
+if [ -z "$MSG_FILE" ]; then
+  echo "commit-msg hook: no message file provided"
+  exit 2
+fi
+
+FIRST_LINE=$(sed -n '1{p;q;}' "$MSG_FILE" | tr -d '\r')
+
+# Conventional-like format: type(optional-scope): subject
+# Allowed types:
+TYPES="feat|fix|docs|style|refactor|perf|test|chore|build|ci"
+# Scope: alphanum, dot, underscore, hyphen, space allowed inside parentheses
+REGEX="^($TYPES)(\([a-zA-Z0-9._ \-]+\))?: .{1,72}$"
+
+if ! echo "$FIRST_LINE" | grep -E -q "$REGEX"; then
+  echo "ERROR: Commit message does not follow the project's commit format." >&2
+  echo "Expected: <type>(optional-scope): <subject> (max 72 chars)" >&2
+  echo "Allowed types: feat, fix, docs, style, refactor, perf, test, chore, build, ci" >&2
+  echo "Example: feat(renderer): add Vulkan renderer" >&2
+  exit 1
+fi
+
+exit 0

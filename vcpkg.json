@@ -1,0 +1,6 @@
+{
+    "name": "altinaengine",
+    "version-string": "0.1.0",
+    "builtin-baseline": "f38028b82d90d92d2bb2f9b2585fa1313dcd89e5",
+    "dependencies": []
+}

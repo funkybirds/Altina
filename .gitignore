@@ -1,0 +1,78 @@
+# Build directories
+out/
+build/
+CMakeFiles/
+CMakeCache.txt
+
+# Demo binaries staged by post-build steps
+Demo/*/Binaries/
+
+# Generated files
+*.sln
+*.vcxproj*
+*.user
+*.opensdf
+*.sdf
+*.db
+*.pdb
+*.obj
+*.log
+*.tlog
+*.idb
+*.ipdb
+*.iobj
+*.dll
+*.exe
+*.lib
+*.exp
+*.ilk
+*.ninja
+*.dir
+compile_commands.json
+
+# Preset and package artifacts
+CMakeUserPresets.json
+.cache/
+
+# Dependency managers
+vcpkg_installed/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS-specific
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Python
+__pycache__/
+*.pyc
+
+# Temporary
+*.tmp
+*.swp
+*.swo
+
+# Local git hooks: keep the hook scripts tracked, but ignore local-only state and temp files.
+# (This ensures .githooks/* is in the repo but local state does not get committed.)
+.githooks/local/
+.githooks/*.local
+.githooks/*.state
+.githooks/*.log
+
+# Local temp commit message files created by scripts
+temp_*.txt
+
+# CMake output folders
+out/
+out/*
+
+# Demo binaries/staging
+Demo/*/Binaries/
+
+# PowerShell temp/persist files
+*.ps1xml
+

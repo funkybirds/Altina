@@ -340,4 +340,17 @@ namespace AltinaEngine
         }
     };
 
+    // Const evaluated context
+    constexpr bool IsConstantEvaluated() noexcept
+    {
+        if consteval
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
 } // namespace AltinaEngine

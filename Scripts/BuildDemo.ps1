@@ -13,7 +13,7 @@ function Get-VsDevCmdPath {
         throw "vswhere.exe not found. Install Visual Studio Build Tools or launch from a Developer Command Prompt."
     }
 
-    $vsInstallPath = & $vsWherePath -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+    $vsInstallPath = & $vsWherePath -latest -prerelease -products * -requires Microsoft.Component.MSBuild -property installationPath
     if (-not $vsInstallPath) {
         throw "Visual Studio installation with C++ components not detected."
     }

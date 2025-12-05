@@ -39,7 +39,7 @@ target_include_directories(${TargetName}
 
 target_compile_features(${TargetName}
     PUBLIC
-        cxx_std_20
+        cxx_std_23
 )
 
 target_compile_definitions(${TargetName}

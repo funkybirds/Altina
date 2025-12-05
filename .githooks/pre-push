@@ -19,11 +19,17 @@ if [ $rc -ne 0 ]; then
   exit $rc
 fi
 
-TEST_EXE="out/build/windows-msvc-relwithdebinfo/Test/AltinaEngineTests.exe"
-if [ -f "$TEST_EXE" ]; then
-  echo "Running tests (fast)..."
-  "$TEST_EXE"
-  rc=$?
+echo "Running tests (ctest -C RelWithDebInfo)..."
+ctest -C RelWithDebInfo --output-on-failure
+rc=$?
+if [ $rc -ne 0 ]; then
+  echo "ctest reported failures (exit $rc). Falling back to test exe..." >&2
+  TEST_EXE="out/build/windows-msvc-relwithdebinfo/Source/Tests/AltinaEngineTests.exe"
+  if [ -f "$TEST_EXE" ]; then
+    echo "Running test executable directly: $TEST_EXE"
+    "$TEST_EXE"
+    rc=$?
+  fi
   if [ $rc -ne 0 ]; then
     echo "Tests failed (exit $rc). Aborting push." >&2
     exit $rc

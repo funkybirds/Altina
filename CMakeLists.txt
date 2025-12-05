@@ -12,8 +12,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # C++23 standard switch; for other compilers enable `-Werror`.
 if(MSVC)
     add_compile_options(/WX)
-    # Request MSVC to use the C++23 language standard explicitly.
-    add_compile_options(/std:c++23)
+    # Suppress common DLL-interface warning (4251) so it isn't promoted
+    # to an error by `/WX`. Rely on CMake's `CMAKE_CXX_STANDARD` /
+    # `target_compile_features` to request C++23 instead of forcing
+    # `/std:c++23` which some toolsets may not accept.
+    add_compile_options(/wd4251)
 else()
     add_compile_options(-Werror)
 endif()
@@ -27,4 +30,4 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory(Source/Engine/Core)
 add_subdirectory(Demo/Minimal)
-add_subdirectory(Test)
+add_subdirectory(Source/Tests)

@@ -1,7 +1,8 @@
 param(
     [string]$Preset = "windows-msvc-relwithdebinfo",
     [string]$Target = "AltinaEngineCore",
-    [switch]$ForceConfigure
+    [switch]$ForceConfigure,
+    [switch]$RunTests
 )
 
 $ErrorActionPreference = "Stop"
@@ -61,6 +62,28 @@ function Invoke-Configure($presetName) {
     Invoke-WithVisualStudioEnv @("cmake", "--preset", $presetName)
 }
 
+function Get-CtestConfigFromPreset($presetName) {
+    # Infer common CTest configuration names from the preset token.
+    # Examples:
+    #  - windows-msvc-relwithdebinfo -> RelWithDebInfo
+    #  - windows-msvc-debug -> Debug
+    #  - linux-clang-release -> Release
+    if (-not $presetName) { return 'RelWithDebInfo' }
+    $tokens = $presetName -split '[-_.]'
+    if ($tokens.Length -eq 0) { return 'RelWithDebInfo' }
+    $candidate = $tokens[-1].ToLowerInvariant()
+    switch ($candidate) {
+        'debug' { return 'Debug' }
+        'release' { return 'Release' }
+        'relwithdebinfo' { return 'RelWithDebInfo' }
+        'minsizerel' { return 'MinSizeRel' }
+        default {
+            # Fallback: capitalize first letter (least surprising)
+            return ($candidate.Substring(0,1).ToUpper() + $candidate.Substring(1))
+        }
+    }
+}
+
 try {
     Set-Location $repoRoot
 
@@ -71,6 +94,41 @@ try {
 
     Write-Host "[CMake] Building $Target via preset '$Preset'"
     Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", $Target)
+
+    # Decide whether to run tests after a successful build.
+    $shouldRunTests = $RunTests.IsPresent -or ($Target -match 'Test') -or ($Target -match 'Tests')
+    if ($shouldRunTests) {
+        $ctestConfig = Get-CtestConfigFromPreset $Preset
+        Write-Host "[CTest] Running tests for preset '$Preset' (config: $ctestConfig)..."
+        $buildDir = Join-Path $repoRoot "out\build\$Preset"
+        $testBuildDir = Join-Path $buildDir "Source\Tests"
+        if (Test-Path $testBuildDir) {
+            Push-Location $testBuildDir
+            try {
+                Invoke-WithVisualStudioEnv @("ctest", "-C", $ctestConfig, "--output-on-failure")
+            } catch {
+                Pop-Location
+                throw "ctest reported failures or failed to run."
+            }
+            Pop-Location
+        } elseif (Test-Path $buildDir) {
+            Push-Location $buildDir
+            try {
+                Invoke-WithVisualStudioEnv @("ctest", "-C", $ctestConfig, "--output-on-failure")
+            } catch {
+                Pop-Location
+                throw "ctest reported failures or failed to run."
+            }
+            Pop-Location
+        } else {
+            Write-Warning "Build directory not found: $buildDir. Running ctest from repo root."
+            try {
+                Invoke-WithVisualStudioEnv @("ctest", "-C", $ctestConfig, "--output-on-failure")
+            } catch {
+                throw "ctest reported failures or failed to run."
+            }
+        }
+    }
 }
 finally {
     Set-Location $initialLocation

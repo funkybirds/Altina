@@ -18,7 +18,7 @@ target_link_libraries(${TargetName}
 
 target_compile_features(${TargetName}
     PRIVATE
-        cxx_std_20
+        cxx_std_23
 )
 
 set(DemoBinaryDir ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)

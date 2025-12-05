@@ -30,14 +30,26 @@ if ($rc -ne 0) {
     exit $rc
 }
 
-$testExe = Join-Path $PSScriptRoot "..\out\build\windows-msvc-relwithdebinfo\Test\AltinaEngineTests.exe"
-if (Test-Path $testExe) {
-    Write-Host "Running tests (fast)..."
-    & $testExe
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Tests failed (exit $LASTEXITCODE). Aborting push."
-        exit $LASTEXITCODE
+Write-Host "Running tests via ctest (RelWithDebInfo)..."
+try {
+    & "ctest" -C RelWithDebInfo --output-on-failure
+    $rc = $LASTEXITCODE
+} catch {
+    $rc = 1
+}
+if ($rc -ne 0) {
+    Write-Warning "ctest reported failures (exit $rc). Falling back to test exe..."
+    $testExe = Join-Path $PSScriptRoot "..\out\build\windows-msvc-relwithdebinfo\Source\Tests\AltinaEngineTests.exe"
+    if (Test-Path $testExe) {
+        Write-Host "Running tests (exe fallback)..."
+        & $testExe
+        $rc = $LASTEXITCODE
     }
+}
+
+if ($rc -ne 0) {
+    Write-Error "Tests failed (exit $rc). Aborting push."
+    exit $rc
 }
 
 Write-Host "All pre-push checks passed."

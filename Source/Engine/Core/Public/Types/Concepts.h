@@ -24,4 +24,19 @@ namespace AltinaEngine
     template <typename T, typename... Ts>
     concept ISameAsAll = (sizeof...(Ts) == 0) || (TTypeSameAs<T, Ts>::Value && ...);
 
+    template <typename T>
+    concept IRandomReadable = TTypeIsRandomReadable<T>::Value;
+
+    template <typename T>
+    concept IRandomWritable = TTypeIsRandomWritable<T>::Value;
+
+    template <typename It>
+    concept IReadableIterator = TTypeIsReadableIterator<It>::Value;
+
+    template <typename It>
+    concept IWritableIterator = TTypeIsWritableIterator<It>::Value;
+
+    template <typename It>
+    concept IRandomAccessIterator = TTypeIsRandomAccessIterator<It>::Value;
+
 } // namespace AltinaEngine

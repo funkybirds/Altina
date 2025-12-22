@@ -108,4 +108,10 @@ namespace AltinaEngine::Core::Platform
         }
     };
 
+    FMemoryAllocator* GetGlobalMemoryAllocator() noexcept
+    {
+        static FDefaultMemoryAllocator GDefaultAllocator;
+        return &GDefaultAllocator;
+    }
+
 } // namespace AltinaEngine::Core::Platform

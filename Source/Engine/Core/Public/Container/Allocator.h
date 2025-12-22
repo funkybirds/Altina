@@ -2,6 +2,7 @@
 #define ALTINAENGINE_CORE_PUBLIC_CONTAINER_ALLOCATOR_H
 
 #include "../Base/CoreAPI.h"
+#include "../Platform/Generic/GenericPlatformDecl.h"
 
 namespace AltinaEngine::Core::Container
 {
@@ -10,7 +11,7 @@ namespace AltinaEngine::Core::Container
      * TAllocator<T>
      * Minimal allocator intended for use in engine containers. Stateless.
      */
-    template <typename T> struct AE_CORE_API TAllocator
+    template <typename T> struct TAllocator
     {
         using value_type      = T;
         using pointer         = value_type*;
@@ -34,13 +35,30 @@ namespace AltinaEngine::Core::Container
             {
                 return nullptr;
             }
-            void* p = ::operator new(static_cast<size_type>(n) * sizeof(value_type));
+            using AltinaEngine::Core::Platform::FMemoryAllocator;
+            using AltinaEngine::Core::Platform::GetGlobalMemoryAllocator;
+
+            FMemoryAllocator* Allocator = GetGlobalMemoryAllocator();
+            void*             p         = Allocator->MemoryAllocate(
+                static_cast<AltinaEngine::usize>(n) * sizeof(value_type), alignof(value_type));
             return static_cast<pointer>(p);
         }
 
         inline pointer Allocate(size_type n, const_pointer /*hint*/) { return Allocate(n); }
 
-        inline void    Deallocate(pointer p, size_type /*n*/) noexcept { ::operator delete(static_cast<void*>(p)); }
+        inline void Deallocate(pointer p, size_type /*n*/) noexcept
+        {
+            if (!p)
+            {
+                return;
+            }
+
+            using AltinaEngine::Core::Platform::FMemoryAllocator;
+            using AltinaEngine::Core::Platform::GetGlobalMemoryAllocator;
+
+            FMemoryAllocator* Allocator = GetGlobalMemoryAllocator();
+            Allocator->MemoryFree(static_cast<void*>(p));
+        }
 
         template <typename... Args> inline void Construct(pointer p, Args&&... args)
         {

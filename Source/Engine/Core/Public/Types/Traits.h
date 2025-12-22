@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Aliases.h"
+
 namespace AltinaEngine
 {
 
@@ -51,6 +53,42 @@ namespace AltinaEngine
         template <typename T, typename U> auto TestGreater(int) -> decltype(Declval<T>() > Declval<U>(), TTrueType{});
 
         template <typename T, typename U> TFalseType TestGreater(...);
+
+        template <typename T>
+        auto TestIndexReadable(int) -> decltype(Declval<const T&>()[usize{}], TTrueType{});
+
+        template <typename T> TFalseType TestIndexReadable(...);
+
+        template <typename T>
+        auto TestIndexWritable(int) -> decltype(Declval<T&>()[usize{}], TTrueType{});
+
+        template <typename T> TFalseType TestIndexWritable(...);
+
+        template <typename It>
+        auto TestReadableIterator(int)
+            -> decltype(*Declval<It&>(), ++Declval<It&>(), TTrueType{});
+
+        template <typename It> TFalseType TestReadableIterator(...);
+
+        template <typename It>
+        auto TestWritableIterator(int)
+            -> decltype(*Declval<It&>() = *Declval<It&>(), ++Declval<It&>(), TTrueType{});
+
+        template <typename It> TFalseType TestWritableIterator(...);
+
+        template <typename It>
+        auto TestRandomAccessIterator(int)
+            -> decltype(
+                Declval<It&>() + usize{},
+                Declval<It&>() - usize{},
+                Declval<It&>() += usize{},
+                Declval<It&>() -= usize{},
+                Declval<It&>()[usize{}],
+                Declval<It>() - Declval<It>(),
+                TTrueType{}
+            );
+
+        template <typename It> TFalseType TestRandomAccessIterator(...);
 
     } // namespace Detail
 
@@ -255,6 +293,26 @@ namespace AltinaEngine
     };
 
     template <typename T, typename U = T> struct TTypeGreaterComparable : decltype(Detail::TestGreater<T, U>(0))
+    {
+    };
+
+    template <typename T> struct TTypeIsRandomReadable : decltype(Detail::TestIndexReadable<T>(0))
+    {
+    };
+
+    template <typename T> struct TTypeIsRandomWritable : decltype(Detail::TestIndexWritable<T>(0))
+    {
+    };
+
+    template <typename It> struct TTypeIsReadableIterator : decltype(Detail::TestReadableIterator<It>(0))
+    {
+    };
+
+    template <typename It> struct TTypeIsWritableIterator : decltype(Detail::TestWritableIterator<It>(0))
+    {
+    };
+
+    template <typename It> struct TTypeIsRandomAccessIterator : decltype(Detail::TestRandomAccessIterator<It>(0))
     {
     };
 

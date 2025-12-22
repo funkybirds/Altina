@@ -23,4 +23,9 @@ namespace AltinaEngine::Core::Platform
         virtual void  MemoryFree(void* Ptr)                                       = 0;
     };
 
+    // Accessor for the engine-wide default allocator instance.
+    // The implementation lives in the platform memory module and returns
+    // a pointer to a static FMemoryAllocator instance.
+    [[nodiscard]] AE_CORE_API FMemoryAllocator* GetGlobalMemoryAllocator() noexcept;
+
 } // namespace AltinaEngine::Core::Platform

@@ -60,6 +60,7 @@ target_compile_options(${TargetName}
 )
 
 set(AE_DEMO_MINIMAL_BIN_DIR ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)
+set(AE_TEST_BIN_DIR ${CMAKE_BINARY_DIR}/Source/Tests)
 
 add_custom_command(
     TARGET ${TargetName}
@@ -68,6 +69,10 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:${TargetName}>
         ${AE_DEMO_MINIMAL_BIN_DIR}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${AE_TEST_BIN_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:${TargetName}>
+        ${AE_TEST_BIN_DIR}
     COMMENT "Copying ${TargetName} to Minimal demo binaries"
 )
 

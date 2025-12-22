@@ -3,6 +3,8 @@
 
 #include "../Base/CoreAPI.h"
 #include "../Platform/Generic/GenericPlatformDecl.h"
+#include "../Types/Traits.h"
+#include "ContainerConfig.h"
 
 namespace AltinaEngine::Core::Container
 {
@@ -80,6 +82,74 @@ namespace AltinaEngine::Core::Container
 
         constexpr bool operator==(const TAllocator&) const noexcept { return true; }
         constexpr bool operator!=(const TAllocator&) const noexcept { return false; }
+    };
+
+    template <typename Alloc>
+    struct TAllocatorTraits
+    {
+        using allocator_type = Alloc;
+        using value_type = typename Alloc::value_type;
+        using pointer = typename Alloc::pointer;
+        using const_pointer = typename Alloc::const_pointer;
+        using size_type = typename Alloc::size_type;
+
+        static pointer Allocate(Alloc& a, size_type n)
+        {
+            return a.Allocate(n);
+        }
+
+        static void Deallocate(Alloc& a, pointer p, size_type n)
+        {
+            a.Deallocate(p, n);
+        }
+
+        template <typename... Args>
+        static void Construct(Alloc& a, pointer p, Args&&... args)
+        {
+            a.Construct(p, AltinaEngine::Forward<Args>(args)...);
+        }
+
+        static void Destroy(Alloc& a, pointer p)
+        {
+            a.Destroy(p);
+        }
+    };
+
+    template <typename T>
+    struct TDefaultDeleter
+    {
+        constexpr TDefaultDeleter() noexcept = default;
+
+        void operator()(T* ptr) const
+        {
+            if (ptr)
+            {
+                if constexpr (kSmartPtrUseManagedAllocator)
+                {
+                    TAllocator<T> Allocator;
+                    TAllocatorTraits<TAllocator<T>>::Destroy(Allocator, ptr);
+                    TAllocatorTraits<TAllocator<T>>::Deallocate(Allocator, ptr, 1);
+                }
+                else
+                {
+                    delete ptr;
+                }
+            }
+        }
+    };
+
+    template <typename T>
+    struct TDefaultDeleter<T[]>
+    {
+        constexpr TDefaultDeleter() noexcept = default;
+
+        void operator()(T* ptr) const
+        {
+            if (ptr)
+            {
+                delete[] ptr;
+            }
+        }
     };
 
 } // namespace AltinaEngine::Core::Container

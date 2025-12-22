@@ -238,6 +238,24 @@ namespace AltinaEngine
         using Type = T;
     };
 
+    template <typename T>
+    constexpr typename TRemoveReference<T>::Type&& Move(T&& Arg) noexcept
+    {
+        return static_cast<typename TRemoveReference<T>::Type&&>(Arg);
+    }
+
+    template <typename T>
+    constexpr T&& Forward(typename TRemoveReference<T>::Type& Arg) noexcept
+    {
+        return static_cast<T&&>(Arg);
+    }
+
+    template <typename T>
+    constexpr T&& Forward(typename TRemoveReference<T>::Type&& Arg) noexcept
+    {
+        return static_cast<T&&>(Arg);
+    }
+
     template <typename T> struct TRemoveConst
     {
         using Type = T;

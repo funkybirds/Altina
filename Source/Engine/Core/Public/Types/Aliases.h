@@ -21,5 +21,19 @@ namespace AltinaEngine
 
     using usize = std::size_t;
     using isize = std::ptrdiff_t;
+
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+    using TChar = wchar_t;
+#   ifdef TEXT
+#       undef TEXT
+#   endif
+#   define TEXT(str) L##str
+#else
+    using TChar = char;
+#   ifdef TEXT
+#       undef TEXT
+#   endif
+#   define TEXT(str) str
+#endif
 } // namespace AltinaEngine
  

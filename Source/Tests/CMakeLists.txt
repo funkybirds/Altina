@@ -10,8 +10,5 @@ target_link_libraries(AltinaEngineTests PRIVATE AltinaEngine::Core)
 target_include_directories(AltinaEngineTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(AltinaEngineTests PROPERTIES FOLDER "Tests")
 
-# Register with CTest
-include(CTest)
-enable_testing()
-# Use the target file path so CTest knows where the executable lives.
+# Register with CTest (CTest is enabled at the top level).
 add_test(NAME AltinaEngineTests COMMAND $<TARGET_FILE:AltinaEngineTests>)

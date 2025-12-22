@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.28)
 
 project(AltinaEngine VERSION 0.1.0 LANGUAGES CXX)
 
+# Enable CTest/CTest integration at the top level so `ctest` from the
+# build tree root discovers all registered tests.
+include(CTest)
+enable_testing()
+
 # Require C++23 for features like "if consteval". Make the standard required
 # and disable compiler extensions for consistent behaviour across toolchains.
 set(CMAKE_CXX_STANDARD 23)

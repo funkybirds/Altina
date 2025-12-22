@@ -86,15 +86,6 @@ AltinaEngine/
 - **Cons**: requires export macros (`AE_CORE_API`) and disciplined symbol visibility; additional packaging for platform-specific runtimes; ABI breakage risks between engine and demos; slightly heavier load-time complexity (dependency graphs, versioning).
 - **Implementation notes**: `AltinaEngineCore` builds with `AE_CORE_BUILD` defined, exporting surface symbols via `CoreAPI.h`. Post-build steps stage the `.dll/.so` into demo `Binaries/` folders.
 
-### Alternative — Static Libraries
-- **Pros**: simpler deployment, no runtime loader concerns, and whole-program optimization opportunities when linking demos; useful for unit tests or CI pipelines that prefer single binaries.
-- **Cons**: every consumer must relink on engine changes; larger executables and duplicated code; cannot support hot reload or isolated engine updates.
-- **When to use**: enable temporarily via `-DBUILD_SHARED_LIBS=OFF` for quick experiments or to simplify debugger setup in tightly controlled environments.
-
-### Hybrid Path
-- Combine shared core modules with static leaf utilities (math, containers) to balance iteration speed and link-time performance.
-- Evaluate ABI compatibility regularly; consider versioned loader interfaces if third-party plugins become a goal.
-
 ## Coding Style Guidelines
 - **File layout**: mirror Unreal Engine conventions; one primary type per file named `<TypeName>.h/.cpp`, with public headers under `Public/` and implementations under `Private/`.
 - **Type prefixes**:

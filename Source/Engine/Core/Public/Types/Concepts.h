@@ -15,7 +15,13 @@ namespace AltinaEngine
     template <typename T>
     concept IFloatingPoint = TTypeIsFloatingPoint<T>::Value;
 
+    template <typename T>
+    concept ISignedIntegral = TTypeIsIntegral<T>::Value && TTypeIsSigned<T>::Value;
+
     template <typename T, typename U>
     concept ISameSizeAs = sizeof(T) == sizeof(U);
+
+    template <typename T, typename... Ts>
+    concept ISameAsAll = (sizeof...(Ts) == 0) || (TTypeSameAs<T, Ts>::Value && ...);
 
 } // namespace AltinaEngine

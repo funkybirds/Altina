@@ -144,6 +144,14 @@ namespace AltinaEngine
     {
     };
 
+    template <typename T, bool IsIntegral = TTypeIsIntegral<T>::Value> struct TTypeIsSigned : TFalseType
+    {
+    };
+
+    template <typename T> struct TTypeIsSigned<T, true> : TBoolConstant<(static_cast<T>(-1) < static_cast<T>(0))>
+    {
+    };
+
     template <typename T> struct TTypeIsFloatingPoint : TFalseType
     {
     };
@@ -253,15 +261,6 @@ namespace AltinaEngine
     // Backwards-compatible alias the user requested
     template <typename T, typename U = T> using TGreaterComparable = TTypeGreaterComparable<T, U>;
 
-    // std::like function objects -------------------------------------------------
-    // Simple function objects that call the underlying operators. Provide a
-    // primary template for concrete type and a transparent `void` specialization
-    // that accepts mixed/forwarding arguments (similar to C++14/17
-    // std::less<void>).
-
-    // Inline variable templates and comparator instances ------------------------
-
-    // Trait variable templates (inline constexpr) for easy checks: X_v
     template <typename T, typename U> inline constexpr bool TTypeSameAs_v = TTypeSameAs<T, U>::Value;
 
     template <typename T> inline constexpr bool             TTypeIsIntegral_v = TTypeIsIntegral<T>::Value;

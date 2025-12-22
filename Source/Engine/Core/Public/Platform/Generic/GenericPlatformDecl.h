@@ -19,7 +19,7 @@ namespace AltinaEngine::Core::Platform
     struct FMemoryAllocator
     {
         virtual void* MemoryAllocate(usize Size, usize Alignment)                 = 0;
-        virtual void  MemoryReallocate(void* Ptr, usize NewSize, usize Alignment) = 0;
+        virtual void* MemoryReallocate(void* Ptr, usize NewSize, usize Alignment) = 0;
         virtual void  MemoryFree(void* Ptr)                                       = 0;
     };
 

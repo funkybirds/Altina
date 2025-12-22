@@ -22,3 +22,4 @@ namespace AltinaEngine
     using usize = std::size_t;
     using isize = std::ptrdiff_t;
 } // namespace AltinaEngine
+ 

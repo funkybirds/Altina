@@ -52,6 +52,8 @@ namespace AltinaEngine::Core::Logging
             Log(Level, GetDefaultCategory(), Message);
         }
 
+        static void SetDefaultCategory(TStringView Category);
+        static void ResetDefaultCategory() noexcept;
         static TStringView GetDefaultCategory() noexcept;
 
         template <typename... Args>
@@ -99,6 +101,14 @@ namespace AltinaEngine::Core::Logging
     }
 
     template <typename... Args>
+    inline void LogInfoCat(TStringView Category,
+                           TFormatString<Args...> Format,
+                           Args&&... args)
+    {
+        LogInfoCategory(Category, Format, AltinaEngine::Forward<Args>(args)...);
+    }
+
+    template <typename... Args>
     inline void LogWarningCategory(TStringView Category,
                                    TFormatString<Args...> Format,
                                    Args&&... args)
@@ -116,6 +126,14 @@ namespace AltinaEngine::Core::Logging
         LogWarningCategory(FLogger::GetDefaultCategory(),
                            Format,
                            AltinaEngine::Forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    inline void LogWarningCat(TStringView Category,
+                              TFormatString<Args...> Format,
+                              Args&&... args)
+    {
+        LogWarningCategory(Category, Format, AltinaEngine::Forward<Args>(args)...);
     }
 
     template <typename... Args>
@@ -138,6 +156,14 @@ namespace AltinaEngine::Core::Logging
                          AltinaEngine::Forward<Args>(args)...);
     }
 
+    template <typename... Args>
+    inline void LogErrorCat(TStringView Category,
+                            TFormatString<Args...> Format,
+                            Args&&... args)
+    {
+        LogErrorCategory(Category, Format, AltinaEngine::Forward<Args>(args)...);
+    }
+
 } // namespace AltinaEngine::Core::Logging
 
 namespace AltinaEngine
@@ -147,10 +173,13 @@ namespace AltinaEngine
     using Logging::ELogLevel;
     using Logging::FLogger;
     using Logging::LogError;
+    using Logging::LogErrorCat;
     using Logging::LogErrorCategory;
     using Logging::LogInfo;
+    using Logging::LogInfoCat;
     using Logging::LogInfoCategory;
     using Logging::LogWarning;
+    using Logging::LogWarningCat;
     using Logging::LogWarningCategory;
     using Logging::TFormatString;
 }

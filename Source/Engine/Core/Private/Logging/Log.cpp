@@ -3,6 +3,7 @@
 #include <atomic>
 #include <iostream>
 #include <mutex>
+#include <string>
 #include <type_traits>
 
 using AltinaEngine::Core::Container::TStringView;
@@ -29,6 +30,8 @@ namespace AltinaEngine::Core::Logging
         FLogSink GUserSink = nullptr;
         void* GUserData = nullptr;
         std::mutex GLogMutex;
+        thread_local std::basic_string<AltinaEngine::TChar> GThreadDefaultCategory;
+        thread_local bool GThreadHasCustomCategory = false;
 
         TStringView LevelToLabel(ELogLevel Level) noexcept
         {
@@ -129,8 +132,32 @@ namespace AltinaEngine::Core::Logging
         return Level >= GMinimumLevel.load(std::memory_order_relaxed);
     }
 
+    void FLogger::SetDefaultCategory(TStringView Category)
+    {
+        if (Category.IsEmpty())
+        {
+            ResetDefaultCategory();
+            return;
+        }
+
+        GThreadDefaultCategory.assign(Category.Data(), Category.Length());
+        GThreadHasCustomCategory = true;
+    }
+
+    void FLogger::ResetDefaultCategory() noexcept
+    {
+        GThreadDefaultCategory.clear();
+        GThreadHasCustomCategory = false;
+    }
+
     TStringView FLogger::GetDefaultCategory() noexcept
     {
+        if (GThreadHasCustomCategory && !GThreadDefaultCategory.empty())
+        {
+            return TStringView(GThreadDefaultCategory.data(),
+                               static_cast<AltinaEngine::usize>(GThreadDefaultCategory.size()));
+        }
+
         return LiteralView(kDefaultCategory);
     }
 

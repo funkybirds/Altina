@@ -37,9 +37,10 @@ TEST_CASE("Logger formats text via sink")
 {
     std::vector<FCapturedLog> Captured;
     FLogger::SetLogLevel(ELogLevel::Trace);
+    FLogger::SetDefaultCategory(TEXT("Test"));
     FLogger::SetLogSink(&CaptureSink, &Captured);
 
-    AltinaEngine::LogInfoCategory(TEXT("Test"), TEXT("Value {}"), 42);
+    AltinaEngine::LogInfo(TEXT("Value {}"), 42);
 
     REQUIRE_EQ(Captured.size(), 1U);
     REQUIRE_EQ(Captured[0].Level, ELogLevel::Info);
@@ -54,6 +55,7 @@ TEST_CASE("Logger formats text via sink")
     REQUIRE_EQ(MessageView[7], TEXT('2'));
 
     FLogger::ResetLogSink();
+    FLogger::ResetDefaultCategory();
 }
 
 TEST_CASE("Logger respects minimum log level")
@@ -61,14 +63,16 @@ TEST_CASE("Logger respects minimum log level")
     std::vector<FCapturedLog> Captured;
     FLogger::SetLogSink(&CaptureSink, &Captured);
     FLogger::SetLogLevel(ELogLevel::Warning);
+    FLogger::SetDefaultCategory(TEXT("Test"));
 
-    AltinaEngine::LogInfoCategory(TEXT("Test"), TEXT("Skip me"));
+    AltinaEngine::LogInfo(TEXT("Skip me"));
     REQUIRE_EQ(Captured.size(), 0U);
 
-    AltinaEngine::LogErrorCategory(TEXT("Test"), TEXT("Emit {}"), TEXT("!"));
+    AltinaEngine::LogError(TEXT("Emit {}"), TEXT("!"));
     REQUIRE_EQ(Captured.size(), 1U);
     REQUIRE_EQ(Captured[0].Level, ELogLevel::Error);
 
     FLogger::ResetLogSink();
     FLogger::SetLogLevel(ELogLevel::Info);
+    FLogger::ResetDefaultCategory();
 }

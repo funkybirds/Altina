@@ -17,10 +17,12 @@ int main(int argc, char** argv)
     FApplication Application(StartupParams);
     Application.Initialize();
 
-    for (int32_t FrameIndex = 0; FrameIndex < 3; ++FrameIndex)
+    for (i32 FrameIndex = 0; FrameIndex < 3; ++FrameIndex)
     {
         Application.Tick(1.0f / 60.0f);
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
+
+        LogError(TEXT("Frame {} processed."), FrameIndex);
     }
 
     Application.Shutdown();

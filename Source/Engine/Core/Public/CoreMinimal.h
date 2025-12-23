@@ -15,9 +15,7 @@
 namespace AltinaEngine
 {
 
-    class AE_CORE_API  FApplication;
-
-    struct AE_CORE_API FStartupParameters
+    struct FStartupParameters
     {
         std::string CommandLine; // Raw command-line passed to the engine.
     };

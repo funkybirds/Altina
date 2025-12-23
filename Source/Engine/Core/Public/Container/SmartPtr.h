@@ -205,12 +205,12 @@ namespace AltinaEngine::Core::Container
 
         void AddRef() noexcept
         {
-            mRefCount.FetchAdd(1, EMemoryOrder::AcquireRelease);
+            mRefCount.FetchAdd(static_cast<AltinaEngine::usize>(1), EMemoryOrder::AcquireRelease);
         }
 
         bool ReleaseRef() noexcept
         {
-            return mRefCount.FetchSub(1, EMemoryOrder::AcquireRelease) == 1;
+            return mRefCount.FetchSub(static_cast<AltinaEngine::usize>(1), EMemoryOrder::AcquireRelease) == 1;
         }
 
         AltinaEngine::usize GetRefCount() const noexcept

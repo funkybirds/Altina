@@ -1,10 +1,17 @@
-#include "Application/Application.h"
+#include "Base/AltinaBase.h"
+
+#if AE_PLATFORM_WIN
+    #include "Application/Windows/WindowsApplication.h"
+#else
+    #error "AltinaEngine Minimal demo currently supports only Windows builds."
+#endif
 
 #include <chrono>
 #include <cstdint>
 #include <thread>
 
 using namespace AltinaEngine;
+using namespace AltinaEngine::Application;
 
 int main(int argc, char** argv)
 {
@@ -14,10 +21,10 @@ int main(int argc, char** argv)
         StartupParams.CommandLine = argv[1];
     }
 
-    FApplication Application(StartupParams);
+    FWindowsApplication Application(StartupParams);
     Application.Initialize();
 
-    for (i32 FrameIndex = 0; FrameIndex < 3; ++FrameIndex)
+    for (i32 FrameIndex = 0; FrameIndex < 600; ++FrameIndex)
     {
         Application.Tick(1.0f / 60.0f);
         std::this_thread::sleep_for(std::chrono::milliseconds(16));

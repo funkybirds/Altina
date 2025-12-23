@@ -35,5 +35,6 @@ namespace AltinaEngine
 #   endif
 #   define TEXT(str) str
 #endif
+
 } // namespace AltinaEngine
  

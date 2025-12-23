@@ -1,6 +1,7 @@
 #include "TestHarness.h"
 
 #include "Container/String.h"
+#include "Container/StringView.h"
 
 using namespace AltinaEngine::Core::Container;
 
@@ -27,4 +28,23 @@ TEST_CASE("FString append and case conversion")
     REQUIRE_EQ(Phrase[0], TEXT('H'));
     REQUIRE_EQ(Phrase[5], TEXT(' '));
     REQUIRE_EQ(Phrase[6], TEXT('W'));
+}
+
+TEST_CASE("TStringView basic operations")
+{
+    TStringView Literal(TEXT("Engine"));
+    REQUIRE_EQ(Literal.Length(), 6U);
+    REQUIRE_EQ(Literal[1], TEXT('n'));
+
+    auto Mid = Literal.Substring(2U, 3U);
+    REQUIRE_EQ(Mid.Length(), 3U);
+    REQUIRE_EQ(Mid[0], TEXT('g'));
+
+    const FString Word(TEXT("Altina"));
+    TStringView FromView = Word.ToView();
+    REQUIRE_EQ(FromView.Length(), 6U);
+    REQUIRE_EQ(FromView[5], TEXT('a'));
+
+    TStringView Implicit = Word;
+    REQUIRE_EQ(Implicit[0], TEXT('A'));
 }

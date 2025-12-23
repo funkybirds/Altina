@@ -4,6 +4,7 @@
 #include <cwctype>
 #include <initializer_list>
 
+#include "StringView.h"
 #include "Vector.h"
 #include "../Types/Aliases.h"
 
@@ -87,6 +88,16 @@ namespace AltinaEngine::Core::Container
         AltinaEngine::usize Length() const noexcept { return this->Size(); }
 
         bool IsEmptyString() const noexcept { return this->IsEmpty(); }
+
+        [[nodiscard]] TStringView ToView() const noexcept
+        {
+            return TStringView(this->GetData(), this->Length());
+        }
+
+        [[nodiscard]] operator TStringView() const noexcept
+        {
+            return ToView();
+        }
 
         void ToLower()
         {

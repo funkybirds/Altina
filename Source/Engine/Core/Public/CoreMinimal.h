@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Base/CoreAPI.h"
+#include "Logging/Log.h"
 #include "Math/Vector.h"
 #include "Types/Aliases.h"
 #include "Types/Concepts.h"

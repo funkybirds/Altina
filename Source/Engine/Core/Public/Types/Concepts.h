@@ -5,11 +5,15 @@
 
 namespace AltinaEngine
 {
-    
-
     template <typename T>
     concept IScalar = TTypeIsIntegral<T>::Value || TTypeIsFloatingPoint<T>::Value;
 
+    template <typename R, typename Pred>
+    concept IPredicateForRange = requires(Pred p, decltype(Declval<R>().begin()) it)
+    {
+        { p(*it) };
+        { static_cast<bool>(p(*it)) };
+    };
     template <typename T>
     concept IIntegral = TTypeIsIntegral<T>::Value;
 

@@ -5,6 +5,7 @@
 
 using namespace AltinaEngine;
 using namespace AltinaEngine::Core::Container;
+using namespace AltinaEngine::Core::Algorithm;
 
 TEST_CASE("Range algorithms basic")
 {

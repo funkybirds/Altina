@@ -1,5 +1,56 @@
 #pragma once
 
+#include "../../Base/CoreAPI.h"
+#include <cstdint>
+
+namespace AltinaEngine::Core::Platform::Generic {
+
+// Opaque platform objects are represented as void* in engine code.
+
+extern "C" {
+
+// Critical section / mutex
+AE_CORE_API void* PlatformCreateCriticalSection();
+AE_CORE_API void PlatformDeleteCriticalSection(void* CS);
+AE_CORE_API void PlatformEnterCriticalSection(void* CS);
+AE_CORE_API int  PlatformTryEnterCriticalSection(void* CS);
+AE_CORE_API void PlatformLeaveCriticalSection(void* CS);
+
+// Condition variable
+AE_CORE_API void* PlatformCreateConditionVariable();
+AE_CORE_API void PlatformDeleteConditionVariable(void* CV);
+AE_CORE_API void PlatformWakeConditionVariable(void* CV);
+AE_CORE_API void PlatformWakeAllConditionVariable(void* CV);
+AE_CORE_API int  PlatformSleepConditionVariableCS(void* CV, void* CS, unsigned long Milliseconds);
+
+// Event
+AE_CORE_API void* PlatformCreateEvent(int bManualReset, int bInitiallySignaled);
+AE_CORE_API void PlatformCloseEvent(void* Event);
+AE_CORE_API void PlatformSetEvent(void* Event);
+AE_CORE_API void PlatformResetEvent(void* Event);
+AE_CORE_API int  PlatformWaitForEvent(void* Event, unsigned long Milliseconds);
+
+// Interlocked / atomic primitives (operate on integer storage)
+AE_CORE_API int32_t  PlatformInterlockedCompareExchange32(volatile int32_t* ptr, int32_t exchange, int32_t comparand);
+AE_CORE_API int32_t  PlatformInterlockedExchange32(volatile int32_t* ptr, int32_t value);
+AE_CORE_API int32_t  PlatformInterlockedIncrement32(volatile int32_t* ptr);
+AE_CORE_API int32_t  PlatformInterlockedDecrement32(volatile int32_t* ptr);
+AE_CORE_API int32_t  PlatformInterlockedExchangeAdd32(volatile int32_t* ptr, int32_t add);
+
+AE_CORE_API int64_t  PlatformInterlockedCompareExchange64(volatile int64_t* ptr, int64_t exchange, int64_t comparand);
+AE_CORE_API int64_t  PlatformInterlockedExchange64(volatile int64_t* ptr, int64_t value);
+AE_CORE_API int64_t  PlatformInterlockedIncrement64(volatile int64_t* ptr);
+AE_CORE_API int64_t  PlatformInterlockedDecrement64(volatile int64_t* ptr);
+AE_CORE_API int64_t  PlatformInterlockedExchangeAdd64(volatile int64_t* ptr, int64_t add);
+
+} // extern "C"
+
+// Portable helpers in namespace
+AE_CORE_API void PlatformSleepMilliseconds(unsigned long Milliseconds);
+
+} // namespace
+#pragma once
+
 #include "../../Types/Aliases.h"
 #include "../../Types/Concepts.h"
 #include "../../Base/CoreAPI.h"

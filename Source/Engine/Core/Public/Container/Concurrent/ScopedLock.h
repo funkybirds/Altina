@@ -1,15 +1,15 @@
 #pragma once
 
-#include <mutex>
+#include "../../Threading/Mutex.h"
 
 namespace AltinaEngine::Core::Container
 {
 
-    // Lightweight RAII scoped lock using std::mutex (STL allowed for concurrency)
+    // Lightweight RAII scoped lock using engine FMutex
     class FScopedLock
     {
     public:
-        explicit FScopedLock(std::mutex& m) noexcept
+        explicit FScopedLock(AltinaEngine::Core::Threading::FMutex& m) noexcept
             : mLock(m)
         {
         }
@@ -21,7 +21,7 @@ namespace AltinaEngine::Core::Container
         FScopedLock& operator=(const FScopedLock&) = delete;
 
     private:
-        std::unique_lock<std::mutex> mLock;
+        AltinaEngine::Core::Threading::FScopedLock mLock;
     };
 
 } // namespace AltinaEngine::Core::Container

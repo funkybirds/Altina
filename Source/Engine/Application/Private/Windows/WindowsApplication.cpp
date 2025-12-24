@@ -2,6 +2,7 @@
 
 #if AE_PLATFORM_WIN
 
+#include <Windows.h>
 #include "Application/Windows/WindowsApplication.h"
 
 #include "Logging/Log.h"
@@ -64,14 +65,14 @@ namespace AltinaEngine::Application
 
     FWindowsPlatformWindow::FWindowsPlatformWindow()
     {
-        mInstanceHandle = GetModuleHandle(nullptr);
+        mInstanceHandle = static_cast<void*>(GetModuleHandle(nullptr));
     }
 
     FWindowsPlatformWindow::~FWindowsPlatformWindow()
     {
         if (mWindowHandle)
         {
-            DestroyWindow(mWindowHandle);
+            DestroyWindow(static_cast<HWND>(mWindowHandle));
             mWindowHandle = nullptr;
         }
     }
@@ -89,7 +90,7 @@ namespace AltinaEngine::Application
 
         const FWindowTitleCStr TitleCStr(InProperties.Title);
 
-        mWindowHandle = CreateWindowEx(
+        mWindowHandle = static_cast<void*>(CreateWindowEx(
             0,
             kWindowClassName,
             TitleCStr.Get(),
@@ -100,8 +101,8 @@ namespace AltinaEngine::Application
             Height,
             nullptr,
             nullptr,
-            mInstanceHandle,
-            this);
+            static_cast<HINSTANCE>(mInstanceHandle),
+            this));
 
         if (!mWindowHandle)
         {
@@ -109,7 +110,7 @@ namespace AltinaEngine::Application
             return false;
         }
 
-        SetWindowLongPtr(mWindowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+        SetWindowLongPtr(static_cast<HWND>(mWindowHandle), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
         mProperties = InProperties;
         UpdateCachedSizeFromClientRect();
@@ -124,8 +125,8 @@ namespace AltinaEngine::Application
             return;
         }
 
-        ShowWindow(mWindowHandle, SW_SHOW);
-        UpdateWindow(mWindowHandle);
+        ShowWindow(static_cast<HWND>(mWindowHandle), SW_SHOW);
+        UpdateWindow(static_cast<HWND>(mWindowHandle));
     }
 
     void FWindowsPlatformWindow::Hide()
@@ -135,7 +136,7 @@ namespace AltinaEngine::Application
             return;
         }
 
-        ShowWindow(mWindowHandle, SW_HIDE);
+        ShowWindow(static_cast<HWND>(mWindowHandle), SW_HIDE);
     }
 
     void FWindowsPlatformWindow::Resize(u32 InWidth, u32 InHeight)
@@ -148,7 +149,7 @@ namespace AltinaEngine::Application
         mProperties.Width  = InWidth;
         mProperties.Height = InHeight;
 
-        SetWindowPos(mWindowHandle,
+        SetWindowPos(static_cast<HWND>(mWindowHandle),
                      nullptr,
                      0,
                      0,
@@ -165,7 +166,7 @@ namespace AltinaEngine::Application
             return;
         }
 
-        SetWindowPos(mWindowHandle,
+        SetWindowPos(static_cast<HWND>(mWindowHandle),
                      nullptr,
                      InPositionX,
                      InPositionY,
@@ -181,7 +182,7 @@ namespace AltinaEngine::Application
             return;
         }
 
-        ShowWindow(mWindowHandle, SW_MINIMIZE);
+        ShowWindow(static_cast<HWND>(mWindowHandle), SW_MINIMIZE);
     }
 
     void FWindowsPlatformWindow::Maximalize()
@@ -191,7 +192,7 @@ namespace AltinaEngine::Application
             return;
         }
 
-        ShowWindow(mWindowHandle, SW_MAXIMIZE);
+        ShowWindow(static_cast<HWND>(mWindowHandle), SW_MAXIMIZE);
     }
 
     FWindowExtent FWindowsPlatformWindow::GetSize() const noexcept
@@ -208,7 +209,7 @@ namespace AltinaEngine::Application
         return mProperties;
     }
 
-    HWND FWindowsPlatformWindow::GetWindowHandle() const noexcept
+    void* FWindowsPlatformWindow::GetWindowHandle() const noexcept
     {
         return mWindowHandle;
     }
@@ -233,7 +234,7 @@ namespace AltinaEngine::Application
 
         if (Window)
         {
-            Window->mWindowHandle = InWindowHandle;
+            Window->mWindowHandle = static_cast<void*>(InWindowHandle);
         }
 
         switch (InMessage)
@@ -265,7 +266,7 @@ namespace AltinaEngine::Application
         WNDCLASS WindowClass{};
         WindowClass.style         = CS_HREDRAW | CS_VREDRAW;
         WindowClass.lpfnWndProc   = &FWindowsPlatformWindow::WindowProc;
-        WindowClass.hInstance     = mInstanceHandle;
+        WindowClass.hInstance     = static_cast<HINSTANCE>(mInstanceHandle);
         WindowClass.lpszClassName = kWindowClassName;
         WindowClass.hCursor       = LoadCursor(nullptr, IDC_ARROW);
         WindowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
@@ -290,7 +291,7 @@ namespace AltinaEngine::Application
         }
 
         RECT ClientRect{};
-        GetClientRect(mWindowHandle, &ClientRect);
+        GetClientRect(static_cast<HWND>(mWindowHandle), &ClientRect);
         mCachedSize.Width  = static_cast<u32>(ClientRect.right - ClientRect.left);
         mCachedSize.Height = static_cast<u32>(ClientRect.bottom - ClientRect.top);
         mProperties.Width  = mCachedSize.Width;

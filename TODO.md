@@ -1,1 +1,79 @@
 # AltinaEngine TODO
+
+## Job System Foundations
+- [ ] Draft `Source/Engine/Core/Public/Jobs/JobSystem.h` covering job submission, job handles, fences, and dependency nodes.
+	- [ ] Enumerate minimal forward declarations and include order for `Jobs` public headers.
+	- [ ] Define `JobHandle`, `JobFence`, and `DependencyNode` interfaces with API docs.
+	- [ ] Add configuration structs (worker counts, affinity tags) referenced by consumers.
+- [ ] Create `Source/Engine/Core/Private/Jobs/JobSystem.cpp` with queue plumbing, dependency evaluation, and hooks for future scheduler backends.
+	- [ ] Stand up basic job queue storage (lock-free ring buffer prototype + fallback) and enqueue/dequeue helpers.
+	- [ ] Implement dependency evaluation pass that checks readiness before dispatch.
+	- [ ] Insert stub interfaces for platform/architecture-specific scheduler backends.
+- [ ] Add `JobDescriptor` and `JobDependency` types plus documentation in `docs/ModuleContracts.md` describing lifetime and threading guarantees.
+	- [ ] Define struct fields (callback, payload pointer, debug label, affinity mask).
+	- [ ] Document ownership rules and payload lifetime in `ModuleContracts`.
+	- [ ] Provide example snippets showing descriptor construction for named threads vs generic workers.
+- [ ] Implement a lightweight `JobGraphBuilder` utility to batch job creation, attach dependencies, and emit execution plans.
+	- [ ] Design fluent API for adding jobs, dependencies, and metadata labels.
+	- [ ] Validate emission path (topological ordering + cycle detection) before handing to runtime queue.
+	- [ ] Add debug dump that prints the graph for troubleshooting.
+- [ ] Support dependency graph resolution so jobs/named-thread tasks can reference `JobHandle`/`ThreadTaskHandle` prerequisites before dispatch.
+	- [ ] Introduce `WaitForHandles(...)` entry points that block or enqueue continuations.
+	- [ ] Teach scheduler to track completion counters per handle/fence.
+	- [ ] Add validation that cross-thread dependencies do not deadlock (e.g., named thread waiting on itself).
+
+## Threading Infrastructure
+- [ ] Introduce `Engine/Core` threading primitives (mutex, event, condition variable wrappers) that abstract platform specifics.
+	- [ ] Wrap Win32/POSIX primitives behind unified API with RAII helpers.
+	- [ ] Add unit tests checking lock recursion rules and timeout semantics.
+	- [ ] Document cost/behavior tradeoffs for each primitive in headers.
+- [ ] Build a configurable worker thread pool (min/max threads, stealability toggles) consuming the job queues.
+	- [ ] Parse configuration data (CVar, preset, config file) at startup.
+	- [ ] Implement worker lifecycle management (spawn, pin priority, teardown).
+	- [ ] Add optional work-stealing deque implementation with telemetry toggles.
+- [ ] Provide instrumentation hooks (per-thread names, counters, timing) to integrate with future profiling tools.
+	- [ ] Emit tracing events on job enqueue/dequeue/complete.
+	- [ ] Surface per-thread counters accessible via debug console/API.
+	- [ ] Integrate with existing logging/assert systems for anomalies.
+- [ ] Define named thread descriptors for `RHI`, `Rendering`, `Gameplay`, and `Audio` including their startup order and run-loop responsibilities.
+	- [ ] Capture initialization contracts per named thread (modules they bootstrap, required services).
+	- [ ] Specify run-loop pseudo code documenting how they drain queues vs perform frame tasks.
+	- [ ] Store descriptor metadata in a sharable manifest for debug tools.
+- [ ] Expose APIs allowing named threads to register internal helper threads (e.g., `RHI` command submission, async uploads) with lifecycle tracking and visibility to profilers.
+	- [ ] Define helper-thread registration structure (name, owning thread, purpose).
+	- [ ] Track helper thread states (idle, busy) and expose metrics.
+	- [ ] Ensure helper threads inherit affinity + logging configuration from parents.
+- [ ] Ensure the job system can target named threads/pools via affinity + priority tags so module jobs land on the correct execution context.
+	- [ ] Add affinity mask encoding that maps to named thread IDs and worker pools.
+	- [ ] Implement priority buckets in queues to avoid starvation of critical tasks.
+	- [ ] Provide validation helpers to catch invalid affinity combinations in debug builds.
+- [ ] Add watchdog/logging support that surfaces when named threads stall or internal helper threads are not consuming work.
+	- [ ] Track per-thread heartbeat timestamps and expose thresholds for alerts.
+	- [ ] Emit structured logs when watchdog triggers and include callstack capture hooks.
+	- [ ] Integrate with future telemetry (e.g., editor overlay) to highlight stalled threads.
+- [ ] Stand up interim thread-safe `TQueue`/`TStack` wrappers using `FScopedLock` until lock-free containers arrive.
+	- [ ] Create `FThreadSafeQueue`/`FThreadSafeStack` templates that wrap enqueue/dequeue/push/pop with scoped locks.
+	- [ ] Add unit tests proving basic correctness under concurrent producers/consumers.
+	- [ ] Document limitations (blocking behavior, contention) and plan follow-up work for true lock-free structures.
+
+## Integration Tasks
+- [ ] Expose configuration knobs via `Engine/Application` plus preset files to set worker counts, named thread enablement, and helper thread limits.
+	- [ ] Extend application config schema/CLI flags for job + thread settings.
+	- [ ] Ensure presets map to sane platform defaults (console vs desktop vs mobile).
+	- [ ] Add runtime console commands to inspect/adjust counts for debugging.
+- [ ] Integrate job-system startup/shutdown sequencing into `Engine/Application` so named threads register before subsystems boot.
+	- [ ] Define startup ordering dependencies (e.g., Core -> Job System -> Named Threads -> Subsystems).
+	- [ ] Ensure graceful shutdown drains queues, joins helper threads, and reports unresolved jobs.
+	- [ ] Add startup/shutdown tracing to verify order in automated tests.
+- [ ] Write unit tests under `Source/Tests/Core/` validating dependency resolution, affinity routing, and named-thread submission.
+	- [ ] Add synthetic workload tests that schedule jobs with dependency chains and assert ordering.
+	- [ ] Test affinity routing by forcing jobs to specific named threads and confirming execution context.
+	- [ ] Simulate failure/timeout cases to ensure diagnostics fire.
+- [ ] Add smoke tests that spin up RHI/Rendering/Gaming/Audio named threads and verify helper thread registration.
+	- [ ] Build harness that boots a miniature application loop with all named threads active.
+	- [ ] Validate helper thread registration tables and telemetry outputs.
+	- [ ] Capture timing metrics to ensure startup/shutdown budgets are met.
+- [ ] Update `docs/CodingStyle.md` with guidelines for submitting work to the job system, declaring dependencies, and ensuring thread safety.
+	- [ ] Document best practices for job granularity, affinity usage, and dependency chains.
+	- [ ] Add examples covering named-thread submissions and helper thread creation.
+	- [ ] Highlight anti-patterns (blocking on named threads, long-lived locks) and mitigation strategies.

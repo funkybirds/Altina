@@ -1,8 +1,8 @@
 #include "Logging/Log.h"
 
-#include <atomic>
+#include "../../Public/Threading/Atomic.h"
 #include <iostream>
-#include <mutex>
+#include "../../Public/Threading/Mutex.h"
 #include <string>
 #include <type_traits>
 
@@ -26,10 +26,10 @@ namespace AltinaEngine::Core::Logging
         constexpr AltinaEngine::TChar kErrorLabel[] = TEXT("ERROR");
         constexpr AltinaEngine::TChar kFatalLabel[] = TEXT("FATAL");
 
-        std::atomic<ELogLevel> GMinimumLevel{ ELogLevel::Info };
+        AltinaEngine::Core::Threading::FAtomicInt32 GMinimumLevel(static_cast<int32_t>(ELogLevel::Info));
         FLogSink GUserSink = nullptr;
         void* GUserData = nullptr;
-        std::mutex GLogMutex;
+        AltinaEngine::Core::Threading::FMutex GLogMutex;
         thread_local std::basic_string<AltinaEngine::TChar> GThreadDefaultCategory;
         thread_local bool GThreadHasCustomCategory = false;
 
@@ -95,17 +95,17 @@ namespace AltinaEngine::Core::Logging
 
     void FLogger::SetLogLevel(ELogLevel Level) noexcept
     {
-        GMinimumLevel.store(Level, std::memory_order_relaxed);
+        GMinimumLevel.Store(static_cast<int32_t>(Level));
     }
 
     ELogLevel FLogger::GetLogLevel() noexcept
     {
-        return GMinimumLevel.load(std::memory_order_relaxed);
+        return static_cast<ELogLevel>(GMinimumLevel.Load());
     }
 
     void FLogger::SetLogSink(FLogSink Sink, void* UserData)
     {
-        std::scoped_lock Lock(GLogMutex);
+        AltinaEngine::Core::Threading::FScopedLock Lock(GLogMutex);
         GUserSink = Sink;
         GUserData = UserData;
     }
@@ -129,7 +129,7 @@ namespace AltinaEngine::Core::Logging
 
     bool FLogger::ShouldLog(ELogLevel Level) noexcept
     {
-        return Level >= GMinimumLevel.load(std::memory_order_relaxed);
+        return Level >= static_cast<ELogLevel>(GMinimumLevel.Load());
     }
 
     void FLogger::SetDefaultCategory(TStringView Category)
@@ -168,7 +168,7 @@ namespace AltinaEngine::Core::Logging
         FLogSink SinkCopy = nullptr;
         void* UserDataCopy = nullptr;
         {
-            std::scoped_lock Lock(GLogMutex);
+            AltinaEngine::Core::Threading::FScopedLock Lock(GLogMutex);
             SinkCopy = GUserSink;
             UserDataCopy = GUserData;
         }

@@ -9,7 +9,19 @@
 #ifndef NOMINMAX
     #define NOMINMAX
 #endif
-#include <Windows.h>
+
+// Forward-declare minimal Windows types to avoid including Windows.h in public headers.
+typedef struct HINSTANCE__* HINSTANCE;
+typedef struct HWND__* HWND;
+using DWORD = unsigned long;
+using UINT  = unsigned int;
+using WPARAM = unsigned long long;
+using LPARAM = long long;
+using LRESULT = long long;
+
+#ifndef CALLBACK
+#define CALLBACK
+#endif
 
 #include "Application/Application.h"
 
@@ -32,7 +44,7 @@ namespace AltinaEngine::Application
 
         [[nodiscard]] FWindowExtent GetSize() const noexcept override;
         [[nodiscard]] FPlatformWindowProperty GetProperties() const override;
-        [[nodiscard]] HWND GetWindowHandle() const noexcept;
+        [[nodiscard]] void* GetWindowHandle() const noexcept;
 
     private:
         static LRESULT CALLBACK WindowProc(HWND InWindowHandle, UINT InMessage, WPARAM InWParam, LPARAM InLParam);
@@ -41,8 +53,8 @@ namespace AltinaEngine::Application
         void UpdateCachedSizeFromClientRect();
         [[nodiscard]] DWORD ResolveWindowStyle(const FPlatformWindowProperty& InProperties) const noexcept;
 
-        HWND                    mWindowHandle   = nullptr;
-        HINSTANCE               mInstanceHandle = nullptr;
+        void*                   mWindowHandle   = nullptr;
+        void*                   mInstanceHandle = nullptr;
         FPlatformWindowProperty mProperties{};
         FWindowExtent           mCachedSize{};
     };

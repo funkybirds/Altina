@@ -8,7 +8,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <thread>
 
 using namespace AltinaEngine;
 using namespace AltinaEngine::Application;
@@ -27,7 +26,7 @@ int main(int argc, char** argv)
     for (i32 FrameIndex = 0; FrameIndex < 600; ++FrameIndex)
     {
         Application.Tick(1.0f / 60.0f);
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        AltinaEngine::Core::Platform::Generic::PlatformSleepMilliseconds(16);
 
         LogError(TEXT("Frame {} processed."), FrameIndex);
     }

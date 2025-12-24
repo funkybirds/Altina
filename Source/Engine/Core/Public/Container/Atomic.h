@@ -1,10 +1,12 @@
 #pragma once
 
-#include <atomic>
+#include <cstdint>
+#include <type_traits>
+#include "../Threading/Atomic.h"
 
 namespace AltinaEngine::Core::Container
 {
-    
+
     enum class EMemoryOrder
     {
         Relaxed,
@@ -15,72 +17,76 @@ namespace AltinaEngine::Core::Container
         SequentiallyConsistent,
     };
 
-    inline constexpr std::memory_order ToStdMemoryOrder(EMemoryOrder order)
-    {
-        switch (order)
-        {
-            case EMemoryOrder::Relaxed:
-                return std::memory_order_relaxed;
-            case EMemoryOrder::Consume:
-                return std::memory_order_consume;
-            case EMemoryOrder::Acquire:
-                return std::memory_order_acquire;
-            case EMemoryOrder::Release:
-                return std::memory_order_release;
-            case EMemoryOrder::AcquireRelease:
-                return std::memory_order_acq_rel;
-            case EMemoryOrder::SequentiallyConsistent:
-            default:
-                return std::memory_order_seq_cst;
-        }
-    }
-
-    // Thin wrapper over std::atomic that keeps engine naming consistent.
+    // Thin wrapper that uses engine atomics for supported types.
     template <typename T>
     class TAtomic
     {
     public:
-        using value_type  = T;
-        using atomic_type = std::atomic<T>;
+        using value_type = T;
 
-        constexpr TAtomic() noexcept = default;
-        constexpr explicit TAtomic(T desired) noexcept : mValue(desired) {}
+        static_assert(std::is_integral_v<T>, "TAtomic currently supports integral types only");
+        static_assert(sizeof(T) == 4 || sizeof(T) == 8, "TAtomic supports 32-bit and 64-bit integral types only");
+
+        using ImplType = std::conditional_t<sizeof(T) == 4,
+                                           AltinaEngine::Core::Threading::FAtomicInt32,
+                                           AltinaEngine::Core::Threading::FAtomicInt64>;
+
+        constexpr TAtomic() noexcept : mImpl(0) {}
+        constexpr explicit TAtomic(T desired) noexcept : mImpl(static_cast<std::conditional_t<sizeof(T)==4,int32_t,int64_t>>(desired)) {}
 
         TAtomic(const TAtomic&) = delete;
         TAtomic& operator=(const TAtomic&) = delete;
 
-        [[nodiscard]] bool IsLockFree() const noexcept { return mValue.is_lock_free(); }
+        [[nodiscard]] bool IsLockFree() const noexcept { return true; }
 
-        void Store(T desired,
-                   EMemoryOrder order = EMemoryOrder::SequentiallyConsistent) noexcept
+        void Store(T desired, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            mValue.store(desired, ToStdMemoryOrder(order));
+            if constexpr (sizeof(T) == 4)
+                mImpl.Store(static_cast<int32_t>(desired));
+            else
+                mImpl.Store(static_cast<int64_t>(desired));
         }
 
-        T Load(EMemoryOrder order = EMemoryOrder::SequentiallyConsistent) const noexcept
+        T Load(EMemoryOrder = EMemoryOrder::SequentiallyConsistent) const noexcept
         {
-            return mValue.load(ToStdMemoryOrder(order));
+            if constexpr (sizeof(T) == 4)
+                return static_cast<T>(mImpl.Load());
+            else
+                return static_cast<T>(mImpl.Load());
         }
 
-        T Exchange(T desired, EMemoryOrder order = EMemoryOrder::SequentiallyConsistent) noexcept
+        T Exchange(T desired, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            return mValue.exchange(desired, ToStdMemoryOrder(order));
+            if constexpr (sizeof(T) == 4)
+                return static_cast<T>(mImpl.Exchange(static_cast<int32_t>(desired)));
+            else
+                return static_cast<T>(mImpl.Exchange(static_cast<int64_t>(desired)));
         }
 
         bool CompareExchangeWeak(T& expected, T desired,
-                                 EMemoryOrder success = EMemoryOrder::SequentiallyConsistent,
-                                 EMemoryOrder failure = EMemoryOrder::SequentiallyConsistent) noexcept
+                                 EMemoryOrder = EMemoryOrder::SequentiallyConsistent,
+                                 EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            return mValue.compare_exchange_weak(expected, desired, ToStdMemoryOrder(success),
-                                                ToStdMemoryOrder(failure));
+            if constexpr (sizeof(T) == 4) {
+                int32_t exp = static_cast<int32_t>(expected);
+                int32_t prev = mImpl.CompareExchange(exp, static_cast<int32_t>(desired));
+                if (prev == exp) return true;
+                expected = static_cast<T>(prev);
+                return false;
+            } else {
+                int64_t exp = static_cast<int64_t>(expected);
+                int64_t prev = mImpl.CompareExchange(exp, static_cast<int64_t>(desired));
+                if (prev == exp) return true;
+                expected = static_cast<T>(prev);
+                return false;
+            }
         }
 
         bool CompareExchangeStrong(T& expected, T desired,
                                    EMemoryOrder success = EMemoryOrder::SequentiallyConsistent,
                                    EMemoryOrder failure = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            return mValue.compare_exchange_strong(expected, desired, ToStdMemoryOrder(success),
-                                                  ToStdMemoryOrder(failure));
+            return CompareExchangeWeak(expected, desired, success, failure);
         }
 
         T operator=(T desired) noexcept
@@ -92,37 +98,85 @@ namespace AltinaEngine::Core::Container
         [[nodiscard]] operator T() const noexcept { return Load(); }
 
         template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
-        U FetchAdd(U arg, EMemoryOrder order = EMemoryOrder::SequentiallyConsistent) noexcept
+        U FetchAdd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            return mValue.fetch_add(arg, ToStdMemoryOrder(order));
+            if constexpr (sizeof(T) == 4)
+                return static_cast<U>(mImpl.ExchangeAdd(static_cast<int32_t>(arg)));
+            else
+                return static_cast<U>(mImpl.ExchangeAdd(static_cast<int64_t>(arg)));
         }
 
         template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
-        U FetchSub(U arg, EMemoryOrder order = EMemoryOrder::SequentiallyConsistent) noexcept
+        U FetchSub(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            return mValue.fetch_sub(arg, ToStdMemoryOrder(order));
+            if constexpr (sizeof(T) == 4)
+                return static_cast<U>(mImpl.ExchangeAdd(-static_cast<int32_t>(arg)));
+            else
+                return static_cast<U>(mImpl.ExchangeAdd(-static_cast<int64_t>(arg)));
         }
 
         template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
-        U FetchAnd(U arg, EMemoryOrder order = EMemoryOrder::SequentiallyConsistent) noexcept
+        U FetchAnd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            return mValue.fetch_and(arg, ToStdMemoryOrder(order));
+            if constexpr (sizeof(T) == 4) {
+                int32_t expected, desired;
+                do {
+                    expected = mImpl.Load();
+                    desired = expected & static_cast<int32_t>(arg);
+                } while (mImpl.CompareExchange(expected, desired) != expected);
+                return static_cast<U>(expected);
+            } else {
+                int64_t expected, desired;
+                do {
+                    expected = mImpl.Load();
+                    desired = expected & static_cast<int64_t>(arg);
+                } while (mImpl.CompareExchange(expected, desired) != expected);
+                return static_cast<U>(expected);
+            }
         }
 
         template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
-        U FetchOr(U arg, EMemoryOrder order = EMemoryOrder::SequentiallyConsistent) noexcept
+        U FetchOr(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            return mValue.fetch_or(arg, ToStdMemoryOrder(order));
+            if constexpr (sizeof(T) == 4) {
+                int32_t expected, desired;
+                do {
+                    expected = mImpl.Load();
+                    desired = expected | static_cast<int32_t>(arg);
+                } while (mImpl.CompareExchange(expected, desired) != expected);
+                return static_cast<U>(expected);
+            } else {
+                int64_t expected, desired;
+                do {
+                    expected = mImpl.Load();
+                    desired = expected | static_cast<int64_t>(arg);
+                } while (mImpl.CompareExchange(expected, desired) != expected);
+                return static_cast<U>(expected);
+            }
         }
 
         template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
-        U FetchXor(U arg, EMemoryOrder order = EMemoryOrder::SequentiallyConsistent) noexcept
+        U FetchXor(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            return mValue.fetch_xor(arg, ToStdMemoryOrder(order));
+            if constexpr (sizeof(T) == 4) {
+                int32_t expected, desired;
+                do {
+                    expected = mImpl.Load();
+                    desired = expected ^ static_cast<int32_t>(arg);
+                } while (mImpl.CompareExchange(expected, desired) != expected);
+                return static_cast<U>(expected);
+            } else {
+                int64_t expected, desired;
+                do {
+                    expected = mImpl.Load();
+                    desired = expected ^ static_cast<int64_t>(arg);
+                } while (mImpl.CompareExchange(expected, desired) != expected);
+                return static_cast<U>(expected);
+            }
         }
 
     private:
-        atomic_type mValue;
+        ImplType mImpl;
     };
 
 } // namespace AltinaEngine::Core::Container

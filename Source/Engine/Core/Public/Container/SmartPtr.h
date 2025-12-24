@@ -6,6 +6,7 @@
 
 namespace AltinaEngine::Core::Container
 {
+    
     template <typename T, typename D = TDefaultDeleter<T>>
     class TOwner
     {
@@ -149,7 +150,7 @@ namespace AltinaEngine::Core::Container
         const D& get_deleter() const noexcept { return Deleter; }
         explicit operator bool() const noexcept { return Ptr != nullptr; }
 
-        T& operator[](AltinaEngine::usize i) const { return Ptr[i]; }
+        T& operator[](usize i) const { return Ptr[i]; }
 
     private:
         pointer Ptr;
@@ -205,15 +206,15 @@ namespace AltinaEngine::Core::Container
 
         void AddRef() noexcept
         {
-            mRefCount.FetchAdd(static_cast<AltinaEngine::usize>(1), EMemoryOrder::AcquireRelease);
+            mRefCount.FetchAdd(static_cast<usize>(1), EMemoryOrder::AcquireRelease);
         }
 
         bool ReleaseRef() noexcept
         {
-            return mRefCount.FetchSub(static_cast<AltinaEngine::usize>(1), EMemoryOrder::AcquireRelease) == 1;
+            return mRefCount.FetchSub(static_cast<usize>(1), EMemoryOrder::AcquireRelease) == 1;
         }
 
-        AltinaEngine::usize GetRefCount() const noexcept
+        usize GetRefCount() const noexcept
         {
             return mRefCount.Load(EMemoryOrder::Acquire);
         }
@@ -222,7 +223,7 @@ namespace AltinaEngine::Core::Container
         virtual void DestroySelf() noexcept = 0;
 
     private:
-        TAtomic<AltinaEngine::usize> mRefCount;
+        TAtomic<usize> mRefCount;
     };
 
     template <typename T, typename Deleter>
@@ -368,7 +369,7 @@ namespace AltinaEngine::Core::Container
         pointer operator->() const noexcept { return Ptr; }
         explicit operator bool() const noexcept { return Ptr != nullptr; }
 
-        AltinaEngine::usize UseCount() const noexcept
+        usize UseCount() const noexcept
         {
             return Control ? Control->GetRefCount() : 0U;
         }

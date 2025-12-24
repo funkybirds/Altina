@@ -5,6 +5,7 @@
 
 namespace AltinaEngine
 {
+    
 
     template <typename T>
     concept IScalar = TTypeIsIntegral<T>::Value || TTypeIsFloatingPoint<T>::Value;
@@ -39,4 +40,33 @@ namespace AltinaEngine
     template <typename It>
     concept IRandomAccessIterator = TTypeIsRandomAccessIterator<It>::Value;
 
+    template <typename From, typename To>
+    concept IDynamicConvertible = TTypeIsDynamicConvertible<To, From>::Value;
+
+    // Range concepts
+    template <typename R>
+    concept IRange = requires(R r)
+    {
+        { r.begin() };
+        { r.end() };
+    };
+
+    template <typename R>
+    concept ICommonRange = IRange<R> && TTypeSameAs<decltype(Declval<R>().begin()), decltype(Declval<R>().end())>::Value;
+
+    template <typename R>
+    concept IReadableRange = IRange<R> && IReadableIterator<decltype(Declval<R>().begin())>;
+
+    template <typename R>
+    concept IWritableRange = IRange<R> && IWritableIterator<decltype(Declval<R>().begin())>;
+
+    template <typename It>
+    concept IIncrementable = requires(It it)
+    {
+        { ++it };
+        { it++ };
+    };
+
+    template <typename R>
+    concept IForwardRange = IRange<R> && IIncrementable<decltype(Declval<R>().begin())> && IReadableIterator<decltype(Declval<R>().begin())>;
 } // namespace AltinaEngine

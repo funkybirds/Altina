@@ -5,6 +5,7 @@
 
 namespace AltinaEngine::Core::Container
 {
+    
     template <typename CharType>
     class TBasicStringView
     {
@@ -12,7 +13,7 @@ namespace AltinaEngine::Core::Container
         using value_type = CharType;
         using pointer = const value_type*;
         using reference = const value_type&;
-        using size_type = AltinaEngine::usize;
+        using size_type = usize;
 
         constexpr TBasicStringView() noexcept
             : mData(nullptr)
@@ -83,6 +84,6 @@ namespace AltinaEngine::Core::Container
         size_type mLength;
     };
 
-    using TStringView = TBasicStringView<AltinaEngine::TChar>;
+    using TStringView = TBasicStringView<TChar>;
 
 } // namespace AltinaEngine::Core::Container

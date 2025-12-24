@@ -100,6 +100,11 @@ AltinaEngine/
 	- Pointer members append `Ptr` (`mRenderDevicePtr`) to clarify ownership semantics.
 - **Functions & methods**: PascalCase (`InitializeRenderer`, `LoadModule`); boolean getters can use `Is`/`Has` prefix.
 -- **Namespace rules**: wrap engine code in `AltinaEngine::` sub-namespaces per module; avoid `using namespace` in headers.
+
+### Namespace Naming Guideline
+
+- Avoid redundant `AltinaEngine` prefixes on type names inside engine modules (e.g., do not repeat the top-level identifier in type names). Public API stays under `AltinaEngine::` sub-namespaces, but type identifiers, aliases and traits should not include an extra `AltinaEngine` textual prefix.
+- Plan: perform a staged refactor to remove duplicated textual prefixes from TypeTraits, Concepts, container types and basic aliases; document progress in `TODO.md`.
 - **Includes**: order from local module headers, other engine modules, third-party libs, then STL; enforce angle brackets vs quotes per category.
 - **Formatting**: 120-column soft limit, tabs for indentation in code blocks that mimic UE (or configured via clang-format profile once finalized).
 - **Comments**: use `//` for brief notes, `/** */` for API docs; prefer documenting module boundaries and lifecycle contracts.

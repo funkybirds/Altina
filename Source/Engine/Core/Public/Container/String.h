@@ -10,10 +10,11 @@
 
 namespace AltinaEngine::Core::Container
 {
-    class FString : public TVector<AltinaEngine::TChar>
+    
+    class FString : public TVector<TChar>
     {
     public:
-        using Super = TVector<AltinaEngine::TChar>;
+        using Super = TVector<TChar>;
         using typename Super::value_type;
         using typename Super::size_type;
         using typename Super::reference;
@@ -26,7 +27,7 @@ namespace AltinaEngine::Core::Container
             Append(Text);
         }
 
-        FString(const value_type* Text, AltinaEngine::usize Length)
+        FString(const value_type* Text, usize Length)
         {
             Append(Text, Length);
         }
@@ -63,7 +64,7 @@ namespace AltinaEngine::Core::Container
             Append(Text, ComputeLength(Text));
         }
 
-        void Append(const value_type* Text, AltinaEngine::usize Length)
+        void Append(const value_type* Text, usize Length)
         {
             if ((Text == nullptr) || (Length == 0U))
             {
@@ -71,7 +72,7 @@ namespace AltinaEngine::Core::Container
             }
 
             Super::Reserve(this->Size() + Length);
-            for (AltinaEngine::usize Index = 0; Index < Length; ++Index)
+            for (usize Index = 0; Index < Length; ++Index)
             {
                 this->PushBack(Text[Index]);
             }
@@ -85,7 +86,7 @@ namespace AltinaEngine::Core::Container
         const value_type* GetData() const noexcept { return Super::Data(); }
         value_type*       GetData() noexcept { return Super::Data(); }
 
-        AltinaEngine::usize Length() const noexcept { return this->Size(); }
+        usize Length() const noexcept { return this->Size(); }
 
         bool IsEmptyString() const noexcept { return this->IsEmpty(); }
 
@@ -127,7 +128,7 @@ namespace AltinaEngine::Core::Container
         template <typename Func>
         void TransformCharacters(Func&& Transformer)
         {
-            for (AltinaEngine::usize Index = 0; Index < this->Size(); ++Index)
+            for (usize Index = 0; Index < this->Size(); ++Index)
             {
                 (*this)[Index] = Transformer((*this)[Index]);
             }
@@ -159,9 +160,9 @@ namespace AltinaEngine::Core::Container
             }
         }
 
-        static AltinaEngine::usize ComputeLength(const value_type* Text)
+        static usize ComputeLength(const value_type* Text)
         {
-            AltinaEngine::usize Length = 0U;
+            usize Length = 0U;
             while (Text[Length] != static_cast<value_type>(0))
             {
                 ++Length;

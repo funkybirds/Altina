@@ -8,19 +8,18 @@
 
 namespace AltinaEngine::Core::Container
 {
-
     using AltinaEngine::Core::Math::FNumericConstants;
 
-    // Lightweight non-owning view over a contiguous sequence of T.
+    
     // Does not expose any constructor that directly takes a raw pointer.
-    template <typename T, AltinaEngine::usize Extent = FNumericConstants::kDynamicSized>
+    template <typename T, usize Extent = FNumericConstants::kDynamicSized>
     class TSpan
     {
     public:
         using element_type    = T;
-        using value_type      = typename AltinaEngine::TRemoveCV<T>::Type;
-        using size_type       = AltinaEngine::usize;
-        using difference_type = AltinaEngine::isize;
+        using value_type      = typename TRemoveCV<T>::Type;
+        using size_type       = usize;
+        using difference_type = isize;
         using pointer         = element_type*;
         using const_pointer   = const element_type*;
         using reference       = element_type&;
@@ -38,7 +37,7 @@ namespace AltinaEngine::Core::Container
         }
 
         // From C-style array (non-const)
-        template <AltinaEngine::usize N>
+        template <usize N>
         constexpr TSpan(element_type (&array)[N]) noexcept
             : mData(array)
             , mSize(N)
@@ -48,7 +47,7 @@ namespace AltinaEngine::Core::Container
         }
 
         // From C-style array (const)
-        template <AltinaEngine::usize N>
+        template <usize N>
         constexpr TSpan(const element_type (&array)[N]) noexcept
             : mData(const_cast<element_type*>(array))
             , mSize(N)
@@ -58,7 +57,7 @@ namespace AltinaEngine::Core::Container
         }
 
         // From fixed-size engine array
-        template <AltinaEngine::usize N>
+        template <usize N>
         constexpr TSpan(TArray<element_type, N>& array) noexcept
             : mData(array.Data())
             , mSize(TArray<element_type, N>::Size())
@@ -67,7 +66,7 @@ namespace AltinaEngine::Core::Container
                           "TSpan static extent must match source size");
         }
 
-        template <AltinaEngine::usize N>
+        template <usize N>
         constexpr TSpan(const TArray<element_type, N>& array) noexcept
             : mData(const_cast<element_type*>(array.Data()))
             , mSize(TArray<element_type, N>::Size())

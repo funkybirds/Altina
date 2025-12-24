@@ -8,11 +8,13 @@ namespace AltinaEngine::Core::Container
 {
 
     // Fixed-size array, analogous to std::array.
-    template <typename T, AltinaEngine::usize N>
+    
+    
+    template <typename T, usize N>
     struct TArray
     {
         using value_type      = T;
-        using size_type       = AltinaEngine::usize;
+        using size_type       = usize;
         using pointer         = value_type*;
         using const_pointer   = const value_type*;
         using reference       = value_type&;

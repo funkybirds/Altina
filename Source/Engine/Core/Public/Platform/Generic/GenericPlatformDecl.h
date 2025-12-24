@@ -6,6 +6,7 @@
 
 namespace AltinaEngine::Core::Platform
 {
+    
 
     // Intrinsic bit manipulation functions
     inline constexpr u32 PopCount32(u32 Value) noexcept;

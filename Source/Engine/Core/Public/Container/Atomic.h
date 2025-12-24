@@ -4,6 +4,7 @@
 
 namespace AltinaEngine::Core::Container
 {
+    
     enum class EMemoryOrder
     {
         Relaxed,

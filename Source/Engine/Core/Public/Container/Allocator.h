@@ -8,6 +8,7 @@
 
 namespace AltinaEngine::Core::Container
 {
+    
 
     /**
      * TAllocator<T>
@@ -42,7 +43,7 @@ namespace AltinaEngine::Core::Container
 
             FMemoryAllocator* Allocator = GetGlobalMemoryAllocator();
             void*             p         = Allocator->MemoryAllocate(
-                static_cast<AltinaEngine::usize>(n) * sizeof(value_type), alignof(value_type));
+                static_cast<usize>(n) * sizeof(value_type), alignof(value_type));
             return static_cast<pointer>(p);
         }
 

@@ -10,6 +10,7 @@
 
 namespace AltinaEngine::Core::Container
 {
+    
 
     // Dynamic array similar to std::vector, using the engine allocator.
     template <typename T, typename TAllocatorType = TAllocator<T>>
@@ -17,7 +18,7 @@ namespace AltinaEngine::Core::Container
     {
         using value_type      = T;
         using allocator_type  = TAllocatorType;
-        using size_type       = AltinaEngine::usize;
+        using size_type       = usize;
         using pointer         = value_type*;
         using const_pointer   = const value_type*;
         using reference       = value_type&;

@@ -8,6 +8,7 @@
 
 namespace AltinaEngine::Core::Platform
 {
+    
     inline constexpr u32 PopCount32(u32 Value) noexcept
     {
         return (IsConstantEvaluated()) ? Detail::PopCount32Impl(Value)

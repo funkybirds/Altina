@@ -6,6 +6,7 @@
 
 namespace AltinaEngine::Core::Math
 {
+    
     template <typename T, u32 ComponentCount> struct TVector
     {
         static_assert(AltinaEngine::IScalar<T>, "TVector requires scalar component types");

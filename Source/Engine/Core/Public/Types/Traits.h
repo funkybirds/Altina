@@ -4,6 +4,8 @@
 
 namespace AltinaEngine
 {
+    
+    
 
     template <bool TValue> struct TBoolConstant
     {

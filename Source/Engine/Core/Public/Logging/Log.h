@@ -14,7 +14,7 @@ namespace AltinaEngine::Core::Logging
     using AltinaEngine::Core::Container::TStringView;
 
     template <typename... Args>
-    using TFormatString = std::conditional_t<std::is_same_v<AltinaEngine::TChar, wchar_t>,
+    using TFormatString = std::conditional_t<std::is_same_v<TChar, wchar_t>,
                                              std::wformat_string<Args...>,
                                              std::format_string<Args...>>;
 
@@ -70,7 +70,7 @@ namespace AltinaEngine::Core::Logging
             const std::basic_string<AltinaEngine::TChar> Buffer = std::format(
                 Format, AltinaEngine::Forward<Args>(args)...);
             Dispatch(Level, Category,
-                     TStringView(Buffer.data(), static_cast<AltinaEngine::usize>(Buffer.size())));
+                     TStringView(Buffer.data(), static_cast<usize>(Buffer.size())));
         }
 
     private:

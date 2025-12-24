@@ -29,6 +29,13 @@ AltinaEngine follows Unreal Engine inspired naming and layout conventions. Keep 
 - Keep access specifiers (`public`, `private`) indented one level.
 - Document public APIs with `/** ... */` blocks when behaviour is non-trivial.
 
+## Documentation Comments
+
+- Use Doxygen-style block comments (`/** ... */`) for public APIs in `Public/` headers.
+- Keep comments concise: describe ownership, complexity guarantees (O(1), amortized O(1)), and any pre/post conditions.
+- Place an example usage snippet for non-trivial containers or utilities (e.g., `TDeque`) near the type's top-level comment.
+- Avoid duplicating implementation details; focus on the contract and observable behaviour.
+
 ## DLL Export Macros
 
 - Module public headers expose an `<Module>API.h` file that defines `<MODULE>_API` (e.g., `AE_CORE_API`).

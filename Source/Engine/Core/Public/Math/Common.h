@@ -8,6 +8,7 @@
 
 namespace AltinaEngine::Core::Math
 {
+    
 
     // Casting Utilities
     template <IIntegral TDst, IFloatingPoint TSrc>

@@ -48,6 +48,14 @@ AE_CORE_API i64  PlatformInterlockedExchangeAdd64(volatile i64* ptr, i64 add);
 // Portable helpers in namespace
 AE_CORE_API void PlatformSleepMilliseconds(unsigned long Milliseconds);
 
+// Abort / terminate / memory helpers
+extern "C" {
+    AE_CORE_API void PlatformAbort();
+    AE_CORE_API void PlatformTerminate();
+    AE_CORE_API void* Memset(void* Dest, int Value, usize Count);
+    AE_CORE_API void* Memcpy(void* Dest, const void* Src, usize Count);
+}
+
 } // namespace
 #pragma once
 

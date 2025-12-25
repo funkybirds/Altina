@@ -1,5 +1,6 @@
 #include "../../Public/Jobs/JobSystem.h"
 #include "../../Public/Threading/Mutex.h"
+#include <utility>
 
 namespace AltinaEngine::Core::Jobs {
 
@@ -37,7 +38,7 @@ void FWorkerPool::Stop()
     Threads.clear();
 }
 
-void FWorkerPool::Submit(std::function<void()> Job)
+void FWorkerPool::Submit(AltinaEngine::Core::Container::TFunction<void()> Job)
 {
     JobQueue.Push(std::move(Job));
     WakeEvent.Set();

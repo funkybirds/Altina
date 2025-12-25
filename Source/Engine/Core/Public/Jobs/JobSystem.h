@@ -4,8 +4,7 @@
 #include "../Types/Aliases.h"
 #include "../Container/ThreadSafeQueue.h"
 #include "../Threading/Event.h"
-
-#include <functional>
+#include "../Container/Function.h"
 #include <vector>
 #include <thread>
 #include <atomic>
@@ -27,7 +26,7 @@ public:
     void Stop();
 
     // Submit a job to the pool. Job is copied into the internal queue.
-    void Submit(std::function<void()> Job);
+    void Submit(AltinaEngine::Core::Container::TFunction<void()> Job);
 
     bool IsRunning() const noexcept { return bRunning.load(); }
 
@@ -35,7 +34,7 @@ private:
     void WorkerMain();
 
     FWorkerPoolConfig Config;
-    AltinaEngine::Core::Container::TThreadSafeQueue<std::function<void()>> JobQueue;
+    AltinaEngine::Core::Container::TThreadSafeQueue<AltinaEngine::Core::Container::TFunction<void()>> JobQueue;
     AltinaEngine::Core::Threading::FEvent WakeEvent{false, AltinaEngine::Core::Threading::EEventResetMode::Auto};
     std::vector<std::thread> Threads;
     std::atomic<bool> bRunning{false};

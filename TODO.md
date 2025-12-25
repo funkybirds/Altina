@@ -23,9 +23,9 @@
 	- [ ] Add validation that cross-thread dependencies do not deadlock (e.g., named thread waiting on itself).
 
 ## Threading Infrastructure
-- [ ] Introduce `Engine/Core` threading primitives (mutex, event, condition variable wrappers) that abstract platform specifics.
-	- [ ] Wrap Win32/POSIX primitives behind unified API with RAII helpers.
-	- [ ] Add unit tests checking lock recursion rules and timeout semantics.
+- [x] Introduce `Engine/Core` threading primitives (mutex, event, condition variable wrappers) that abstract platform specifics.
+	- [x] Wrap Win32/POSIX primitives behind unified API with RAII helpers.
+	- [x] Add unit tests checking lock recursion rules and timeout semantics.
 	- [ ] Document cost/behavior tradeoffs for each primitive in headers.
 - [ ] Build a configurable worker thread pool (min/max threads, stealability toggles) consuming the job queues.
 	- [ ] Parse configuration data (CVar, preset, config file) at startup.
@@ -51,10 +51,10 @@
 	- [ ] Track per-thread heartbeat timestamps and expose thresholds for alerts.
 	- [ ] Emit structured logs when watchdog triggers and include callstack capture hooks.
 	- [ ] Integrate with future telemetry (e.g., editor overlay) to highlight stalled threads.
-- [ ] Stand up interim thread-safe `TQueue`/`TStack` wrappers using `FScopedLock` until lock-free containers arrive.
-	- [ ] Create `FThreadSafeQueue`/`FThreadSafeStack` templates that wrap enqueue/dequeue/push/pop with scoped locks.
-	- [ ] Add unit tests proving basic correctness under concurrent producers/consumers.
-	- [ ] Document limitations (blocking behavior, contention) and plan follow-up work for true lock-free structures.
+ - [x] Stand up interim thread-safe `TQueue`/`TStack` wrappers using `FScopedLock` until lock-free containers arrive.
+	- [x] Create `FThreadSafeQueue`/`FThreadSafeStack` templates that wrap enqueue/dequeue/push/pop with scoped locks.
+	- [x] Add unit tests proving basic correctness under concurrent producers/consumers.
+	- [x] Document limitations (blocking behavior, contention) and plan follow-up work for true lock-free structures.
 
 ## Integration Tasks
 - [ ] Expose configuration knobs via `Engine/Application` plus preset files to set worker counts, named thread enablement, and helper thread limits.

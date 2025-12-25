@@ -1,5 +1,13 @@
 # AltinaEngine TODO
 
+## Coding Check
+- [ ] Meta-programming styling check
+  - [ ] Move all static_asserts for type to concept
+  
+- [ ] Coding style check
+  - [ ] TFunction
+  - [ ] Job system infrastructure
+
 ## Job System Foundations
 - [ ] Draft `Source/Engine/Core/Public/Jobs/JobSystem.h` covering job submission, job handles, fences, and dependency nodes.
 	- [ ] Enumerate minimal forward declarations and include order for `Jobs` public headers.

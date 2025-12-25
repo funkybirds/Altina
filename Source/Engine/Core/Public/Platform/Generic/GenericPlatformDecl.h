@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Base/CoreAPI.h"
-#include <cstdint>
+#include "../../Types/Aliases.h"
 
 namespace AltinaEngine::Core::Platform::Generic {
 
@@ -31,17 +31,17 @@ AE_CORE_API void PlatformResetEvent(void* Event);
 AE_CORE_API int  PlatformWaitForEvent(void* Event, unsigned long Milliseconds);
 
 // Interlocked / atomic primitives (operate on integer storage)
-AE_CORE_API int32_t  PlatformInterlockedCompareExchange32(volatile int32_t* ptr, int32_t exchange, int32_t comparand);
-AE_CORE_API int32_t  PlatformInterlockedExchange32(volatile int32_t* ptr, int32_t value);
-AE_CORE_API int32_t  PlatformInterlockedIncrement32(volatile int32_t* ptr);
-AE_CORE_API int32_t  PlatformInterlockedDecrement32(volatile int32_t* ptr);
-AE_CORE_API int32_t  PlatformInterlockedExchangeAdd32(volatile int32_t* ptr, int32_t add);
+AE_CORE_API i32  PlatformInterlockedCompareExchange32(volatile i32* ptr, i32 exchange, i32 comparand);
+AE_CORE_API i32  PlatformInterlockedExchange32(volatile i32* ptr, i32 value);
+AE_CORE_API i32  PlatformInterlockedIncrement32(volatile i32* ptr);
+AE_CORE_API i32  PlatformInterlockedDecrement32(volatile i32* ptr);
+AE_CORE_API i32  PlatformInterlockedExchangeAdd32(volatile i32* ptr, i32 add);
 
-AE_CORE_API int64_t  PlatformInterlockedCompareExchange64(volatile int64_t* ptr, int64_t exchange, int64_t comparand);
-AE_CORE_API int64_t  PlatformInterlockedExchange64(volatile int64_t* ptr, int64_t value);
-AE_CORE_API int64_t  PlatformInterlockedIncrement64(volatile int64_t* ptr);
-AE_CORE_API int64_t  PlatformInterlockedDecrement64(volatile int64_t* ptr);
-AE_CORE_API int64_t  PlatformInterlockedExchangeAdd64(volatile int64_t* ptr, int64_t add);
+AE_CORE_API i64  PlatformInterlockedCompareExchange64(volatile i64* ptr, i64 exchange, i64 comparand);
+AE_CORE_API i64  PlatformInterlockedExchange64(volatile i64* ptr, i64 value);
+AE_CORE_API i64  PlatformInterlockedIncrement64(volatile i64* ptr);
+AE_CORE_API i64  PlatformInterlockedDecrement64(volatile i64* ptr);
+AE_CORE_API i64  PlatformInterlockedExchangeAdd64(volatile i64* ptr, i64 add);
 
 } // extern "C"
 

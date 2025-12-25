@@ -2,12 +2,11 @@
 #pragma once
 #include "../Base/CoreAPI.h"
 
+#include "Common.h"
+
 namespace AltinaEngine::Core::Threading {
 
 class FMutex;
-
-// Use a portable infinite-wait sentinel instead of exposing platform headers.
-inline constexpr unsigned long kInfiniteWait = static_cast<unsigned long>(-1);
 
 class AE_CORE_API FConditionVariable {
 public:

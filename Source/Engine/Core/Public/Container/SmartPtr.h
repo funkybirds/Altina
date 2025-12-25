@@ -1,8 +1,11 @@
 #pragma once
 
 #include "Allocator.h"
-#include "Atomic.h"
+#include "../Threading/Atomic.h"
 #include "../Types/Traits.h"
+
+using AltinaEngine::Core::Threading::TAtomic;
+using AltinaEngine::Core::Threading::EMemoryOrder;
 
 namespace AltinaEngine::Core::Container
 {

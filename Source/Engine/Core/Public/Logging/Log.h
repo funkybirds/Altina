@@ -2,7 +2,7 @@
 
 #include <format>
 #include <string>
-#include <type_traits>
+#include "../Types/Traits.h"
 
 #include "../Base/CoreAPI.h"
 #include "../Types/Aliases.h"
@@ -11,12 +11,15 @@
 
 namespace AltinaEngine::Core::Logging
 {
+    template <bool B, typename TTrue, typename TFalse>
+    struct TSelect { using Type = TTrue; };
+    template <typename TTrue, typename TFalse>
+    struct TSelect<false, TTrue, TFalse> { using Type = TFalse; };
+
     using AltinaEngine::Core::Container::TStringView;
 
     template <typename... Args>
-    using TFormatString = std::conditional_t<std::is_same_v<TChar, wchar_t>,
-                                             std::wformat_string<Args...>,
-                                             std::format_string<Args...>>;
+    using TFormatString = typename TSelect<AltinaEngine::TTypeSameAs_v<TChar, wchar_t>, std::wformat_string<Args...>, std::format_string<Args...>>::Type;
 
     enum class ELogLevel : AltinaEngine::u8
     {

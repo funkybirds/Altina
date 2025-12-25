@@ -2,7 +2,7 @@
 #pragma once
 
 #include "../Base/CoreAPI.h"
-#include <type_traits>
+#include "../Types/Traits.h"
 #include "../Types/Aliases.h"
 
 namespace AltinaEngine::Core::Threading {
@@ -66,11 +66,19 @@ namespace AltinaEngine::Core::Threading
     public:
         using value_type = T;
 
-        static_assert(std::is_integral_v<T>, "TAtomic currently supports integral types only");
+        static_assert(AltinaEngine::TTypeIsIntegral_v<T>, "TAtomic currently supports integral types only");
         static_assert(sizeof(T) == 4 || sizeof(T) == 8, "TAtomic supports 32-bit and 64-bit integral types only");
 
-        using ImplType = std::conditional_t<sizeof(T) == 4, FAtomicInt32, FAtomicInt64>;
-        using SignedType = std::conditional_t<sizeof(T) == 4, i32, i64>;
+        template <usize N> struct ImplForSize;
+        template <> struct ImplForSize<4> { using Type = FAtomicInt32; };
+        template <> struct ImplForSize<8> { using Type = FAtomicInt64; };
+
+        template <usize N> struct SignedForSize;
+        template <> struct SignedForSize<4> { using Type = i32; };
+        template <> struct SignedForSize<8> { using Type = i64; };
+
+        using ImplType = typename ImplForSize<sizeof(T)>::Type;
+        using SignedType = typename SignedForSize<sizeof(T)>::Type;
 
         constexpr TAtomic() noexcept : mImpl(static_cast<SignedType>(0)) {}
         constexpr explicit TAtomic(T desired) noexcept : mImpl(static_cast<SignedType>(desired)) {}
@@ -121,19 +129,22 @@ namespace AltinaEngine::Core::Threading
 
         [[nodiscard]] operator T() const noexcept { return Load(); }
 
-        template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
+        template <typename U = T>
+            requires (AltinaEngine::TTypeIsIntegral_v<U>)
         U FetchAdd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
             return static_cast<U>(mImpl.ExchangeAdd(static_cast<SignedType>(arg)));
         }
 
-        template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
+        template <typename U = T>
+            requires (AltinaEngine::TTypeIsIntegral_v<U>)
         U FetchSub(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
             return static_cast<U>(mImpl.ExchangeAdd(-static_cast<SignedType>(arg)));
         }
 
-        template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
+        template <typename U = T>
+            requires (AltinaEngine::TTypeIsIntegral_v<U>)
         U FetchAnd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
             SignedType expected, desired;
@@ -144,7 +155,8 @@ namespace AltinaEngine::Core::Threading
             return static_cast<U>(expected);
         }
 
-        template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
+        template <typename U = T>
+            requires (AltinaEngine::TTypeIsIntegral_v<U>)
         U FetchOr(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
             SignedType expected, desired;
@@ -155,7 +167,8 @@ namespace AltinaEngine::Core::Threading
             return static_cast<U>(expected);
         }
 
-        template <typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
+        template <typename U = T>
+            requires (AltinaEngine::TTypeIsIntegral_v<U>)
         U FetchXor(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
             SignedType expected, desired;

@@ -39,8 +39,7 @@ namespace AltinaEngine::Core::Algorithm
         return best;
     }
 
-    template <IRange R, typename Pred>
-    [[nodiscard]] constexpr bool AnyOf(R&& range, Pred pred)
+    template <IRange R, typename Pred> [[nodiscard]] constexpr bool AnyOf(R&& range, Pred pred)
     {
         for (auto it = range.begin(); it != range.end(); ++it)
             if (pred(*it))
@@ -49,7 +48,7 @@ namespace AltinaEngine::Core::Algorithm
     }
 
     template <IRange R, typename Pred>
-    requires IPredicateForRange<R, Pred>
+        requires IPredicateForRange<R, Pred>
     [[nodiscard]] constexpr bool AllOf(R&& range, Pred pred)
     {
         for (auto it = range.begin(); it != range.end(); ++it)
@@ -59,19 +58,18 @@ namespace AltinaEngine::Core::Algorithm
     }
 
     template <IRange R, typename Pred>
-    requires IPredicateForRange<R, Pred>
+        requires IPredicateForRange<R, Pred>
     [[nodiscard]] constexpr bool NoneOf(R&& range, Pred pred)
     {
         return !AnyOf(static_cast<R&&>(range), pred);
     }
 
-    template <IRange R, typename Comp = TLess<>>
-    [[nodiscard]] constexpr bool IsSorted(R&& range, Comp comp = Comp{})
+    template <IRange R, typename Comp = TLess<>> [[nodiscard]] constexpr bool IsSorted(R&& range, Comp comp = Comp{})
     {
         if (range.begin() == range.end())
             return true;
         auto prev = range.begin();
-        auto it = prev;
+        auto it   = prev;
         ++it;
         for (; it != range.end(); ++it, ++prev)
         {
@@ -81,4 +79,4 @@ namespace AltinaEngine::Core::Algorithm
         return true;
     }
 
-} // namespace Altina::Core::Algorithm
+} // namespace AltinaEngine::Core::Algorithm

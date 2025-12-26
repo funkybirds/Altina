@@ -33,7 +33,7 @@ TEST_CASE("TArray - basic properties")
 TEST_CASE("TArray - iteration and algorithms")
 {
     TArray<int, 4> arr{};
-    int value = 1;
+    int            value = 1;
     for (auto& v : arr)
     {
         v = value++;

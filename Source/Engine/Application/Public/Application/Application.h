@@ -15,13 +15,13 @@ namespace AltinaEngine::Application
         explicit FApplication(const FStartupParameters& InStartupParameters);
         virtual ~FApplication();
 
-        void Initialize();
-        void Tick(float InDeltaTime);
-        void Shutdown();
+        void                                         Initialize();
+        void                                         Tick(float InDeltaTime);
+        void                                         Shutdown();
 
-        [[nodiscard]] bool IsRunning() const noexcept { return mIsRunning; }
+        [[nodiscard]] bool                           IsRunning() const noexcept { return mIsRunning; }
 
-        void SetWindowProperties(const FPlatformWindowProperty& InProperties);
+        void                                         SetWindowProperties(const FPlatformWindowProperty& InProperties);
         [[nodiscard]] const FPlatformWindowProperty& GetWindowProperties() const noexcept;
 
     protected:
@@ -29,16 +29,16 @@ namespace AltinaEngine::Application
         [[nodiscard]] FPlatformWindow*          GetMainWindow() noexcept;
         void                                    RequestShutdown() noexcept;
 
-        virtual FWindowOwner CreatePlatformWindow() = 0;
-        virtual void        PumpPlatformMessages();
+        virtual FWindowOwner                    CreatePlatformWindow() = 0;
+        virtual void                            PumpPlatformMessages();
 
     private:
-        void EnsureWindow();
+        void                    EnsureWindow();
 
-        FStartupParameters     mStartupParameters;
+        FStartupParameters      mStartupParameters;
         FPlatformWindowProperty mWindowProperties;
-        FWindowOwner          mMainWindow;
-        bool                  mIsRunning = false;
+        FWindowOwner            mMainWindow;
+        bool                    mIsRunning = false;
     };
 
 } // namespace AltinaEngine::Application

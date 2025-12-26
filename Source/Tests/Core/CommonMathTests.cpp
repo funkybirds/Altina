@@ -3,10 +3,10 @@
 #include "Math/Common.h"
 
 using namespace AltinaEngine::Core::Math;
-using AltinaEngine::i32;
-using AltinaEngine::u32;
 using AltinaEngine::f32;
 using AltinaEngine::f64;
+using AltinaEngine::i32;
+using AltinaEngine::u32;
 
 // Compile-time sanity for identical-type constraints
 static_assert(Max(1, 2, 3) == 3);

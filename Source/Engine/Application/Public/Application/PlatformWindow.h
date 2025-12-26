@@ -23,11 +23,11 @@ namespace AltinaEngine::Application
 
     struct AE_APPLICATION_API FPlatformWindowProperty
     {
-        FString             Title       = FString(TEXT("AltinaEngine"));
-        u32                 Width       = 1280;
-        u32                 Height      = 720;
-        f32                 DPIScaling  = 1.0f;
-        EWindowDisplayMode  DisplayMode = EWindowDisplayMode::Windowed;
+        FString            Title       = FString(TEXT("AltinaEngine"));
+        u32                Width       = 1280;
+        u32                Height      = 720;
+        f32                DPIScaling  = 1.0f;
+        EWindowDisplayMode DisplayMode = EWindowDisplayMode::Windowed;
     };
 
     class AE_APPLICATION_API FPlatformWindow
@@ -35,16 +35,16 @@ namespace AltinaEngine::Application
     public:
         virtual ~FPlatformWindow() = default;
 
-        virtual bool Initialize(const FPlatformWindowProperty& InProperties) = 0;
-        virtual void Show()        = 0;
-        virtual void Hide()        = 0;
-        virtual void Resize(u32 InWidth, u32 InHeight)                       = 0;
-        virtual void MoveTo(i32 InPositionX, i32 InPositionY)                 = 0;
-        virtual void Minimalize()                                             = 0;
-        virtual void Maximalize()                                             = 0;
+        virtual bool                                  Initialize(const FPlatformWindowProperty& InProperties) = 0;
+        virtual void                                  Show()                                                  = 0;
+        virtual void                                  Hide()                                                  = 0;
+        virtual void                                  Resize(u32 InWidth, u32 InHeight)                       = 0;
+        virtual void                                  MoveTo(i32 InPositionX, i32 InPositionY)                = 0;
+        virtual void                                  Minimalize()                                            = 0;
+        virtual void                                  Maximalize()                                            = 0;
 
-        [[nodiscard]] virtual FWindowExtent GetSize() const noexcept          = 0;
-        [[nodiscard]] virtual FPlatformWindowProperty GetProperties() const   = 0;
+        [[nodiscard]] virtual FWindowExtent           GetSize() const noexcept = 0;
+        [[nodiscard]] virtual FPlatformWindowProperty GetProperties() const    = 0;
     };
 
 } // namespace AltinaEngine::Application

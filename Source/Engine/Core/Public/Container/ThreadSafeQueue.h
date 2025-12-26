@@ -3,53 +3,60 @@
 #include "Queue.h"
 #include "../Threading/Mutex.h"
 
-namespace AltinaEngine::Core::Container {
-
-template <typename T, typename C = TDeque<T>>
-class TThreadSafeQueue
+namespace AltinaEngine::Core::Container
 {
-public:
-    using value_type = T;
-    using size_type = usize;
 
-    bool IsEmpty() const noexcept {
-        AltinaEngine::Core::Threading::FScopedLock lock(const_cast<AltinaEngine::Core::Threading::FMutex&>(mMutex));
-        return mQueue.IsEmpty();
-    }
+    template <typename T, typename C = TDeque<T>> class TThreadSafeQueue
+    {
+    public:
+        using value_type = T;
+        using size_type  = usize;
 
-    size_type Size() const noexcept {
-        AltinaEngine::Core::Threading::FScopedLock lock(const_cast<AltinaEngine::Core::Threading::FMutex&>(mMutex));
-        return mQueue.Size();
-    }
+        bool IsEmpty() const noexcept
+        {
+            AltinaEngine::Core::Threading::FScopedLock lock(const_cast<AltinaEngine::Core::Threading::FMutex&>(mMutex));
+            return mQueue.IsEmpty();
+        }
 
-    void Push(const value_type& v) {
-        AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
-        mQueue.Push(v);
-    }
+        size_type Size() const noexcept
+        {
+            AltinaEngine::Core::Threading::FScopedLock lock(const_cast<AltinaEngine::Core::Threading::FMutex&>(mMutex));
+            return mQueue.Size();
+        }
 
-    void Push(value_type&& v) {
-        AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
-        mQueue.Push(AltinaEngine::Move(v));
-    }
+        void Push(const value_type& v)
+        {
+            AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
+            mQueue.Push(v);
+        }
 
-    void Pop() {
-        AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
-        mQueue.Pop();
-    }
+        void Push(value_type&& v)
+        {
+            AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
+            mQueue.Push(AltinaEngine::Move(v));
+        }
 
-    value_type Front() {
-        AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
-        return mQueue.Front();
-    }
+        void Pop()
+        {
+            AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
+            mQueue.Pop();
+        }
 
-    value_type FrontConst() const {
-        AltinaEngine::Core::Threading::FScopedLock lock(const_cast<AltinaEngine::Core::Threading::FMutex&>(mMutex));
-        return mQueue.Front();
-    }
+        value_type Front()
+        {
+            AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
+            return mQueue.Front();
+        }
 
-private:
-    TQueue<T, C> mQueue;
-    mutable AltinaEngine::Core::Threading::FMutex mMutex;
-};
+        value_type FrontConst() const
+        {
+            AltinaEngine::Core::Threading::FScopedLock lock(const_cast<AltinaEngine::Core::Threading::FMutex&>(mMutex));
+            return mQueue.Front();
+        }
 
-} // namespace
+    private:
+        TQueue<T, C>                                  mQueue;
+        mutable AltinaEngine::Core::Threading::FMutex mMutex;
+    };
+
+} // namespace AltinaEngine::Core::Container

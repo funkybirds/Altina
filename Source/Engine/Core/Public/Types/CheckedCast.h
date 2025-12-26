@@ -9,8 +9,7 @@ namespace AltinaEngine
     // (as detected by TTypeIsDynamicConvertible), otherwise falls back to
     // static_cast. This single template handles pointers, references and
     // value conversions.
-    template <typename To, typename From>
-    inline To CheckedCast(From&& from) noexcept
+    template <typename To, typename From> inline To CheckedCast(From&& from) noexcept
     {
         if constexpr (TTypeIsDynamicConvertible<To, From>::Value)
         {

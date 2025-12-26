@@ -26,8 +26,8 @@ TEST_CASE("TOwner release and reset")
 
 TEST_CASE("TOwner move and swap semantics")
 {
-    auto First = MakeUnique<int>(5);
-    auto Second = MakeUnique<int>(9);
+    auto        First  = MakeUnique<int>(5);
+    auto        Second = MakeUnique<int>(9);
 
     TOwner<int> Moved(std::move(First));
     REQUIRE(!First);
@@ -91,7 +91,7 @@ TEST_CASE("TOwner array specialization supports indexing")
 TEST_CASE("AllocateUnique constructs via allocator")
 {
     TAllocator<int> Allocator;
-    auto Owner = AllocateUnique<int>(Allocator, 55);
+    auto            Owner = AllocateUnique<int>(Allocator, 55);
     REQUIRE(Owner);
     REQUIRE_EQ(*Owner, 55);
 }
@@ -117,8 +117,8 @@ TEST_CASE("TShared basic reference counting")
 
 TEST_CASE("TShared move and reset semantics")
 {
-    auto Shared = MakeShared<int>(5);
-    TShared<int> Copy = Shared;
+    auto         Shared = MakeShared<int>(5);
+    TShared<int> Copy   = Shared;
     REQUIRE_EQ(Shared.UseCount(), 2U);
 
     TShared<int> Moved(AltinaEngine::Move(Shared));
@@ -159,7 +159,7 @@ TEST_CASE("TShared custom deleter triggers once")
 TEST_CASE("AllocateShared produces owning reference")
 {
     TAllocator<int> Alloc;
-    auto Shared = AllocateShared<int>(Alloc, 72);
+    auto            Shared = AllocateShared<int>(Alloc, 72);
     REQUIRE(Shared);
     REQUIRE_EQ(*Shared, 72);
     REQUIRE_EQ(Shared.UseCount(), 1U);

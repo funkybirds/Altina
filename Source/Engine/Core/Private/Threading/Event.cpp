@@ -1,32 +1,29 @@
 #include "../../Public/Threading/Event.h"
 #include "../../Public/Platform/Generic/GenericPlatformDecl.h"
 
-namespace AltinaEngine::Core::Threading {
+namespace AltinaEngine::Core::Threading
+{
 
-using namespace AltinaEngine::Core::Platform::Generic;
+    using namespace AltinaEngine::Core::Platform::Generic;
 
-FEvent::FEvent(bool bInitiallySignaled, EEventResetMode ResetMode) noexcept {
-    Impl = PlatformCreateEvent(ResetMode == EEventResetMode::Manual ? 1 : 0,
-                               bInitiallySignaled ? 1 : 0);
-}
-
-FEvent::~FEvent() noexcept {
-    if (Impl) {
-        PlatformCloseEvent(Impl);
-        Impl = nullptr;
+    FEvent::FEvent(bool bInitiallySignaled, EEventResetMode ResetMode) noexcept
+    {
+        Impl = PlatformCreateEvent(ResetMode == EEventResetMode::Manual ? 1 : 0, bInitiallySignaled ? 1 : 0);
     }
-}
 
-void FEvent::Set() noexcept {
-    PlatformSetEvent(Impl);
-}
+    FEvent::~FEvent() noexcept
+    {
+        if (Impl)
+        {
+            PlatformCloseEvent(Impl);
+            Impl = nullptr;
+        }
+    }
 
-void FEvent::Reset() noexcept {
-    PlatformResetEvent(Impl);
-}
+    void FEvent::Set() noexcept { PlatformSetEvent(Impl); }
 
-bool FEvent::Wait(unsigned long Milliseconds) noexcept {
-    return PlatformWaitForEvent(Impl, Milliseconds) != 0;
-}
+    void FEvent::Reset() noexcept { PlatformResetEvent(Impl); }
 
-} // namespace
+    bool FEvent::Wait(unsigned long Milliseconds) noexcept { return PlatformWaitForEvent(Impl, Milliseconds) != 0; }
+
+} // namespace AltinaEngine::Core::Threading

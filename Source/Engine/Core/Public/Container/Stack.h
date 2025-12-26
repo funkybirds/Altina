@@ -4,24 +4,22 @@
 
 namespace AltinaEngine::Core::Container
 {
-    
 
-    template <typename T, typename C = TDeque<T>>
-    class TStack
+    template <typename T, typename C = TDeque<T>> class TStack
     {
     public:
         using value_type = T;
-        using size_type = usize;
+        using size_type  = usize;
 
-        bool IsEmpty() const noexcept { return mContainer.IsEmpty(); }
-        size_type Size() const noexcept { return mContainer.Size(); }
+        bool              IsEmpty() const noexcept { return mContainer.IsEmpty(); }
+        size_type         Size() const noexcept { return mContainer.Size(); }
 
-        void Push(const value_type& v) { mContainer.PushBack(v); }
-        void Push(value_type&& v) { mContainer.PushBack(AltinaEngine::Move(v)); }
+        void              Push(const value_type& v) { mContainer.PushBack(v); }
+        void              Push(value_type&& v) { mContainer.PushBack(AltinaEngine::Move(v)); }
 
-        void Pop() { mContainer.PopBack(); }
+        void              Pop() { mContainer.PopBack(); }
 
-        value_type& Top() { return mContainer.Back(); }
+        value_type&       Top() { return mContainer.Back(); }
         const value_type& Top() const { return mContainer.Back(); }
 
     private:

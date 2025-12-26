@@ -12,28 +12,27 @@ namespace AltinaEngine::Core::Logging
 {
     namespace
     {
-        template <AltinaEngine::usize N>
-        constexpr TStringView LiteralView(const AltinaEngine::TChar (&Text)[N])
+        template <AltinaEngine::usize N> constexpr TStringView LiteralView(const AltinaEngine::TChar (&Text)[N])
         {
             return { Text, N > 0 ? N - 1 : 0 }; // remove null terminator
         }
 
-        constexpr AltinaEngine::TChar kDefaultCategory[] = TEXT("Default");
-        constexpr AltinaEngine::TChar kTraceLabel[] = TEXT("TRACE");
-        constexpr AltinaEngine::TChar kDebugLabel[] = TEXT("DEBUG");
-        constexpr AltinaEngine::TChar kInfoLabel[] = TEXT("INFO");
-        constexpr AltinaEngine::TChar kWarningLabel[] = TEXT("WARN");
-        constexpr AltinaEngine::TChar kErrorLabel[] = TEXT("ERROR");
-        constexpr AltinaEngine::TChar kFatalLabel[] = TEXT("FATAL");
+        constexpr AltinaEngine::TChar                       kDefaultCategory[] = TEXT("Default");
+        constexpr AltinaEngine::TChar                       kTraceLabel[]      = TEXT("TRACE");
+        constexpr AltinaEngine::TChar                       kDebugLabel[]      = TEXT("DEBUG");
+        constexpr AltinaEngine::TChar                       kInfoLabel[]       = TEXT("INFO");
+        constexpr AltinaEngine::TChar                       kWarningLabel[]    = TEXT("WARN");
+        constexpr AltinaEngine::TChar                       kErrorLabel[]      = TEXT("ERROR");
+        constexpr AltinaEngine::TChar                       kFatalLabel[]      = TEXT("FATAL");
 
-        AltinaEngine::Core::Threading::FAtomicInt32 GMinimumLevel(static_cast<int32_t>(ELogLevel::Info));
-        FLogSink GUserSink = nullptr;
-        void* GUserData = nullptr;
-        AltinaEngine::Core::Threading::FMutex GLogMutex;
+        AltinaEngine::Core::Threading::FAtomicInt32         GMinimumLevel(static_cast<int32_t>(ELogLevel::Info));
+        FLogSink                                            GUserSink = nullptr;
+        void*                                               GUserData = nullptr;
+        AltinaEngine::Core::Threading::FMutex               GLogMutex;
         thread_local std::basic_string<AltinaEngine::TChar> GThreadDefaultCategory;
-        thread_local bool GThreadHasCustomCategory = false;
+        thread_local bool                                   GThreadHasCustomCategory = false;
 
-        TStringView LevelToLabel(ELogLevel Level) noexcept
+        TStringView                                         LevelToLabel(ELogLevel Level) noexcept
         {
             switch (Level)
             {
@@ -65,13 +64,10 @@ namespace AltinaEngine::Core::Logging
             }
         }
 
-        void DefaultSink(ELogLevel Level,
-                         TStringView Category,
-                         TStringView Message,
-                         void*)
+        void DefaultSink(ELogLevel Level, TStringView Category, TStringView Message, void*)
         {
-            auto& Stream = ConsoleStream();
-            const TStringView Label = LevelToLabel(Level);
+            auto&             Stream = ConsoleStream();
+            const TStringView Label  = LevelToLabel(Level);
 
             Stream << TEXT('[');
             if (!Label.IsEmpty())
@@ -93,31 +89,20 @@ namespace AltinaEngine::Core::Logging
         }
     } // namespace
 
-    void FLogger::SetLogLevel(ELogLevel Level) noexcept
-    {
-        GMinimumLevel.Store(static_cast<int32_t>(Level));
-    }
+    void      FLogger::SetLogLevel(ELogLevel Level) noexcept { GMinimumLevel.Store(static_cast<int32_t>(Level)); }
 
-    ELogLevel FLogger::GetLogLevel() noexcept
-    {
-        return static_cast<ELogLevel>(GMinimumLevel.Load());
-    }
+    ELogLevel FLogger::GetLogLevel() noexcept { return static_cast<ELogLevel>(GMinimumLevel.Load()); }
 
-    void FLogger::SetLogSink(FLogSink Sink, void* UserData)
+    void      FLogger::SetLogSink(FLogSink Sink, void* UserData)
     {
         AltinaEngine::Core::Threading::FScopedLock Lock(GLogMutex);
         GUserSink = Sink;
         GUserData = UserData;
     }
 
-    void FLogger::ResetLogSink()
-    {
-        SetLogSink(nullptr, nullptr);
-    }
+    void FLogger::ResetLogSink() { SetLogSink(nullptr, nullptr); }
 
-    void FLogger::Log(ELogLevel Level,
-                      TStringView Category,
-                      TStringView Message)
+    void FLogger::Log(ELogLevel Level, TStringView Category, TStringView Message)
     {
         if (!ShouldLog(Level))
         {
@@ -127,10 +112,7 @@ namespace AltinaEngine::Core::Logging
         Dispatch(Level, Category, Message);
     }
 
-    bool FLogger::ShouldLog(ELogLevel Level) noexcept
-    {
-        return Level >= static_cast<ELogLevel>(GMinimumLevel.Load());
-    }
+    bool FLogger::ShouldLog(ELogLevel Level) noexcept { return Level >= static_cast<ELogLevel>(GMinimumLevel.Load()); }
 
     void FLogger::SetDefaultCategory(TStringView Category)
     {
@@ -154,22 +136,20 @@ namespace AltinaEngine::Core::Logging
     {
         if (GThreadHasCustomCategory && !GThreadDefaultCategory.empty())
         {
-            return TStringView(GThreadDefaultCategory.data(),
-                               static_cast<AltinaEngine::usize>(GThreadDefaultCategory.size()));
+            return TStringView(
+                GThreadDefaultCategory.data(), static_cast<AltinaEngine::usize>(GThreadDefaultCategory.size()));
         }
 
         return LiteralView(kDefaultCategory);
     }
 
-    void FLogger::Dispatch(ELogLevel Level,
-                           TStringView Category,
-                           TStringView Message)
+    void FLogger::Dispatch(ELogLevel Level, TStringView Category, TStringView Message)
     {
-        FLogSink SinkCopy = nullptr;
-        void* UserDataCopy = nullptr;
+        FLogSink SinkCopy     = nullptr;
+        void*    UserDataCopy = nullptr;
         {
             AltinaEngine::Core::Threading::FScopedLock Lock(GLogMutex);
-            SinkCopy = GUserSink;
+            SinkCopy     = GUserSink;
             UserDataCopy = GUserData;
         }
 

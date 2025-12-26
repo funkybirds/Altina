@@ -12,15 +12,15 @@
 
 // Forward-declare minimal Windows types to avoid including Windows.h in public headers.
 typedef struct HINSTANCE__* HINSTANCE;
-typedef struct HWND__* HWND;
-using DWORD = unsigned long;
-using UINT  = unsigned int;
-using WPARAM = unsigned long long;
-using LPARAM = long long;
+typedef struct HWND__*      HWND;
+using DWORD   = unsigned long;
+using UINT    = unsigned int;
+using WPARAM  = unsigned long long;
+using LPARAM  = long long;
 using LRESULT = long long;
 
 #ifndef CALLBACK
-#define CALLBACK
+    #define CALLBACK
 #endif
 
 #include "Application/Application.h"
@@ -34,24 +34,24 @@ namespace AltinaEngine::Application
         FWindowsPlatformWindow();
         ~FWindowsPlatformWindow() override;
 
-        bool Initialize(const FPlatformWindowProperty& InProperties) override;
-        void Show() override;
-        void Hide() override;
-        void Resize(u32 InWidth, u32 InHeight) override;
-        void MoveTo(i32 InPositionX, i32 InPositionY) override;
-        void Minimalize() override;
-        void Maximalize() override;
+        bool                                  Initialize(const FPlatformWindowProperty& InProperties) override;
+        void                                  Show() override;
+        void                                  Hide() override;
+        void                                  Resize(u32 InWidth, u32 InHeight) override;
+        void                                  MoveTo(i32 InPositionX, i32 InPositionY) override;
+        void                                  Minimalize() override;
+        void                                  Maximalize() override;
 
-        [[nodiscard]] FWindowExtent GetSize() const noexcept override;
+        [[nodiscard]] FWindowExtent           GetSize() const noexcept override;
         [[nodiscard]] FPlatformWindowProperty GetProperties() const override;
-        [[nodiscard]] void* GetWindowHandle() const noexcept;
+        [[nodiscard]] void*                   GetWindowHandle() const noexcept;
 
     private:
         static LRESULT CALLBACK WindowProc(HWND InWindowHandle, UINT InMessage, WPARAM InWParam, LPARAM InLParam);
 
-        void RegisterWindowClass();
-        void UpdateCachedSizeFromClientRect();
-        [[nodiscard]] DWORD ResolveWindowStyle(const FPlatformWindowProperty& InProperties) const noexcept;
+        void                    RegisterWindowClass();
+        void                    UpdateCachedSizeFromClientRect();
+        [[nodiscard]] DWORD     ResolveWindowStyle(const FPlatformWindowProperty& InProperties) const noexcept;
 
         void*                   mWindowHandle   = nullptr;
         void*                   mInstanceHandle = nullptr;

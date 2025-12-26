@@ -24,15 +24,14 @@ namespace AltinaEngine
 
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
     using TChar = wchar_t;
-#   ifndef TEXT
-#       define TEXT(str) L##str
-#   endif
+    #ifndef TEXT
+        #define TEXT(str) L##str
+    #endif
 #else
     using TChar = char;
-#   ifndef TEXT
-#       define TEXT(str) str
-#   endif
+    #ifndef TEXT
+        #define TEXT(str) str
+    #endif
 #endif
 
 } // namespace AltinaEngine
- 

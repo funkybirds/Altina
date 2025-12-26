@@ -8,7 +8,6 @@
 
 namespace AltinaEngine::Core::Math
 {
-    
 
     // Casting Utilities
     template <IIntegral TDst, IFloatingPoint TSrc>
@@ -83,28 +82,24 @@ namespace AltinaEngine::Core::Math
     [[nodiscard]] AE_FORCEINLINE constexpr TDst Floor(TSrc value) noexcept
     {
         const TDst truncated = static_cast<TDst>(value);
-        return (static_cast<TSrc>(truncated) > value) ? static_cast<TDst>(truncated - static_cast<TDst>(1))
-                                                      : truncated;
+        return (static_cast<TSrc>(truncated) > value) ? static_cast<TDst>(truncated - static_cast<TDst>(1)) : truncated;
     }
 
     template <ISignedIntegral TDst, IFloatingPoint TSrc>
     [[nodiscard]] AE_FORCEINLINE constexpr TDst Ceil(TSrc value) noexcept
     {
         const TDst truncated = static_cast<TDst>(value);
-        return (static_cast<TSrc>(truncated) < value) ? static_cast<TDst>(truncated + static_cast<TDst>(1))
-                                                      : truncated;
+        return (static_cast<TSrc>(truncated) < value) ? static_cast<TDst>(truncated + static_cast<TDst>(1)) : truncated;
     }
 
     // Linear interpolation (floating point only, identical types)
-    template <IFloatingPoint T>
-    [[nodiscard]] AE_FORCEINLINE constexpr T Lerp(T a, T b, T t) noexcept
+    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE constexpr T Lerp(T a, T b, T t) noexcept
     {
         return a + (b - a) * t;
     }
 
     // Clamp (scalar only, identical types)
-    template <IScalar T>
-    [[nodiscard]] AE_FORCEINLINE constexpr T Clamp(T value, T minValue, T maxValue) noexcept
+    template <IScalar T> [[nodiscard]] AE_FORCEINLINE constexpr T Clamp(T value, T minValue, T maxValue) noexcept
     {
         const T clampedLower = (value < minValue) ? minValue : value;
         return (clampedLower > maxValue) ? maxValue : clampedLower;

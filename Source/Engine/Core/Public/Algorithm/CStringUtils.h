@@ -6,8 +6,7 @@
 
 namespace AltinaEngine::Core::Algorithm
 {
-    template <AltinaEngine::ICharType CharT>
-    inline CharT ToLowerChar(CharT Character)
+    template <AltinaEngine::ICharType CharT> inline CharT ToLowerChar(CharT Character)
     {
         if constexpr (sizeof(CharT) == sizeof(wchar_t))
         {
@@ -20,8 +19,7 @@ namespace AltinaEngine::Core::Algorithm
         }
     }
 
-    template <AltinaEngine::ICharType CharT>
-    inline CharT ToUpperChar(CharT Character)
+    template <AltinaEngine::ICharType CharT> inline CharT ToUpperChar(CharT Character)
     {
         if constexpr (sizeof(CharT) == sizeof(wchar_t))
         {

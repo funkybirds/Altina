@@ -41,7 +41,7 @@ TEST_CASE("TStringView basic operations")
     REQUIRE_EQ(Mid[0], TEXT('g'));
 
     const FString Word(TEXT("Altina"));
-    TStringView FromView = Word.ToView();
+    TStringView   FromView = Word.ToView();
     REQUIRE_EQ(FromView.Length(), 6U);
     REQUIRE_EQ(FromView[5], TEXT('a'));
 

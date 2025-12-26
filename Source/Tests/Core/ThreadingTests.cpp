@@ -20,16 +20,17 @@ TEST_CASE("FScopedLock releases mutex after scope")
     // After scope the mutex must be unlocked
     bool Acquired = M.TryLock();
     REQUIRE(Acquired);
-    if (Acquired) M.Unlock();
+    if (Acquired)
+        M.Unlock();
 }
 
 TEST_CASE("FConditionVariable notify wakes waiter")
 {
     FConditionVariable CV;
-    FMutex M;
-    bool Flag = false;
+    FMutex             M;
+    bool               Flag = false;
 
-    std::thread Worker([&](){
+    std::thread        Worker([&]() {
         // Waiter thread
         M.Lock();
         bool Signaled = CV.Wait(M, 5000);
@@ -54,10 +55,10 @@ TEST_CASE("FConditionVariable notify wakes waiter")
 
 TEST_CASE("FEvent signals waiter")
 {
-    FEvent E(false, EEventResetMode::Auto);
+    FEvent      E(false, EEventResetMode::Auto);
 
-    bool WorkerSaw = false;
-    std::thread Worker([&](){
+    bool        WorkerSaw = false;
+    std::thread Worker([&]() {
         bool Signaled = E.Wait(5000);
         REQUIRE(Signaled);
         WorkerSaw = true;
@@ -72,21 +73,24 @@ TEST_CASE("FEvent signals waiter")
 TEST_CASE("TAtomic concurrent increments")
 {
     using CounterT = int;
-    TAtomic<CounterT> Counter(static_cast<CounterT>(0));
+    TAtomic<CounterT>        Counter(static_cast<CounterT>(0));
 
-    const int Threads = 4;
-    const int IncrementsPerThread = 10000;
+    const int                Threads             = 4;
+    const int                IncrementsPerThread = 10000;
 
     std::vector<std::thread> workers;
-    for (int i = 0; i < Threads; ++i) {
-        workers.emplace_back([&](){
-            for (int j = 0; j < IncrementsPerThread; ++j) {
+    for (int i = 0; i < Threads; ++i)
+    {
+        workers.emplace_back([&]() {
+            for (int j = 0; j < IncrementsPerThread; ++j)
+            {
                 Counter.FetchAdd(1);
             }
         });
     }
 
-    for (auto &t : workers) t.join();
+    for (auto& t : workers)
+        t.join();
 
     CounterT Final = Counter.Load();
     REQUIRE_EQ(Final, Threads * IncrementsPerThread);

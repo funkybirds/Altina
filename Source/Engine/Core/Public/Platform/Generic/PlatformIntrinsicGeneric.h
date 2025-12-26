@@ -3,7 +3,7 @@
 
 namespace AltinaEngine::Core::Platform::Detail
 {
-    
+
     inline constexpr u32 PopCount32Impl(u32 Value) noexcept
     {
         u32 Count = 0;

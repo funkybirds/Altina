@@ -2,10 +2,10 @@
 
 #if AE_PLATFORM_WIN
 
-#include <Windows.h>
-#include "Application/Windows/WindowsApplication.h"
+    #include <Windows.h>
+    #include "Application/Windows/WindowsApplication.h"
 
-#include "Logging/Log.h"
+    #include "Logging/Log.h"
 
 namespace AltinaEngine::Application
 {
@@ -16,7 +16,7 @@ namespace AltinaEngine::Application
     {
         constexpr const TChar* kWindowClassName = TEXT("AltinaEngineWindowClass");
 
-        DWORD ToWin32DisplayMode(EWindowDisplayMode DisplayMode)
+        DWORD                  ToWin32DisplayMode(EWindowDisplayMode DisplayMode)
         {
             switch (DisplayMode)
             {
@@ -33,16 +33,9 @@ namespace AltinaEngine::Application
         class FWindowTitleCStr
         {
         public:
-            explicit FWindowTitleCStr(const FString& Title)
-                : mBuffer(Title)
-            {
-                EnsureNullTerminated();
-            }
+            explicit FWindowTitleCStr(const FString& Title) : mBuffer(Title) { EnsureNullTerminated(); }
 
-            const TChar* Get() const noexcept
-            {
-                return mBuffer.IsEmptyString() ? TEXT("") : mBuffer.GetData();
-            }
+            const TChar* Get() const noexcept { return mBuffer.IsEmptyString() ? TEXT("") : mBuffer.GetData(); }
 
         private:
             void EnsureNullTerminated()
@@ -63,10 +56,7 @@ namespace AltinaEngine::Application
         };
     } // namespace
 
-    FWindowsPlatformWindow::FWindowsPlatformWindow()
-    {
-        mInstanceHandle = static_cast<void*>(GetModuleHandle(nullptr));
-    }
+    FWindowsPlatformWindow::FWindowsPlatformWindow() { mInstanceHandle = static_cast<void*>(GetModuleHandle(nullptr)); }
 
     FWindowsPlatformWindow::~FWindowsPlatformWindow()
     {
@@ -82,27 +72,17 @@ namespace AltinaEngine::Application
         RegisterWindowClass();
 
         const DWORD WindowStyle = ResolveWindowStyle(InProperties);
-        RECT         WindowRect{0, 0, static_cast<LONG>(InProperties.Width), static_cast<LONG>(InProperties.Height)};
+        RECT        WindowRect{ 0, 0, static_cast<LONG>(InProperties.Width), static_cast<LONG>(InProperties.Height) };
         AdjustWindowRect(&WindowRect, WindowStyle, FALSE);
 
-        const i32 Width  = WindowRect.right - WindowRect.left;
-        const i32 Height = WindowRect.bottom - WindowRect.top;
+        const i32              Width  = WindowRect.right - WindowRect.left;
+        const i32              Height = WindowRect.bottom - WindowRect.top;
 
         const FWindowTitleCStr TitleCStr(InProperties.Title);
 
-        mWindowHandle = static_cast<void*>(CreateWindowEx(
-            0,
-            kWindowClassName,
-            TitleCStr.Get(),
-            WindowStyle,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            Width,
-            Height,
-            nullptr,
-            nullptr,
-            static_cast<HINSTANCE>(mInstanceHandle),
-            this));
+        mWindowHandle =
+            static_cast<void*>(CreateWindowEx(0, kWindowClassName, TitleCStr.Get(), WindowStyle, CW_USEDEFAULT,
+                CW_USEDEFAULT, Width, Height, nullptr, nullptr, static_cast<HINSTANCE>(mInstanceHandle), this));
 
         if (!mWindowHandle)
         {
@@ -149,13 +129,8 @@ namespace AltinaEngine::Application
         mProperties.Width  = InWidth;
         mProperties.Height = InHeight;
 
-        SetWindowPos(static_cast<HWND>(mWindowHandle),
-                     nullptr,
-                     0,
-                     0,
-                     static_cast<int>(InWidth),
-                     static_cast<int>(InHeight),
-                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(static_cast<HWND>(mWindowHandle), nullptr, 0, 0, static_cast<int>(InWidth),
+            static_cast<int>(InHeight), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         UpdateCachedSizeFromClientRect();
     }
 
@@ -166,13 +141,8 @@ namespace AltinaEngine::Application
             return;
         }
 
-        SetWindowPos(static_cast<HWND>(mWindowHandle),
-                     nullptr,
-                     InPositionX,
-                     InPositionY,
-                     0,
-                     0,
-                     SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(static_cast<HWND>(mWindowHandle), nullptr, InPositionX, InPositionY, 0, 0,
+            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
     void FWindowsPlatformWindow::Minimalize()
@@ -195,10 +165,7 @@ namespace AltinaEngine::Application
         ShowWindow(static_cast<HWND>(mWindowHandle), SW_MAXIMIZE);
     }
 
-    FWindowExtent FWindowsPlatformWindow::GetSize() const noexcept
-    {
-        return mCachedSize;
-    }
+    FWindowExtent           FWindowsPlatformWindow::GetSize() const noexcept { return mCachedSize; }
 
     FPlatformWindowProperty FWindowsPlatformWindow::GetProperties() const
     {
@@ -209,22 +176,17 @@ namespace AltinaEngine::Application
         return mProperties;
     }
 
-    void* FWindowsPlatformWindow::GetWindowHandle() const noexcept
-    {
-        return mWindowHandle;
-    }
+    void*            FWindowsPlatformWindow::GetWindowHandle() const noexcept { return mWindowHandle; }
 
-    LRESULT CALLBACK FWindowsPlatformWindow::WindowProc(HWND InWindowHandle,
-                                                         UINT InMessage,
-                                                         WPARAM InWParam,
-                                                         LPARAM InLParam)
+    LRESULT CALLBACK FWindowsPlatformWindow::WindowProc(
+        HWND InWindowHandle, UINT InMessage, WPARAM InWParam, LPARAM InLParam)
     {
         FWindowsPlatformWindow* Window = nullptr;
 
         if (InMessage == WM_NCCREATE)
         {
             const auto* CreateStruct = reinterpret_cast<CREATESTRUCT*>(InLParam);
-            Window = static_cast<FWindowsPlatformWindow*>(CreateStruct->lpCreateParams);
+            Window                   = static_cast<FWindowsPlatformWindow*>(CreateStruct->lpCreateParams);
             SetWindowLongPtr(InWindowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(Window));
         }
         else

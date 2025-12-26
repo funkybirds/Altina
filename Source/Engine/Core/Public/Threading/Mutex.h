@@ -2,36 +2,41 @@
 #pragma once
 #include "../Base/CoreAPI.h"
 
-namespace AltinaEngine::Core::Threading {
+namespace AltinaEngine::Core::Threading
+{
 
-class AE_CORE_API FMutex {
-public:
-    FMutex() noexcept;
-    ~FMutex() noexcept;
+    class AE_CORE_API FMutex
+    {
+    public:
+        FMutex() noexcept;
+        ~FMutex() noexcept;
 
-    void Lock() noexcept;
-    bool TryLock() noexcept;
-    void Unlock() noexcept;
+        void  Lock() noexcept;
+        bool  TryLock() noexcept;
+        void  Unlock() noexcept;
 
-    void* GetNative() const noexcept;
+        void* GetNative() const noexcept;
 
-    // Non-copyable
-    FMutex(const FMutex&) = delete;
-    FMutex& operator=(const FMutex&) = delete;
-private:
-    void* Impl; // Opaque pointer to platform implementation
-};
+        // Non-copyable
+        FMutex(const FMutex&)            = delete;
+        FMutex& operator=(const FMutex&) = delete;
 
-class AE_CORE_API FScopedLock {
-public:
-    explicit FScopedLock(FMutex& InMutex) noexcept;
-    ~FScopedLock() noexcept;
+    private:
+        void* Impl; // Opaque pointer to platform implementation
+    };
 
-    // Non-copyable
-    FScopedLock(const FScopedLock&) = delete;
-    FScopedLock& operator=(const FScopedLock&) = delete;
-private:
-    FMutex& Mutex;
-};
+    class AE_CORE_API FScopedLock
+    {
+    public:
+        explicit FScopedLock(FMutex& InMutex) noexcept;
+        ~FScopedLock() noexcept;
 
-} // namespace
+        // Non-copyable
+        FScopedLock(const FScopedLock&)            = delete;
+        FScopedLock& operator=(const FScopedLock&) = delete;
+
+    private:
+        FMutex& Mutex;
+    };
+
+} // namespace AltinaEngine::Core::Threading

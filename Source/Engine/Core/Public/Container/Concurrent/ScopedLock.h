@@ -9,15 +9,12 @@ namespace AltinaEngine::Core::Container
     class FScopedLock
     {
     public:
-        explicit FScopedLock(AltinaEngine::Core::Threading::FMutex& m) noexcept
-            : mLock(m)
-        {
-        }
+        explicit FScopedLock(AltinaEngine::Core::Threading::FMutex& m) noexcept : mLock(m) {}
 
         ~FScopedLock() = default;
 
         // non-copyable
-        FScopedLock(const FScopedLock&) = delete;
+        FScopedLock(const FScopedLock&)            = delete;
         FScopedLock& operator=(const FScopedLock&) = delete;
 
     private:

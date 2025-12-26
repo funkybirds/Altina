@@ -4,8 +4,6 @@
 
 namespace AltinaEngine
 {
-    
-    
 
     template <bool TValue> struct TBoolConstant
     {
@@ -56,39 +54,28 @@ namespace AltinaEngine
 
         template <typename T, typename U> TFalseType TestGreater(...);
 
-        template <typename T>
-        auto TestIndexReadable(int) -> decltype(Declval<const T&>()[usize{}], TTrueType{});
+        template <typename T> auto       TestIndexReadable(int) -> decltype(Declval<const T&>()[usize{}], TTrueType{});
 
         template <typename T> TFalseType TestIndexReadable(...);
 
-        template <typename T>
-        auto TestIndexWritable(int) -> decltype(Declval<T&>()[usize{}], TTrueType{});
+        template <typename T> auto       TestIndexWritable(int) -> decltype(Declval<T&>()[usize{}], TTrueType{});
 
         template <typename T> TFalseType TestIndexWritable(...);
 
         template <typename It>
-        auto TestReadableIterator(int)
-            -> decltype(*Declval<It&>(), ++Declval<It&>(), TTrueType{});
+        auto TestReadableIterator(int) -> decltype(*Declval<It&>(), ++Declval<It&>(), TTrueType{});
 
         template <typename It> TFalseType TestReadableIterator(...);
 
         template <typename It>
-        auto TestWritableIterator(int)
-            -> decltype(*Declval<It&>() = *Declval<It&>(), ++Declval<It&>(), TTrueType{});
+        auto TestWritableIterator(int) -> decltype(*Declval<It&>() = *Declval<It&>(), ++Declval<It&>(), TTrueType{});
 
         template <typename It> TFalseType TestWritableIterator(...);
 
         template <typename It>
         auto TestRandomAccessIterator(int)
-            -> decltype(
-                Declval<It&>() + usize{},
-                Declval<It&>() - usize{},
-                Declval<It&>() += usize{},
-                Declval<It&>() -= usize{},
-                Declval<It&>()[usize{}],
-                Declval<It>() - Declval<It>(),
-                TTrueType{}
-            );
+            -> decltype(Declval<It&>() + usize{}, Declval<It&>() - usize{}, Declval<It&>() += usize{},
+                Declval<It&>() -= usize{}, Declval<It&>()[usize{}], Declval<It>() - Declval<It>(), TTrueType{});
 
         template <typename It> TFalseType TestRandomAccessIterator(...);
 
@@ -240,20 +227,17 @@ namespace AltinaEngine
         using Type = T;
     };
 
-    template <typename T>
-    constexpr typename TRemoveReference<T>::Type&& Move(T&& Arg) noexcept
+    template <typename T> constexpr typename TRemoveReference<T>::Type&& Move(T&& Arg) noexcept
     {
         return static_cast<typename TRemoveReference<T>::Type&&>(Arg);
     }
 
-    template <typename T>
-    constexpr T&& Forward(typename TRemoveReference<T>::Type& Arg) noexcept
+    template <typename T> constexpr T&& Forward(typename TRemoveReference<T>::Type& Arg) noexcept
     {
         return static_cast<T&&>(Arg);
     }
 
-    template <typename T>
-    constexpr T&& Forward(typename TRemoveReference<T>::Type&& Arg) noexcept
+    template <typename T> constexpr T&& Forward(typename TRemoveReference<T>::Type&& Arg) noexcept
     {
         return static_cast<T&&>(Arg);
     }

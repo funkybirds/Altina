@@ -8,7 +8,6 @@
 
 namespace AltinaEngine::Core::Container
 {
-    
 
     /**
      * TAllocator<T>
@@ -42,14 +41,13 @@ namespace AltinaEngine::Core::Container
             using AltinaEngine::Core::Platform::GetGlobalMemoryAllocator;
 
             FMemoryAllocator* Allocator = GetGlobalMemoryAllocator();
-            void*             p         = Allocator->MemoryAllocate(
-                static_cast<usize>(n) * sizeof(value_type), alignof(value_type));
+            void* p = Allocator->MemoryAllocate(static_cast<usize>(n) * sizeof(value_type), alignof(value_type));
             return static_cast<pointer>(p);
         }
 
         inline pointer Allocate(size_type n, const_pointer /*hint*/) { return Allocate(n); }
 
-        inline void Deallocate(pointer p, size_type /*n*/) noexcept
+        inline void    Deallocate(pointer p, size_type /*n*/) noexcept
         {
             if (!p)
             {
@@ -85,39 +83,27 @@ namespace AltinaEngine::Core::Container
         constexpr bool operator!=(const TAllocator&) const noexcept { return false; }
     };
 
-    template <typename Alloc>
-    struct TAllocatorTraits
+    template <typename Alloc> struct TAllocatorTraits
     {
         using allocator_type = Alloc;
-        using value_type = typename Alloc::value_type;
-        using pointer = typename Alloc::pointer;
-        using const_pointer = typename Alloc::const_pointer;
-        using size_type = typename Alloc::size_type;
+        using value_type     = typename Alloc::value_type;
+        using pointer        = typename Alloc::pointer;
+        using const_pointer  = typename Alloc::const_pointer;
+        using size_type      = typename Alloc::size_type;
 
-        static pointer Allocate(Alloc& a, size_type n)
-        {
-            return a.Allocate(n);
-        }
+        static pointer                          Allocate(Alloc& a, size_type n) { return a.Allocate(n); }
 
-        static void Deallocate(Alloc& a, pointer p, size_type n)
-        {
-            a.Deallocate(p, n);
-        }
+        static void                             Deallocate(Alloc& a, pointer p, size_type n) { a.Deallocate(p, n); }
 
-        template <typename... Args>
-        static void Construct(Alloc& a, pointer p, Args&&... args)
+        template <typename... Args> static void Construct(Alloc& a, pointer p, Args&&... args)
         {
             a.Construct(p, AltinaEngine::Forward<Args>(args)...);
         }
 
-        static void Destroy(Alloc& a, pointer p)
-        {
-            a.Destroy(p);
-        }
+        static void Destroy(Alloc& a, pointer p) { a.Destroy(p); }
     };
 
-    template <typename T>
-    struct TDefaultDeleter
+    template <typename T> struct TDefaultDeleter
     {
         constexpr TDefaultDeleter() noexcept = default;
 
@@ -139,8 +125,7 @@ namespace AltinaEngine::Core::Container
         }
     };
 
-    template <typename T>
-    struct TDefaultDeleter<T[]>
+    template <typename T> struct TDefaultDeleter<T[]>
     {
         constexpr TDefaultDeleter() noexcept = default;
 

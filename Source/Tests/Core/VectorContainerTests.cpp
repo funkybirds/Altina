@@ -7,9 +7,9 @@ using namespace AltinaEngine;
 using namespace AltinaEngine::Core::Container;
 
 // Compile-time checks for TVector iterators and random access traits
-using TVec       = TVector<int>;
-using TVecIter   = TVec::iterator;
-using TVecCIter  = TVec::const_iterator;
+using TVec      = TVector<int>;
+using TVecIter  = TVec::iterator;
+using TVecCIter = TVec::const_iterator;
 
 static_assert(IReadableIterator<TVecIter>);
 static_assert(IWritableIterator<TVecIter>);

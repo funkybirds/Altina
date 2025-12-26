@@ -9,27 +9,21 @@
 
 namespace AltinaEngine::Core::Container
 {
-    
+
     class FString : public TVector<TChar>
     {
     public:
         using Super = TVector<TChar>;
-        using typename Super::value_type;
-        using typename Super::size_type;
-        using typename Super::reference;
         using typename Super::const_reference;
+        using typename Super::reference;
+        using typename Super::size_type;
+        using typename Super::value_type;
 
         FString() = default;
 
-        explicit FString(const value_type* Text)
-        {
-            Append(Text);
-        }
+        explicit FString(const value_type* Text) { Append(Text); }
 
-        FString(const value_type* Text, usize Length)
-        {
-            Append(Text, Length);
-        }
+        FString(const value_type* Text, usize Length) { Append(Text, Length); }
 
         FString(std::initializer_list<value_type> Init)
         {
@@ -77,27 +71,18 @@ namespace AltinaEngine::Core::Container
             }
         }
 
-        void Append(const_reference Character)
-        {
-            this->PushBack(Character);
-        }
+        void                      Append(const_reference Character) { this->PushBack(Character); }
 
-        const value_type* GetData() const noexcept { return Super::Data(); }
-        value_type*       GetData() noexcept { return Super::Data(); }
+        const value_type*         GetData() const noexcept { return Super::Data(); }
+        value_type*               GetData() noexcept { return Super::Data(); }
 
-        usize Length() const noexcept { return this->Size(); }
+        usize                     Length() const noexcept { return this->Size(); }
 
-        bool IsEmptyString() const noexcept { return this->IsEmpty(); }
+        bool                      IsEmptyString() const noexcept { return this->IsEmpty(); }
 
-        [[nodiscard]] TStringView ToView() const noexcept
-        {
-            return TStringView(this->GetData(), this->Length());
-        }
+        [[nodiscard]] TStringView ToView() const noexcept { return TStringView(this->GetData(), this->Length()); }
 
-        [[nodiscard]] operator TStringView() const noexcept
-        {
-            return ToView();
-        }
+        [[nodiscard]] operator TStringView() const noexcept { return ToView(); }
 
         void ToLower()
         {
@@ -124,8 +109,7 @@ namespace AltinaEngine::Core::Container
         }
 
     private:
-        template <typename Func>
-        void TransformCharacters(Func&& Transformer)
+        template <typename Func> void TransformCharacters(Func&& Transformer)
         {
             for (usize Index = 0; Index < this->Size(); ++Index)
             {
@@ -153,4 +137,4 @@ namespace AltinaEngine::Core::Container
             return Length;
         }
     };
-}
+} // namespace AltinaEngine::Core::Container

@@ -5,52 +5,35 @@
 
 namespace AltinaEngine::Core::Container
 {
-    
-    template <typename CharType>
-    class TBasicStringView
+
+    template <typename CharType> class TBasicStringView
     {
     public:
         using value_type = CharType;
-        using pointer = const value_type*;
-        using reference = const value_type&;
-        using size_type = usize;
+        using pointer    = const value_type*;
+        using reference  = const value_type&;
+        using size_type  = usize;
 
-        constexpr TBasicStringView() noexcept
-            : mData(nullptr)
-            , mLength(0)
-        {
-        }
+        constexpr TBasicStringView() noexcept : mData(nullptr), mLength(0) {}
 
-        constexpr TBasicStringView(pointer data, size_type length) noexcept
-            : mData(data)
-            , mLength(length)
-        {
-        }
+        constexpr TBasicStringView(pointer data, size_type length) noexcept : mData(data), mLength(length) {}
 
-        constexpr TBasicStringView(const value_type* data) noexcept
-            : mData(data)
-            , mLength(ComputeLength(data))
-        {
-        }
+        constexpr TBasicStringView(const value_type* data) noexcept : mData(data), mLength(ComputeLength(data)) {}
 
         template <typename Allocator>
         TBasicStringView(const TVector<CharType, Allocator>& Vector) noexcept
-            : mData(Vector.Data())
-            , mLength(Vector.Size())
+            : mData(Vector.Data()), mLength(Vector.Size())
         {
         }
 
-        [[nodiscard]] constexpr pointer Data() const noexcept { return mData; }
-        [[nodiscard]] constexpr size_type Length() const noexcept { return mLength; }
-        [[nodiscard]] constexpr bool IsEmpty() const noexcept { return mLength == 0; }
+        [[nodiscard]] constexpr pointer          Data() const noexcept { return mData; }
+        [[nodiscard]] constexpr size_type        Length() const noexcept { return mLength; }
+        [[nodiscard]] constexpr bool             IsEmpty() const noexcept { return mLength == 0; }
 
-        [[nodiscard]] constexpr reference operator[](size_type index) const noexcept
-        {
-            return mData[index];
-        }
+        [[nodiscard]] constexpr reference        operator[](size_type index) const noexcept { return mData[index]; }
 
-        [[nodiscard]] constexpr pointer begin() const noexcept { return mData; }
-        [[nodiscard]] constexpr pointer end() const noexcept { return mData + mLength; }
+        [[nodiscard]] constexpr pointer          begin() const noexcept { return mData; }
+        [[nodiscard]] constexpr pointer          end() const noexcept { return mData + mLength; }
 
         [[nodiscard]] constexpr TBasicStringView Substring(size_type offset, size_type count) const noexcept
         {
@@ -80,7 +63,7 @@ namespace AltinaEngine::Core::Container
         }
 
     private:
-        pointer  mData;
+        pointer   mData;
         size_type mLength;
     };
 

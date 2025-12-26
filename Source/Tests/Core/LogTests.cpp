@@ -19,19 +19,16 @@ namespace
         FString   Message;
     };
 
-    void CaptureSink(ELogLevel Level,
-                     TStringView Category,
-                     TStringView Message,
-                     void* UserData)
+    void CaptureSink(ELogLevel Level, TStringView Category, TStringView Message, void* UserData)
     {
-        auto* Storage = static_cast<std::vector<FCapturedLog>*>(UserData);
+        auto*        Storage = static_cast<std::vector<FCapturedLog>*>(UserData);
         FCapturedLog Entry;
-        Entry.Level = Level;
+        Entry.Level    = Level;
         Entry.Category = FString(Category.Data(), Category.Length());
-        Entry.Message = FString(Message.Data(), Message.Length());
+        Entry.Message  = FString(Message.Data(), Message.Length());
         Storage->push_back(std::move(Entry));
     }
-}
+} // namespace
 
 TEST_CASE("Logger formats text via sink")
 {

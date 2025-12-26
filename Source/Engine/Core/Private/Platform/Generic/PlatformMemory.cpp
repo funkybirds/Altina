@@ -55,8 +55,8 @@ namespace AltinaEngine::Core::Platform
                 return std::malloc(Size);
             }
 
-            void* Result = nullptr;
-            const int  Error  = posix_memalign(&Result, NormalizedAlignment, Size);
+            void*     Result = nullptr;
+            const int Error  = posix_memalign(&Result, NormalizedAlignment, Size);
             return (Error == 0) ? Result : nullptr;
 #endif
         }
@@ -84,8 +84,8 @@ namespace AltinaEngine::Core::Platform
                 return std::realloc(Ptr, NewSize);
             }
 
-            void* Result = nullptr;
-            const int  Error  = posix_memalign(&Result, NormalizedAlignment, NewSize);
+            void*     Result = nullptr;
+            const int Error  = posix_memalign(&Result, NormalizedAlignment, NewSize);
 
             if (Error != 0)
             {

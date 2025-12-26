@@ -1,8 +1,8 @@
 #include "TestHarness.h"
 
 #if AE_PLATFORM_WIN
-#include "Platform/Generic/GenericPlatformDecl.h"
-#include "Platform/Windows/PlatformIntrinsicWindows.h"
+    #include "Platform/Generic/GenericPlatformDecl.h"
+    #include "Platform/Windows/PlatformIntrinsicWindows.h"
 
 using namespace AltinaEngine::Core::Platform;
 

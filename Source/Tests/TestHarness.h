@@ -39,25 +39,25 @@ namespace Test
         {
             current_checks   = 0;
             current_failures = 0;
-            std::cout << "[ RUN ] " << c.name << std::endl;
+            std::cout << "[ RUN ] " << c.name << '\n';
             try
             {
                 c.func();
             }
             catch (const std::exception& e)
             {
-                std::cerr << "Unhandled exception in " << c.name << ": " << e.what() << std::endl;
+                std::cerr << "Unhandled exception in " << c.name << ": " << e.what() << '\n';
                 current_failures++;
             }
             catch (...)
             {
-                std::cerr << "Unhandled non-standard exception in " << c.name << std::endl;
+                std::cerr << "Unhandled non-standard exception in " << c.name << '\n';
                 current_failures++;
             }
             if (current_failures == 0)
-                std::cout << "[  OK  ] " << c.name << std::endl;
+                std::cout << "[  OK  ] " << c.name << '\n';
             else
-                std::cout << "[FAILED] " << c.name << " (" << current_failures << " failed checks)" << std::endl;
+                std::cout << "[FAILED] " << c.name << " (" << current_failures << " failed checks)" << '\n';
 
             total_failures += current_failures;
         }
@@ -75,30 +75,33 @@ namespace Test
 
 #define STATIC_REQUIRE(x) static_assert(x)
 
-#define REQUIRE(expr)                                                                         \
-    do                                                                                        \
-    {                                                                                         \
-        ++Test::current_checks;                                                               \
-        if (!(expr))                                                                          \
-        {                                                                                     \
-            ++Test::current_failures;                                                         \
-            std::cerr << "FAIL: " << __FILE__ << ":" << __LINE__ << " - " #expr << std::endl; \
-        }                                                                                     \
-    }                                                                                         \
-    while (0)
+#define REQUIRE(expr) Test::Require((expr), #expr, __FILE__, __LINE__)
 
 #define REQUIRE_EQ(a, b) REQUIRE((a) == (b))
 
-#define REQUIRE_CLOSE(a, b, eps)                                                                            \
-    do                                                                                                      \
-    {                                                                                                       \
-        ++Test::current_checks;                                                                             \
-        if (std::fabs((double)(a) - (double)(b)) > (double)(eps))                                           \
-        {                                                                                                   \
-            ++Test::current_failures;                                                                       \
-            std::cerr << "FAIL: " << __FILE__ << ":" << __LINE__ << " - close(" #a "," #b ")" << std::endl; \
-        }                                                                                                   \
-    }                                                                                                       \
-    while (0)
+#define REQUIRE_CLOSE(a, b, eps) Test::RequireClose((a), (b), (eps), #a, #b, __FILE__, __LINE__)
+
+// Inline helpers replace previous do/while(0) macros to satisfy
+// cppcoreguidelines-avoid-do-while while preserving diagnostics.
+inline void Require(bool expr, const char* exprText, const char* file, int line)
+{
+    ++current_checks;
+    if (!expr)
+    {
+        ++current_failures;
+        std::cerr << "FAIL: " << file << ":" << line << " - " << exprText << '\n';
+    }
+}
+
+template<typename T, typename U, typename E>
+inline void RequireClose(T a, U b, E eps, const char* aText, const char* bText, const char* file, int line)
+{
+    ++current_checks;
+    if (std::fabs((double)a - (double)b) > (double)eps)
+    {
+        ++current_failures;
+        std::cerr << "FAIL: " << file << ":" << line << " - close(" << aText << "," << bText << ")" << '\n';
+    }
+}
 
 } // namespace Test

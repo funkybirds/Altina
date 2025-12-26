@@ -1,6 +1,8 @@
 #include "TestHarness.h"
 
 #include "Math/Common.h"
+#include "Math/Sampling/LowDiscrepancy.h"
+#include "Math/Sampling/Spherical.h"
 
 using namespace AltinaEngine::Core::Math;
 using AltinaEngine::f32;
@@ -60,4 +62,66 @@ TEST_CASE("Math Common - Clamp")
     REQUIRE(Clamp(15, 0, 10) == 10);
 
     REQUIRE_CLOSE(Clamp(1.5F, 0.0F, 1.0F), 1.0F, 1e-6F);
+}
+
+TEST_CASE("Math Common - Sin/Cos")
+{
+    // f32 checks
+    REQUIRE_CLOSE(Sin<f32>(0.0F), 0.0F, 1e-6F);
+    REQUIRE_CLOSE(Cos<f32>(0.0F), 1.0F, 1e-6F);
+
+    REQUIRE_CLOSE(Sin<f32>(kHalfPiF), 1.0F, 1e-6F);
+    REQUIRE_CLOSE(Cos<f32>(kHalfPiF), 0.0F, 1e-6F);
+
+    REQUIRE_CLOSE(Sin<f32>(kPiF), 0.0F, 1e-5F);
+    REQUIRE_CLOSE(Cos<f32>(kPiF), -1.0F, 1e-6F);
+
+    // f64 checks
+    REQUIRE_CLOSE(Sin<f64>(0.0), 0.0, 1e-12);
+    REQUIRE_CLOSE(Cos<f64>(0.0), 1.0, 1e-12);
+
+    REQUIRE_CLOSE(Sin<f64>(kHalfPiD), 1.0, 1e-12);
+    REQUIRE_CLOSE(Cos<f64>(kHalfPiD), 0.0, 1e-12);
+
+    REQUIRE_CLOSE(Sin<f64>(kPiD), 0.0, 1e-12);
+    REQUIRE_CLOSE(Cos<f64>(kPiD), -1.0, 1e-12);
+}
+
+TEST_CASE("Math Common - Hammersley2d")
+{
+    const u32 N = 4;
+
+    {
+        const auto p0 = Hammersley2d(0u, N);
+        REQUIRE_CLOSE(p0.X(), 0.0F, 1e-6F);
+        REQUIRE_CLOSE(p0.Y(), 0.0F, 1e-6F);
+    }
+
+    {
+        const auto p1 = Hammersley2d(1u, N);
+        REQUIRE_CLOSE(p1.X(), 1.0F / 4.0F, 1e-6F);
+        REQUIRE_CLOSE(p1.Y(), 0.5F, 1e-6F);
+    }
+
+    {
+        const auto p2 = Hammersley2d(2u, N);
+        REQUIRE_CLOSE(p2.X(), 2.0F / 4.0F, 1e-6F);
+        REQUIRE_CLOSE(p2.Y(), 0.25F, 1e-6F);
+    }
+
+    {
+        const auto p3 = Hammersley2d(3u, N);
+        REQUIRE_CLOSE(p3.X(), 3.0F / 4.0F, 1e-6F);
+        REQUIRE_CLOSE(p3.Y(), 0.75F, 1e-6F);
+    }
+}
+
+TEST_CASE("Math Sampling - ConcentricOctahedralTransform")
+{
+    // center sample should map to zero vector
+    const FVector2f center{ 0.5F, 0.5F };
+    const auto      v = ConcentricOctahedralTransform(center);
+    REQUIRE_CLOSE(v.X(), 0.0F, 1e-6F);
+    REQUIRE_CLOSE(v.Y(), 0.0F, 1e-6F);
+    REQUIRE_CLOSE(v.Z(), 0.0F, 1e-6F);
 }

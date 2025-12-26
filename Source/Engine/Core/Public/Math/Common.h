@@ -8,6 +8,28 @@
 
 namespace AltinaEngine::Core::Math
 {
+    // Details
+    namespace Details
+    {
+        AE_CORE_API f32 SinF(f32 radians) noexcept;
+        AE_CORE_API f64 SinD(f64 radians) noexcept;
+        AE_CORE_API f32 CosF(f32 radians) noexcept;
+        AE_CORE_API f64 CosD(f64 radians) noexcept;
+        AE_CORE_API f32 SqrtF(f32 value) noexcept;
+        AE_CORE_API f64 SqrtD(f64 value) noexcept;
+    } // namespace Details
+
+    // Math Constants
+    inline constexpr f32 kPiF       = 3.14159265358979323846f;
+    inline constexpr f64 kPiD       = 3.14159265358979323846;
+    inline constexpr f32 kTwoPiF    = 6.28318530717958647692f;
+    inline constexpr f64 kTwoPiD    = 6.28318530717958647692;
+    inline constexpr f32 kHalfPiF   = 1.57079632679489661923f;
+    inline constexpr f64 kHalfPiD   = 1.57079632679489661923;
+    inline constexpr f32 kInvPiF    = 0.31830988618379067154f;
+    inline constexpr f64 kInvPiD    = 0.31830988618379067154;
+    inline constexpr f32 kInvTwoPiF = 0.15915494309189533577f;
+    inline constexpr f64 kInvTwoPiD = 0.15915494309189533577;
 
     // Casting Utilities
     template <IIntegral TDst, IFloatingPoint TSrc>
@@ -77,7 +99,7 @@ namespace AltinaEngine::Core::Math
         return result;
     }
 
-    // Floor / Ceil (signed integral destination, floating-point source)
+    // Floor / Ceil (signed integral destination, f32ing-point source)
     template <ISignedIntegral TDst, IFloatingPoint TSrc>
     [[nodiscard]] AE_FORCEINLINE constexpr TDst Floor(TSrc value) noexcept
     {
@@ -92,7 +114,7 @@ namespace AltinaEngine::Core::Math
         return (static_cast<TSrc>(truncated) < value) ? static_cast<TDst>(truncated + static_cast<TDst>(1)) : truncated;
     }
 
-    // Linear interpolation (floating point only, identical types)
+    // Linear interpolation (f32ing point only, identical types)
     template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE constexpr T Lerp(T a, T b, T t) noexcept
     {
         return a + (b - a) * t;
@@ -103,6 +125,59 @@ namespace AltinaEngine::Core::Math
     {
         const T clampedLower = (value < minValue) ? minValue : value;
         return (clampedLower > maxValue) ? maxValue : clampedLower;
+    }
+
+    // Abs
+    template <ISignedIntegral T> [[nodiscard]] AE_FORCEINLINE constexpr T Abs(T value) noexcept
+    {
+        return (value < static_cast<T>(0)) ? -value : value;
+    }
+    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE constexpr T Abs(T value) noexcept
+    {
+        return (value < static_cast<T>(0)) ? -value : value;
+    }
+
+    // Sin, Cos (radians, floating-point)
+    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE T Sin(T radians) noexcept
+    {
+        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>)
+        {
+            return Details::SinF(radians);
+        }
+        else
+        {
+            return static_cast<T>(Details::SinD(static_cast<f64>(radians)));
+        }
+    }
+
+    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE T Cos(T radians) noexcept
+    {
+        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>)
+        {
+            return Details::CosF(radians);
+        }
+        else
+        {
+            return static_cast<T>(Details::CosD(static_cast<f64>(radians)));
+        }
+    }
+
+    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE T Tan(T radians) noexcept
+    {
+        return Sin(radians) / Cos(radians);
+    }
+
+    // Sqrt (floating-point)
+    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE T Sqrt(T value) noexcept
+    {
+        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>)
+        {
+            return Details::SqrtF(value);
+        }
+        else
+        {
+            return static_cast<T>(Details::SqrtD(static_cast<f64>(value)));
+        }
     }
 
 } // namespace AltinaEngine::Core::Math

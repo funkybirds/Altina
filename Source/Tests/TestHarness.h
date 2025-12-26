@@ -83,10 +83,11 @@ namespace Test
 
 // Inline helpers replace previous do/while(0) macros to satisfy
 // cppcoreguidelines-avoid-do-while while preserving diagnostics.
-inline void Require(bool expr, const char* exprText, const char* file, int line)
+template <typename T>
+inline void Require(T&& expr, const char* exprText, const char* file, int line)
 {
     ++current_checks;
-    if (!expr)
+    if (!static_cast<bool>(expr))
     {
         ++current_failures;
         std::cerr << "FAIL: " << file << ":" << line << " - " << exprText << '\n';

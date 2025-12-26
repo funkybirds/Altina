@@ -7,10 +7,8 @@
 namespace AltinaEngine::Core::Math
 {
 
-    template <typename T, u32 ComponentCount> struct TVector
+    template <IScalar T, u32 ComponentCount> struct TVector
     {
-        static_assert(AltinaEngine::IScalar<T>, "TVector requires scalar component types");
-
         T                                Components[ComponentCount]{};
 
         [[nodiscard]] constexpr T&       operator[](u32 Index) noexcept { return Components[Index]; }
@@ -53,7 +51,7 @@ namespace AltinaEngine::Core::Math
         }
     };
 
-    template <typename T, u32 ComponentCount>
+    template <IScalar T, u32 ComponentCount>
     [[nodiscard]] constexpr TVector<T, ComponentCount> operator+(
         TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept
     {
@@ -61,7 +59,7 @@ namespace AltinaEngine::Core::Math
         return Lhs;
     }
 
-    template <typename T, u32 ComponentCount>
+    template <IScalar T, u32 ComponentCount>
     [[nodiscard]] constexpr TVector<T, ComponentCount> operator-(
         TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept
     {
@@ -69,7 +67,7 @@ namespace AltinaEngine::Core::Math
         return Lhs;
     }
 
-    template <typename T, u32 ComponentCount>
+    template <IScalar T, u32 ComponentCount>
     [[nodiscard]] constexpr TVector<T, ComponentCount> operator*(
         TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept
     {
@@ -77,7 +75,7 @@ namespace AltinaEngine::Core::Math
         return Lhs;
     }
 
-    template <typename T, u32 ComponentCount>
+    template <IScalar T, u32 ComponentCount>
     [[nodiscard]] constexpr TVector<T, ComponentCount> operator/(
         TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept
     {

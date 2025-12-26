@@ -1,9 +1,12 @@
 #include "../../Public/Jobs/JobSystem.h"
 #include "../../Public/Threading/Mutex.h"
+#include "../../Public/Threading/Atomic.h"
+#include "../../Public/Container/Vector.h"
 #include <utility>
 #include <algorithm>
 #include <chrono>
 #include <vector>
+#include <thread>
 
 namespace AltinaEngine::Core::Jobs
 {
@@ -14,110 +17,124 @@ namespace AltinaEngine::Core::Jobs
 
     void FWorkerPool::Start()
     {
-        if (bRunning.exchange(true))
+        if (bRunning.Exchange(1) != 0)
             return;
 
         const usize Count = Config.MinThreads > 0 ? Config.MinThreads : 1;
-        Threads.reserve(Count);
+        Threads.Reserve(Count);
         for (usize i = 0; i < Count; ++i)
         {
-            Threads.emplace_back([this]() { WorkerMain(); });
+            // allocate std::thread on heap and store opaque pointer in public TVector<void*>
+            auto* t = new std::thread([this]() { WorkerMain(); });
+            Threads.PushBack(reinterpret_cast<void*>(t));
         }
     }
 
     void FWorkerPool::Stop()
     {
-        if (!bRunning.exchange(false))
+        if (bRunning.Exchange(0) == 0)
             return;
 
         // Wake all workers so they exit promptly
         WakeEvent.Set();
 
-        for (auto& t : Threads)
+        for (usize i = 0; i < Threads.Size(); ++i)
         {
-            if (t.joinable())
-                t.join();
+            auto* tptr = reinterpret_cast<std::thread*>(Threads[i]);
+            if (tptr && tptr->joinable())
+                tptr->join();
+            delete tptr;
         }
-        Threads.clear();
+        Threads.Clear();
     }
 
-    void FWorkerPool::Submit(AltinaEngine::Core::Container::TFunction<void()> Job)
+    void FWorkerPool::Submit(TFunction<void()> Job)
     {
         FJobEntry e;
-        e.Task      = std::move(Job);
-        e.Priority  = 0;
-        e.ExecuteAt = std::chrono::steady_clock::now();
-        JobQueue.Push(std::move(e));
+        e.Task       = Move(Job);
+        e.Priority   = 0;
+        e.ExecuteAtMs = static_cast<u64>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+        JobQueue.Push(Move(e));
         WakeEvent.Set();
     }
-
-    void FWorkerPool::SubmitDelayed(
-        AltinaEngine::Core::Container::TFunction<void()> Job, std::chrono::milliseconds Delay)
+    void FWorkerPool::SubmitDelayed(TFunction<void()> Job, u64 DelayMs)
     {
         FJobEntry e;
-        e.Task      = std::move(Job);
+        e.Task      = Move(Job);
         e.Priority  = 0;
-        e.ExecuteAt = std::chrono::steady_clock::now() + Delay;
+        e.ExecuteAtMs = static_cast<u64>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + DelayMs);
 
         {
             AltinaEngine::Core::Threading::FScopedLock lock(DelayedJobsMutex);
-            DelayedJobs.push_back(std::move(e));
+            DelayedJobs.PushBack(Move(e));
         }
         WakeEvent.Set();
     }
-
-    void FWorkerPool::SubmitWithPriority(AltinaEngine::Core::Container::TFunction<void()> Job, int Priority)
+    void FWorkerPool::SubmitWithPriority(TFunction<void()> Job, int Priority)
     {
         FJobEntry e;
-        e.Task      = std::move(Job);
+        e.Task      = Move(Job);
         e.Priority  = Priority;
-        e.ExecuteAt = std::chrono::steady_clock::now();
-        JobQueue.Push(std::move(e));
+        e.ExecuteAtMs = static_cast<u64>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+        JobQueue.Push(Move(e));
         WakeEvent.Set();
     }
 
     void FWorkerPool::WorkerMain()
     {
-        while (bRunning.load() || !JobQueue.IsEmpty())
+        while (bRunning.Load() != 0 || !JobQueue.IsEmpty())
         {
             // Move due delayed jobs into the main queue
             {
                 AltinaEngine::Core::Threading::FScopedLock lock(DelayedJobsMutex);
-                auto                                       now = std::chrono::steady_clock::now();
-                for (auto it = DelayedJobs.begin(); it != DelayedJobs.end();)
+                auto nowMs = static_cast<u64>(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+
+                for (usize idx = 0; idx < DelayedJobs.Size();)
                 {
-                    if (it->ExecuteAt <= now)
+                    if (DelayedJobs[idx].ExecuteAtMs <= nowMs)
                     {
-                        JobQueue.Push(std::move(*it));
-                        it = DelayedJobs.erase(it);
+                        JobQueue.Push(Move(DelayedJobs[idx]));
+                        // remove current by swapping with last
+                        if (idx + 1 < DelayedJobs.Size())
+                        {
+                            DelayedJobs[idx] = Move(DelayedJobs.Back());
+                        }
+                        DelayedJobs.PopBack();
                     }
                     else
                     {
-                        ++it;
+                        ++idx;
                     }
                 }
             }
 
             // Drain jobs into local vector to allow priority sorting
-            std::vector<FJobEntry> batch;
+            TVector<FJobEntry> batch;
             while (!JobQueue.IsEmpty())
             {
                 auto item = JobQueue.Front();
                 JobQueue.Pop();
-                batch.push_back(std::move(item));
+                batch.PushBack(Move(item));
             }
 
-            if (!batch.empty())
+            if (!batch.IsEmpty())
             {
                 // Sort by priority descending
                 std::sort(batch.begin(), batch.end(),
                     [](const FJobEntry& a, const FJobEntry& b) { return a.Priority > b.Priority; });
 
                 auto now = std::chrono::steady_clock::now();
+                auto nowMs = static_cast<u64>(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
                 // Execute ready tasks; re-queue delayed ones
-                for (auto& j : batch)
+                for (usize i = 0; i < batch.Size(); ++i)
                 {
-                    if (j.ExecuteAt <= now)
+                    auto& j = batch[i];
+                    if (j.ExecuteAtMs <= nowMs)
                     {
                         try
                         {
@@ -130,13 +147,13 @@ namespace AltinaEngine::Core::Jobs
                     else
                     {
                         AltinaEngine::Core::Threading::FScopedLock lock(DelayedJobsMutex);
-                        DelayedJobs.push_back(std::move(j));
+                        DelayedJobs.PushBack(Move(j));
                     }
                 }
             }
 
             // Wait for new work
-            if (bRunning.load())
+            if (bRunning.Load() != 0)
             {
                 WakeEvent.Wait(1000); // wake periodically to re-check running flag
             }

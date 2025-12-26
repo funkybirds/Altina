@@ -73,4 +73,13 @@ namespace AltinaEngine
 
     template <typename R>
     concept IForwardRange = IRange<R> && IIncrementable<decltype(Declval<R>().begin())> && IReadableIterator<decltype(Declval<R>().begin())>;
+
+        template <typename T>
+        concept ICharType = TTypeSameAs_v<T, char>
+    #if defined(__cpp_char8_t)
+                            || TTypeSameAs_v<T, char8_t>
+    #endif
+                            || TTypeSameAs_v<T, char16_t>
+                            || TTypeSameAs_v<T, char32_t>
+                            || TTypeSameAs_v<T, wchar_t>;
 } // namespace AltinaEngine

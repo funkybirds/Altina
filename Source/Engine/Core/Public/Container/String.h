@@ -1,8 +1,7 @@
 #pragma once
 
-#include <cctype>
-#include <cwctype>
 #include <initializer_list>
+#include "../Algorithm/CStringUtils.h"
 
 #include "StringView.h"
 #include "Vector.h"
@@ -136,28 +135,12 @@ namespace AltinaEngine::Core::Container
 
         static value_type LowerChar(value_type Character)
         {
-            if constexpr (sizeof(value_type) == sizeof(wchar_t))
-            {
-                return static_cast<value_type>(std::towlower(static_cast<wint_t>(Character)));
-            }
-            else
-            {
-                const unsigned char Narrow = static_cast<unsigned char>(Character);
-                return static_cast<value_type>(std::tolower(Narrow));
-            }
+            return AltinaEngine::Core::Algorithm::ToLowerChar<value_type>(Character);
         }
 
         static value_type UpperChar(value_type Character)
         {
-            if constexpr (sizeof(value_type) == sizeof(wchar_t))
-            {
-                return static_cast<value_type>(std::towupper(static_cast<wint_t>(Character)));
-            }
-            else
-            {
-                const unsigned char Narrow = static_cast<unsigned char>(Character);
-                return static_cast<value_type>(std::toupper(Narrow));
-            }
+            return AltinaEngine::Core::Algorithm::ToUpperChar<value_type>(Character);
         }
 
         static usize ComputeLength(const value_type* Text)

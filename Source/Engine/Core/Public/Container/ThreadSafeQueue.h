@@ -29,7 +29,7 @@ public:
 
     void Push(value_type&& v) {
         AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
-        mQueue.Push(std::move(v));
+        mQueue.Push(AltinaEngine::Move(v));
     }
 
     void Pop() {

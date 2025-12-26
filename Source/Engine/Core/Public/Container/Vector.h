@@ -108,7 +108,7 @@ namespace AltinaEngine::Core::Container
             : mData(other.mData)
             , mSize(other.mSize)
             , mCapacity(other.mCapacity)
-            , mAllocator(std::move(other.mAllocator))
+            , mAllocator(AltinaEngine::Move(other.mAllocator))
         {
             other.mData     = nullptr;
             other.mSize     = 0;
@@ -154,7 +154,7 @@ namespace AltinaEngine::Core::Container
             mData      = other.mData;
             mSize      = other.mSize;
             mCapacity  = other.mCapacity;
-            mAllocator = std::move(other.mAllocator);
+            mAllocator = AltinaEngine::Move(other.mAllocator);
 
             other.mData     = nullptr;
             other.mSize     = 0;
@@ -211,7 +211,7 @@ namespace AltinaEngine::Core::Container
 
             for (size_type i = 0; i < mSize; ++i)
             {
-                mAllocator.Construct(newData + i, std::move_if_noexcept(mData[i]));
+                mAllocator.Construct(newData + i, AltinaEngine::Move(mData[i]));
                 mAllocator.Destroy(mData + i);
             }
 
@@ -270,7 +270,7 @@ namespace AltinaEngine::Core::Container
         void PushBack(value_type&& value)
         {
             EnsureCapacityForOneMore();
-            mAllocator.Construct(mData + mSize, std::move(value));
+            mAllocator.Construct(mData + mSize, AltinaEngine::Move(value));
             ++mSize;
         }
 

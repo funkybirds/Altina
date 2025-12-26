@@ -17,7 +17,7 @@ namespace AltinaEngine::Core::Container
         size_type Size() const noexcept { return mContainer.Size(); }
 
         void Push(const value_type& v) { mContainer.PushBack(v); }
-        void Push(value_type&& v) { mContainer.PushBack(std::move(v)); }
+        void Push(value_type&& v) { mContainer.PushBack(AltinaEngine::Move(v)); }
 
         void Pop() { mContainer.PopBack(); }
 

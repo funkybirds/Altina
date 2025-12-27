@@ -5,7 +5,7 @@
 
 namespace AltinaEngine::Core::Math
 {
-    [[nodiscard]] inline constexpr f32 VanDeCorputRadicalInverse2(u32 bits) noexcept
+    [[nodiscard]] constexpr auto VanDeCorputRadicalInverse2(u32 bits) noexcept -> f32
     {
         // Reference:
         // https://github.com/Nadrin/PBR/blob/master/data/shaders/hlsl/spmap.hlsl
@@ -19,7 +19,7 @@ namespace AltinaEngine::Core::Math
         return static_cast<f32>(f64(bits) * 2.3283064365386963e-10); // / 0x100000000
     }
 
-    [[nodiscard]] AE_FORCEINLINE constexpr FVector2f Hammersley2d(u32 x, u32 N) noexcept
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Hammersley2d(u32 x, u32 N) noexcept -> FVector2f
     {
         f32 u1 = f32(x) / f32(N);
         f32 u2 = VanDeCorputRadicalInverse2(x);

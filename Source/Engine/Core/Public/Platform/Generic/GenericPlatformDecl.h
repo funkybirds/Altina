@@ -12,38 +12,38 @@ namespace AltinaEngine::Core::Platform::Generic
     {
 
         // Critical section / mutex
-        AE_CORE_API void* PlatformCreateCriticalSection();
-        AE_CORE_API void  PlatformDeleteCriticalSection(void* CS);
-        AE_CORE_API void  PlatformEnterCriticalSection(void* CS);
-        AE_CORE_API int   PlatformTryEnterCriticalSection(void* CS);
-        AE_CORE_API void  PlatformLeaveCriticalSection(void* CS);
+        AE_CORE_API auto PlatformCreateCriticalSection() -> void*;
+        AE_CORE_API void PlatformDeleteCriticalSection(void* CS);
+        AE_CORE_API void PlatformEnterCriticalSection(void* CS);
+        AE_CORE_API auto PlatformTryEnterCriticalSection(void* CS) -> int;
+        AE_CORE_API void PlatformLeaveCriticalSection(void* CS);
 
         // Condition variable
-        AE_CORE_API void* PlatformCreateConditionVariable();
-        AE_CORE_API void  PlatformDeleteConditionVariable(void* CV);
-        AE_CORE_API void  PlatformWakeConditionVariable(void* CV);
-        AE_CORE_API void  PlatformWakeAllConditionVariable(void* CV);
-        AE_CORE_API int   PlatformSleepConditionVariableCS(void* CV, void* CS, unsigned long Milliseconds);
+        AE_CORE_API auto PlatformCreateConditionVariable() -> void*;
+        AE_CORE_API void PlatformDeleteConditionVariable(void* CV);
+        AE_CORE_API void PlatformWakeConditionVariable(void* CV);
+        AE_CORE_API void PlatformWakeAllConditionVariable(void* CV);
+        AE_CORE_API auto PlatformSleepConditionVariableCS(void* CV, void* CS, unsigned long Milliseconds) -> int;
 
         // Event
-        AE_CORE_API void* PlatformCreateEvent(int bManualReset, int bInitiallySignaled);
-        AE_CORE_API void  PlatformCloseEvent(void* Event);
-        AE_CORE_API void  PlatformSetEvent(void* Event);
-        AE_CORE_API void  PlatformResetEvent(void* Event);
-        AE_CORE_API int   PlatformWaitForEvent(void* Event, unsigned long Milliseconds);
+        AE_CORE_API auto PlatformCreateEvent(int bManualReset, int bInitiallySignaled) -> void*;
+        AE_CORE_API void PlatformCloseEvent(void* Event);
+        AE_CORE_API void PlatformSetEvent(void* Event);
+        AE_CORE_API void PlatformResetEvent(void* Event);
+        AE_CORE_API auto PlatformWaitForEvent(void* Event, unsigned long Milliseconds) -> int;
 
         // Interlocked / atomic primitives (operate on integer storage)
-        AE_CORE_API i32   PlatformInterlockedCompareExchange32(volatile i32* ptr, i32 exchange, i32 comparand);
-        AE_CORE_API i32   PlatformInterlockedExchange32(volatile i32* ptr, i32 value);
-        AE_CORE_API i32   PlatformInterlockedIncrement32(volatile i32* ptr);
-        AE_CORE_API i32   PlatformInterlockedDecrement32(volatile i32* ptr);
-        AE_CORE_API i32   PlatformInterlockedExchangeAdd32(volatile i32* ptr, i32 add);
+        AE_CORE_API auto PlatformInterlockedCompareExchange32(volatile i32* ptr, i32 exchange, i32 comparand) -> i32;
+        AE_CORE_API auto PlatformInterlockedExchange32(volatile i32* ptr, i32 value) -> i32;
+        AE_CORE_API auto PlatformInterlockedIncrement32(volatile i32* ptr) -> i32;
+        AE_CORE_API i32  PlatformInterlockedDecrement32(volatile i32* ptr);
+        AE_CORE_API i32  PlatformInterlockedExchangeAdd32(volatile i32* ptr, i32 add);
 
-        AE_CORE_API i64   PlatformInterlockedCompareExchange64(volatile i64* ptr, i64 exchange, i64 comparand);
-        AE_CORE_API i64   PlatformInterlockedExchange64(volatile i64* ptr, i64 value);
-        AE_CORE_API i64   PlatformInterlockedIncrement64(volatile i64* ptr);
-        AE_CORE_API i64   PlatformInterlockedDecrement64(volatile i64* ptr);
-        AE_CORE_API i64   PlatformInterlockedExchangeAdd64(volatile i64* ptr, i64 add);
+        AE_CORE_API i64  PlatformInterlockedCompareExchange64(volatile i64* ptr, i64 exchange, i64 comparand);
+        AE_CORE_API i64  PlatformInterlockedExchange64(volatile i64* ptr, i64 value);
+        AE_CORE_API i64  PlatformInterlockedIncrement64(volatile i64* ptr);
+        AE_CORE_API i64  PlatformInterlockedDecrement64(volatile i64* ptr);
+        AE_CORE_API i64  PlatformInterlockedExchangeAdd64(volatile i64* ptr, i64 add);
 
     } // extern "C"
 
@@ -80,6 +80,7 @@ namespace AltinaEngine::Core::Platform
     // Memory management
     struct FMemoryAllocator
     {
+        virtual ~FMemoryAllocator()                                               = default;
         virtual void* MemoryAllocate(usize Size, usize Alignment)                 = 0;
         virtual void* MemoryReallocate(void* Ptr, usize NewSize, usize Alignment) = 0;
         virtual void  MemoryFree(void* Ptr)                                       = 0;

@@ -9,7 +9,10 @@
 #include "../Container/Vector.h"
 #include "../Threading/Atomic.h"
 
-namespace std { class thread; }
+namespace std
+{
+    class thread;
+}
 
 namespace AltinaEngine::Core::Jobs
 {
@@ -18,16 +21,15 @@ namespace AltinaEngine::Core::Jobs
     using Container::TFunction;
     using Container::TThreadSafeQueue;
     using Container::TVector;
-    using Threading::FMutex;
     using Threading::FEvent;
+    using Threading::FMutex;
     using Threading::TAtomic;
-
 
     struct FWorkerPoolConfig
     {
-        usize MinThreads  = 1;
-        usize MaxThreads  = 4;
-        bool  bAllowSteal = false; // reserved for future
+        usize mMinThreads = 1;
+        usize mMaxThreads = 4;
+        bool  mAllowSteal = false; // reserved for future
     };
 
     class AE_CORE_API FWorkerPool
@@ -48,26 +50,26 @@ namespace AltinaEngine::Core::Jobs
         // Submit a job with a priority (higher value == higher priority). Priority is advisory.
         void SubmitWithPriority(TFunction<void()> Job, int Priority);
 
-        bool IsRunning() const noexcept { return bRunning.Load() != 0; }
+        auto IsRunning() const noexcept -> bool { return mRunning.Load() != 0; }
 
     private:
         void              WorkerMain();
 
-        FWorkerPoolConfig Config;
+        FWorkerPoolConfig mConfig;
         struct FJobEntry
         {
-            TFunction<void()> Task;
-            int               Priority    = 0;
-            u64               ExecuteAtMs = 0; // milliseconds since epoch
+            TFunction<void()> mTask;
+            int               mPriority    = 0;
+            u64               mExecuteAtMs = 0; // milliseconds since epoch
         };
 
-        TThreadSafeQueue<FJobEntry> JobQueue;
+        TThreadSafeQueue<FJobEntry> mJobQueue;
         // Delayed jobs stored separately and moved to JobQueue when due
-        TVector<FJobEntry> DelayedJobs;
-        FMutex              DelayedJobsMutex;
-        FEvent              WakeEvent{ false, Threading::EEventResetMode::Auto };
-        TVector<void*>      Threads; // opaque thread pointers (implementation hides std::thread)
-        TAtomic<i32>        bRunning{ static_cast<i32>(0) };
+        TVector<FJobEntry>          mDelayedJobs;
+        FMutex                      mDelayedJobsMutex;
+        FEvent                      mWakeEvent{ false, Threading::EEventResetMode::Auto };
+        TVector<void*>              mThreads; // opaque thread pointers (implementation hides std::thread)
+        TAtomic<i32>                mRunning{ static_cast<i32>(0) };
     };
 
 } // namespace AltinaEngine::Core::Jobs

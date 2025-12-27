@@ -6,27 +6,27 @@ namespace AltinaEngine::Core::Threading
 
     using namespace AltinaEngine::Core::Platform::Generic;
 
-    FMutex::FMutex() noexcept { Impl = PlatformCreateCriticalSection(); }
+    FMutex::FMutex() noexcept { mImpl = PlatformCreateCriticalSection(); }
 
     FMutex::~FMutex() noexcept
     {
-        if (Impl)
+        if (mImpl)
         {
-            PlatformDeleteCriticalSection(Impl);
-            Impl = nullptr;
+            PlatformDeleteCriticalSection(mImpl);
+            mImpl = nullptr;
         }
     }
 
-    void  FMutex::Lock() noexcept { PlatformEnterCriticalSection(Impl); }
+    void FMutex::Lock() noexcept { PlatformEnterCriticalSection(mImpl); }
 
-    bool  FMutex::TryLock() noexcept { return PlatformTryEnterCriticalSection(Impl) != 0; }
+    auto FMutex::TryLock() noexcept -> bool { return PlatformTryEnterCriticalSection(mImpl) != 0; }
 
-    void  FMutex::Unlock() noexcept { PlatformLeaveCriticalSection(Impl); }
+    void FMutex::Unlock() noexcept { PlatformLeaveCriticalSection(mImpl); }
 
-    void* FMutex::GetNative() const noexcept { return Impl; }
+    auto FMutex::GetNative() const noexcept -> void* { return mImpl; }
 
-    FScopedLock::FScopedLock(FMutex& InMutex) noexcept : Mutex(InMutex) { Mutex.Lock(); }
+    FScopedLock::FScopedLock(FMutex& InMutex) noexcept : mMutex(InMutex) { mMutex.Lock(); }
 
-    FScopedLock::~FScopedLock() noexcept { Mutex.Unlock(); }
+    FScopedLock::~FScopedLock() noexcept { mMutex.Unlock(); }
 
 } // namespace AltinaEngine::Core::Threading

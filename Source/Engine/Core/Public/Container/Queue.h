@@ -8,19 +8,19 @@ namespace AltinaEngine::Core::Container
     template <typename T, typename C = TDeque<T>> class TQueue
     {
     public:
-        using value_type = T;
-        using size_type  = usize;
+        using TValueType = T;
+        using TSizeType  = usize;
 
-        bool              IsEmpty() const noexcept { return mContainer.IsEmpty(); }
-        size_type         Size() const noexcept { return mContainer.Size(); }
+        [[nodiscard]] auto IsEmpty() const noexcept -> bool { return mContainer.IsEmpty(); }
+        [[nodiscard]] auto Size() const noexcept -> TSizeType { return mContainer.Size(); }
 
-        void              Push(const value_type& v) { mContainer.PushBack(v); }
-        void              Push(value_type&& v) { mContainer.PushBack(AltinaEngine::Move(v)); }
+        void               Push(const TValueType& v) { mContainer.PushBack(v); }
+        void               Push(TValueType&& v) { mContainer.PushBack(AltinaEngine::Move(v)); }
 
-        void              Pop() { mContainer.PopFront(); }
+        void               Pop() { mContainer.PopFront(); }
 
-        value_type&       Front() { return mContainer.Front(); }
-        const value_type& Front() const { return mContainer.Front(); }
+        auto               Front() -> TValueType& { return mContainer.Front(); }
+        auto               Front() const -> const TValueType& { return mContainer.Front(); }
 
     private:
         C mContainer;

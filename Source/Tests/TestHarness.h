@@ -81,28 +81,27 @@ namespace Test
 
 #define REQUIRE_CLOSE(a, b, eps) Test::RequireClose((a), (b), (eps), #a, #b, __FILE__, __LINE__)
 
-// Inline helpers replace previous do/while(0) macros to satisfy
-// cppcoreguidelines-avoid-do-while while preserving diagnostics.
-template <typename T>
-inline void Require(T&& expr, const char* exprText, const char* file, int line)
-{
-    ++current_checks;
-    if (!static_cast<bool>(expr))
+    // Inline helpers replace previous do/while(0) macros to satisfy
+    // cppcoreguidelines-avoid-do-while while preserving diagnostics.
+    template <typename T> inline void Require(T&& expr, const char* exprText, const char* file, int line)
     {
-        ++current_failures;
-        std::cerr << "FAIL: " << file << ":" << line << " - " << exprText << '\n';
+        ++current_checks;
+        if (!static_cast<bool>(expr))
+        {
+            ++current_failures;
+            std::cerr << "FAIL: " << file << ":" << line << " - " << exprText << '\n';
+        }
     }
-}
 
-template<typename T, typename U, typename E>
-inline void RequireClose(T a, U b, E eps, const char* aText, const char* bText, const char* file, int line)
-{
-    ++current_checks;
-    if (std::fabs((double)a - (double)b) > (double)eps)
+    template <typename T, typename U, typename E>
+    inline void RequireClose(T a, U b, E eps, const char* aText, const char* bText, const char* file, int line)
     {
-        ++current_failures;
-        std::cerr << "FAIL: " << file << ":" << line << " - close(" << aText << "," << bText << ")" << '\n';
+        ++current_checks;
+        if (std::fabs((double)a - (double)b) > (double)eps)
+        {
+            ++current_failures;
+            std::cerr << "FAIL: " << file << ":" << line << " - close(" << aText << "," << bText << ")" << '\n';
+        }
     }
-}
 
 } // namespace Test

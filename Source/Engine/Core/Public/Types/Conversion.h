@@ -11,11 +11,11 @@ namespace AltinaEngine
 
     template <typename TDst, typename TSrc>
         requires(ISameSizeAs<TDst, TSrc>)
-    [[nodiscard]] AE_FORCEINLINE constexpr TDst BitCast(TSrc Value) noexcept
+    [[nodiscard]] AE_FORCEINLINE constexpr auto BitCast(TSrc Value) noexcept -> TDst
     {
-        TDst Dst;
-        std::memcpy(&Dst, &Value, sizeof(TDst));
-        return Dst;
+        TDst dst;
+        std::memcpy(&dst, &Value, sizeof(TDst));
+        return dst;
     }
 
 } // namespace AltinaEngine

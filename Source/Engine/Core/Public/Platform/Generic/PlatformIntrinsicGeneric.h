@@ -4,29 +4,29 @@
 namespace AltinaEngine::Core::Platform::Detail
 {
 
-    inline constexpr u32 PopCount32Impl(u32 Value) noexcept
+    constexpr auto PopCount32Impl(u32 Value) noexcept -> u32
     {
-        u32 Count = 0;
+        u32 count = 0;
         while (Value)
         {
-            Count += Value & 1U;
+            count += Value & 1U;
             Value >>= 1U;
         }
-        return Count;
+        return count;
     }
 
-    inline constexpr u32 PopCount64Impl(u64 Value) noexcept
+    constexpr auto PopCount64Impl(u64 Value) noexcept -> u32
     {
-        u32 Count = 0;
+        u32 count = 0;
         while (Value)
         {
-            Count += static_cast<u32>(Value & 1ULL);
+            count += static_cast<u32>(Value & 1ULL);
             Value >>= 1ULL;
         }
-        return Count;
+        return count;
     }
 
-    inline constexpr u32 CountLeadingZeros32Impl(u32 Value) noexcept
+    constexpr auto CountLeadingZeros32Impl(u32 Value) noexcept -> u32
     {
         if (Value == 0U)
         {
@@ -41,7 +41,7 @@ namespace AltinaEngine::Core::Platform::Detail
         return Count;
     }
 
-    inline constexpr u32 CountLeadingZeros64Impl(u64 Value) noexcept
+    constexpr auto CountLeadingZeros64Impl(u64 Value) noexcept -> u32
     {
         if (Value == 0ULL)
         {
@@ -56,34 +56,34 @@ namespace AltinaEngine::Core::Platform::Detail
         return Count;
     }
 
-    inline constexpr u32 CountTrailingZeros32Impl(u32 Value) noexcept
+    constexpr auto CountTrailingZeros32Impl(u32 Value) noexcept -> u32
     {
         if (Value == 0U)
         {
             return 32U;
         }
-        u32 Count = 0;
+        u32 count = 0;
         while ((Value & 1U) == 0U)
         {
-            ++Count;
+            ++count;
             Value >>= 1U;
         }
-        return Count;
+        return count;
     }
 
-    inline constexpr u32 CountTrailingZeros64Impl(u64 Value) noexcept
+    constexpr auto CountTrailingZeros64Impl(u64 Value) noexcept -> u32
     {
         if (Value == 0ULL)
         {
             return 64U;
         }
-        u32 Count = 0;
+        u32 count = 0;
         while ((Value & 1ULL) == 0ULL)
         {
-            ++Count;
+            ++count;
             Value >>= 1ULL;
         }
-        return Count;
+        return count;
     }
 
 } // namespace AltinaEngine::Core::Platform::Detail

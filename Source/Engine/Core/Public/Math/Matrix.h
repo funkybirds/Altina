@@ -3,20 +3,22 @@
 #include "Types/Aliases.h"
 #include "Types/Concepts.h"
 #include "Vector.h"
-#include "Base/CoreAPI.h"
 
 namespace AltinaEngine::Core::Math
 {
     template <IScalar T, u32 Rows, u32 Cols> struct TMatrix
     {
-        T                                Elements[Rows][Cols]{};
+        T                            mElements[Rows][Cols]{};
 
-        [[nodiscard]] constexpr T&       operator()(u32 Row, u32 Col) noexcept { return Elements[Row][Col]; }
-        [[nodiscard]] constexpr const T& operator()(u32 Row, u32 Col) const noexcept { return Elements[Row][Col]; }
+        [[nodiscard]] constexpr auto operator()(u32 Row, u32 Col) noexcept -> T& { return mElements[Row][Col]; }
+        [[nodiscard]] constexpr auto operator()(u32 Row, u32 Col) const noexcept -> const T&
+        {
+            return mElements[Row][Col];
+        }
 
         // Row access: returns pointer to row elements (Cols length)
-        [[nodiscard]] constexpr T*       operator[](u32 Row) noexcept { return Elements[Row]; }
-        [[nodiscard]] constexpr const T* operator[](u32 Row) const noexcept { return Elements[Row]; }
+        [[nodiscard]] constexpr auto operator[](u32 Row) noexcept -> T* { return mElements[Row]; }
+        [[nodiscard]] constexpr auto operator[](u32 Row) const noexcept -> const T* { return mElements[Row]; }
 
         constexpr TMatrix() = default;
 
@@ -27,17 +29,14 @@ namespace AltinaEngine::Core::Math
             {
                 for (u32 c = 0U; c < Cols; ++c)
                 {
-                    Elements[r][c] = v;
+                    mElements[r][c] = v;
                 }
             }
         }
     };
 
-    using FMatrix3x3f = TMatrix<f32, 3U, 3U>;
-    using FMatrix4x4f = TMatrix<f32, 4U, 4U>;
-    // legacy aliases
-    using FMatrix3x3 = FMatrix3x3f;
-    using FMatrix4x4 = FMatrix4x4f;
+    using FMatrix3x3f = TMatrix<f32, 3U, 3U>; // NOLINT(*-identifier-naming)
+    using FMatrix4x4f = TMatrix<f32, 4U, 4U>; // NOLINT(*-identifier-naming)
 
 } // namespace AltinaEngine::Core::Math
 
@@ -45,59 +44,63 @@ namespace AltinaEngine::Core::Math
 namespace AltinaEngine::Core::Math
 {
     template <IScalar T, u32 R, u32 C>
-    [[nodiscard]] constexpr TMatrix<T, R, C> operator+(const TMatrix<T, R, C>& A, const TMatrix<T, R, C>& B) noexcept
+    [[nodiscard]] constexpr auto operator+(const TMatrix<T, R, C>& A, const TMatrix<T, R, C>& B) noexcept
+        -> TMatrix<T, R, C>
     {
-        TMatrix<T, R, C> Out;
+        TMatrix<T, R, C> out;
         for (u32 r = 0U; r < R; ++r)
         {
             for (u32 c = 0U; c < C; ++c)
             {
-                Out(r, c) = A.Elements[r][c] + B.Elements[r][c];
+                out(r, c) = A.mElements[r][c] + B.mElements[r][c];
             }
         }
-        return Out;
+        return out;
     }
 
     template <IScalar T, u32 R, u32 C>
-    [[nodiscard]] constexpr TMatrix<T, R, C> operator-(const TMatrix<T, R, C>& A, const TMatrix<T, R, C>& B) noexcept
+    [[nodiscard]] constexpr auto operator-(const TMatrix<T, R, C>& A, const TMatrix<T, R, C>& B) noexcept
+        -> TMatrix<T, R, C>
     {
-        TMatrix<T, R, C> Out;
+        TMatrix<T, R, C> out;
         for (u32 r = 0U; r < R; ++r)
         {
             for (u32 c = 0U; c < C; ++c)
             {
-                Out(r, c) = A.Elements[r][c] - B.Elements[r][c];
+                out(r, c) = A.mElements[r][c] - B.mElements[r][c];
             }
         }
-        return Out;
+        return out;
     }
 
     template <IScalar T, u32 R, u32 C>
-    [[nodiscard]] constexpr TMatrix<T, R, C> operator*(const TMatrix<T, R, C>& A, const TMatrix<T, R, C>& B) noexcept
+    [[nodiscard]] constexpr auto operator*(const TMatrix<T, R, C>& A, const TMatrix<T, R, C>& B) noexcept
+        -> TMatrix<T, R, C>
     {
-        TMatrix<T, R, C> Out;
+        TMatrix<T, R, C> out;
         for (u32 r = 0U; r < R; ++r)
         {
             for (u32 c = 0U; c < C; ++c)
             {
-                Out(r, c) = A.Elements[r][c] * B.Elements[r][c];
+                out(r, c) = A.mElements[r][c] * B.mElements[r][c];
             }
         }
-        return Out;
+        return out;
     }
 
     template <IScalar T, u32 R, u32 C>
-    [[nodiscard]] constexpr TMatrix<T, R, C> operator/(const TMatrix<T, R, C>& A, const TMatrix<T, R, C>& B) noexcept
+    [[nodiscard]] constexpr auto operator/(const TMatrix<T, R, C>& A, const TMatrix<T, R, C>& B) noexcept
+        -> TMatrix<T, R, C>
     {
-        TMatrix<T, R, C> Out;
+        TMatrix<T, R, C> out;
         for (u32 r = 0U; r < R; ++r)
         {
             for (u32 c = 0U; c < C; ++c)
             {
-                Out(r, c) = A.Elements[r][c] / B.Elements[r][c];
+                out(r, c) = A.mElements[r][c] / B.mElements[r][c];
             }
         }
-        return Out;
+        return out;
     }
 
 } // namespace AltinaEngine::Core::Math
@@ -106,17 +109,17 @@ namespace AltinaEngine::Core::Math
 namespace AltinaEngine::Core::Math
 {
     template <IScalar T, u32 R, u32 C>
-    [[nodiscard]] constexpr TMatrix<T, C, R> Transpose(const TMatrix<T, R, C>& M) noexcept
+    [[nodiscard]] constexpr auto Transpose(const TMatrix<T, R, C>& M) noexcept -> TMatrix<T, C, R>
     {
-        TMatrix<T, C, R> Out(T{});
+        TMatrix<T, C, R> out(T{});
         for (u32 r = 0U; r < R; ++r)
         {
             for (u32 c = 0U; c < C; ++c)
             {
-                Out(c, r) = M.Elements[r][c];
+                out(c, r) = M.mElements[r][c];
             }
         }
-        return Out;
+        return out;
     }
 
 } // namespace AltinaEngine::Core::Math
@@ -125,19 +128,19 @@ namespace AltinaEngine::Core::Math
 namespace AltinaEngine::Core::Math
 {
     template <IScalar T, u32 R, u32 C>
-    [[nodiscard]] constexpr TVector<T, R> MatMul(const TMatrix<T, R, C>& M, const TVector<T, C>& v) noexcept
+    [[nodiscard]] constexpr auto MatMul(const TMatrix<T, R, C>& M, const TVector<T, C>& v) noexcept -> TVector<T, R>
     {
-        TVector<T, R> Out(T{});
+        TVector<T, R> out(T{});
         for (u32 r = 0U; r < R; ++r)
         {
             T sum = T{};
             for (u32 c = 0U; c < C; ++c)
             {
-                sum += M.Elements[r][c] * v[c];
+                sum += M.mElements[r][c] * v[c];
             }
-            Out[r] = sum;
+            out[r] = sum;
         }
-        return Out;
+        return out;
     }
 
 } // namespace AltinaEngine::Core::Math
@@ -146,9 +149,10 @@ namespace AltinaEngine::Core::Math
 namespace AltinaEngine::Core::Math
 {
     template <IScalar T, u32 R, u32 K, u32 C>
-    [[nodiscard]] constexpr TMatrix<T, R, C> MatMul(const TMatrix<T, R, K>& A, const TMatrix<T, K, C>& B) noexcept
+    [[nodiscard]] constexpr auto MatMul(const TMatrix<T, R, K>& A, const TMatrix<T, K, C>& B) noexcept
+        -> TMatrix<T, R, C>
     {
-        TMatrix<T, R, C> Out(T{});
+        TMatrix<T, R, C> out(T{});
         for (u32 r = 0U; r < R; ++r)
         {
             for (u32 c = 0U; c < C; ++c)
@@ -156,12 +160,12 @@ namespace AltinaEngine::Core::Math
                 T sum = T{};
                 for (u32 k = 0U; k < K; ++k)
                 {
-                    sum += A.Elements[r][k] * B.Elements[k][c];
+                    sum += A.mElements[r][k] * B.mElements[k][c];
                 }
-                Out(r, c) = sum;
+                out(r, c) = sum;
             }
         }
-        return Out;
+        return out;
     }
 
 } // namespace AltinaEngine::Core::Math

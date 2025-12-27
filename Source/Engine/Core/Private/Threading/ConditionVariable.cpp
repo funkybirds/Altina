@@ -7,24 +7,24 @@ namespace AltinaEngine::Core::Threading
 
     using namespace AltinaEngine::Core::Platform::Generic;
 
-    FConditionVariable::FConditionVariable() noexcept { Impl = PlatformCreateConditionVariable(); }
+    FConditionVariable::FConditionVariable() noexcept : mImpl(PlatformCreateConditionVariable()) {}
 
     FConditionVariable::~FConditionVariable() noexcept
     {
-        if (Impl)
+        if (mImpl)
         {
-            PlatformDeleteConditionVariable(Impl);
-            Impl = nullptr;
+            PlatformDeleteConditionVariable(mImpl);
+            mImpl = nullptr;
         }
     }
 
-    void FConditionVariable::NotifyOne() noexcept { PlatformWakeConditionVariable(Impl); }
+    void FConditionVariable::NotifyOne() noexcept { PlatformWakeConditionVariable(mImpl); }
 
-    void FConditionVariable::NotifyAll() noexcept { PlatformWakeAllConditionVariable(Impl); }
+    void FConditionVariable::NotifyAll() noexcept { PlatformWakeAllConditionVariable(mImpl); }
 
-    bool FConditionVariable::Wait(FMutex& Mutex, unsigned long Milliseconds) noexcept
+    auto FConditionVariable::Wait(FMutex& Mutex, unsigned long Milliseconds) noexcept -> bool
     {
-        return PlatformSleepConditionVariableCS(Impl, Mutex.GetNative(), Milliseconds) != 0;
+        return PlatformSleepConditionVariableCS(mImpl, Mutex.GetNative(), Milliseconds) != 0;
     }
 
 } // namespace AltinaEngine::Core::Threading

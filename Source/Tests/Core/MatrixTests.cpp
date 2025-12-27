@@ -7,7 +7,7 @@ using namespace AltinaEngine::Core::Math;
 
 TEST_CASE("Matrix - element access and fill")
 {
-    FMatrix3x3 m(3.0f);
+    FMatrix3x3f m(3.0f);
     REQUIRE_CLOSE(m(0, 0), 3.0F, 1e-6F);
     REQUIRE_CLOSE(m(1, 1), 3.0F, 1e-6F);
     REQUIRE_CLOSE(m(2, 2), 3.0F, 1e-6F);
@@ -18,10 +18,10 @@ TEST_CASE("Matrix - element access and fill")
 
 TEST_CASE("Matrix - elementwise ops")
 {
-    FMatrix3x3 A(1.0f);
-    FMatrix3x3 B(2.0f);
+    FMatrix3x3f A(1.0f);
+    FMatrix3x3f B(2.0f);
 
-    auto       C = A + B;
+    auto        C = A + B;
     REQUIRE_CLOSE(C(0, 0), 3.0F, 1e-6F);
 
     auto D = B - A;
@@ -36,7 +36,7 @@ TEST_CASE("Matrix - elementwise ops")
 
 TEST_CASE("Matrix - multiply vector")
 {
-    FMatrix3x3 I(0.0f);
+    FMatrix3x3f I(0.0f);
     I(0, 0) = 1.0F;
     I(1, 1) = 1.0F;
     I(2, 2) = 1.0F;

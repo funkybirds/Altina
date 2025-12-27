@@ -8,24 +8,24 @@
 
 namespace AltinaEngine::Core::Container
 {
-    using AltinaEngine::Core::Math::FNumericConstants;
+    using Math::FNumericConstants;
 
     // Does not expose any constructor that directly takes a raw pointer.
     template <typename T, usize Extent = FNumericConstants::kDynamicSized> class TSpan
     {
     public:
-        using element_type    = T;
-        using value_type      = typename TRemoveCV<T>::Type;
-        using size_type       = usize;
-        using difference_type = isize;
-        using pointer         = element_type*;
-        using const_pointer   = const element_type*;
-        using reference       = element_type&;
-        using const_reference = const element_type&;
-        using iterator        = pointer;
-        using const_iterator  = const_pointer;
+        using TElementType    = T;
+        using TValueType      = TRemoveCV<T>::Type;
+        using TSizeType       = usize;
+        using TDifferenceType = isize;
+        using TPointer        = TElementType*;
+        using TConstPointer   = const TElementType*;
+        using TReference      = TElementType&;
+        using TConstReference = const TElementType&;
+        using TIterator       = TPointer;
+        using TConstIterator  = TConstPointer;
 
-        static constexpr size_type kExtent = Extent;
+        static constexpr TSizeType kExtent = Extent;
 
         // Default constructor only for dynamic extent
         constexpr TSpan() noexcept
@@ -35,7 +35,7 @@ namespace AltinaEngine::Core::Container
         }
 
         // From C-style array (non-const)
-        template <usize N> constexpr TSpan(element_type (&array)[N]) noexcept : mData(array), mSize(N)
+        template <usize N> constexpr TSpan(TElementType (&array)[N]) noexcept : mData(array), mSize(N)
         {
             static_assert(Extent == FNumericConstants::kDynamicSized || Extent == N,
                 "TSpan static extent must match source size");
@@ -43,7 +43,7 @@ namespace AltinaEngine::Core::Container
 
         // From C-style array (const)
         template <usize N>
-        constexpr TSpan(const element_type (&array)[N]) noexcept : mData(const_cast<element_type*>(array)), mSize(N)
+        constexpr TSpan(const TElementType (&array)[N]) noexcept : mData(const_cast<TElementType*>(array)), mSize(N)
         {
             static_assert(Extent == FNumericConstants::kDynamicSized || Extent == N,
                 "TSpan static extent must match source size");
@@ -51,16 +51,16 @@ namespace AltinaEngine::Core::Container
 
         // From fixed-size engine array
         template <usize N>
-        constexpr TSpan(TArray<element_type, N>& array) noexcept
-            : mData(array.Data()), mSize(TArray<element_type, N>::Size())
+        constexpr TSpan(TArray<TElementType, N>& array) noexcept
+            : mData(array.Data()), mSize(TArray<TElementType, N>::Size())
         {
             static_assert(Extent == FNumericConstants::kDynamicSized || Extent == N,
                 "TSpan static extent must match source size");
         }
 
         template <usize N>
-        constexpr TSpan(const TArray<element_type, N>& array) noexcept
-            : mData(const_cast<element_type*>(array.Data())), mSize(TArray<element_type, N>::Size())
+        constexpr TSpan(const TArray<TElementType, N>& array) noexcept
+            : mData(const_cast<TElementType*>(array.Data())), mSize(TArray<TElementType, N>::Size())
         {
             static_assert(Extent == FNumericConstants::kDynamicSized || Extent == N,
                 "TSpan static extent must match source size");
@@ -68,62 +68,68 @@ namespace AltinaEngine::Core::Container
 
         // From dynamic engine vector (dynamic extent only)
         template <typename TAllocatorType>
-        constexpr TSpan(TVector<element_type, TAllocatorType>& vector) noexcept
+        constexpr TSpan(TVector<TElementType, TAllocatorType>& vector) noexcept
             : mData(vector.IsEmpty() ? nullptr : &vector[0]), mSize(vector.Size())
         {
             static_assert(Extent == FNumericConstants::kDynamicSized, "TSpan over TVector must use dynamic extent");
         }
 
         template <typename TAllocatorType>
-        constexpr TSpan(const TVector<element_type, TAllocatorType>& vector) noexcept
-            : mData(vector.IsEmpty() ? nullptr : const_cast<element_type*>(&vector[0])), mSize(vector.Size())
+        constexpr TSpan(const TVector<TElementType, TAllocatorType>& vector) noexcept
+            : mData(vector.IsEmpty() ? nullptr : const_cast<TElementType*>(&vector[0])), mSize(vector.Size())
         {
             static_assert(Extent == FNumericConstants::kDynamicSized, "TSpan over TVector must use dynamic extent");
         }
 
         // Observers
-        [[nodiscard]] constexpr size_type Size() const noexcept { return mSize; }
+        [[nodiscard]] constexpr auto Size() const noexcept -> TSizeType { return mSize; }
 
-        [[nodiscard]] constexpr bool      IsEmpty() const noexcept { return mSize == 0; }
+        [[nodiscard]] constexpr auto IsEmpty() const noexcept -> bool { return mSize == 0; }
 
-        [[nodiscard]] constexpr size_type ExtentValue() const noexcept
+        [[nodiscard]] constexpr auto ExtentValue() const noexcept -> TSizeType
         {
             return (Extent == FNumericConstants::kDynamicSized) ? mSize : Extent;
         }
 
         // Element access
-        [[nodiscard]] reference       operator[](size_type index) noexcept { return mData[index]; }
+        [[nodiscard]] auto operator[](TSizeType index) noexcept -> TReference { return mData[index]; }
 
-        [[nodiscard]] const_reference operator[](size_type index) const noexcept { return mData[index]; }
+        [[nodiscard]] auto operator[](TSizeType index) const noexcept -> TConstReference { return mData[index]; }
 
-        [[nodiscard]] reference       Front() noexcept { return mData[0]; }
+        [[nodiscard]] auto Front() noexcept -> TReference { return mData[0]; }
 
-        [[nodiscard]] const_reference Front() const noexcept { return mData[0]; }
+        [[nodiscard]] auto Front() const noexcept -> TConstReference { return mData[0]; }
 
-        [[nodiscard]] reference       Back() noexcept { return mData[mSize - 1]; }
+        [[nodiscard]] auto Back() noexcept -> TReference { return mData[mSize - 1]; }
 
-        [[nodiscard]] const_reference Back() const noexcept { return mData[mSize - 1]; }
+        [[nodiscard]] auto Back() const noexcept -> TConstReference { return mData[mSize - 1]; }
 
-        [[nodiscard]] pointer         Data() noexcept { return mData; }
+        [[nodiscard]] auto Data() noexcept -> TPointer { return mData; }
 
-        [[nodiscard]] const_pointer   Data() const noexcept { return mData; }
+        [[nodiscard]] auto Data() const noexcept -> TConstPointer { return mData; }
 
         // Iteration
-        [[nodiscard]] iterator        begin() noexcept { return mData; }
+        [[nodiscard]] auto begin() noexcept -> TIterator { return mData; } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] const_iterator  begin() const noexcept { return mData; }
+        [[nodiscard]] auto begin() const noexcept -> TConstIterator { return mData; } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] const_iterator  cbegin() const noexcept { return mData; }
+        [[nodiscard]] auto cbegin() const noexcept -> TConstIterator { return mData; } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] iterator        end() noexcept { return mData + mSize; }
+        [[nodiscard]] auto end() noexcept -> TIterator { return mData + mSize; } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] const_iterator  end() const noexcept { return mData + mSize; }
+        [[nodiscard]] auto end() const noexcept -> TConstIterator
+        {
+            return mData + mSize;
+        } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] const_iterator  cend() const noexcept { return mData + mSize; }
+        [[nodiscard]] auto cend() const noexcept -> TConstIterator
+        {
+            return mData + mSize;
+        } // NOLINT(*-identifier-naming)
 
     private:
-        pointer   mData;
-        size_type mSize;
+        TPointer  mData;
+        TSizeType mSize;
     };
 
 } // namespace AltinaEngine::Core::Container

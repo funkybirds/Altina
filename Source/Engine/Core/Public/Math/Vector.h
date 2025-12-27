@@ -2,41 +2,40 @@
 
 #include "Types/Aliases.h"
 #include "Types/Concepts.h"
-#include "Base/CoreAPI.h"
 
 namespace AltinaEngine::Core::Math
 {
 
     template <IScalar T, u32 ComponentCount> struct TVector
     {
-        T                                Components[ComponentCount]{};
+        T                            mComponents[ComponentCount]{};
 
-        [[nodiscard]] constexpr T&       operator[](u32 Index) noexcept { return Components[Index]; }
-        [[nodiscard]] constexpr const T& operator[](u32 Index) const noexcept { return Components[Index]; }
+        [[nodiscard]] constexpr auto operator[](u32 Index) noexcept -> T& { return mComponents[Index]; }
+        [[nodiscard]] constexpr auto operator[](u32 Index) const noexcept -> const T& { return mComponents[Index]; }
 
         // Convenience constructors for common vector sizes
         explicit constexpr TVector(T a, T b) noexcept
             requires(ComponentCount == 2)
         {
-            Components[0] = a;
-            Components[1] = b;
+            mComponents[0] = a;
+            mComponents[1] = b;
         }
 
         explicit constexpr TVector(T a, T b, T c) noexcept
             requires(ComponentCount == 3)
         {
-            Components[0] = a;
-            Components[1] = b;
-            Components[2] = c;
+            mComponents[0] = a;
+            mComponents[1] = b;
+            mComponents[2] = c;
         }
 
         explicit constexpr TVector(T a, T b, T c, T d) noexcept
             requires(ComponentCount == 4)
         {
-            Components[0] = a;
-            Components[1] = b;
-            Components[2] = c;
-            Components[3] = d;
+            mComponents[0] = a;
+            mComponents[1] = b;
+            mComponents[2] = c;
+            mComponents[3] = d;
         }
 
         // Set all components to the same value
@@ -44,130 +43,130 @@ namespace AltinaEngine::Core::Math
         {
             for (u32 i = 0U; i < ComponentCount; ++i)
             {
-                Components[i] = x;
+                mComponents[i] = x;
             }
         }
 
         // Component accessors
-        [[nodiscard]] constexpr T& X() noexcept
+        [[nodiscard]] constexpr auto X() noexcept -> T&
             requires(ComponentCount >= 1)
         {
-            return Components[0];
+            return mComponents[0];
         }
-        [[nodiscard]] constexpr const T& X() const noexcept
+        [[nodiscard]] constexpr auto X() const noexcept -> const T&
             requires(ComponentCount >= 1)
         {
-            return Components[0];
+            return mComponents[0];
         }
 
-        [[nodiscard]] constexpr T& Y() noexcept
+        [[nodiscard]] constexpr auto Y() noexcept -> T&
             requires(ComponentCount >= 2)
         {
-            return Components[1];
+            return mComponents[1];
         }
-        [[nodiscard]] constexpr const T& Y() const noexcept
+        [[nodiscard]] constexpr auto Y() const noexcept -> const T&
             requires(ComponentCount >= 2)
         {
-            return Components[1];
+            return mComponents[1];
         }
 
-        [[nodiscard]] constexpr T& Z() noexcept
+        [[nodiscard]] constexpr auto Z() noexcept -> T&
             requires(ComponentCount >= 3)
         {
-            return Components[2];
+            return mComponents[2];
         }
-        [[nodiscard]] constexpr const T& Z() const noexcept
+        [[nodiscard]] constexpr auto Z() const noexcept -> const T&
             requires(ComponentCount >= 3)
         {
-            return Components[2];
+            return mComponents[2];
         }
 
-        [[nodiscard]] constexpr T& W() noexcept
+        [[nodiscard]] constexpr auto W() noexcept -> T&
             requires(ComponentCount >= 4)
         {
-            return Components[3];
+            return mComponents[3];
         }
-        [[nodiscard]] constexpr const T& W() const noexcept
+        [[nodiscard]] constexpr auto W() const noexcept -> const T&
             requires(ComponentCount >= 4)
         {
-            return Components[3];
+            return mComponents[3];
         }
 
-        constexpr TVector& operator+=(const TVector& Rhs) noexcept
+        constexpr auto operator+=(const TVector& Rhs) noexcept -> TVector&
         {
             for (u32 i = 0U; i < ComponentCount; ++i)
             {
-                Components[i] += Rhs.Components[i];
+                mComponents[i] += Rhs.mComponents[i];
             }
             return *this;
         }
 
-        constexpr TVector& operator-=(const TVector& Rhs) noexcept
+        constexpr auto operator-=(const TVector& Rhs) noexcept -> TVector&
         {
             for (u32 i = 0U; i < ComponentCount; ++i)
             {
-                Components[i] -= Rhs.Components[i];
+                mComponents[i] -= Rhs.mComponents[i];
             }
             return *this;
         }
 
-        constexpr TVector& operator*=(const TVector& Rhs) noexcept
+        constexpr auto operator*=(const TVector& Rhs) noexcept -> TVector&
         {
             for (u32 i = 0U; i < ComponentCount; ++i)
             {
-                Components[i] *= Rhs.Components[i];
+                mComponents[i] *= Rhs.mComponents[i];
             }
             return *this;
         }
 
-        constexpr TVector& operator/=(const TVector& Rhs) noexcept
+        constexpr auto operator/=(const TVector& Rhs) noexcept -> TVector&
         {
             for (u32 i = 0U; i < ComponentCount; ++i)
             {
-                Components[i] /= Rhs.Components[i];
+                mComponents[i] /= Rhs.mComponents[i];
             }
             return *this;
         }
     };
 
     template <IScalar T, u32 ComponentCount>
-    [[nodiscard]] constexpr TVector<T, ComponentCount> operator+(
-        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept
+    [[nodiscard]] constexpr auto operator+(
+        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
     {
         Lhs += Rhs;
         return Lhs;
     }
 
     template <IScalar T, u32 ComponentCount>
-    [[nodiscard]] constexpr TVector<T, ComponentCount> operator-(
-        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept
+    [[nodiscard]] constexpr auto operator-(
+        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
     {
         Lhs -= Rhs;
         return Lhs;
     }
 
     template <IScalar T, u32 ComponentCount>
-    [[nodiscard]] constexpr TVector<T, ComponentCount> operator*(
-        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept
+    [[nodiscard]] constexpr auto operator*(
+        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
     {
         Lhs *= Rhs;
         return Lhs;
     }
 
     template <IScalar T, u32 ComponentCount>
-    [[nodiscard]] constexpr TVector<T, ComponentCount> operator/(
-        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept
+    [[nodiscard]] constexpr auto operator/(
+        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
     {
         Lhs /= Rhs;
         return Lhs;
     }
 
-    using FVector2f = TVector<f32, 2U>;
-    using FVector3f = TVector<f32, 3U>;
-    using FVector4f = TVector<f32, 4U>;
+    using FVector2f = TVector<f32, 2U>; // NOLINT(*-identifier-naming)
+    using FVector3f = TVector<f32, 3U>; // NOLINT(*-identifier-naming)
+    using FVector4f = TVector<f32, 4U>; // NOLINT(*-identifier-naming)
 
-    using FVector2i = TVector<i32, 2U>;
-    using FVector3i = TVector<i32, 3U>;
-    using FVector4i = TVector<i32, 4U>;
+    using FVector2i = TVector<i32, 2U>; // NOLINT(*-identifier-naming)
+    using FVector3i = TVector<i32, 3U>; // NOLINT(*-identifier-naming)
+    using FVector4i = TVector<i32, 4U>; // NOLINT(*-identifier-naming)
 
 } // namespace AltinaEngine::Core::Math

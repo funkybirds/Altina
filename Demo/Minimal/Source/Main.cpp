@@ -17,7 +17,7 @@ int main(int argc, char** argv)
     FStartupParameters StartupParams{};
     if (argc > 1)
     {
-        StartupParams.CommandLine = argv[1];
+        StartupParams.mCommandLine = argv[1];
     }
 
     FWindowsApplication Application(StartupParams);

@@ -1,21 +1,17 @@
 #include "../../Public/Math/Common.h"
 #include <cmath>
 
-namespace AltinaEngine::Core::Math
+namespace AltinaEngine::Core::Math::Details
 {
-    namespace Details
-    {
-        AE_CORE_API f32 SinF(f32 radians) noexcept { return static_cast<f32>(::std::sin(static_cast<float>(radians))); }
+    AE_CORE_API auto SinF(f32 radians) noexcept -> f32 { return sin(radians); }
 
-        AE_CORE_API f64 SinD(f64 radians) noexcept { return ::sin(static_cast<double>(radians)); }
+    AE_CORE_API auto SinD(f64 radians) noexcept -> f64 { return sin(radians); }
 
-        AE_CORE_API f32 CosF(f32 radians) noexcept { return static_cast<f32>(::std::cos(static_cast<float>(radians))); }
+    AE_CORE_API auto CosF(f32 radians) noexcept -> f32 { return cos(radians); }
 
-        AE_CORE_API f64 CosD(f64 radians) noexcept { return ::cos(static_cast<double>(radians)); }
+    AE_CORE_API auto CosD(f64 radians) noexcept -> f64 { return cos(radians); }
 
-        AE_CORE_API f32 SqrtF(f32 value) noexcept { return static_cast<f32>(::std::sqrt(static_cast<float>(value))); }
+    AE_CORE_API auto SqrtF(f32 value) noexcept -> f32 { return sqrt(value); }
 
-        AE_CORE_API f64 SqrtD(f64 value) noexcept { return ::sqrt(static_cast<double>(value)); }
-    } // namespace Details
-
-} // namespace AltinaEngine::Core::Math
+    AE_CORE_API auto SqrtD(f64 value) noexcept -> f64 { return sqrt(value); }
+} // namespace AltinaEngine::Core::Math::Details

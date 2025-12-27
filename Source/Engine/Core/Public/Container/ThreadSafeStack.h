@@ -9,54 +9,54 @@ namespace AltinaEngine::Core::Container
     template <typename T, typename C = TDeque<T>> class TThreadSafeStack
     {
     public:
-        using value_type = T;
-        using size_type  = usize;
+        using TValueType = T;
+        using TSizeType  = usize;
 
-        bool IsEmpty() const noexcept
+        auto IsEmpty() const noexcept -> bool
         {
-            AltinaEngine::Core::Threading::FScopedLock lock(const_cast<AltinaEngine::Core::Threading::FMutex&>(mMutex));
+            Threading::FScopedLock lock(const_cast<Threading::FMutex&>(mMutex));
             return mStack.IsEmpty();
         }
 
-        size_type Size() const noexcept
+        auto Size() const noexcept -> TSizeType
         {
-            AltinaEngine::Core::Threading::FScopedLock lock(const_cast<AltinaEngine::Core::Threading::FMutex&>(mMutex));
+            Threading::FScopedLock lock(const_cast<Threading::FMutex&>(mMutex));
             return mStack.Size();
         }
 
-        void Push(const value_type& v)
+        void Push(const TValueType& v)
         {
-            AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
+            Threading::FScopedLock lock(mMutex);
             mStack.Push(v);
         }
 
-        void Push(value_type&& v)
+        void Push(TValueType&& v)
         {
-            AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
+            Threading::FScopedLock lock(mMutex);
             mStack.Push(AltinaEngine::Move(v));
         }
 
         void Pop()
         {
-            AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
+            Threading::FScopedLock lock(mMutex);
             mStack.Pop();
         }
 
-        value_type Top()
+        auto Top() -> TValueType
         {
-            AltinaEngine::Core::Threading::FScopedLock lock(mMutex);
+            Threading::FScopedLock lock(mMutex);
             return mStack.Top();
         }
 
-        value_type TopConst() const
+        auto TopConst() const -> TValueType
         {
-            AltinaEngine::Core::Threading::FScopedLock lock(const_cast<AltinaEngine::Core::Threading::FMutex&>(mMutex));
+            Threading::FScopedLock lock(const_cast<Threading::FMutex&>(mMutex));
             return mStack.Top();
         }
 
     private:
-        TStack<T, C>                                  mStack;
-        mutable AltinaEngine::Core::Threading::FMutex mMutex;
+        TStack<T, C>              mStack;
+        mutable Threading::FMutex mMutex;
     };
 
 } // namespace AltinaEngine::Core::Container

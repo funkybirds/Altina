@@ -11,8 +11,8 @@
 #endif
 
 // Forward-declare minimal Windows types to avoid including Windows.h in public headers.
-typedef struct HINSTANCE__* HINSTANCE;
-typedef struct HWND__*      HWND;
+typedef struct HINSTANCE__* HINSTANCE; // NOLINT(*-use-using)
+typedef struct HWND__*      HWND;      // NOLINT(*-use-using)
 using DWORD   = unsigned long;
 using UINT    = unsigned int;
 using WPARAM  = unsigned long long;
@@ -34,24 +34,24 @@ namespace AltinaEngine::Application
         FWindowsPlatformWindow();
         ~FWindowsPlatformWindow() override;
 
-        bool                                  Initialize(const FPlatformWindowProperty& InProperties) override;
-        void                                  Show() override;
-        void                                  Hide() override;
-        void                                  Resize(u32 InWidth, u32 InHeight) override;
-        void                                  MoveTo(i32 InPositionX, i32 InPositionY) override;
-        void                                  Minimalize() override;
-        void                                  Maximalize() override;
+        auto               Initialize(const FPlatformWindowProperty& InProperties) -> bool override;
+        void               Show() override;
+        void               Hide() override;
+        void               Resize(u32 InWidth, u32 InHeight) override;
+        void               MoveTo(i32 InPositionX, i32 InPositionY) override;
+        void               Minimalize() override;
+        void               Maximalize() override;
 
-        [[nodiscard]] FWindowExtent           GetSize() const noexcept override;
-        [[nodiscard]] FPlatformWindowProperty GetProperties() const override;
-        [[nodiscard]] void*                   GetWindowHandle() const noexcept;
+        [[nodiscard]] auto GetSize() const noexcept -> FWindowExtent override;
+        [[nodiscard]] auto GetProperties() const -> FPlatformWindowProperty override;
+        [[nodiscard]] auto GetWindowHandle() const noexcept -> void*;
 
     private:
         static LRESULT CALLBACK WindowProc(HWND InWindowHandle, UINT InMessage, WPARAM InWParam, LPARAM InLParam);
 
         void                    RegisterWindowClass();
         void                    UpdateCachedSizeFromClientRect();
-        [[nodiscard]] DWORD     ResolveWindowStyle(const FPlatformWindowProperty& InProperties) const noexcept;
+        [[nodiscard]] auto      ResolveWindowStyle(const FPlatformWindowProperty& InProperties) const noexcept -> DWORD;
 
         void*                   mWindowHandle   = nullptr;
         void*                   mInstanceHandle = nullptr;
@@ -66,8 +66,8 @@ namespace AltinaEngine::Application
         ~FWindowsApplication() override = default;
 
     protected:
-        FWindowOwner CreatePlatformWindow() override;
-        void         PumpPlatformMessages() override;
+        auto CreatePlatformWindow() -> FWindowOwner override;
+        void PumpPlatformMessages() override;
     };
 
 } // namespace AltinaEngine::Application

@@ -1,14 +1,14 @@
 
 // Minimal event wrapper (manual-reset/auto-reset) using Win32 Event.
 #pragma once
-#include "../Base/CoreAPI.h"
+#include "Types/Traits.h"
 
 #include "Common.h"
 
 namespace AltinaEngine::Core::Threading
 {
 
-    enum class EEventResetMode
+    enum class EEventResetMode : u8
     {
         Auto,
         Manual
@@ -22,14 +22,14 @@ namespace AltinaEngine::Core::Threading
 
         void Set() noexcept;
         void Reset() noexcept;
-        bool Wait(unsigned long Milliseconds = kInfiniteWait) noexcept;
+        auto Wait(unsigned long Milliseconds = kInfiniteWait) noexcept -> bool;
 
         // Non-copyable
-        FEvent(const FEvent&)            = delete;
-        FEvent& operator=(const FEvent&) = delete;
+        FEvent(const FEvent&)                    = delete;
+        auto operator=(const FEvent&) -> FEvent& = delete;
 
     private:
-        void* Impl;
+        void* mImpl;
     };
 
 } // namespace AltinaEngine::Core::Threading

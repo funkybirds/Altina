@@ -6,21 +6,21 @@ namespace AltinaEngine::Application
 {
     namespace
     {
-        FPlatformWindowProperty NormalizeWindowProperties(FPlatformWindowProperty Properties)
+        auto NormalizeWindowProperties(FPlatformWindowProperty Properties) -> FPlatformWindowProperty
         {
-            if (Properties.Width == 0U)
+            if (Properties.mWidth == 0U)
             {
-                Properties.Width = 1U;
+                Properties.mWidth = 1U;
             }
 
-            if (Properties.Height == 0U)
+            if (Properties.mHeight == 0U)
             {
-                Properties.Height = 1U;
+                Properties.mHeight = 1U;
             }
 
-            if (Properties.Title.IsEmptyString())
+            if (Properties.mTitle.IsEmptyString())
             {
-                Properties.Title.Assign(TEXT("AltinaEngine"));
+                Properties.mTitle.Assign(TEXT("AltinaEngine"));
             }
 
             return Properties;
@@ -98,40 +98,43 @@ namespace AltinaEngine::Application
         mWindowProperties = NormalizeWindowProperties(InProperties);
     }
 
-    const FPlatformWindowProperty& FApplication::GetWindowProperties() const noexcept { return mWindowProperties; }
+    auto FApplication::GetWindowProperties() const noexcept -> const FPlatformWindowProperty&
+    {
+        return mWindowProperties;
+    }
 
-    const FStartupParameters&      FApplication::GetStartupParameters() const noexcept { return mStartupParameters; }
+    auto FApplication::GetStartupParameters() const noexcept -> const FStartupParameters& { return mStartupParameters; }
 
-    FPlatformWindow*               FApplication::GetMainWindow() noexcept { return mMainWindow.get(); }
+    auto FApplication::GetMainWindow() noexcept -> FPlatformWindow* { return mMainWindow.get(); }
 
-    void                           FApplication::RequestShutdown() noexcept { mIsRunning = false; }
+    void FApplication::RequestShutdown() noexcept { mIsRunning = false; }
 
-    void                           FApplication::PumpPlatformMessages() {}
+    void FApplication::PumpPlatformMessages() {}
 
-    void                           FApplication::EnsureWindow()
+    void FApplication::EnsureWindow()
     {
         if (mMainWindow)
         {
             return;
         }
 
-        const FPlatformWindowProperty NormalizedProperties = NormalizeWindowProperties(mWindowProperties);
+        const FPlatformWindowProperty normalizedProperties = NormalizeWindowProperties(mWindowProperties);
 
-        FWindowOwner                  PlatformWindow = CreatePlatformWindow();
-        if (!PlatformWindow)
+        FWindowOwner                  platformWindow = CreatePlatformWindow();
+        if (!platformWindow)
         {
             LogError(TEXT("CreatePlatformWindow returned null."));
             return;
         }
 
-        if (!PlatformWindow->Initialize(NormalizedProperties))
+        if (!platformWindow->Initialize(normalizedProperties))
         {
             LogError(TEXT("Platform window initialization failed."));
             return;
         }
 
-        mWindowProperties = PlatformWindow->GetProperties();
-        mMainWindow       = AltinaEngine::Move(PlatformWindow);
+        mWindowProperties = platformWindow->GetProperties();
+        mMainWindow       = Move(platformWindow);
     }
 
 } // namespace AltinaEngine::Application

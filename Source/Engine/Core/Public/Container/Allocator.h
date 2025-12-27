@@ -1,7 +1,6 @@
 #ifndef ALTINAENGINE_CORE_PUBLIC_CONTAINER_ALLOCATOR_H
 #define ALTINAENGINE_CORE_PUBLIC_CONTAINER_ALLOCATOR_H
 
-#include "../Base/CoreAPI.h"
 #include "../Platform/Generic/GenericPlatformDecl.h"
 #include "../Types/Traits.h"
 #include "ContainerConfig.h"
@@ -15,23 +14,23 @@ namespace AltinaEngine::Core::Container
      */
     template <typename T> struct TAllocator
     {
-        using value_type      = T;
-        using pointer         = value_type*;
-        using const_pointer   = const value_type*;
-        using reference       = value_type&;
-        using const_reference = const value_type&;
-        using size_type       = unsigned long long;
+        using TValueType      = T;
+        using TPointer        = TValueType*;
+        using TConstPointer   = const TValueType*;
+        using TReference      = TValueType&;
+        using TConstReference = const TValueType&;
+        using TSizeType       = unsigned long long;
 
         constexpr TAllocator() noexcept = default;
 
         template <typename U> constexpr TAllocator(const TAllocator<U>&) noexcept {}
 
-        template <typename U> struct rebind
+        template <typename U> struct Rebind
         {
-            using other = TAllocator<U>;
+            using TOther = TAllocator<U>;
         };
 
-        inline pointer Allocate(size_type n)
+        inline auto Allocate(const TSizeType n) -> TPointer
         {
             if (n == 0)
             {
@@ -40,67 +39,67 @@ namespace AltinaEngine::Core::Container
             using AltinaEngine::Core::Platform::FMemoryAllocator;
             using AltinaEngine::Core::Platform::GetGlobalMemoryAllocator;
 
-            FMemoryAllocator* Allocator = GetGlobalMemoryAllocator();
-            void* p = Allocator->MemoryAllocate(static_cast<usize>(n) * sizeof(value_type), alignof(value_type));
-            return static_cast<pointer>(p);
+            FMemoryAllocator* allocator = GetGlobalMemoryAllocator();
+            void* p = allocator->MemoryAllocate(static_cast<usize>(n) * sizeof(TValueType), alignof(TValueType));
+            return static_cast<TPointer>(p);
         }
 
-        inline pointer Allocate(size_type n, const_pointer /*hint*/) { return Allocate(n); }
+        inline auto Allocate(const TSizeType n, TConstPointer /*hint*/) -> TPointer { return Allocate(n); }
 
-        inline void    Deallocate(pointer p, size_type /*n*/) noexcept
+        inline void Deallocate(TPointer p, TSizeType /*n*/) noexcept
         {
             if (!p)
             {
                 return;
             }
 
-            using AltinaEngine::Core::Platform::FMemoryAllocator;
-            using AltinaEngine::Core::Platform::GetGlobalMemoryAllocator;
+            using Platform::FMemoryAllocator;
+            using Platform::GetGlobalMemoryAllocator;
 
-            FMemoryAllocator* Allocator = GetGlobalMemoryAllocator();
-            Allocator->MemoryFree(static_cast<void*>(p));
+            FMemoryAllocator* allocator = GetGlobalMemoryAllocator();
+            allocator->MemoryFree(static_cast<void*>(p));
         }
 
-        template <typename... Args> inline void Construct(pointer p, Args&&... args)
+        template <typename... Args> void Construct(TPointer p, Args&&... args)
         {
-            ::new (static_cast<void*>(p)) value_type(static_cast<Args&&>(args)...);
+            ::new (static_cast<void*>(p)) TValueType(static_cast<Args&&>(args)...);
         }
 
-        inline void Destroy(pointer p) noexcept
+        void Destroy(TPointer p) noexcept
         {
             if (p)
             {
-                p->~value_type();
+                p->~TValueType();
             }
         }
 
-        constexpr size_type MaxSize() const noexcept
+        [[nodiscard]] constexpr auto MaxSize() const noexcept -> TSizeType
         {
-            return static_cast<size_type>(~static_cast<size_type>(0)) / sizeof(value_type);
+            return ~static_cast<TSizeType>(0) / sizeof(TValueType);
         }
 
-        constexpr bool operator==(const TAllocator&) const noexcept { return true; }
-        constexpr bool operator!=(const TAllocator&) const noexcept { return false; }
+        constexpr auto operator==(const TAllocator&) const noexcept -> bool { return true; }
+        constexpr auto operator!=(const TAllocator&) const noexcept -> bool { return false; }
     };
 
     template <typename Alloc> struct TAllocatorTraits
     {
-        using allocator_type = Alloc;
-        using value_type     = typename Alloc::value_type;
-        using pointer        = typename Alloc::pointer;
-        using const_pointer  = typename Alloc::const_pointer;
-        using size_type      = typename Alloc::size_type;
+        using TAllocatorType = Alloc;
+        using TValueType     = Alloc::TValueType;
+        using TPointer       = Alloc::TPointer;
+        using TConstPointer  = Alloc::TConstPointer;
+        using TSizeType      = Alloc::TSizeType;
 
-        static pointer                          Allocate(Alloc& a, size_type n) { return a.Allocate(n); }
+        static auto                             Allocate(Alloc& a, TSizeType n) -> TPointer { return a.Allocate(n); }
 
-        static void                             Deallocate(Alloc& a, pointer p, size_type n) { a.Deallocate(p, n); }
+        static void                             Deallocate(Alloc& a, TPointer p, TSizeType n) { a.Deallocate(p, n); }
 
-        template <typename... Args> static void Construct(Alloc& a, pointer p, Args&&... args)
+        template <typename... Args> static void Construct(Alloc& a, TPointer p, Args&&... args)
         {
             a.Construct(p, AltinaEngine::Forward<Args>(args)...);
         }
 
-        static void Destroy(Alloc& a, pointer p) { a.Destroy(p); }
+        static void Destroy(Alloc& a, TPointer p) { a.Destroy(p); }
     };
 
     template <typename T> struct TDefaultDeleter
@@ -113,28 +112,25 @@ namespace AltinaEngine::Core::Container
             {
                 if constexpr (kSmartPtrUseManagedAllocator)
                 {
-                    TAllocator<T> Allocator;
-                    TAllocatorTraits<TAllocator<T>>::Destroy(Allocator, ptr);
-                    TAllocatorTraits<TAllocator<T>>::Deallocate(Allocator, ptr, 1);
+                    TAllocator<T> allocator;
+                    TAllocatorTraits<TAllocator<T>>::Destroy(allocator, ptr);
+                    TAllocatorTraits<TAllocator<T>>::Deallocate(allocator, ptr, 1);
                 }
                 else
                 {
-                    delete ptr;
+                    delete ptr; // NOLINT
                 }
             }
         }
     };
 
-    template <typename T> struct TDefaultDeleter<T[]>
+    template <typename T> struct TDefaultDeleter<T[]> // NOLINT
     {
         constexpr TDefaultDeleter() noexcept = default;
 
         void operator()(T* ptr) const
         {
-            if (ptr)
-            {
-                delete[] ptr;
-            }
+            delete[] ptr; // NOLINT
         }
     };
 

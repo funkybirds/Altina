@@ -11,18 +11,18 @@ namespace AltinaEngine::Core::Threading
         FMutex() noexcept;
         ~FMutex() noexcept;
 
-        void  Lock() noexcept;
-        bool  TryLock() noexcept;
-        void  Unlock() noexcept;
+        void               Lock() noexcept;
+        auto               TryLock() noexcept -> bool;
+        void               Unlock() noexcept;
 
-        void* GetNative() const noexcept;
+        [[nodiscard]] auto GetNative() const noexcept -> void*;
 
         // Non-copyable
-        FMutex(const FMutex&)            = delete;
-        FMutex& operator=(const FMutex&) = delete;
+        FMutex(const FMutex&)                    = delete;
+        auto operator=(const FMutex&) -> FMutex& = delete;
 
     private:
-        void* Impl; // Opaque pointer to platform implementation
+        void* mImpl; // Opaque pointer to platform implementation
     };
 
     class AE_CORE_API FScopedLock
@@ -32,11 +32,11 @@ namespace AltinaEngine::Core::Threading
         ~FScopedLock() noexcept;
 
         // Non-copyable
-        FScopedLock(const FScopedLock&)            = delete;
-        FScopedLock& operator=(const FScopedLock&) = delete;
+        FScopedLock(const FScopedLock&)                    = delete;
+        auto operator=(const FScopedLock&) -> FScopedLock& = delete;
 
     private:
-        FMutex& Mutex;
+        FMutex& mMutex;
     };
 
 } // namespace AltinaEngine::Core::Threading

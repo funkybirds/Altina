@@ -11,44 +11,41 @@ namespace AltinaEngine::Core::Container
 
     template <typename T, usize N> struct TArray
     {
-        using value_type      = T;
-        using size_type       = usize;
-        using pointer         = value_type*;
-        using const_pointer   = const value_type*;
-        using reference       = value_type&;
-        using const_reference = const value_type&;
-        using iterator        = value_type*;
-        using const_iterator  = const value_type*;
+        using TValueType      = T;
+        using TSizeType       = usize;
+        using TPointer        = TValueType*;
+        using TConstPointer   = const TValueType*;
+        using TReference      = TValueType&;
+        using TConstReference = const TValueType&;
+        using TIterator       = TValueType*;
+        using TConstIterator  = const TValueType*;
 
-        // Capacity / state
-        [[nodiscard]] static constexpr size_type Size() noexcept { return N; }
+        [[nodiscard]] static constexpr auto Size() noexcept -> TSizeType { return N; }
 
-        [[nodiscard]] static constexpr bool      IsEmpty() noexcept { return N == 0; }
+        [[nodiscard]] static constexpr auto IsEmpty() noexcept -> bool { return N == 0; }
 
-        // Data access
-        [[nodiscard]] pointer                    Data() noexcept { return mData; }
+        [[nodiscard]] auto                  Data() noexcept -> TPointer { return mData; }
 
-        [[nodiscard]] const_pointer              Data() const noexcept { return mData; }
+        [[nodiscard]] auto                  Data() const noexcept -> TConstPointer { return mData; }
 
-        [[nodiscard]] reference                  operator[](size_type index) noexcept { return mData[index]; }
+        [[nodiscard]] auto                  operator[](TSizeType index) noexcept -> TReference { return mData[index]; }
 
-        [[nodiscard]] const_reference            operator[](size_type index) const noexcept { return mData[index]; }
+        [[nodiscard]] auto operator[](TSizeType index) const noexcept -> TConstReference { return mData[index]; }
 
-        // Iteration (std::array-compatible names)
-        [[nodiscard]] iterator                   begin() noexcept { return mData; }
+        [[nodiscard]] auto begin() noexcept -> TIterator { return mData; } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] const_iterator             begin() const noexcept { return mData; }
+        [[nodiscard]] auto begin() const noexcept -> TConstIterator { return mData; } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] const_iterator             cbegin() const noexcept { return mData; }
+        [[nodiscard]] auto cbegin() const noexcept -> TConstIterator { return mData; } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] iterator                   end() noexcept { return mData + N; }
+        [[nodiscard]] auto end() noexcept -> TIterator { return mData + N; } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] const_iterator             end() const noexcept { return mData + N; }
+        [[nodiscard]] auto end() const noexcept -> TConstIterator { return mData + N; } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] const_iterator             cend() const noexcept { return mData + N; }
+        [[nodiscard]] auto cend() const noexcept -> TConstIterator { return mData + N; } // NOLINT(*-identifier-naming)
 
     private:
-        value_type mData[N > 0 ? N : 1]{};
+        TValueType mData[N > 0 ? N : 1]{}; // NOLINT
     };
 
 } // namespace AltinaEngine::Core::Container

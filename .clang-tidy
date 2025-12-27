@@ -3,20 +3,18 @@ Checks: >
   bugprone-*,
   performance-*,
   modernize-*,
+  -modernize-avoid-c-arrays,
   readability-identifier-naming,
-  cppcoreguidelines-*
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-c-arrays
 WarningsAsErrors: ''
 HeaderFilterRegex: 'Source/.*|Demo/.*'
 FormatStyle: file
 CheckOptions:
   - key: readability-identifier-naming.ClassCase
     value: CamelCase
-  - key: readability-identifier-naming.ClassPrefix
-    value: F
   - key: readability-identifier-naming.StructCase
     value: CamelCase
-  - key: readability-identifier-naming.StructPrefix
-    value: F
   - key: readability-identifier-naming.ClassTemplatePrefix
     value: T
   - key: readability-identifier-naming.StructTemplatePrefix
@@ -48,7 +46,7 @@ CheckOptions:
   - key: readability-identifier-naming.ProtectedMemberPrefix
     value: m
   - key: readability-identifier-naming.VariableCase
-    value: CamelCase
+    value: camelBack
   - key: readability-identifier-naming.GlobalFunctionCase
     value: CamelCase
   - key: readability-identifier-naming.NamespaceCase

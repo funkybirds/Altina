@@ -20,14 +20,14 @@ namespace AltinaEngine::Core::Threading
 
         // Waits with the provided mutex locked. Returns true if signaled, false on timeout.
         // Use `kInfiniteWait` for an infinite wait.
-        bool Wait(FMutex& Mutex, unsigned long Milliseconds = kInfiniteWait) noexcept;
+        auto Wait(FMutex& Mutex, unsigned long Milliseconds = kInfiniteWait) noexcept -> bool;
 
         // Non-copyable
-        FConditionVariable(const FConditionVariable&)            = delete;
-        FConditionVariable& operator=(const FConditionVariable&) = delete;
+        FConditionVariable(const FConditionVariable&)                    = delete;
+        auto operator=(const FConditionVariable&) -> FConditionVariable& = delete;
 
     private:
-        void* Impl;
+        void* mImpl;
     };
 
 } // namespace AltinaEngine::Core::Threading

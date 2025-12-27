@@ -7,23 +7,26 @@ namespace AltinaEngine::Core::Threading
     using namespace AltinaEngine::Core::Platform::Generic;
 
     FEvent::FEvent(bool bInitiallySignaled, EEventResetMode ResetMode) noexcept
+        : mImpl(PlatformCreateEvent(ResetMode == EEventResetMode::Manual ? 1 : 0, bInitiallySignaled ? 1 : 0))
     {
-        Impl = PlatformCreateEvent(ResetMode == EEventResetMode::Manual ? 1 : 0, bInitiallySignaled ? 1 : 0);
     }
 
     FEvent::~FEvent() noexcept
     {
-        if (Impl)
+        if (mImpl)
         {
-            PlatformCloseEvent(Impl);
-            Impl = nullptr;
+            PlatformCloseEvent(mImpl);
+            mImpl = nullptr;
         }
     }
 
-    void FEvent::Set() noexcept { PlatformSetEvent(Impl); }
+    void FEvent::Set() noexcept { PlatformSetEvent(mImpl); }
 
-    void FEvent::Reset() noexcept { PlatformResetEvent(Impl); }
+    void FEvent::Reset() noexcept { PlatformResetEvent(mImpl); }
 
-    bool FEvent::Wait(unsigned long Milliseconds) noexcept { return PlatformWaitForEvent(Impl, Milliseconds) != 0; }
+    auto FEvent::Wait(unsigned long Milliseconds) noexcept -> bool
+    {
+        return PlatformWaitForEvent(mImpl, Milliseconds) != 0;
+    }
 
 } // namespace AltinaEngine::Core::Threading

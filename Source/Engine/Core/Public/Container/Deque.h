@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Allocator.h"
-#include "ContainerConfig.h"
 
 namespace AltinaEngine::Core::Container
 {
@@ -22,193 +21,167 @@ namespace AltinaEngine::Core::Container
     template <typename T, typename TAllocator = TAllocator<T>> class TDeque
     {
     public:
-        using value_type     = T;
-        using allocator_type = TAllocator;
-        using size_type      = usize;
-        using pointer        = value_type*;
-        using reference      = value_type&;
+        using TValueType     = T;
+        using TAllocatorType = TAllocator;
+        using TSizeType      = usize;
+        using TPointer       = TValueType*;
+        using TReference     = TValueType&;
 
-        /**
-         * Forward iterator over the deque. Lightweight and single-pass.
-         * This iterator supports increment but is not a full RandomAccessIterator yet.
-         */
-        struct iterator
+        struct Iterator
         {
-            TDeque*   parent = nullptr;
-            size_type index  = 0;
+            TDeque*   mParent = nullptr;
+            TSizeType mIndex  = 0;
 
-            reference operator*() const { return parent->AtIndex(index); }
-            iterator& operator++()
+            auto      operator*() const -> TReference { return mParent->AtIndex(mIndex); }
+            auto      operator++() -> Iterator&
             {
-                ++index;
+                ++mIndex;
                 return *this;
             }
-            iterator operator++(int)
+            auto operator++(int) -> Iterator
             {
-                iterator tmp = *this;
+                Iterator tmp = *this;
                 ++*this;
                 return tmp;
             }
-            bool operator!=(const iterator& o) const { return index != o.index || parent != o.parent; }
-            bool operator==(const iterator& o) const { return !(*this != o); }
+            auto operator!=(const Iterator& o) const -> bool { return mIndex != o.mIndex || mParent != o.mParent; }
+            auto operator==(const Iterator& o) const -> bool { return !(*this != o); }
         };
 
-        /** Default-construct an empty deque. */
-        TDeque() noexcept : mData(nullptr), mCapacity(0), mSize(0), mHead(0), mAllocator() {}
+        TDeque() noexcept : mData(nullptr), mAllocator() {}
 
-        /** Destroy the deque and release storage. */
         ~TDeque()
         {
             Clear();
             if (mData)
             {
-                TAllocatorTraits<allocator_type>::Deallocate(mAllocator, mData, mCapacity);
+                TAllocatorTraits<TAllocatorType>::Deallocate(mAllocator, mData, mCapacity);
                 mData     = nullptr;
                 mCapacity = 0;
             }
         }
 
-        /** Return true when the container has no elements. */
-        bool      IsEmpty() const noexcept { return mSize == 0; }
-        /** Number of elements currently stored. */
-        size_type Size() const noexcept { return mSize; }
+        [[nodiscard]] auto IsEmpty() const noexcept -> bool { return mSize == 0; }
+        [[nodiscard]] auto Size() const noexcept -> TSizeType { return mSize; }
 
-        /**
-         * Destroy all elements and reset size to zero.
-         * Capacity is preserved.
-         */
-        void      Clear() noexcept
+        void               Clear() noexcept
         {
             if (mData)
             {
-                for (size_type i = 0; i < mSize; ++i)
+                for (TSizeType i = 0; i < mSize; ++i)
                 {
-                    size_type idx = (mHead + i) % mCapacity;
-                    TAllocatorTraits<allocator_type>::Destroy(mAllocator, mData + idx);
+                    TSizeType idx = (mHead + i) % mCapacity;
+                    TAllocatorTraits<TAllocatorType>::Destroy(mAllocator, mData + idx);
                 }
             }
             mSize = 0;
             mHead = 0;
         }
 
-        /**
-         * Push an element to the back. Amortized O(1).
-         */
-        void PushBack(const value_type& v)
+        void PushBack(const TValueType& v)
         {
             EnsureCapacityForOneMore();
-            size_type idx = (mHead + mSize) % mCapacity;
-            TAllocatorTraits<allocator_type>::Construct(mAllocator, mData + idx, v);
+            TSizeType idx = (mHead + mSize) % mCapacity;
+            TAllocatorTraits<TAllocatorType>::Construct(mAllocator, mData + idx, v);
             ++mSize;
         }
 
-        /** Move-push an element to the back. */
-        void PushBack(value_type&& v)
+        void PushBack(TValueType&& v)
         {
             EnsureCapacityForOneMore();
-            size_type idx = (mHead + mSize) % mCapacity;
-            TAllocatorTraits<allocator_type>::Construct(mAllocator, mData + idx, AltinaEngine::Forward<value_type>(v));
+            TSizeType idx = (mHead + mSize) % mCapacity;
+            TAllocatorTraits<TAllocatorType>::Construct(mAllocator, mData + idx, AltinaEngine::Forward<TValueType>(v));
             ++mSize;
         }
 
-        /**
-         * Push an element to the front. Amortized O(1).
-         */
-        void PushFront(const value_type& v)
+        void PushFront(const TValueType& v)
         {
             EnsureCapacityForOneMore();
             mHead = (mHead + mCapacity - 1) % mCapacity;
-            TAllocatorTraits<allocator_type>::Construct(mAllocator, mData + mHead, v);
+            TAllocatorTraits<TAllocatorType>::Construct(mAllocator, mData + mHead, v);
             ++mSize;
         }
 
-        /** Move-push an element to the front. */
-        void PushFront(value_type&& v)
+        void PushFront(TValueType&& v)
         {
             EnsureCapacityForOneMore();
             mHead = (mHead + mCapacity - 1) % mCapacity;
-            TAllocatorTraits<allocator_type>::Construct(
-                mAllocator, mData + mHead, AltinaEngine::Forward<value_type>(v));
+            TAllocatorTraits<TAllocatorType>::Construct(
+                mAllocator, mData + mHead, AltinaEngine::Forward<TValueType>(v));
             ++mSize;
         }
 
-        /** Pop the last element. No-op if empty. */
         void PopBack() noexcept
         {
             if (mSize == 0)
                 return;
-            size_type idx = (mHead + mSize - 1) % mCapacity;
-            TAllocatorTraits<allocator_type>::Destroy(mAllocator, mData + idx);
+            TSizeType idx = (mHead + mSize - 1) % mCapacity;
+            TAllocatorTraits<TAllocatorType>::Destroy(mAllocator, mData + idx);
             --mSize;
         }
 
-        /** Pop the first element. No-op if empty. */
         void PopFront() noexcept
         {
             if (mSize == 0)
                 return;
-            TAllocatorTraits<allocator_type>::Destroy(mAllocator, mData + mHead);
+            TAllocatorTraits<TAllocatorType>::Destroy(mAllocator, mData + mHead);
             mHead = (mHead + 1) % mCapacity;
             --mSize;
         }
 
-        /** Access the first element (must be non-empty). */
-        reference       Front() noexcept { return AtIndex(0); }
-        const reference Front() const noexcept { return const_cast<TDeque*>(this)->AtIndex(0); }
+        auto Front() noexcept -> TReference { return AtIndex(0); }
+        auto Front() const noexcept -> TReference { return const_cast<TDeque*>(this)->AtIndex(0); }
 
-        /** Access the last element (must be non-empty). */
-        reference       Back() noexcept { return AtIndex(mSize - 1); }
-        const reference Back() const noexcept { return const_cast<TDeque*>(this)->AtIndex(mSize - 1); }
+        auto Back() noexcept -> TReference { return AtIndex(mSize - 1); }
+        auto Back() const noexcept -> TReference { return const_cast<TDeque*>(this)->AtIndex(mSize - 1); }
 
-        /** Iteration from front (inclusive) to back (exclusive). */
-        iterator        begin() noexcept { return iterator{ this, 0 }; }
-        iterator        end() noexcept { return iterator{ this, mSize }; }
+        auto begin() noexcept -> Iterator { return Iterator{ this, 0 }; }   // NOLINT(*-identifier-naming)
+        auto end() noexcept -> Iterator { return Iterator{ this, mSize }; } // NOLINT(*-identifier-naming)
 
     private:
-        reference AtIndex(size_type i) noexcept
+        auto AtIndex(TSizeType i) noexcept -> TReference
         {
-            size_type idx = (mHead + i) % mCapacity;
+            TSizeType idx = (mHead + i) % mCapacity;
             return mData[idx];
         }
 
-        const reference AtIndex(size_type i) const noexcept { return const_cast<TDeque*>(this)->AtIndex(i); }
+        auto AtIndex(TSizeType i) const noexcept -> TReference { return const_cast<TDeque*>(this)->AtIndex(i); }
 
-        void            EnsureCapacityForOneMore()
+        void EnsureCapacityForOneMore()
         {
             if (mSize < mCapacity && mCapacity > 0)
                 return;
-            const size_type newCapacity = (mCapacity == 0) ? 4 : (mCapacity * 2);
+            const TSizeType newCapacity = (mCapacity == 0) ? 4 : (mCapacity * 2);
             Reallocate(newCapacity);
         }
 
-        void Reallocate(size_type newCapacity)
+        void Reallocate(TSizeType newCapacity)
         {
-            pointer newData = TAllocatorTraits<allocator_type>::Allocate(
-                mAllocator, static_cast<typename allocator_type::size_type>(newCapacity));
+            TPointer newData = TAllocatorTraits<TAllocatorType>::Allocate(
+                mAllocator, static_cast<TAllocatorType::TSizeType>(newCapacity));
             // move existing elements
-            for (size_type i = 0; i < mSize; ++i)
+            for (TSizeType i = 0; i < mSize; ++i)
             {
-                size_type oldIdx = (mHead + i) % (mCapacity == 0 ? 1 : mCapacity);
-                TAllocatorTraits<allocator_type>::Construct(
+                TSizeType oldIdx = (mHead + i) % (mCapacity == 0 ? 1 : mCapacity);
+                TAllocatorTraits<TAllocatorType>::Construct(
                     mAllocator, newData + i, AltinaEngine::Move(*(mData + oldIdx)));
                 if (mData)
-                    TAllocatorTraits<allocator_type>::Destroy(mAllocator, mData + oldIdx);
+                    TAllocatorTraits<TAllocatorType>::Destroy(mAllocator, mData + oldIdx);
             }
             if (mData)
             {
-                TAllocatorTraits<allocator_type>::Deallocate(mAllocator, mData, mCapacity);
+                TAllocatorTraits<TAllocatorType>::Deallocate(mAllocator, mData, mCapacity);
             }
             mData     = newData;
             mCapacity = newCapacity;
             mHead     = 0;
         }
 
-    private:
-        pointer        mData;
-        size_type      mCapacity;
-        size_type      mSize;
-        size_type      mHead;
-        allocator_type mAllocator;
+        TPointer       mData;
+        TSizeType      mCapacity{ 0 };
+        TSizeType      mSize{ 0 };
+        TSizeType      mHead{ 0 };
+        TAllocatorType mAllocator;
     };
 
 } // namespace AltinaEngine::Core::Container

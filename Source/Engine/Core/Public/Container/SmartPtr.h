@@ -13,17 +13,17 @@ namespace AltinaEngine::Core::Container
     template <typename T, typename D = TDefaultDeleter<T>> class TOwner
     {
     public:
-        using pointer      = T*;
-        using element_type = T;
-        using deleter_type = D;
+        using TPointer     = T*;
+        using TElementType = T;
+        using TDeleterType = D;
 
         constexpr TOwner() noexcept : Ptr(nullptr) {}
         constexpr TOwner(decltype(nullptr)) noexcept : Ptr(nullptr) {}
 
-        explicit TOwner(pointer p) noexcept : Ptr(p) {}
+        explicit TOwner(TPointer p) noexcept : Ptr(p) {}
 
-        TOwner(pointer p, const D& d) noexcept : Ptr(p), Deleter(d) {}
-        TOwner(pointer p, D&& d) noexcept : Ptr(p), Deleter(AltinaEngine::Move(d)) {}
+        TOwner(TPointer p, const D& d) noexcept : Ptr(p), Deleter(d) {}
+        TOwner(TPointer p, D&& d) noexcept : Ptr(p), Deleter(AltinaEngine::Move(d)) {}
 
         TOwner(TOwner&& Other) noexcept : Ptr(Other.release()), Deleter(AltinaEngine::Forward<D>(Other.get_deleter()))
         {
@@ -50,17 +50,17 @@ namespace AltinaEngine::Core::Container
             }
         }
 
-        pointer release() noexcept
+        TPointer release() noexcept
         {
-            pointer p = Ptr;
-            Ptr       = nullptr;
+            TPointer p = Ptr;
+            Ptr        = nullptr;
             return p;
         }
 
-        void reset(pointer p = nullptr) noexcept
+        void reset(TPointer p = nullptr) noexcept
         {
-            pointer old = Ptr;
-            Ptr         = p;
+            TPointer old = Ptr;
+            Ptr          = p;
             if (old)
             {
                 Deleter(old);
@@ -69,26 +69,26 @@ namespace AltinaEngine::Core::Container
 
         void swap(TOwner& Other) noexcept
         {
-            pointer tmpPtr = Ptr;
-            Ptr            = Other.Ptr;
-            Other.Ptr      = tmpPtr;
+            TPointer tmpPtr = Ptr;
+            Ptr             = Other.Ptr;
+            Other.Ptr       = tmpPtr;
 
             D tmpDeleter  = AltinaEngine::Move(Deleter);
             Deleter       = AltinaEngine::Move(Other.Deleter);
             Other.Deleter = AltinaEngine::Move(tmpDeleter);
         }
 
-        pointer                             get() const noexcept { return Ptr; }
+        TPointer                            get() const noexcept { return Ptr; }
         D&                                  get_deleter() noexcept { return Deleter; }
         const D&                            get_deleter() const noexcept { return Deleter; }
         explicit                            operator bool() const noexcept { return Ptr != nullptr; }
 
         typename TRemoveReference<T>::Type& operator*() const { return *Ptr; }
-        pointer                             operator->() const noexcept { return Ptr; }
+        TPointer                            operator->() const noexcept { return Ptr; }
 
     private:
-        pointer Ptr;
-        D       Deleter;
+        TPointer Ptr;
+        D        Deleter;
     };
 
     template <typename T, typename D> class TOwner<T[], D>
@@ -246,29 +246,29 @@ namespace AltinaEngine::Core::Container
     {
     public:
         using element_type = T;
-        using pointer      = element_type*;
+        using TPointer     = element_type*;
 
-        constexpr TShared() noexcept : Ptr(nullptr), Control(nullptr) {}
+        constexpr TShared() noexcept : mPtr(nullptr), mControl(nullptr) {}
 
-        TShared(const TShared& Other) noexcept : Ptr(Other.Ptr), Control(Other.Control)
+        TShared(const TShared& Other) noexcept : mPtr(Other.mPtr), mControl(Other.mControl)
         {
-            if (Control)
+            if (mControl)
             {
-                Control->AddRef();
+                mControl->AddRef();
             }
         }
 
-        TShared(TShared&& Other) noexcept : Ptr(Other.Ptr), Control(Other.Control)
+        TShared(TShared&& Other) noexcept : mPtr(Other.mPtr), mControl(Other.mControl)
         {
-            Other.Ptr     = nullptr;
-            Other.Control = nullptr;
+            Other.mPtr     = nullptr;
+            Other.mControl = nullptr;
         }
 
-        explicit TShared(pointer InPtr) : TShared(InPtr, TDefaultDeleter<element_type>{}) {}
+        explicit TShared(TPointer InPtr) : TShared(InPtr, TDefaultDeleter<element_type>{}) {}
 
-        template <typename D> explicit TShared(pointer InPtr, D&& InDeleter) : Ptr(InPtr), Control(nullptr)
+        template <typename D> explicit TShared(TPointer InPtr, D&& InDeleter) : mPtr(InPtr), mControl(nullptr)
         {
-            if (Ptr)
+            if (mPtr)
             {
                 InitializeControlBlock(AltinaEngine::Forward<D>(InDeleter));
             }
@@ -281,11 +281,11 @@ namespace AltinaEngine::Core::Container
             if (this != &Other)
             {
                 Release();
-                Ptr     = Other.Ptr;
-                Control = Other.Control;
-                if (Control)
+                mPtr     = Other.mPtr;
+                mControl = Other.mControl;
+                if (mControl)
                 {
-                    Control->AddRef();
+                    mControl->AddRef();
                 }
             }
             return *this;
@@ -296,24 +296,24 @@ namespace AltinaEngine::Core::Container
             if (this != &Other)
             {
                 Release();
-                Ptr           = Other.Ptr;
-                Control       = Other.Control;
-                Other.Ptr     = nullptr;
-                Other.Control = nullptr;
+                mPtr           = Other.mPtr;
+                mControl       = Other.mControl;
+                Other.mPtr     = nullptr;
+                Other.mControl = nullptr;
             }
             return *this;
         }
 
         void                       Reset() noexcept { Release(); }
 
-        void                       Reset(pointer InPtr) { Reset(InPtr, TDefaultDeleter<element_type>{}); }
+        void                       Reset(TPointer InPtr) { Reset(InPtr, TDefaultDeleter<element_type>{}); }
 
-        template <typename D> void Reset(pointer InPtr, D&& InDeleter)
+        template <typename D> void Reset(TPointer InPtr, D&& InDeleter)
         {
             Release();
-            Ptr     = InPtr;
-            Control = nullptr;
-            if (Ptr)
+            mPtr     = InPtr;
+            mControl = nullptr;
+            if (mPtr)
             {
                 InitializeControlBlock(AltinaEngine::Forward<D>(InDeleter));
             }
@@ -321,82 +321,82 @@ namespace AltinaEngine::Core::Container
 
         void Swap(TShared& Other) noexcept
         {
-            pointer tmpPtr = Ptr;
-            Ptr            = Other.Ptr;
-            Other.Ptr      = tmpPtr;
+            TPointer tmpPtr = mPtr;
+            mPtr            = Other.mPtr;
+            Other.mPtr      = tmpPtr;
 
-            FSharedControlBlock* tmpControl = Control;
-            Control                         = Other.Control;
-            Other.Control                   = tmpControl;
+            FSharedControlBlock* tmpControl = mControl;
+            mControl                        = Other.mControl;
+            Other.mControl                  = tmpControl;
         }
 
-        pointer       Get() const noexcept { return Ptr; }
-        element_type& operator*() const { return *Ptr; }
-        pointer       operator->() const noexcept { return Ptr; }
-        explicit      operator bool() const noexcept { return Ptr != nullptr; }
+        TPointer      Get() const noexcept { return mPtr; }
+        element_type& operator*() const { return *mPtr; }
+        TPointer      operator->() const noexcept { return mPtr; }
+        explicit      operator bool() const noexcept { return mPtr != nullptr; }
 
-        usize         UseCount() const noexcept { return Control ? Control->GetRefCount() : 0U; }
+        auto          UseCount() const noexcept -> usize { return mControl ? mControl->GetRefCount() : 0U; }
 
     private:
         template <typename D> using TDecayDeleter = typename AltinaEngine::TDecay<D>::Type;
 
         template <typename D> void InitializeControlBlock(D&& InDeleter)
         {
-            using StorageType = TDecayDeleter<D>;
-            using ControlType = TSharedControlBlock<element_type, StorageType>;
+            using TStorageType = TDecayDeleter<D>;
+            using TControlType = TSharedControlBlock<element_type, TStorageType>;
 
-            StorageType SafeDeleter(AltinaEngine::Forward<D>(InDeleter));
+            TStorageType safeDeleter(AltinaEngine::Forward<D>(InDeleter));
             try
             {
-                Control = new ControlType(Ptr, SafeDeleter);
+                mControl = new TControlType(mPtr, safeDeleter);
             }
             catch (...)
             {
-                SafeDeleter(Ptr);
-                Ptr     = nullptr;
-                Control = nullptr;
+                safeDeleter(mPtr);
+                mPtr     = nullptr;
+                mControl = nullptr;
                 throw;
             }
         }
 
         void Release() noexcept
         {
-            if (Control)
+            if (mControl)
             {
-                if (Control->ReleaseRef())
+                if (mControl->ReleaseRef())
                 {
-                    Control->DestroyManaged();
-                    Control->DestroySelf();
+                    mControl->DestroyManaged();
+                    mControl->DestroySelf();
                 }
             }
-            Ptr     = nullptr;
-            Control = nullptr;
+            mPtr     = nullptr;
+            mControl = nullptr;
         }
 
-        pointer              Ptr;
-        FSharedControlBlock* Control;
+        TPointer             mPtr;
+        FSharedControlBlock* mControl;
     };
 
-    template <typename T, typename... Args> TShared<T> MakeShared(Args&&... args)
+    template <typename T, typename... Args> auto MakeShared(Args&&... args) -> TShared<T>
     {
         if constexpr (kSmartPtrUseManagedAllocator)
         {
-            TAllocator<T> Allocator;
-            T*            ptr = TAllocatorTraits<TAllocator<T>>::Allocate(Allocator, 1);
+            TAllocator<T> allocator;
+            T*            ptr = TAllocatorTraits<TAllocator<T>>::Allocate(allocator, 1);
             try
             {
-                TAllocatorTraits<TAllocator<T>>::Construct(Allocator, ptr, AltinaEngine::Forward<Args>(args)...);
+                TAllocatorTraits<TAllocator<T>>::Construct(allocator, ptr, AltinaEngine::Forward<Args>(args)...);
             }
             catch (...)
             {
-                TAllocatorTraits<TAllocator<T>>::Deallocate(Allocator, ptr, 1);
+                TAllocatorTraits<TAllocator<T>>::Deallocate(allocator, ptr, 1);
                 throw;
             }
 
-            TOwner<T, TAllocatorDeleter<T, TAllocator<T>>> Owner(ptr, TAllocatorDeleter<T, TAllocator<T>>(Allocator));
-            TShared<T>                                     Result(Owner.get(), Owner.get_deleter());
-            Owner.release();
-            return Result;
+            TOwner<T, TAllocatorDeleter<T, TAllocator<T>>> owner(ptr, TAllocatorDeleter<T, TAllocator<T>>(allocator));
+            TShared<T>                                     result(owner.get(), owner.get_deleter());
+            owner.release();
+            return result;
         }
         else
         {
@@ -420,9 +420,9 @@ namespace AltinaEngine::Core::Container
             throw;
         }
 
-        TOwner<T, TAllocatorDeleter<T, Alloc>> Owner(ptr, TAllocatorDeleter<T, Alloc>(alloc));
-        TShared<T>                             Result(Owner.get(), Owner.get_deleter());
-        Owner.release();
-        return Result;
+        TOwner<T, TAllocatorDeleter<T, Alloc>> owner(ptr, TAllocatorDeleter<T, Alloc>(alloc));
+        TShared<T>                             result(owner.get(), owner.get_deleter());
+        owner.release();
+        return result;
     }
 } // namespace AltinaEngine::Core::Container

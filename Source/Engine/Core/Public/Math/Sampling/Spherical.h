@@ -5,7 +5,7 @@
 
 namespace AltinaEngine::Core::Math
 {
-    inline FVector3f ConcentricOctahedralTransform(const FVector2f& sample)
+    inline auto ConcentricOctahedralTransform(const FVector2f& sample) -> FVector3f
     {
         // https://zhuanlan.zhihu.com/p/408898601
         // https://fileadmin.cs.lth.se/graphics/research/papers/2008/simdmapping/clarberg_simdmapping08_preprint.pdf

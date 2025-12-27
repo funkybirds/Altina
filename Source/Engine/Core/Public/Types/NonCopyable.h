@@ -10,8 +10,8 @@ namespace AltinaEngine
         NonCopyableClass()  = default;
         ~NonCopyableClass() = default;
 
-        NonCopyableClass(const NonCopyableClass&)            = delete;
-        NonCopyableClass& operator=(const NonCopyableClass&) = delete;
+        NonCopyableClass(const NonCopyableClass&)                    = delete;
+        auto operator=(const NonCopyableClass&) -> NonCopyableClass& = delete;
     };
 
     // Base struct to disable copy semantics for POD-like structs
@@ -20,8 +20,8 @@ namespace AltinaEngine
         NonCopyableStruct()  = default;
         ~NonCopyableStruct() = default;
 
-        NonCopyableStruct(const NonCopyableStruct&)            = delete;
-        NonCopyableStruct& operator=(const NonCopyableStruct&) = delete;
+        NonCopyableStruct(const NonCopyableStruct&)                    = delete;
+        auto operator=(const NonCopyableStruct&) -> NonCopyableStruct& = delete;
     };
 
 } // namespace AltinaEngine

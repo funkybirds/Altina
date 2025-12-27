@@ -214,62 +214,62 @@ namespace AltinaEngine
 
     template <typename T> struct TRemoveReference
     {
-        using Type = T;
+        using Type = T; // NOLINT(*-identifier-naming)
     };
 
     template <typename T> struct TRemoveReference<T&>
     {
-        using Type = T;
+        using Type = T; // NOLINT(*-identifier-naming)
     };
 
     template <typename T> struct TRemoveReference<T&&>
     {
-        using Type = T;
+        using Type = T; // NOLINT(*-identifier-naming)
     };
 
-    template <typename T> constexpr typename TRemoveReference<T>::Type&& Move(T&& Arg) noexcept
+    template <typename T> constexpr auto Move(T&& Arg) noexcept -> typename TRemoveReference<T>::Type&&
     {
         return static_cast<typename TRemoveReference<T>::Type&&>(Arg);
     }
 
-    template <typename T> constexpr T&& Forward(typename TRemoveReference<T>::Type& Arg) noexcept
+    template <typename T> constexpr auto Forward(typename TRemoveReference<T>::Type& Arg) noexcept -> T&&
     {
         return static_cast<T&&>(Arg);
     }
 
-    template <typename T> constexpr T&& Forward(typename TRemoveReference<T>::Type&& Arg) noexcept
+    template <typename T> constexpr auto Forward(typename TRemoveReference<T>::Type&& Arg) noexcept -> T&&
     {
         return static_cast<T&&>(Arg);
     }
 
     template <typename T> struct TRemoveConst
     {
-        using Type = T;
+        using Type = T; // NOLINT(*-identifier-naming)
     };
 
     template <typename T> struct TRemoveConst<const T>
     {
-        using Type = T;
+        using Type = T; // NOLINT(*-identifier-naming)
     };
 
     template <typename T> struct TRemoveVolatile
     {
-        using Type = T;
+        using Type = T; // NOLINT(*-identifier-naming)
     };
 
     template <typename T> struct TRemoveVolatile<volatile T>
     {
-        using Type = T;
+        using Type = T; // NOLINT(*-identifier-naming)
     };
 
     template <typename T> struct TRemoveCV
     {
-        using Type = typename TRemoveConst<typename TRemoveVolatile<T>::Type>::Type;
+        using Type = typename TRemoveConst<typename TRemoveVolatile<T>::Type>::Type; // NOLINT(*-identifier-naming)
     };
 
     template <typename T> struct TDecay
     {
-        using Type = typename TRemoveCV<typename TRemoveReference<T>::Type>::Type;
+        using Type = typename TRemoveCV<typename TRemoveReference<T>::Type>::Type; // NOLINT(*-identifier-naming)
     };
 
     template <typename T> struct TTypeIsDecayed : TTypeSameAs<T, typename TDecay<T>::Type>
@@ -323,45 +323,59 @@ namespace AltinaEngine
     // Backwards-compatible alias the user requested
     template <typename T, typename U = T> using TGreaterComparable = TTypeGreaterComparable<T, U>;
 
-    template <typename T, typename U> inline constexpr bool TTypeSameAs_v = TTypeSameAs<T, U>::Value;
+    template <typename T, typename U>
+    inline constexpr bool TTypeSameAs_v = TTypeSameAs<T, U>::Value; // NOLINT(*-identifier-naming)
 
-    template <typename T> inline constexpr bool             TTypeIsIntegral_v = TTypeIsIntegral<T>::Value;
+    template <typename T>
+    inline constexpr bool TTypeIsIntegral_v = TTypeIsIntegral<T>::Value; // NOLINT(*-identifier-naming)
 
-    template <typename T> inline constexpr bool             TTypeIsFloatingPoint_v = TTypeIsFloatingPoint<T>::Value;
+    template <typename T>
+    inline constexpr bool TTypeIsFloatingPoint_v = TTypeIsFloatingPoint<T>::Value; // NOLINT(*-identifier-naming)
 
-    template <typename T> inline constexpr bool             TTypeIsConstQualified_v = TTypeIsConstQualified<T>::Value;
+    template <typename T>
+    inline constexpr bool TTypeIsConstQualified_v = TTypeIsConstQualified<T>::Value; // NOLINT(*-identifier-naming)
 
-    template <typename T> inline constexpr bool TTypeIsVolatileQualified_v = TTypeIsVolatileQualified<T>::Value;
+    template <typename T>
+    inline constexpr bool TTypeIsVolatileQualified_v =
+        TTypeIsVolatileQualified<T>::Value; // NOLINT(*-identifier-naming)
 
-    template <typename T> inline constexpr bool TTypeIsDefaultConstructible_v = TTypeIsDefaultConstructible<T>::Value;
+    template <typename T>
+    inline constexpr bool TTypeIsDefaultConstructible_v =
+        TTypeIsDefaultConstructible<T>::Value; // NOLINT(*-identifier-naming)
 
-    template <typename T> inline constexpr bool TTypeIsCopyConstructible_v = TTypeIsCopyConstructible<T>::Value;
+    template <typename T>
+    inline constexpr bool TTypeIsCopyConstructible_v =
+        TTypeIsCopyConstructible<T>::Value; // NOLINT(*-identifier-naming)
 
-    template <typename T> inline constexpr bool TTypeIsMovable_v = TTypeIsMovable<T>::Value;
+    template <typename T>
+    inline constexpr bool TTypeIsMovable_v = TTypeIsMovable<T>::Value; // NOLINT(*-identifier-naming)
 
-    template <typename T> inline constexpr bool TTypeIsDestructible_v = TTypeIsDestructible<T>::Value;
+    template <typename T>
+    inline constexpr bool TTypeIsDestructible_v = TTypeIsDestructible<T>::Value; // NOLINT(*-identifier-naming)
 
     template <typename T, typename U>
-    inline constexpr bool TTypeIsStaticConvertible_v = TTypeIsStaticConvertible<T, U>::Value;
+    inline constexpr bool TTypeIsStaticConvertible_v =
+        TTypeIsStaticConvertible<T, U>::Value; // NOLINT(*-identifier-naming)
 
     template <typename T, typename U>
-    inline constexpr bool TTypeIsDynamicConvertible_v = TTypeIsDynamicConvertible<T, U>::Value;
+    inline constexpr bool TTypeIsDynamicConvertible_v =
+        TTypeIsDynamicConvertible<T, U>::Value; // NOLINT(*-identifier-naming)
 
     template <typename T, typename U = T>
-    inline constexpr bool TTypeLessComparable_v = TTypeLessComparable<T, U>::Value;
+    inline constexpr bool TTypeLessComparable_v = TTypeLessComparable<T, U>::Value; // NOLINT(*-identifier-naming)
 
     template <typename T, typename U = T>
-    inline constexpr bool TTypeEqualComparable_v = TTypeEqualComparable<T, U>::Value;
+    inline constexpr bool TTypeEqualComparable_v = TTypeEqualComparable<T, U>::Value; // NOLINT(*-identifier-naming)
 
     template <typename T, typename U = T>
-    inline constexpr bool TTypeGreaterComparable_v = TTypeGreaterComparable<T, U>::Value;
+    inline constexpr bool TTypeGreaterComparable_v = TTypeGreaterComparable<T, U>::Value; // NOLINT(*-identifier-naming)
 
     // Comparator instances will be declared after the comparator templates to avoid
     // referencing templates before their definitions.
 
     template <typename T = void> struct TLess
     {
-        constexpr bool operator()(const T& a, const T& b) const noexcept(noexcept(a < b)) { return a < b; }
+        constexpr auto operator()(const T& a, const T& b) const noexcept(noexcept(a < b)) -> bool { return a < b; }
     };
 
     template <> struct TLess<void>
@@ -375,7 +389,7 @@ namespace AltinaEngine
 
     template <typename T = void> struct TGreater
     {
-        constexpr bool operator()(const T& a, const T& b) const noexcept(noexcept(a > b)) { return a > b; }
+        constexpr auto operator()(const T& a, const T& b) const noexcept(noexcept(a > b)) -> bool { return a > b; }
     };
 
     template <> struct TGreater<void>
@@ -389,7 +403,7 @@ namespace AltinaEngine
 
     template <typename T = void> struct TEqual
     {
-        constexpr bool operator()(const T& a, const T& b) const noexcept(noexcept(a == b)) { return a == b; }
+        constexpr auto operator()(const T& a, const T& b) const noexcept(noexcept(a == b)) -> bool { return a == b; }
     };
 
     template <> struct TEqual<void>
@@ -402,7 +416,7 @@ namespace AltinaEngine
     };
 
     // Const evaluated context
-    constexpr bool IsConstantEvaluated() noexcept
+    constexpr auto IsConstantEvaluated() noexcept -> bool
     {
         if consteval
         {

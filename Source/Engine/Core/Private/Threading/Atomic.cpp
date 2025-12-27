@@ -9,128 +9,128 @@ namespace AltinaEngine::Core::Threading
 
     struct FAtomicImpl
     {
-        volatile i32 Value;
+        volatile i32 mValue;
     };
 
     FAtomicInt32::FAtomicInt32(i32 Initial) noexcept
     {
-        FAtomicImpl* P = static_cast<FAtomicImpl*>(::operator new(sizeof(FAtomicImpl)));
-        P->Value       = Initial;
-        Impl           = P;
+        auto* p   = static_cast<FAtomicImpl*>(operator new(sizeof(FAtomicImpl)));
+        p->mValue = Initial;
+        mImpl     = p;
     }
 
     FAtomicInt32::~FAtomicInt32() noexcept
     {
-        if (Impl)
+        if (mImpl)
         {
-            ::operator delete(Impl);
-            Impl = nullptr;
+            ::operator delete(mImpl);
+            mImpl = nullptr;
         }
     }
 
-    i32 FAtomicInt32::Load() const noexcept
+    auto FAtomicInt32::Load() const noexcept -> i32
     {
-        FAtomicImpl* P = static_cast<FAtomicImpl*>(Impl);
-        return PlatformInterlockedCompareExchange32(&P->Value, 0, 0);
+        auto* p = static_cast<FAtomicImpl*>(mImpl);
+        return PlatformInterlockedCompareExchange32(&p->mValue, 0, 0);
     }
 
     void FAtomicInt32::Store(i32 Value) noexcept
     {
-        FAtomicImpl* P = static_cast<FAtomicImpl*>(Impl);
-        PlatformInterlockedExchange32(&P->Value, Value);
+        auto* p = static_cast<FAtomicImpl*>(mImpl);
+        PlatformInterlockedExchange32(&p->mValue, Value);
     }
 
-    i32 FAtomicInt32::Increment() noexcept
+    auto FAtomicInt32::Increment() noexcept -> i32
     {
-        FAtomicImpl* P = static_cast<FAtomicImpl*>(Impl);
-        return PlatformInterlockedIncrement32(&P->Value);
+        auto* p = static_cast<FAtomicImpl*>(mImpl);
+        return PlatformInterlockedIncrement32(&p->mValue);
     }
 
-    i32 FAtomicInt32::Decrement() noexcept
+    auto FAtomicInt32::Decrement() noexcept -> i32
     {
-        FAtomicImpl* P = static_cast<FAtomicImpl*>(Impl);
-        return PlatformInterlockedDecrement32(&P->Value);
+        auto* p = static_cast<FAtomicImpl*>(mImpl);
+        return PlatformInterlockedDecrement32(&p->mValue);
     }
 
-    i32 FAtomicInt32::ExchangeAdd(i32 Delta) noexcept
+    auto FAtomicInt32::ExchangeAdd(i32 Delta) noexcept -> i32
     {
-        FAtomicImpl* P = static_cast<FAtomicImpl*>(Impl);
-        return PlatformInterlockedExchangeAdd32(&P->Value, Delta);
+        auto* p = static_cast<FAtomicImpl*>(mImpl);
+        return PlatformInterlockedExchangeAdd32(&p->mValue, Delta);
     }
 
-    i32 FAtomicInt32::CompareExchange(i32 Expected, i32 Desired) noexcept
+    auto FAtomicInt32::CompareExchange(i32 Expected, i32 Desired) noexcept -> i32
     {
-        FAtomicImpl* P = static_cast<FAtomicImpl*>(Impl);
-        return PlatformInterlockedCompareExchange32(&P->Value, Desired, Expected);
+        auto* p = static_cast<FAtomicImpl*>(mImpl);
+        return PlatformInterlockedCompareExchange32(&p->mValue, Desired, Expected);
     }
 
-    i32 FAtomicInt32::Exchange(i32 Desired) noexcept
+    auto FAtomicInt32::Exchange(i32 Desired) noexcept -> i32
     {
-        FAtomicImpl* P = static_cast<FAtomicImpl*>(Impl);
-        return PlatformInterlockedExchange32(&P->Value, Desired);
+        auto* p = static_cast<FAtomicImpl*>(mImpl);
+        return PlatformInterlockedExchange32(&p->mValue, Desired);
     }
 
     struct FAtomicImpl64
     {
-        volatile i64 Value;
+        volatile i64 mValue;
     };
 
     FAtomicInt64::FAtomicInt64(i64 Initial) noexcept
     {
-        FAtomicImpl64* P = static_cast<FAtomicImpl64*>(::operator new(sizeof(FAtomicImpl64)));
-        P->Value         = Initial;
-        Impl             = P;
+        auto* p   = static_cast<FAtomicImpl64*>(::operator new(sizeof(FAtomicImpl64)));
+        p->mValue = Initial;
+        mImpl     = p;
     }
 
     FAtomicInt64::~FAtomicInt64() noexcept
     {
-        if (Impl)
+        if (mImpl)
         {
-            ::operator delete(Impl);
-            Impl = nullptr;
+            ::operator delete(mImpl);
+            mImpl = nullptr;
         }
     }
 
-    i64 FAtomicInt64::Load() const noexcept
+    auto FAtomicInt64::Load() const noexcept -> i64
     {
-        FAtomicImpl64* P = static_cast<FAtomicImpl64*>(Impl);
-        return PlatformInterlockedCompareExchange64(&P->Value, 0, 0);
+        auto* p = static_cast<FAtomicImpl64*>(mImpl);
+        return PlatformInterlockedCompareExchange64(&p->mValue, 0, 0);
     }
 
     void FAtomicInt64::Store(i64 Value) noexcept
     {
-        FAtomicImpl64* P = static_cast<FAtomicImpl64*>(Impl);
-        PlatformInterlockedExchange64(&P->Value, Value);
+        auto* p = static_cast<FAtomicImpl64*>(mImpl);
+        PlatformInterlockedExchange64(&p->mValue, Value);
     }
 
-    i64 FAtomicInt64::Increment() noexcept
+    auto FAtomicInt64::Increment() noexcept -> i64
     {
-        FAtomicImpl64* P = static_cast<FAtomicImpl64*>(Impl);
-        return PlatformInterlockedIncrement64(&P->Value);
+        auto* p = static_cast<FAtomicImpl64*>(mImpl);
+        return PlatformInterlockedIncrement64(&p->mValue);
     }
 
-    i64 FAtomicInt64::Decrement() noexcept
+    auto FAtomicInt64::Decrement() noexcept -> i64
     {
-        FAtomicImpl64* P = static_cast<FAtomicImpl64*>(Impl);
-        return PlatformInterlockedDecrement64(&P->Value);
+        auto* p = static_cast<FAtomicImpl64*>(mImpl);
+        return PlatformInterlockedDecrement64(&p->mValue);
     }
 
-    i64 FAtomicInt64::ExchangeAdd(i64 Delta) noexcept
+    auto FAtomicInt64::ExchangeAdd(i64 Delta) noexcept -> i64
     {
-        FAtomicImpl64* P = static_cast<FAtomicImpl64*>(Impl);
-        return PlatformInterlockedExchangeAdd64(&P->Value, Delta);
+        auto* p = static_cast<FAtomicImpl64*>(mImpl);
+        return PlatformInterlockedExchangeAdd64(&p->mValue, Delta);
     }
 
-    i64 FAtomicInt64::CompareExchange(i64 Expected, i64 Desired) noexcept
+    auto FAtomicInt64::CompareExchange(i64 Expected, i64 Desired) noexcept -> i64
     {
-        FAtomicImpl64* P = static_cast<FAtomicImpl64*>(Impl);
-        return PlatformInterlockedCompareExchange64(&P->Value, Desired, Expected);
+        auto* p = static_cast<FAtomicImpl64*>(mImpl);
+        return PlatformInterlockedCompareExchange64(&p->mValue, Desired, Expected);
     }
 
-    i64 FAtomicInt64::Exchange(i64 Desired) noexcept
+    auto FAtomicInt64::Exchange(i64 Desired) noexcept -> i64
     {
-        FAtomicImpl64* P = static_cast<FAtomicImpl64*>(Impl);
-        return PlatformInterlockedExchange64(&P->Value, Desired);
+        auto* p = static_cast<FAtomicImpl64*>(mImpl);
+        return PlatformInterlockedExchange64(&p->mValue, Desired);
     }
 
 } // namespace AltinaEngine::Core::Threading

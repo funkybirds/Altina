@@ -6,7 +6,7 @@
 
 namespace AltinaEngine::Core::Algorithm
 {
-    template <AltinaEngine::ICharType CharT> inline CharT ToLowerChar(CharT Character)
+    template <ICharType CharT> auto ToLowerChar(CharT Character) -> CharT
     {
         if constexpr (sizeof(CharT) == sizeof(wchar_t))
         {
@@ -14,12 +14,12 @@ namespace AltinaEngine::Core::Algorithm
         }
         else
         {
-            const unsigned char Narrow = static_cast<unsigned char>(Character);
-            return static_cast<CharT>(std::tolower(Narrow));
+            const auto narrow = static_cast<unsigned char>(Character);
+            return static_cast<CharT>(std::tolower(narrow));
         }
     }
 
-    template <AltinaEngine::ICharType CharT> inline CharT ToUpperChar(CharT Character)
+    template <ICharType CharT> auto ToUpperChar(CharT Character) -> CharT
     {
         if constexpr (sizeof(CharT) == sizeof(wchar_t))
         {
@@ -27,8 +27,8 @@ namespace AltinaEngine::Core::Algorithm
         }
         else
         {
-            const unsigned char Narrow = static_cast<unsigned char>(Character);
-            return static_cast<CharT>(std::toupper(Narrow));
+            const auto narrow = static_cast<unsigned char>(Character);
+            return static_cast<CharT>(std::toupper(narrow));
         }
     }
 

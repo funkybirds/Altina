@@ -13,20 +13,20 @@ namespace AltinaEngine::Core::Threading
     public:
         explicit FAtomicInt32(i32 Initial = 0) noexcept;
         ~FAtomicInt32() noexcept;
-        i32  Load() const noexcept;
+        auto Load() const noexcept -> i32;
         void Store(i32 Value) noexcept;
-        i32  Increment() noexcept;
-        i32  Decrement() noexcept;
-        i32  ExchangeAdd(i32 Delta) noexcept;
-        i32  Exchange(i32 Desired) noexcept;
-        i32  CompareExchange(i32 Expected, i32 Desired) noexcept;
+        auto Increment() noexcept -> i32;
+        auto Decrement() noexcept -> i32;
+        auto ExchangeAdd(i32 Delta) noexcept -> i32;
+        auto Exchange(i32 Desired) noexcept -> i32;
+        auto CompareExchange(i32 Expected, i32 Desired) noexcept -> i32;
 
         // Non-copyable
-        FAtomicInt32(const FAtomicInt32&)            = delete;
-        FAtomicInt32& operator=(const FAtomicInt32&) = delete;
+        FAtomicInt32(const FAtomicInt32&)                    = delete;
+        auto operator=(const FAtomicInt32&) -> FAtomicInt32& = delete;
 
     private:
-        mutable void* Impl; // Opaque pointer to platform storage
+        mutable void* mImpl; // Opaque pointer to platform storage
     };
 
     class AE_CORE_API FAtomicInt64
@@ -34,19 +34,19 @@ namespace AltinaEngine::Core::Threading
     public:
         explicit FAtomicInt64(i64 Initial = 0) noexcept;
         ~FAtomicInt64() noexcept;
-        i64  Load() const noexcept;
+        auto Load() const noexcept -> i64;
         void Store(i64 Value) noexcept;
-        i64  Increment() noexcept;
-        i64  Decrement() noexcept;
-        i64  ExchangeAdd(i64 Delta) noexcept;
-        i64  Exchange(i64 Desired) noexcept;
-        i64  CompareExchange(i64 Expected, i64 Desired) noexcept;
+        auto Increment() noexcept -> i64;
+        auto Decrement() noexcept -> i64;
+        auto ExchangeAdd(i64 Delta) noexcept -> i64;
+        auto Exchange(i64 Desired) noexcept -> i64;
+        auto CompareExchange(i64 Expected, i64 Desired) noexcept -> i64;
 
-        FAtomicInt64(const FAtomicInt64&)            = delete;
-        FAtomicInt64& operator=(const FAtomicInt64&) = delete;
+        FAtomicInt64(const FAtomicInt64&)                    = delete;
+        auto operator=(const FAtomicInt64&) -> FAtomicInt64& = delete;
 
     private:
-        mutable void* Impl;
+        mutable void* mImpl;
     };
 
 } // namespace AltinaEngine::Core::Threading
@@ -55,7 +55,7 @@ namespace AltinaEngine::Core::Threading
 // Moved here to centralize atomic types alongside the engine atomics.
 namespace AltinaEngine::Core::Threading
 {
-    enum class EMemoryOrder
+    enum class EMemoryOrder : u8
     {
         Relaxed,
         Consume,
@@ -68,7 +68,7 @@ namespace AltinaEngine::Core::Threading
     template <typename T> class TAtomic
     {
     public:
-        using value_type = T;
+        using TValueType = T;
 
         static_assert(AltinaEngine::TTypeIsIntegral_v<T>, "TAtomic currently supports integral types only");
         static_assert(sizeof(T) == 4 || sizeof(T) == 8, "TAtomic supports 32-bit and 64-bit integral types only");
@@ -76,67 +76,67 @@ namespace AltinaEngine::Core::Threading
         template <usize N> struct ImplForSize;
         template <> struct ImplForSize<4>
         {
-            using Type = FAtomicInt32;
+            using Type = FAtomicInt32; // NOLINT(*-identifier-naming)
         };
         template <> struct ImplForSize<8>
         {
-            using Type = FAtomicInt64;
+            using Type = FAtomicInt64; // NOLINT(*-identifier-naming)
         };
 
         template <usize N> struct SignedForSize;
         template <> struct SignedForSize<4>
         {
-            using Type = i32;
+            using Type = i32; // NOLINT(*-identifier-naming)
         };
         template <> struct SignedForSize<8>
         {
-            using Type = i64;
+            using Type = i64; // NOLINT(*-identifier-naming)
         };
 
-        using ImplType   = typename ImplForSize<sizeof(T)>::Type;
-        using SignedType = typename SignedForSize<sizeof(T)>::Type;
+        using TImplType   = ImplForSize<sizeof(T)>::Type;
+        using TSignedType = SignedForSize<sizeof(T)>::Type;
 
-        constexpr TAtomic() noexcept : mImpl(static_cast<SignedType>(0)) {}
-        constexpr explicit TAtomic(T desired) noexcept : mImpl(static_cast<SignedType>(desired)) {}
+        constexpr TAtomic() noexcept : mImpl(static_cast<TSignedType>(0)) {}
+        constexpr explicit TAtomic(T desired) noexcept : mImpl(static_cast<TSignedType>(desired)) {}
 
-        TAtomic(const TAtomic&)                      = delete;
-        TAtomic&           operator=(const TAtomic&) = delete;
+        TAtomic(const TAtomic&)                                  = delete;
+        auto               operator=(const TAtomic&) -> TAtomic& = delete;
 
-        [[nodiscard]] bool IsLockFree() const noexcept { return true; }
+        [[nodiscard]] auto IsLockFree() const noexcept -> bool { return true; }
 
         void               Store(T desired, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
         {
-            mImpl.Store(static_cast<SignedType>(desired));
+            mImpl.Store(static_cast<TSignedType>(desired));
         }
 
-        T Load(EMemoryOrder = EMemoryOrder::SequentiallyConsistent) const noexcept
+        auto Load(EMemoryOrder = EMemoryOrder::SequentiallyConsistent) const noexcept -> T
         {
             return static_cast<T>(mImpl.Load());
         }
 
-        T Exchange(T desired, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
+        auto Exchange(T desired, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> T
         {
-            return static_cast<T>(mImpl.Exchange(static_cast<SignedType>(desired)));
+            return static_cast<T>(mImpl.Exchange(static_cast<TSignedType>(desired)));
         }
 
-        bool CompareExchangeWeak(T& expected, T desired, EMemoryOrder = EMemoryOrder::SequentiallyConsistent,
-            EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
+        auto CompareExchangeWeak(T& expected, T desired, EMemoryOrder = EMemoryOrder::SequentiallyConsistent,
+            EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> bool
         {
-            SignedType exp  = static_cast<SignedType>(expected);
-            SignedType prev = mImpl.CompareExchange(exp, static_cast<SignedType>(desired));
+            auto        exp  = static_cast<TSignedType>(expected);
+            TSignedType prev = mImpl.CompareExchange(exp, static_cast<TSignedType>(desired));
             if (prev == exp)
                 return true;
             expected = static_cast<T>(prev);
             return false;
         }
 
-        bool CompareExchangeStrong(T& expected, T desired, EMemoryOrder success = EMemoryOrder::SequentiallyConsistent,
-            EMemoryOrder failure = EMemoryOrder::SequentiallyConsistent) noexcept
+        auto CompareExchangeStrong(T& expected, T desired, EMemoryOrder success = EMemoryOrder::SequentiallyConsistent,
+            EMemoryOrder failure = EMemoryOrder::SequentiallyConsistent) noexcept -> bool
         {
             return CompareExchangeWeak(expected, desired, success, failure);
         }
 
-        T operator=(T desired) noexcept
+        auto operator=(T desired) noexcept -> T
         {
             Store(desired);
             return desired;
@@ -146,27 +146,27 @@ namespace AltinaEngine::Core::Threading
 
         template <typename U = T>
             requires(AltinaEngine::TTypeIsIntegral_v<U>)
-        U FetchAdd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
+        auto FetchAdd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U
         {
-            return static_cast<U>(mImpl.ExchangeAdd(static_cast<SignedType>(arg)));
+            return static_cast<U>(mImpl.ExchangeAdd(static_cast<TSignedType>(arg)));
         }
 
         template <typename U = T>
             requires(AltinaEngine::TTypeIsIntegral_v<U>)
-        U FetchSub(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
+        auto FetchSub(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U
         {
-            return static_cast<U>(mImpl.ExchangeAdd(-static_cast<SignedType>(arg)));
+            return static_cast<U>(mImpl.ExchangeAdd(-static_cast<TSignedType>(arg)));
         }
 
         template <typename U = T>
             requires(AltinaEngine::TTypeIsIntegral_v<U>)
-        U FetchAnd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
+        auto FetchAnd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U
         {
-            SignedType expected, desired;
+            TSignedType expected, desired;
             do
             {
                 expected = mImpl.Load();
-                desired  = expected & static_cast<SignedType>(arg);
+                desired  = expected & static_cast<TSignedType>(arg);
             }
             while (mImpl.CompareExchange(expected, desired) != expected);
             return static_cast<U>(expected);
@@ -174,13 +174,13 @@ namespace AltinaEngine::Core::Threading
 
         template <typename U = T>
             requires(AltinaEngine::TTypeIsIntegral_v<U>)
-        U FetchOr(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
+        auto FetchOr(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U
         {
-            SignedType expected, desired;
+            TSignedType expected, desired;
             do
             {
                 expected = mImpl.Load();
-                desired  = expected | static_cast<SignedType>(arg);
+                desired  = expected | static_cast<TSignedType>(arg);
             }
             while (mImpl.CompareExchange(expected, desired) != expected);
             return static_cast<U>(expected);
@@ -188,20 +188,20 @@ namespace AltinaEngine::Core::Threading
 
         template <typename U = T>
             requires(AltinaEngine::TTypeIsIntegral_v<U>)
-        U FetchXor(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept
+        auto FetchXor(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U
         {
-            SignedType expected, desired;
+            TSignedType expected, desired;
             do
             {
                 expected = mImpl.Load();
-                desired  = expected ^ static_cast<SignedType>(arg);
+                desired  = expected ^ static_cast<TSignedType>(arg);
             }
             while (mImpl.CompareExchange(expected, desired) != expected);
             return static_cast<U>(expected);
         }
 
     private:
-        ImplType mImpl;
+        TImplType mImpl;
     };
 
 } // namespace AltinaEngine::Core::Threading

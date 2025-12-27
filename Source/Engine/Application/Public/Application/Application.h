@@ -6,8 +6,8 @@
 
 namespace AltinaEngine::Application
 {
-    using AltinaEngine::Core::Container::TOwner;
-    using FWindowOwner = TOwner<FPlatformWindow>;
+    using Core::Container::TOwner;
+    using FWindowOwner = TOwner<FPlatformWindow>; // NOLINT(*-identifier-naming)
 
     class AE_APPLICATION_API FApplication
     {
@@ -15,22 +15,22 @@ namespace AltinaEngine::Application
         explicit FApplication(const FStartupParameters& InStartupParameters);
         virtual ~FApplication();
 
-        void                                         Initialize();
-        void                                         Tick(float InDeltaTime);
-        void                                         Shutdown();
+        void               Initialize();
+        void               Tick(float InDeltaTime);
+        void               Shutdown();
 
-        [[nodiscard]] bool                           IsRunning() const noexcept { return mIsRunning; }
+        [[nodiscard]] auto IsRunning() const noexcept -> bool { return mIsRunning; }
 
-        void                                         SetWindowProperties(const FPlatformWindowProperty& InProperties);
-        [[nodiscard]] const FPlatformWindowProperty& GetWindowProperties() const noexcept;
+        void               SetWindowProperties(const FPlatformWindowProperty& InProperties);
+        [[nodiscard]] auto GetWindowProperties() const noexcept -> const FPlatformWindowProperty&;
 
     protected:
-        [[nodiscard]] const FStartupParameters& GetStartupParameters() const noexcept;
-        [[nodiscard]] FPlatformWindow*          GetMainWindow() noexcept;
-        void                                    RequestShutdown() noexcept;
+        [[nodiscard]] auto GetStartupParameters() const noexcept -> const FStartupParameters&;
+        [[nodiscard]] auto GetMainWindow() noexcept -> FPlatformWindow*;
+        void               RequestShutdown() noexcept;
 
-        virtual FWindowOwner                    CreatePlatformWindow() = 0;
-        virtual void                            PumpPlatformMessages();
+        virtual auto       CreatePlatformWindow() -> FWindowOwner = 0;
+        virtual void       PumpPlatformMessages();
 
     private:
         void                    EnsureWindow();

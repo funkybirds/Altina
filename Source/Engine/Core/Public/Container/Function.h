@@ -101,8 +101,10 @@ namespace AltinaEngine::Core::Container
         }
 
     private:
-        // Small buffer capacity (in bytes)
-        static constexpr usize kSmallSize  = 3 * sizeof(void*);
+        // Small buffer capacity (in bytes). Increased to accommodate larger
+        // callable objects (closures capturing small smart pointers) so the
+        // small-buffer optimization doesn't overflow for common use-cases.
+        static constexpr usize kSmallSize  = 8 * sizeof(void*);
         static constexpr usize kSmallAlign = alignof(void*);
 
         struct StorageT

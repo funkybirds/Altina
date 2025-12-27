@@ -1,34 +1,29 @@
 # AltinaEngine TODO
 
-## Coding Check
-- [ ] Meta-programming styling check
-  - [ ] Move all static_asserts for type to concept
-  
-- [ ] Coding style check
-  - [ ] TFunction
-  - [ ] Job system infrastructure
-
 ## Job System Foundations
-- [ ] Draft `Source/Engine/Core/Public/Jobs/JobSystem.h` covering job submission, job handles, fences, and dependency nodes.
-	- [ ] Enumerate minimal forward declarations and include order for `Jobs` public headers.
-	- [ ] Define `JobHandle`, `JobFence`, and `DependencyNode` interfaces with API docs.
-	- [ ] Add configuration structs (worker counts, affinity tags) referenced by consumers.
+ - [x] Draft `Source/Engine/Core/Public/Jobs/JobSystem.h` covering job submission, job handles, fences, and dependency nodes.
+	- [x] Enumerate minimal forward declarations and include order for `Jobs` public headers.
+	- [x] Define `JobHandle`, `JobFence`, and `DependencyNode` interfaces with API docs.
+	- [x] Add configuration structs (worker counts, affinity tags) referenced by consumers.
 - [ ] Create `Source/Engine/Core/Private/Jobs/JobSystem.cpp` with queue plumbing, dependency evaluation, and hooks for future scheduler backends.
-	- [ ] Stand up basic job queue storage (lock-free ring buffer prototype + fallback) and enqueue/dequeue helpers.
-	- [ ] Implement dependency evaluation pass that checks readiness before dispatch.
-	- [ ] Insert stub interfaces for platform/architecture-specific scheduler backends.
+	- [x] Implement core runtime (`JobSystem.cpp`) with worker pool, job queueing, delayed jobs, and dependency emission.
+	- [x] Stand up basic job queue storage using `TThreadSafeQueue` with delayed-job handling.
+	- [x] Implement dependency emission that produces `JobHandle` results and waits on prerequisites.
+	- [ ] Insert stub interfaces for platform/architecture-specific scheduler backends (TODO).
 - [ ] Add `JobDescriptor` and `JobDependency` types plus documentation in `docs/ModuleContracts.md` describing lifetime and threading guarantees.
 	- [ ] Define struct fields (callback, payload pointer, debug label, affinity mask).
-	- [ ] Document ownership rules and payload lifetime in `ModuleContracts`.
-	- [ ] Provide example snippets showing descriptor construction for named threads vs generic workers.
+	- [x] Define `JobDescriptor` (callback, payload pointer, debug label, affinity mask, priority).
+	- [ ] Document ownership rules and payload lifetime in `ModuleContracts` (TODO).
+	- [ ] Provide example snippets showing descriptor construction for named threads vs generic workers (TODO).
 - [ ] Implement a lightweight `JobGraphBuilder` utility to batch job creation, attach dependencies, and emit execution plans.
 	- [ ] Design fluent API for adding jobs, dependencies, and metadata labels.
 	- [ ] Validate emission path (topological ordering + cycle detection) before handing to runtime queue.
 	- [ ] Add debug dump that prints the graph for troubleshooting.
 - [ ] Support dependency graph resolution so jobs/named-thread tasks can reference `JobHandle`/`ThreadTaskHandle` prerequisites before dispatch.
 	- [ ] Introduce `WaitForHandles(...)` entry points that block or enqueue continuations.
-	- [ ] Teach scheduler to track completion counters per handle/fence.
-	- [ ] Add validation that cross-thread dependencies do not deadlock (e.g., named thread waiting on itself).
+	- [x] Provide `JobSystem::Wait(JobHandle)` and `JobFence` APIs to block until completion.
+	- [x] Scheduler tracks completion state for handles via `JobState` storage.
+	- [ ] Add validation that cross-thread dependencies do not deadlock (e.g., named thread waiting on itself) (TODO).
 
 ## Threading Infrastructure
 - [x] Introduce `Engine/Core` threading primitives (mutex, event, condition variable wrappers) that abstract platform specifics.
@@ -37,8 +32,9 @@
 	- [ ] Document cost/behavior tradeoffs for each primitive in headers.
 - [ ] Build a configurable worker thread pool (min/max threads, stealability toggles) consuming the job queues.
 	- [ ] Parse configuration data (CVar, preset, config file) at startup.
-	- [ ] Implement worker lifecycle management (spawn, pin priority, teardown).
-	- [ ] Add optional work-stealing deque implementation with telemetry toggles.
+	- [x] Implement `FWorkerPool` with `Start()`/`Stop()` and basic lifecycle management.
+	- [ ] Parse configuration data (CVar, preset, config file) at startup (TODO).
+	- [ ] Add optional work-stealing deque implementation with telemetry toggles (TODO).
 - [ ] Provide instrumentation hooks (per-thread names, counters, timing) to integrate with future profiling tools.
 	- [ ] Emit tracing events on job enqueue/dequeue/complete.
 	- [ ] Surface per-thread counters accessible via debug console/API.

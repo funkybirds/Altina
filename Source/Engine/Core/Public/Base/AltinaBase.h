@@ -1,5 +1,25 @@
 #pragma once
 
+// Compiler detection macros
+// Detect MSVC, Clang, and GCC
+#if defined(_MSC_VER)
+    #define AE_COMPILER_MSVC 1 // NOLINT
+#else
+    #define AE_COMPILER_MSVC 0 // NOLINT
+#endif
+
+#if defined(__clang__)
+    #define AE_COMPILER_CLANG 1 // NOLINT
+#else
+    #define AE_COMPILER_CLANG 0 // NOLINT
+#endif
+
+#if defined(__GNUC__) && !defined(__clang__)
+    #define AE_COMPILER_GCC 1 // NOLINT
+#else
+    #define AE_COMPILER_GCC 0 // NOLINT
+#endif
+
 // Platform detection macros (0 or 1)
 #if defined(_WIN32) || defined(_WIN64)
     #define AE_PLATFORM_WIN 1 // NOLINT

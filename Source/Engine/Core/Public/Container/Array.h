@@ -1,7 +1,6 @@
 #ifndef ALTINAENGINE_CORE_PUBLIC_CONTAINER_ARRAY_H
 #define ALTINAENGINE_CORE_PUBLIC_CONTAINER_ARRAY_H
 
-#include "../Base/CoreAPI.h"
 #include "../Types/Aliases.h"
 
 namespace AltinaEngine::Core::Container
@@ -24,13 +23,16 @@ namespace AltinaEngine::Core::Container
 
         [[nodiscard]] static constexpr auto IsEmpty() noexcept -> bool { return N == 0; }
 
-        [[nodiscard]] auto                  Data() noexcept -> TPointer { return mData; }
+        [[nodiscard]] constexpr auto        Data() noexcept -> TPointer { return mData; }
 
-        [[nodiscard]] auto                  Data() const noexcept -> TConstPointer { return mData; }
+        [[nodiscard]] constexpr auto        Data() const noexcept -> TConstPointer { return mData; }
 
-        [[nodiscard]] auto                  operator[](TSizeType index) noexcept -> TReference { return mData[index]; }
+        [[nodiscard]] constexpr auto        operator[](TSizeType index) noexcept -> TReference { return mData[index]; }
 
-        [[nodiscard]] auto operator[](TSizeType index) const noexcept -> TConstReference { return mData[index]; }
+        [[nodiscard]] constexpr auto        operator[](TSizeType index) const noexcept -> TConstReference
+        {
+            return mData[index];
+        }
 
         [[nodiscard]] auto begin() noexcept -> TIterator { return mData; } // NOLINT(*-identifier-naming)
 

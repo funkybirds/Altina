@@ -70,6 +70,7 @@ namespace AltinaEngine::Core::Container
         TSizeType mLength;
     };
 
-    using TStringView = TBasicStringView<TChar>;
+    using TStringView       = TBasicStringView<TChar>;
+    using TNativeStringView = TBasicStringView<char>;
 
 } // namespace AltinaEngine::Core::Container

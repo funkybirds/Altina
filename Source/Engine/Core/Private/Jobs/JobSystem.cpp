@@ -30,7 +30,7 @@ namespace AltinaEngine::Core::Jobs
         {
             // allocate std::thread on heap and store opaque pointer in public TVector<void*>
             auto* t = new std::thread([this]() -> void { WorkerMain(); });
-            mThreads.PushBack(reinterpret_cast<void*>(t));
+            mThreads.PushBack(t);
         }
     }
 
@@ -66,12 +66,12 @@ namespace AltinaEngine::Core::Jobs
     void FWorkerPool::SubmitDelayed(TFunction<void()> Job, u64 DelayMs)
     {
         FJobEntry e;
-        e.mTask        = Move(Job);
-        e.mPriority    = 0;
-        e.mExecuteAtMs = static_cast<u64>(
+        e.mTask     = Move(Job);
+        e.mPriority = 0;
+        e.mExecuteAtMs =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
                 .count()
-            + DelayMs);
+            + DelayMs;
 
         {
             AltinaEngine::Core::Threading::FScopedLock lock(mDelayedJobsMutex);
@@ -97,10 +97,10 @@ namespace AltinaEngine::Core::Jobs
         {
             // Move due delayed jobs into the main queue
             {
-                AltinaEngine::Core::Threading::FScopedLock lock(mDelayedJobsMutex);
-                auto nowMs = static_cast<u64>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                Threading::FScopedLock lock(mDelayedJobsMutex);
+                auto                   nowMs = static_cast<u64>(std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now().time_since_epoch())
-                        .count());
+                                          .count());
 
                 for (usize idx = 0; idx < mDelayedJobs.Size();)
                 {
@@ -155,7 +155,7 @@ namespace AltinaEngine::Core::Jobs
                     }
                     else
                     {
-                        AltinaEngine::Core::Threading::FScopedLock lock(mDelayedJobsMutex);
+                        Threading::FScopedLock lock(mDelayedJobsMutex);
                         mDelayedJobs.PushBack(Move(j));
                     }
                 }
@@ -175,13 +175,13 @@ namespace AltinaEngine::Core::Jobs
 
     struct JobState
     {
-        AltinaEngine::Core::Threading::FMutex             mtx;
-        AltinaEngine::Core::Threading::FConditionVariable cv;
-        bool                                              completed = false;
+        FMutex                        mtx;
+        Threading::FConditionVariable cv;
+        bool                          completed = false;
     };
 
-    static AltinaEngine::Core::Threading::TAtomic<u64> gNextJobId{ 1 };
-    static AltinaEngine::Core::Threading::FMutex       gJobsMutex;
+    static TAtomic<u64> gNextJobId{ 1 };
+    static FMutex       gJobsMutex;
     using Container::MakeShared;
     using Container::THashMap;
     using Container::THashSet;
@@ -190,7 +190,7 @@ namespace AltinaEngine::Core::Jobs
     static FWorkerPool*                     gDefaultPool = nullptr;
 
     // Helper to ensure a default pool exists
-    static FWorkerPool*                     EnsureDefaultPool()
+    static auto                             EnsureDefaultPool() -> FWorkerPool*
     {
         AltinaEngine::Core::Threading::FScopedLock lg(gJobsMutex);
         if (!gDefaultPool)
@@ -202,152 +202,82 @@ namespace AltinaEngine::Core::Jobs
     }
 
     // JobFence implementation
-    struct JobFence::Impl
+    struct FJobFence::Impl
     {
-        AltinaEngine::Core::Threading::FMutex             mtx;
-        AltinaEngine::Core::Threading::FConditionVariable cv;
-        bool                                              signalled = false;
+        FMutex                        mtx;
+        Threading::FConditionVariable mCv;
+        bool                          mSignalled = false;
     };
 
-    JobFence::JobFence() noexcept : mImpl(new Impl()) {}
-    JobFence::~JobFence() noexcept { delete mImpl; }
-    void JobFence::Wait() noexcept
+    FJobFence::FJobFence() noexcept : mImpl(new Impl()) {}
+    FJobFence::~FJobFence() noexcept { delete mImpl; }
+    void FJobFence::Wait() noexcept
     {
         if (!mImpl)
             return;
-        AltinaEngine::Core::Threading::FScopedLock lk(mImpl->mtx);
-        while (!mImpl->signalled)
+        Threading::FScopedLock lk(mImpl->mtx);
+        while (!mImpl->mSignalled)
         {
-            mImpl->cv.Wait(mImpl->mtx);
+            mImpl->mCv.Wait(mImpl->mtx);
         }
     }
-    bool JobFence::WaitFor(u64 timeoutMs) noexcept
+    auto FJobFence::WaitFor(u64 timeoutMs) noexcept -> bool
     {
         if (!mImpl)
             return true;
-        AltinaEngine::Core::Threading::FScopedLock lk(mImpl->mtx);
-        if (mImpl->signalled)
+        Threading::FScopedLock lk(mImpl->mtx);
+        if (mImpl->mSignalled)
             return true;
-        return mImpl->cv.Wait(mImpl->mtx, static_cast<unsigned long>(timeoutMs));
+        return mImpl->mCv.Wait(mImpl->mtx, static_cast<unsigned long>(timeoutMs));
     }
-    void JobFence::Signal() noexcept
+    void FJobFence::Signal() noexcept
     {
         if (!mImpl)
             return;
         {
-            AltinaEngine::Core::Threading::FScopedLock lg(mImpl->mtx);
-            mImpl->signalled = true;
+            Threading::FScopedLock lg(mImpl->mtx);
+            mImpl->mSignalled = true;
         }
-        mImpl->cv.NotifyAll();
+        mImpl->mCv.NotifyAll();
     }
-    bool JobFence::IsSignalled() const noexcept
+    auto FJobFence::IsSignalled() const noexcept -> bool
     {
         if (!mImpl)
             return true;
-        AltinaEngine::Core::Threading::FScopedLock lg(mImpl->mtx);
-        return mImpl->signalled;
+        Threading::FScopedLock lg(mImpl->mtx);
+        return mImpl->mSignalled;
     }
 
-    // DependencyNode implementation
-    struct DependencyNode::Impl
-    {
-        TFunction<void()> Job;
-        const char*       DebugLabel = nullptr;
-        TVector<Impl*>    Prereqs;
-    };
-
-    void DependencyNode::AddPrerequisite(const DependencyNode& node) noexcept
-    {
-        if (!mImpl)
-            mImpl = new Impl();
-        if (node.mImpl)
-            mImpl->Prereqs.PushBack(node.mImpl);
-    }
-
-    void DependencyNode::SetJob(TFunction<void()> job, const char* debugLabel) noexcept
-    {
-        if (!mImpl)
-            mImpl = new Impl();
-        mImpl->Job        = Move(job);
-        mImpl->DebugLabel = debugLabel;
-    }
-
-    // Recursively emit nodes and collect their handles; prevent re-emitting nodes.
-    static JobHandle EmitNodeRecursive(DependencyNode::Impl* node, THashMap<DependencyNode::Impl*, JobHandle>& emitted)
-    {
-        if (!node)
-            return JobHandle{};
-        auto it = emitted.find(node);
-        if (it != emitted.end())
-            return it->second;
-
-        // Emit prerequisites first
-        TVector<JobHandle> prereqHandles;
-        std::cout << "EmitNodeRecursive: node=" << reinterpret_cast<void*>(node) << " prereqs=" << node->Prereqs.Size()
-                  << "\n";
-        for (usize i = 0; i < node->Prereqs.Size(); ++i)
-        {
-            auto h = EmitNodeRecursive(node->Prereqs[i], emitted);
-            if (h.IsValid())
-                prereqHandles.PushBack(h);
-        }
-
-        // Build wrapper that waits for prerequisites then runs job
-        JobDescriptor desc;
-        desc.DebugLabel = node->DebugLabel;
-        std::cout << "EmitNodeRecursive: building callback, prereq count=" << prereqHandles.Size() << "\n";
-        // Capture prereq handles by value. Copy the node's job into a heap
-        // allocated TFunction so the lambda remains small and fits the
-        // TFunction small-buffer.
-        TShared<Container::TFunction<void()>> jobPtr;
-        if (node->Job)
-        {
-            jobPtr = MakeShared<Container::TFunction<void()>>(node->Job);
-        }
-
-        desc.Callback = [jobPtr, prereqHandles]() mutable {
-            for (usize i = 0; i < prereqHandles.Size(); ++i)
-            {
-                JobSystem::Wait(prereqHandles[i]);
-            }
-            if (jobPtr && static_cast<bool>(*jobPtr))
-                (*jobPtr)();
-        };
-
-        std::cout << "EmitNodeRecursive: submitting callback\n";
-        JobHandle h = JobSystem::Submit(desc);
-        std::cout << "EmitNodeRecursive: submitted id=" << h.mId << "\n";
-        emitted.emplace(node, h);
-        return h;
-    }
-
-    JobHandle DependencyNode::Emit() const noexcept
-    {
-        if (!mImpl)
-            return JobHandle{};
-        THashMap<DependencyNode::Impl*, JobHandle> emitted;
-        return EmitNodeRecursive(mImpl, emitted);
-    }
+    // Dependency nodes were removed; dependencies are declared on FJobDescriptor
+    // and handled below in Submit/SubmitWithFence by waiting on `desc.Prerequisites`.
 
     // JobSystem API
-    JobHandle JobSystem::Submit(JobDescriptor desc) noexcept
+    auto FJobSystem::Submit(FJobDescriptor desc) noexcept -> FJobHandle
     {
         const u64         id    = static_cast<u64>(gNextJobId.FetchAdd(1));
         TShared<JobState> state = MakeShared<JobState>();
 
         {
-            AltinaEngine::Core::Threading::FScopedLock lg(gJobsMutex);
+            Threading::FScopedLock lg(gJobsMutex);
             gJobs.emplace(id, state);
         }
 
         // Ensure pool
-        FWorkerPool*                          pool = EnsureDefaultPool();
+        FWorkerPool*                 pool = EnsureDefaultPool();
 
         // Wrap the user's callback to mark completion.
         // Allocate the callback on the heap to keep the runtime lambda small
         // (TFunction uses a fixed small-buffer optimization without heap fallback).
-        TShared<Container::TFunction<void()>> cbptr   = MakeShared<Container::TFunction<void()>>(Move(desc.Callback));
-        Container::TFunction<void()>          wrapper = [cbptr, id, state]() mutable {
+        TShared<TFunction<void()>>   cbptr         = MakeShared<Container::TFunction<void()>>(Move(desc.Callback));
+        TVector<FJobHandle>          prereqHandles = Move(desc.Prerequisites);
+
+        Container::TFunction<void()> wrapper = [cbptr, id, state, prereqHandles]() mutable -> void {
+            // Wait for declared prerequisites
+            for (usize i = 0; i < prereqHandles.Size(); ++i)
+            {
+                Wait(prereqHandles[i]);
+            }
+
             try
             {
                 if (cbptr && static_cast<bool>(*cbptr))
@@ -358,30 +288,37 @@ namespace AltinaEngine::Core::Jobs
             }
 
             {
-                AltinaEngine::Core::Threading::FScopedLock lg(state->mtx);
+                Threading::FScopedLock lg(state->mtx);
                 state->completed = true;
             }
             state->cv.NotifyAll();
         };
 
         pool->Submit(Move(wrapper));
-        return JobHandle(id);
+        return FJobHandle(id);
     }
 
-    JobHandle JobSystem::SubmitWithFence(JobDescriptor desc, JobFence& outFence) noexcept
+    auto FJobSystem::SubmitWithFence(FJobDescriptor desc, FJobFence& outFence) noexcept -> FJobHandle
     {
         const u64         id    = static_cast<u64>(gNextJobId.FetchAdd(1));
         TShared<JobState> state = MakeShared<JobState>();
 
         {
-            AltinaEngine::Core::Threading::FScopedLock lg(gJobsMutex);
+            Threading::FScopedLock lg(gJobsMutex);
             gJobs.emplace(id, state);
         }
 
-        FWorkerPool*                          pool = EnsureDefaultPool();
+        FWorkerPool*               pool = EnsureDefaultPool();
 
-        TShared<Container::TFunction<void()>> cbptr   = MakeShared<Container::TFunction<void()>>(Move(desc.Callback));
-        Container::TFunction<void()>          wrapper = [cbptr, state, &outFence]() mutable {
+        TShared<TFunction<void()>> cbptr          = MakeShared<TFunction<void()>>(Move(desc.Callback));
+        TVector<FJobHandle>        prereqHandles2 = Move(desc.Prerequisites);
+
+        TFunction<void()>          wrapper = [cbptr, state, &outFence, prereqHandles2]() mutable -> void {
+            for (usize i = 0; i < prereqHandles2.Size(); ++i)
+            {
+                Wait(prereqHandles2[i]);
+            }
+
             try
             {
                 if (cbptr && static_cast<bool>(*cbptr))
@@ -392,7 +329,7 @@ namespace AltinaEngine::Core::Jobs
             }
 
             {
-                AltinaEngine::Core::Threading::FScopedLock lg(state->mtx);
+                Threading::FScopedLock lg(state->mtx);
                 state->completed = true;
             }
             state->cv.NotifyAll();
@@ -400,37 +337,37 @@ namespace AltinaEngine::Core::Jobs
         };
 
         pool->Submit(Move(wrapper));
-        return JobHandle(id);
+        return FJobHandle(id);
     }
 
-    void JobSystem::Wait(JobHandle h) noexcept
+    void FJobSystem::Wait(FJobHandle h) noexcept
     {
         if (!h.IsValid())
             return;
         TShared<JobState> state;
         {
-            AltinaEngine::Core::Threading::FScopedLock lg(gJobsMutex);
-            auto                                       it = gJobs.find(h.mId);
+            Threading::FScopedLock lg(gJobsMutex);
+            auto                   it = gJobs.find(h.mId);
             if (it == gJobs.end())
                 return;
             state = it->second;
         }
 
-        AltinaEngine::Core::Threading::FScopedLock lk(state->mtx);
+        Threading::FScopedLock lk(state->mtx);
         while (!state->completed)
         {
             state->cv.Wait(state->mtx);
         }
     }
 
-    FWorkerPool* JobSystem::CreateWorkerPool(const FWorkerPoolConfig& cfg) noexcept
+    auto FJobSystem::CreateWorkerPool(const FWorkerPoolConfig& cfg) noexcept -> FWorkerPool*
     {
         auto* p = new FWorkerPool(cfg);
         p->Start();
         return p;
     }
 
-    void JobSystem::DestroyWorkerPool(FWorkerPool* pool) noexcept
+    void FJobSystem::DestroyWorkerPool(FWorkerPool* pool) noexcept
     {
         if (!pool)
             return;

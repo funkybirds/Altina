@@ -3,57 +3,51 @@
 
 #include <unordered_map>
 
-#include "../Base/CoreAPI.h"
-#include "../Types/Aliases.h"
-
 namespace AltinaEngine::Core::Container
 {
-    // Templated wrapper class for std::unordered_map. Implemented as a thin
-    // subclass so call-sites can treat `THashMap` like the standard container
-    // while allowing us to replace the implementation later if needed.
     template <typename Key, typename T, typename Hash = std::hash<Key>, typename KeyEqual = std::equal_to<Key>,
         typename Allocator = std::allocator<std::pair<const Key, T>>>
     class THashMap : public std::unordered_map<Key, T, Hash, KeyEqual, Allocator>
     {
     public:
-        using Base = std::unordered_map<Key, T, Hash, KeyEqual, Allocator>;
-        using typename Base::allocator_type;
-        using typename Base::key_type;
-        using typename Base::mapped_type;
-        using typename Base::size_type;
-        using typename Base::value_type;
+        using TBase = std::unordered_map<Key, T, Hash, KeyEqual, Allocator>;
+        using typename TBase::allocator_type;
+        using typename TBase::key_type;
+        using typename TBase::mapped_type;
+        using typename TBase::size_type;
+        using typename TBase::value_type;
 
-        THashMap() noexcept(std::is_nothrow_default_constructible<Base>::value) : Base() {}
+        THashMap() noexcept(std::is_nothrow_default_constructible_v<TBase>) : TBase() {}
 
         explicit THashMap(size_type bucket_count, const Hash& hash = Hash(), const KeyEqual& equal = KeyEqual(),
             const Allocator& alloc = Allocator())
-            : Base(bucket_count, hash, equal, alloc)
+            : TBase(bucket_count, hash, equal, alloc)
         {
         }
 
         template <class InputIt>
         THashMap(InputIt first, InputIt last, size_type bucket_count = 0, const Hash& hash = Hash(),
             const KeyEqual& equal = KeyEqual(), const Allocator& alloc = Allocator())
-            : Base(first, last, bucket_count, hash, equal, alloc)
+            : TBase(first, last, bucket_count, hash, equal, alloc)
         {
         }
 
         THashMap(std::initializer_list<value_type> init, size_type bucket_count = 0, const Hash& hash = Hash(),
             const KeyEqual& equal = KeyEqual(), const Allocator& alloc = Allocator())
-            : Base(init, bucket_count, hash, equal, alloc)
+            : TBase(init, bucket_count, hash, equal, alloc)
         {
         }
 
-        THashMap(const THashMap& other) : Base(other) {}
-        THashMap(THashMap&& other) noexcept(std::is_nothrow_move_constructible<Base>::value) : Base(std::move(other)) {}
-        THashMap& operator=(const THashMap& other)
+        THashMap(const THashMap& other) : TBase(other) {}
+        THashMap(THashMap&& other) noexcept(std::is_nothrow_move_constructible_v<TBase>) : TBase(std::move(other)) {}
+        auto operator=(const THashMap& other) -> THashMap&
         {
-            Base::operator=(other);
+            TBase::operator=(other);
             return *this;
         }
-        THashMap& operator=(THashMap&& other) noexcept(std::is_nothrow_move_assignable<Base>::value)
+        auto operator=(THashMap&& other) noexcept(std::is_nothrow_move_assignable_v<TBase>) -> THashMap&
         {
-            Base::operator=(std::move(other));
+            TBase::operator=(std::move(other));
             return *this;
         }
         ~THashMap() = default;

@@ -16,43 +16,43 @@ namespace AltinaEngine::Core::Container
     class THashSet : public std::unordered_set<Key, Hash, KeyEqual, Allocator>
     {
     public:
-        using Base = std::unordered_set<Key, Hash, KeyEqual, Allocator>;
-        using typename Base::allocator_type;
-        using typename Base::key_type;
-        using typename Base::size_type;
-        using typename Base::value_type;
+        using TBase = std::unordered_set<Key, Hash, KeyEqual, Allocator>;
+        using typename TBase::allocator_type;
+        using typename TBase::key_type;
+        using typename TBase::size_type;
+        using typename TBase::value_type;
 
-        THashSet() noexcept(std::is_nothrow_default_constructible<Base>::value) : Base() {}
+        THashSet() noexcept(std::is_nothrow_default_constructible_v<TBase>) : TBase() {}
 
         explicit THashSet(size_type bucket_count, const Hash& hash = Hash(), const KeyEqual& equal = KeyEqual(),
             const Allocator& alloc = Allocator())
-            : Base(bucket_count, hash, equal, alloc)
+            : TBase(bucket_count, hash, equal, alloc)
         {
         }
 
         template <class InputIt>
         THashSet(InputIt first, InputIt last, size_type bucket_count = 0, const Hash& hash = Hash(),
             const KeyEqual& equal = KeyEqual(), const Allocator& alloc = Allocator())
-            : Base(first, last, bucket_count, hash, equal, alloc)
+            : TBase(first, last, bucket_count, hash, equal, alloc)
         {
         }
 
         THashSet(std::initializer_list<value_type> init, size_type bucket_count = 0, const Hash& hash = Hash(),
             const KeyEqual& equal = KeyEqual(), const Allocator& alloc = Allocator())
-            : Base(init, bucket_count, hash, equal, alloc)
+            : TBase(init, bucket_count, hash, equal, alloc)
         {
         }
 
-        THashSet(const THashSet& other) : Base(other) {}
-        THashSet(THashSet&& other) noexcept(std::is_nothrow_move_constructible<Base>::value) : Base(std::move(other)) {}
-        THashSet& operator=(const THashSet& other)
+        THashSet(const THashSet& other) : TBase(other) {}
+        THashSet(THashSet&& other) noexcept(std::is_nothrow_move_constructible_v<TBase>) : TBase(std::move(other)) {}
+        auto operator=(const THashSet& other) -> THashSet&
         {
-            Base::operator=(other);
+            TBase::operator=(other);
             return *this;
         }
-        THashSet& operator=(THashSet&& other) noexcept(std::is_nothrow_move_assignable<Base>::value)
+        auto operator=(THashSet&& other) noexcept(std::is_nothrow_move_assignable_v<TBase>) -> THashSet&
         {
-            Base::operator=(std::move(other));
+            TBase::operator=(std::move(other));
             return *this;
         }
         ~THashSet() = default;

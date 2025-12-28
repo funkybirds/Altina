@@ -73,6 +73,9 @@ COMMIT_MSG.txt
 out/
 out/*
 
+# Ignore Testing temporary files and CTest outputs
+Testing/
+
 # Demo binaries/staging
 Demo/*/Binaries/
 

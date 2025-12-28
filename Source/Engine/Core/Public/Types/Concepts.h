@@ -79,4 +79,18 @@ namespace AltinaEngine
         || TTypeSameAs_v<T, char8_t>
 #endif
         || TTypeSameAs_v<T, char16_t> || TTypeSameAs_v<T, char32_t> || TTypeSameAs_v<T, wchar_t>;
+
+    // Extractor Concepts
+    template <typename T>
+    concept IMemberPointer = requires(T t) {
+        typename TMemberType<T>::TBaseType;
+        typename TMemberType<T>::TClassType;
+    };
+
+    template <typename T>
+    concept IMemberFunctionPointer = requires(T t) {
+        typename TMemberFunctionTrait<T>::TReturnType;
+        typename TMemberFunctionTrait<T>::TClassType;
+        typename TMemberFunctionTrait<T>::TArgsTuple;
+    };
 } // namespace AltinaEngine

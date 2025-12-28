@@ -105,6 +105,7 @@ namespace AltinaEngine::Core::TypeMeta
 
         template <auto T> consteval static auto GetActualVarNameArray()
         {
+            using namespace Core::Algorithm;
             constexpr auto kFunctionSignature = GetVarNameToArray<T>();
             constexpr u64  kFirstPos          = GetOccurrencePositionRefined(kFunctionSignature, '<', 0) + 1;
             constexpr u64  kLastPos           = GetLastOccurrencePositionRefined(kFunctionSignature, '>') + 1;
@@ -118,21 +119,51 @@ namespace AltinaEngine::Core::TypeMeta
             constexpr auto kArr = GetActualClassNameArray<T>();
             return GetFuncNameHashImpl(kArr);
         }
+        template <auto T> consteval static auto GetVarNameHashId() -> u64
+        {
+            constexpr auto arr = GetActualVarNameArray<T>();
+            return GetFuncNameHashImpl(arr);
+        }
     } // namespace Detail
 
     using Container::TNativeStringView;
+    using Container::TStringView;
     template <class T> struct TMetaTypeInfo
     {
+        static constexpr u64  kHash                 = Detail::GetFuncNameHashId<T>();
+        static constexpr auto kNameArray            = Detail::GetActualClassNameArray<T>();
+        static constexpr auto kName                 = TNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
+        static constexpr bool kDefaultConstructible = TTypeIsDefaultConstructible_v<T>;
 
-        static constexpr u64               kHash      = Detail::GetFuncNameHashId<T>();
-        static constexpr auto              kNameArray = Detail::GetActualClassNameArray<T>();
-        static constexpr TNativeStringView kName      = TNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
-        static constexpr bool              kDefaultConstructible = TTypeIsDefaultConstructible_v<T>;
-
-        static auto                        GetTypeInfo() -> FTypeInfo const&
+        static auto           GetTypeInfo() -> FTypeInfo const&
         {
             static FTypeInfo const* typeInfo = &typeid(T);
             return *typeInfo;
         }
+    };
+
+    template <auto T>
+        requires IMemberFunctionPointer<decltype(T)>
+    struct TMetaMemberFunctionInfo
+    {
+        static constexpr u64  kHash      = Detail::GetVarNameHashId<T>();
+        static constexpr auto kNameArray = Detail::GetActualVarNameArray<T>();
+        static constexpr auto kName      = TNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
+
+        using TReturnType = TMemberFunctionTrait<decltype(T)>::TReturnType;
+        using TClassType  = TMemberFunctionTrait<decltype(T)>::TClassType;
+        using TArgsTuple  = TMemberFunctionTrait<decltype(T)>::TArgsTuple;
+    };
+
+    template <auto T>
+        requires IMemberPointer<decltype(T)>
+    struct TMetaPropertyInfo
+    {
+        static constexpr u64  kHash      = Detail::GetVarNameHashId<T>();
+        static constexpr auto kNameArray = Detail::GetActualVarNameArray<T>();
+        static constexpr auto kName      = TStringView(kNameArray.Data(), kNameArray.Size() - 1);
+
+        using TBaseType  = TMemberType<decltype(T)>::TBaseType;
+        using TClassType = TMemberType<decltype(T)>::TClassType;
     };
 } // namespace AltinaEngine::Core::TypeMeta

@@ -1,6 +1,19 @@
 #pragma once
 
 #include "Aliases.h"
+#include "Container/Tuple.h"
+
+// Forward-declare TTuple to avoid ordering issues when used in traits specializations
+namespace AltinaEngine
+{
+    namespace Core
+    {
+        namespace Container
+        {
+            template <typename...> struct TTuple;
+        }
+    } // namespace Core
+} // namespace AltinaEngine
 
 namespace AltinaEngine
 {
@@ -336,16 +349,16 @@ namespace AltinaEngine
     inline constexpr bool TTypeIsConstQualified_v = TTypeIsConstQualified<T>::Value; // NOLINT(*-identifier-naming)
 
     template <typename T>
-    inline constexpr bool TTypeIsVolatileQualified_v =
-        TTypeIsVolatileQualified<T>::Value; // NOLINT(*-identifier-naming)
+    inline constexpr bool TTypeIsVolatileQualified_v = // NOLINT(*-identifier-naming)
+        TTypeIsVolatileQualified<T>::Value;
 
     template <typename T>
-    inline constexpr bool TTypeIsDefaultConstructible_v =
-        TTypeIsDefaultConstructible<T>::Value; // NOLINT(*-identifier-naming)
+    inline constexpr bool TTypeIsDefaultConstructible_v = // NOLINT(*-identifier-naming)
+        TTypeIsDefaultConstructible<T>::Value;
 
     template <typename T>
-    inline constexpr bool TTypeIsCopyConstructible_v =
-        TTypeIsCopyConstructible<T>::Value; // NOLINT(*-identifier-naming)
+    inline constexpr bool TTypeIsCopyConstructible_v = // NOLINT(*-identifier-naming)
+        TTypeIsCopyConstructible<T>::Value;
 
     template <typename T>
     inline constexpr bool TTypeIsMovable_v = TTypeIsMovable<T>::Value; // NOLINT(*-identifier-naming)
@@ -354,12 +367,12 @@ namespace AltinaEngine
     inline constexpr bool TTypeIsDestructible_v = TTypeIsDestructible<T>::Value; // NOLINT(*-identifier-naming)
 
     template <typename T, typename U>
-    inline constexpr bool TTypeIsStaticConvertible_v =
-        TTypeIsStaticConvertible<T, U>::Value; // NOLINT(*-identifier-naming)
+    inline constexpr bool TTypeIsStaticConvertible_v = // NOLINT(*-identifier-naming)
+        TTypeIsStaticConvertible<T, U>::Value;
 
     template <typename T, typename U>
-    inline constexpr bool TTypeIsDynamicConvertible_v =
-        TTypeIsDynamicConvertible<T, U>::Value; // NOLINT(*-identifier-naming)
+    inline constexpr bool TTypeIsDynamicConvertible_v = // NOLINT(*-identifier-naming)
+        TTypeIsDynamicConvertible<T, U>::Value;
 
     template <typename T, typename U = T>
     inline constexpr bool TTypeLessComparable_v = TTypeLessComparable<T, U>::Value; // NOLINT(*-identifier-naming)
@@ -413,6 +426,27 @@ namespace AltinaEngine
         {
             return static_cast<L&&>(l) == static_cast<R&&>(r);
         }
+    };
+
+    // Type Extraction
+    template <typename T> struct TMemberType
+    {
+        using TBaseType = T;
+    };
+    template <typename U, typename T> struct TMemberType<U T::*>
+    {
+        using TBaseType  = U;
+        using TClassType = T;
+    };
+    template <typename T> struct TMemberFunctionTrait : TTrueType
+    {
+    };
+
+    template <typename R, typename C, typename... Args> struct TMemberFunctionTrait<R (C::*)(Args...)> : TFalseType
+    {
+        using TReturnType = R;
+        using TClassType  = C;
+        using TArgsTuple  = ::AltinaEngine::Core::Container::TTuple<Args...>;
     };
 
     // Const evaluated context

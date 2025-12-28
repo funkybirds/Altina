@@ -62,3 +62,65 @@ TEST_CASE("TMetaTypeInfo_name_custom_contains")
     }
     REQUIRE(found);
 }
+
+TEST_CASE("TMetaMemberFunctionInfo_name_contains")
+{
+    struct WithMethod
+    {
+        double Foo(int) { return 0.0; }
+    };
+
+    auto        name      = TMetaMemberFunctionInfo<&WithMethod::Foo>::kName;
+    const char* needle    = "Foo";
+    const auto  needleLen = 3u;
+    bool        found     = false;
+    for (AltinaEngine::usize i = 0; i + needleLen <= name.Length(); ++i)
+    {
+        bool ok = true;
+        for (AltinaEngine::usize j = 0; j < needleLen; ++j)
+        {
+            if (name[i + j] != needle[j])
+            {
+                ok = false;
+                break;
+            }
+        }
+        if (ok)
+        {
+            found = true;
+            break;
+        }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("TMetaPropertyInfo_name_contains")
+{
+    struct WithProp
+    {
+        int a;
+    };
+
+    auto        name      = TMetaPropertyInfo<&WithProp::a>::kName;
+    const char* needle    = "a";
+    const auto  needleLen = 1u;
+    bool        found     = false;
+    for (AltinaEngine::usize i = 0; i + needleLen <= name.Length(); ++i)
+    {
+        bool ok = true;
+        for (AltinaEngine::usize j = 0; j < needleLen; ++j)
+        {
+            if (name[i + j] != needle[j])
+            {
+                ok = false;
+                break;
+            }
+        }
+        if (ok)
+        {
+            found = true;
+            break;
+        }
+    }
+    REQUIRE(found);
+}

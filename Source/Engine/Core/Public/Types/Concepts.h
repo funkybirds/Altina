@@ -93,4 +93,9 @@ namespace AltinaEngine
         typename TMemberFunctionTrait<T>::TClassType;
         typename TMemberFunctionTrait<T>::TArgsTuple;
     };
+
+    // Constructor Concepts
+    template <typename T>
+    concept ICopyConstructible = TTypeIsCopyConstructible_v<T>;
+
 } // namespace AltinaEngine

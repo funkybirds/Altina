@@ -32,7 +32,7 @@ TEST_CASE("FString append and case conversion")
 
 TEST_CASE("TStringView basic operations")
 {
-    TStringView Literal(TEXT("Engine"));
+    FStringView Literal(TEXT("Engine"));
     REQUIRE_EQ(Literal.Length(), 6U);
     REQUIRE_EQ(Literal[1], TEXT('n'));
 
@@ -41,10 +41,10 @@ TEST_CASE("TStringView basic operations")
     REQUIRE_EQ(Mid[0], TEXT('g'));
 
     const FString Word(TEXT("Altina"));
-    TStringView   FromView = Word.ToView();
+    FStringView   FromView = Word.ToView();
     REQUIRE_EQ(FromView.Length(), 6U);
     REQUIRE_EQ(FromView[5], TEXT('a'));
 
-    TStringView Implicit = Word;
+    FStringView Implicit = Word;
     REQUIRE_EQ(Implicit[0], TEXT('A'));
 }

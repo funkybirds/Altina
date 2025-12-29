@@ -146,15 +146,63 @@ namespace AltinaEngine::Core::Container
             return (*reinterpret_cast<F*>(storage))(AltinaEngine::Forward<Args>(args)...);
         }
 
+        // Heap-backed helpers: when callable is too large for small-buffer, store pointer to heap object
+        template <typename F> static void DestroyHeapImpl(void* storage) noexcept
+        {
+            F* ptr = *reinterpret_cast<F**>(storage);
+            delete ptr;
+        }
+
+        template <typename F> static void CopyHeapImpl(const void* src, void* dst)
+        {
+            if constexpr (AltinaEngine::TTypeIsCopyConstructible_v<F>)
+            {
+                F* srcPtr                   = *reinterpret_cast<F* const*>(src);
+                *reinterpret_cast<F**>(dst) = new F(*srcPtr);
+            }
+            else
+            {
+                Platform::Generic::PlatformTerminate();
+            }
+        }
+
+        template <typename F> static void MoveHeapImpl(void* src, void* dst) noexcept
+        {
+            *reinterpret_cast<F**>(dst) = *reinterpret_cast<F**>(src);
+            *reinterpret_cast<F**>(src) = nullptr;
+        }
+
+        template <typename F> static auto InvokeHeapImpl(void* storage, Args... args) -> R
+        {
+            F* ptr = *reinterpret_cast<F**>(storage);
+            return (*ptr)(AltinaEngine::Forward<Args>(args)...);
+        }
+
         template <typename F> void Init(F&& f) noexcept
         {
-            using T                = TRemoveReference<F>::Type;
-            static const VTable vt = { &DestroyImpl<T>,
-                (AltinaEngine::TTypeIsCopyConstructible_v<T> ? &CopyImpl<T> : nullptr), &MoveImpl<T>, &InvokeImpl<T> };
+            using T = TRemoveReference<F>::Type;
 
-            // Placement new into storage
-            new (&mStorage) T(AltinaEngine::Move(f));
-            mVTable = &vt;
+            if constexpr (sizeof(T) <= sizeof(StorageT))
+            {
+                static const VTable vt = { &DestroyImpl<T>,
+                    (AltinaEngine::TTypeIsCopyConstructible_v<T> ? &CopyImpl<T> : nullptr), &MoveImpl<T>,
+                    &InvokeImpl<T> };
+
+                // Placement new into storage
+                new (&mStorage) T(AltinaEngine::Move(f));
+                mVTable = &vt;
+            }
+            else
+            {
+                static const VTable vt = { &DestroyHeapImpl<T>,
+                    (AltinaEngine::TTypeIsCopyConstructible_v<T> ? &CopyHeapImpl<T> : nullptr), &MoveHeapImpl<T>,
+                    &InvokeHeapImpl<T> };
+
+                // allocate on heap and store pointer in storage
+                T*                  heapObj       = new T(AltinaEngine::Move(f));
+                *reinterpret_cast<T**>(&mStorage) = heapObj;
+                mVTable                           = &vt;
+            }
         }
 
         VTable const* mVTable;

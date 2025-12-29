@@ -80,9 +80,9 @@ namespace AltinaEngine::Core::Container
 
         [[nodiscard]] auto IsEmptyString() const noexcept -> bool { return this->IsEmpty(); }
 
-        [[nodiscard]] auto ToView() const noexcept -> TStringView { return { this->GetData(), this->Length() }; }
+        [[nodiscard]] auto ToView() const noexcept -> FStringView { return { this->GetData(), this->Length() }; }
 
-        [[nodiscard]] operator TStringView() const noexcept { return ToView(); }
+        [[nodiscard]] operator FStringView() const noexcept { return ToView(); }
 
         void ToLower()
         {

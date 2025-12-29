@@ -7,7 +7,7 @@
 #include "Logging/Log.h"
 
 using AltinaEngine::Core::Container::FString;
-using AltinaEngine::Core::Container::TStringView;
+using AltinaEngine::Core::Container::FStringView;
 using namespace AltinaEngine::Core::Logging;
 
 namespace
@@ -19,7 +19,7 @@ namespace
         FString   Message;
     };
 
-    void CaptureSink(ELogLevel Level, TStringView Category, TStringView Message, void* UserData)
+    void CaptureSink(ELogLevel Level, FStringView Category, FStringView Message, void* UserData)
     {
         auto*        Storage = static_cast<std::vector<FCapturedLog>*>(UserData);
         FCapturedLog Entry;

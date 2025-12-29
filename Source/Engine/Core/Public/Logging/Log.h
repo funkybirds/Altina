@@ -20,7 +20,7 @@ namespace AltinaEngine::Core::Logging
         using Type = TFalse; // NOLINT
     };
 
-    using Container::TStringView;
+    using Container::FStringView;
 
     template <typename... Args>
     using TFormatString =
@@ -37,7 +37,7 @@ namespace AltinaEngine::Core::Logging
     };
 
     using FLogSink = void (*)(
-        ELogLevel Level, TStringView Category, TStringView Message, void* UserData); // NOLINT(*-identifier-naming)
+        ELogLevel Level, FStringView Category, FStringView Message, void* UserData); // NOLINT(*-identifier-naming)
 
     class AE_CORE_API FLogger
     {
@@ -48,16 +48,16 @@ namespace AltinaEngine::Core::Logging
         static void SetLogSink(FLogSink Sink, void* UserData = nullptr);
         static void ResetLogSink();
 
-        static void Log(ELogLevel Level, TStringView Category, TStringView Message);
+        static void Log(ELogLevel Level, FStringView Category, FStringView Message);
 
-        static void Log(ELogLevel Level, TStringView Message) { Log(Level, GetDefaultCategory(), Message); }
+        static void Log(ELogLevel Level, FStringView Message) { Log(Level, GetDefaultCategory(), Message); }
 
-        static void SetDefaultCategory(TStringView Category);
+        static void SetDefaultCategory(FStringView Category);
         static void ResetDefaultCategory() noexcept;
-        static auto GetDefaultCategory() noexcept -> TStringView;
+        static auto GetDefaultCategory() noexcept -> FStringView;
 
         template <typename... Args>
-        static void Logf(ELogLevel Level, TStringView Category, TFormatString<Args...> Format, Args&&... args)
+        static void Logf(ELogLevel Level, FStringView Category, TFormatString<Args...> Format, Args&&... args)
         {
             if (!ShouldLog(Level))
             {
@@ -66,16 +66,16 @@ namespace AltinaEngine::Core::Logging
 
             const std::basic_string<AltinaEngine::TChar> buffer =
                 std::format(Format, AltinaEngine::Forward<Args>(args)...);
-            Dispatch(Level, Category, TStringView(buffer.data(), static_cast<usize>(buffer.size())));
+            Dispatch(Level, Category, FStringView(buffer.data(), static_cast<usize>(buffer.size())));
         }
 
     private:
         static auto ShouldLog(ELogLevel Level) noexcept -> bool;
-        static void Dispatch(ELogLevel Level, TStringView Category, TStringView Message);
+        static void Dispatch(ELogLevel Level, FStringView Category, FStringView Message);
     };
 
     template <typename... Args>
-    void LogInfoCategory(TStringView Category, TFormatString<Args...> Format, Args&&... args)
+    void LogInfoCategory(FStringView Category, TFormatString<Args...> Format, Args&&... args)
     {
         FLogger::Logf(ELogLevel::Info, Category, Format, AltinaEngine::Forward<Args>(args)...);
     }
@@ -85,13 +85,13 @@ namespace AltinaEngine::Core::Logging
         LogInfoCategory(FLogger::GetDefaultCategory(), Format, AltinaEngine::Forward<Args>(args)...);
     }
 
-    template <typename... Args> void LogInfoCat(TStringView Category, TFormatString<Args...> Format, Args&&... args)
+    template <typename... Args> void LogInfoCat(FStringView Category, TFormatString<Args...> Format, Args&&... args)
     {
         LogInfoCategory(Category, Format, AltinaEngine::Forward<Args>(args)...);
     }
 
     template <typename... Args>
-    void LogWarningCategory(TStringView Category, TFormatString<Args...> Format, Args&&... args)
+    void LogWarningCategory(FStringView Category, TFormatString<Args...> Format, Args&&... args)
     {
         FLogger::Logf(ELogLevel::Warning, Category, Format, AltinaEngine::Forward<Args>(args)...);
     }
@@ -101,13 +101,13 @@ namespace AltinaEngine::Core::Logging
         LogWarningCategory(FLogger::GetDefaultCategory(), Format, AltinaEngine::Forward<Args>(args)...);
     }
 
-    template <typename... Args> void LogWarningCat(TStringView Category, TFormatString<Args...> Format, Args&&... args)
+    template <typename... Args> void LogWarningCat(FStringView Category, TFormatString<Args...> Format, Args&&... args)
     {
         LogWarningCategory(Category, Format, AltinaEngine::Forward<Args>(args)...);
     }
 
     template <typename... Args>
-    void LogErrorCategory(TStringView Category, TFormatString<Args...> Format, Args&&... args)
+    void LogErrorCategory(FStringView Category, TFormatString<Args...> Format, Args&&... args)
     {
         FLogger::Logf(ELogLevel::Error, Category, Format, AltinaEngine::Forward<Args>(args)...);
     }
@@ -117,7 +117,7 @@ namespace AltinaEngine::Core::Logging
         LogErrorCategory(FLogger::GetDefaultCategory(), Format, AltinaEngine::Forward<Args>(args)...);
     }
 
-    template <typename... Args> void LogErrorCat(TStringView Category, TFormatString<Args...> Format, Args&&... args)
+    template <typename... Args> void LogErrorCat(FStringView Category, TFormatString<Args...> Format, Args&&... args)
     {
         LogErrorCategory(Category, Format, AltinaEngine::Forward<Args>(args)...);
     }

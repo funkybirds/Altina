@@ -1,4 +1,5 @@
 #pragma once
+#include "Types/Traits.h"
 
 #define AE_RTTI_ENABLED 1
 
@@ -13,4 +14,11 @@ namespace AltinaEngine
 #else
     using FTypeInfo = void; // NOLINT
 #endif
+
+
+    template <typename T>
+    auto GetRttiTypeHash() -> usize
+    {
+        return typeid(T).hash_code();
+    }
 } // namespace AltinaEngine

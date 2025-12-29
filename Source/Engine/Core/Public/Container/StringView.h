@@ -33,10 +33,10 @@ namespace AltinaEngine::Core::Container
         [[nodiscard]] constexpr auto operator[](TSizeType index) const noexcept -> TReference { return mData[index]; }
 
         [[nodiscard]] constexpr auto begin() const noexcept -> TPointer { return mData; } // NOLINT(*-identifier-naming)
-        [[nodiscard]] constexpr auto end() const noexcept -> TPointer
+        [[nodiscard]] constexpr auto end() const noexcept -> TPointer                     // NOLINT(*-identifier-naming)
         {
             return mData + mLength;
-        } // NOLINT(*-identifier-naming)
+        }
 
         [[nodiscard]] constexpr auto Substring(TSizeType offset, TSizeType count) const noexcept -> TBasicStringView
         {
@@ -65,12 +65,11 @@ namespace AltinaEngine::Core::Container
             return length;
         }
 
-    private:
         TPointer  mData;
         TSizeType mLength;
     };
 
-    using TStringView       = TBasicStringView<TChar>;
-    using TNativeStringView = TBasicStringView<char>;
+    using FStringView       = TBasicStringView<TChar>; // NOLINT
+    using FNativeStringView = TBasicStringView<char>;  // NOLINT
 
 } // namespace AltinaEngine::Core::Container

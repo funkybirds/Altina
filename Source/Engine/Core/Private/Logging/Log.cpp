@@ -6,13 +6,13 @@
 #include <string>
 #include <type_traits>
 
-using AltinaEngine::Core::Container::TStringView;
+using AltinaEngine::Core::Container::FStringView;
 
 namespace AltinaEngine::Core::Logging
 {
     namespace
     {
-        template <usize N> constexpr auto LiteralView(const TChar (&Text)[N]) -> TStringView
+        template <usize N> constexpr auto LiteralView(const TChar (&Text)[N]) -> FStringView
         {
             return { Text, N > 0 ? N - 1 : 0 }; // remove null terminator
         }
@@ -32,7 +32,7 @@ namespace AltinaEngine::Core::Logging
         thread_local std::basic_string<TChar> gThreadDefaultCategory;
         thread_local bool                     gThreadHasCustomCategory = false;
 
-        auto                                  LevelToLabel(const ELogLevel Level) noexcept -> TStringView
+        auto                                  LevelToLabel(const ELogLevel Level) noexcept -> FStringView
         {
             switch (Level)
             {
@@ -64,10 +64,10 @@ namespace AltinaEngine::Core::Logging
             }
         }
 
-        void DefaultSink(ELogLevel Level, TStringView Category, TStringView Message, void*)
+        void DefaultSink(ELogLevel Level, FStringView Category, FStringView Message, void*)
         {
             auto&             stream = ConsoleStream();
-            const TStringView label  = LevelToLabel(Level);
+            const FStringView label  = LevelToLabel(Level);
 
             stream << TEXT('[');
             if (!label.IsEmpty())
@@ -102,7 +102,7 @@ namespace AltinaEngine::Core::Logging
 
     void FLogger::ResetLogSink() { SetLogSink(nullptr, nullptr); }
 
-    void FLogger::Log(ELogLevel Level, TStringView Category, TStringView Message)
+    void FLogger::Log(ELogLevel Level, FStringView Category, FStringView Message)
     {
         if (!ShouldLog(Level))
         {
@@ -117,7 +117,7 @@ namespace AltinaEngine::Core::Logging
         return Level >= static_cast<ELogLevel>(gMinimumLevel.Load());
     }
 
-    void FLogger::SetDefaultCategory(TStringView Category)
+    void FLogger::SetDefaultCategory(FStringView Category)
     {
         if (Category.IsEmpty())
         {
@@ -135,7 +135,7 @@ namespace AltinaEngine::Core::Logging
         gThreadHasCustomCategory = false;
     }
 
-    auto FLogger::GetDefaultCategory() noexcept -> TStringView
+    auto FLogger::GetDefaultCategory() noexcept -> FStringView
     {
         if (gThreadHasCustomCategory && !gThreadDefaultCategory.empty())
         {
@@ -145,7 +145,7 @@ namespace AltinaEngine::Core::Logging
         return LiteralView(kDefaultCategory);
     }
 
-    void FLogger::Dispatch(ELogLevel Level, TStringView Category, TStringView Message)
+    void FLogger::Dispatch(ELogLevel Level, FStringView Category, FStringView Message)
     {
         FLogSink sinkCopy     = nullptr;
         void*    userDataCopy = nullptr;

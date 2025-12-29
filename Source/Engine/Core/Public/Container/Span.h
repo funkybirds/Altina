@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../Types/Aliases.h"
-#include "../Types/Traits.h"
-#include "../Math/NumericConstants.h"
+#include "Types/Aliases.h"
+#include "Types/Traits.h"
+#include "Math/NumericConstants.h"
 #include "Array.h"
 #include "Vector.h"
 

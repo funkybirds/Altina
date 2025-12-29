@@ -179,6 +179,16 @@ namespace AltinaEngine::Core::TypeMeta
                 TMetaTypeInfo<T>::kDestructible, TMetaTypeInfo<T>::kHash, TMetaTypeInfo<T>::kName,
                 &TMetaTypeInfo<T>::GetTypeInfo, &TMetaTypeInfo<T>::InvokeDtor, &TMetaTypeInfo<T>::InvokeCopyCtor);
         }
+        static auto CreateVoid()
+        {
+            return FMetaTypeInfo(
+                false, false, false, 0, FNativeStringView{},
+                []() -> FTypeInfo const& {
+                    static FTypeInfo const* typeInfo = &typeid(void);
+                    return *typeInfo;
+                },
+                nullptr, nullptr);
+        }
         static auto CreatePlaceHolder() { return FMetaTypeInfo(); }
 
         friend struct FMetaPropertyInfo;

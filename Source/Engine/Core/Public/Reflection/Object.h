@@ -66,7 +66,7 @@ namespace AltinaEngine::Core::Reflection
         template <typename T> auto As() -> T&
         {
             if (ReflectionAssert(mMetadata.GetTypeInfo() == typeid(T), EReflectionErrorCode::CorruptedAnyCast,
-                    mMetadata, mPtr)) [[likely]]
+                    FReflectionDumpData{})) [[likely]]
             {
                 return *static_cast<T*>(mPtr);
             }
@@ -75,7 +75,7 @@ namespace AltinaEngine::Core::Reflection
         template <typename T> auto As() const -> T&
         {
             if (ReflectionAssert(mMetadata.GetTypeInfo() == typeid(T), EReflectionErrorCode::CorruptedAnyCast,
-                    mMetadata, mPtr)) [[likely]]
+                    FReflectionDumpData{})) [[likely]]
             {
                 return *static_cast<T*>(mPtr);
             }
@@ -83,11 +83,16 @@ namespace AltinaEngine::Core::Reflection
         }
 
         // Constructors
-        template <typename T, typename... TArgs> static auto Create(TArgs&&... args) -> FObject
+        template <INonVoid T, typename... TArgs> static auto Create(TArgs&&... args) -> FObject
         {
             T*            pObject  = new T(Forward<TArgs>(args)...);
             FMetaTypeInfo metadata = FMetaTypeInfo::Create<T>();
             return FObject(pObject, metadata);
+        }
+        template <IVoid> static auto Create()
+        {
+            FMetaTypeInfo metadata = FMetaTypeInfo::CreateVoid();
+            return FObject(nullptr, metadata);
         }
         template <ICopyConstructible T, typename... TArgs> static auto CreateClone(const T& value) -> FObject
         {
@@ -108,7 +113,7 @@ namespace AltinaEngine::Core::Reflection
         void ConstructFromMetadataCopyCtor(const FObject& rhs)
         {
             if (ReflectionAssert(mMetadata.IsCopyConstructible(), EReflectionErrorCode::TypeNotCopyConstructible,
-                    mMetadata, rhs.mPtr)) [[likely]]
+                    FReflectionDumpData{})) [[likely]]
             {
                 mPtr = mMetadata.CallCopyConstructor(rhs.mPtr);
             }
@@ -117,8 +122,8 @@ namespace AltinaEngine::Core::Reflection
         {
             if (!mPtr)
                 return;
-            if (ReflectionAssert(
-                    mMetadata.IsDestructible(), EReflectionErrorCode::TypeNotDestructible, mMetadata, mPtr)) [[likely]]
+            if (ReflectionAssert(mMetadata.IsDestructible(), EReflectionErrorCode::TypeNotDestructible,
+                    FReflectionDumpData{})) [[likely]]
             {
                 mMetadata.CallDestructor(mPtr);
             }

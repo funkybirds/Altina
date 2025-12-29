@@ -1,6 +1,5 @@
 #pragma once
 #include "Base/CoreAPI.h"
-#include "Types/Traits.h"
 #include "Types/Meta.h"
 namespace AltinaEngine::Core::Reflection
 {
@@ -13,19 +12,25 @@ namespace AltinaEngine::Core::Reflection
         TypeNotCopyConstructible = 1,
         TypeNotDestructible      = 2,
         CorruptedAnyCast         = 3,
+        MismatchedArgumentNumber = 4,
     };
 
-    [[noreturn]] AE_CORE_API void ReflectionAbort(
-        EReflectionErrorCode errorCode, const FMetaTypeInfo& tpInfo, void* objInfo);
+    struct FReflectionDumpData
+    {
+        void*            mObjInfo;
+        FMetaMethodInfo* mMethodInfo;
+    };
 
-    inline bool ReflectionAssert(
-        bool condition, EReflectionErrorCode errorCode, const FMetaTypeInfo& tpInfo, void* objInfo)
+    [[noreturn]] AE_CORE_API void ReflectionAbort(EReflectionErrorCode errorCode, const FReflectionDumpData& dumpData);
+
+    inline auto ReflectionAssert(bool condition, EReflectionErrorCode errorCode, const FReflectionDumpData& dumpData)
+        -> bool
     {
         if constexpr (kEnableRuntimeSanityCheck)
         {
             if (!condition) [[unlikely]]
             {
-                ReflectionAbort(errorCode, tpInfo, objInfo);
+                ReflectionAbort(errorCode, dumpData);
             }
         }
         return condition;

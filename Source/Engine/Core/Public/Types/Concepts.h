@@ -8,6 +8,12 @@ namespace AltinaEngine
     template <typename T>
     concept IScalar = TTypeIsIntegral<T>::Value || TTypeIsFloatingPoint<T>::Value;
 
+    template <typename T>
+    concept INonVoid = !TTypeIsVoid_v<T>;
+
+    template <typename T>
+    concept IVoid = TTypeIsVoid_v<T>;
+
     template <typename R, typename Pred>
     concept IPredicateForRange = requires(Pred p, decltype(Declval<R>().begin()) it) {
         { p(*it) };

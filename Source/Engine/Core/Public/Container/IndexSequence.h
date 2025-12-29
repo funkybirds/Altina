@@ -23,4 +23,6 @@ namespace AltinaEngine::Core::Container
 
     template <usize N> using TMakeIndexSequence = TMakeIndexSequenceImpl<N>::type;
 
+    template <typename... TArgs> using TIndexSequenceFor = TMakeIndexSequence<sizeof...(TArgs)>;
+
 } // namespace AltinaEngine::Core::Container

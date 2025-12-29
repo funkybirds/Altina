@@ -1,131 +1,134 @@
 {
-    "version": 5,
-    "cmakeMinimumRequired": {
-        "major": 3,
-        "minor": 28,
-        "patch": 0
+  "version": 5,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "20",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      },
+      "environment": {
+        "VSLANG": "1033"
+      }
     },
-    "configurePresets": [
-        {
-            "name": "base",
-            "hidden": true,
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "installDir": "${sourceDir}/out/install/${presetName}",
-            "cacheVariables": {
-                "CMAKE_CXX_STANDARD": "20",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-            }
-        },
-        {
-            "name": "windows-msvc-debug",
-            "displayName": "Windows MSVC Debug",
-            "inherits": "base",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "windows-msvc-release",
-            "displayName": "Windows MSVC Release",
-            "inherits": "base",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "windows-msvc-relwithdebinfo",
-            "displayName": "Windows MSVC RelWithDebInfo",
-            "inherits": "base",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-            }
-        },
-        {
-            "name": "windows-clangcl-debug",
-            "displayName": "Windows ClangCL Debug",
-            "inherits": "base",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_COMPILER": "clang-cl",
-                "CMAKE_CXX_COMPILER": "clang-cl"
-            }
-        },
-        {
-            "name": "linux-gcc-debug",
-            "displayName": "Linux GCC Debug",
-            "inherits": "base",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_COMPILER": "gcc",
-                "CMAKE_CXX_COMPILER": "g++"
-            }
-        },
-        {
-            "name": "linux-gcc-relwithdebinfo",
-            "displayName": "Linux GCC RelWithDebInfo",
-            "inherits": "base",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-                "CMAKE_C_COMPILER": "gcc",
-                "CMAKE_CXX_COMPILER": "g++"
-            }
-        }
-    ],
-    "buildPresets": [
-        {
-            "name": "windows-msvc-debug",
-            "configurePreset": "windows-msvc-debug"
-        },
-        {
-            "name": "windows-msvc-release",
-            "configurePreset": "windows-msvc-release"
-        },
-        {
-            "name": "windows-msvc-relwithdebinfo",
-            "configurePreset": "windows-msvc-relwithdebinfo"
-        },
-        {
-            "name": "windows-clangcl-debug",
-            "configurePreset": "windows-clangcl-debug"
-        },
-        {
-            "name": "linux-gcc-debug",
-            "configurePreset": "linux-gcc-debug"
-        },
-        {
-            "name": "linux-gcc-relwithdebinfo",
-            "configurePreset": "linux-gcc-relwithdebinfo"
-        }
-    ]
+    {
+      "name": "windows-msvc-debug",
+      "displayName": "Windows MSVC Debug",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "windows-msvc-release",
+      "displayName": "Windows MSVC Release",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-msvc-relwithdebinfo",
+      "displayName": "Windows MSVC RelWithDebInfo",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "windows-clangcl-debug",
+      "displayName": "Windows ClangCL Debug",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+    {
+      "name": "linux-gcc-debug",
+      "displayName": "Linux GCC Debug",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "linux-gcc-relwithdebinfo",
+      "displayName": "Linux GCC RelWithDebInfo",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-msvc-debug",
+      "configurePreset": "windows-msvc-debug"
+    },
+    {
+      "name": "windows-msvc-release",
+      "configurePreset": "windows-msvc-release"
+    },
+    {
+      "name": "windows-msvc-relwithdebinfo",
+      "configurePreset": "windows-msvc-relwithdebinfo"
+    },
+    {
+      "name": "windows-clangcl-debug",
+      "configurePreset": "windows-clangcl-debug"
+    },
+    {
+      "name": "linux-gcc-debug",
+      "configurePreset": "linux-gcc-debug"
+    },
+    {
+      "name": "linux-gcc-relwithdebinfo",
+      "configurePreset": "linux-gcc-relwithdebinfo"
+    }
+  ]
 }

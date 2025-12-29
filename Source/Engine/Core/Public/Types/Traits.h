@@ -289,6 +289,10 @@ namespace AltinaEngine
     {
     };
 
+    template <typename T> struct TTypeIsVoid : TTypeSameAs<void, typename TRemoveCV<T>::Type>
+    {
+    };
+
     template <typename T> struct TTypeIsDestructible : decltype(Detail::TestDestruct<T>(0))
     {
     };
@@ -337,7 +341,9 @@ namespace AltinaEngine
     template <typename T, typename U = T> using TGreaterComparable = TTypeGreaterComparable<T, U>;
 
     template <typename T, typename U>
-    inline constexpr bool TTypeSameAs_v = TTypeSameAs<T, U>::Value; // NOLINT(*-identifier-naming)
+    inline constexpr bool                       TTypeSameAs_v = TTypeSameAs<T, U>::Value; // NOLINT(*-identifier-naming)
+
+    template <typename T> inline constexpr bool TTypeIsVoid_v = TTypeIsVoid<T>::Value; // NOLINT(*-identifier-naming)
 
     template <typename T>
     inline constexpr bool TTypeIsIntegral_v = TTypeIsIntegral<T>::Value; // NOLINT(*-identifier-naming)

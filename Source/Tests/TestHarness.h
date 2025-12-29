@@ -73,7 +73,7 @@ namespace Test
     static Test::Registrar TEST_CONCAT(test_reg_, __LINE__)(name, &TEST_CONCAT(test_fn_, __LINE__)); \
     static void            TEST_CONCAT(test_fn_, __LINE__)()
 
-#define STATIC_REQUIRE(x) static_assert(x)
+#define STATIC_REQUIRE(x) static_assert((x))
 
 #define REQUIRE(expr) Test::Require((expr), #expr, __FILE__, __LINE__)
 

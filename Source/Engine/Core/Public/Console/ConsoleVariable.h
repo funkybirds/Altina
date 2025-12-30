@@ -33,17 +33,17 @@ namespace AltinaEngine::Core::Console
 
         FConsoleVariable(const FString& name, const FString& defaultValue);
 
-        const FString& GetName() const noexcept;
+        const FString&           GetName() const noexcept;
 
-        FString GetString() const noexcept;
+        FString                  GetString() const noexcept;
 
-        int GetInt() const noexcept;
+        int                      GetInt() const noexcept;
 
-        float GetFloat() const noexcept;
+        float                    GetFloat() const noexcept;
 
-        bool GetBool() const noexcept;
+        bool                     GetBool() const noexcept;
 
-        void SetFromString(const FString& v) noexcept;
+        void                     SetFromString(const FString& v) noexcept;
 
         EType                    GetType() const noexcept { return mType; }
 
@@ -52,10 +52,10 @@ namespace AltinaEngine::Core::Console
 
         static FConsoleVariable* Find(const FString& name) noexcept;
 
-        static void ForEach(TFunction<void(const FConsoleVariable&)> fn) noexcept;
+        static void              ForEach(TFunction<void(const FConsoleVariable&)> fn) noexcept;
 
     private:
-        static EType GuessType(const FString& v) noexcept;
+        static EType   GuessType(const FString& v) noexcept;
 
         FString        mName;
         FString        mValue;

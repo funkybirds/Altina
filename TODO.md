@@ -35,9 +35,9 @@
 	- [x] Implement `FWorkerPool` with `Start()`/`Stop()` and basic lifecycle management.
 	- [ ] Parse configuration data (CVar, preset, config file) at startup (TODO).
 	- [ ] Add optional work-stealing deque implementation with telemetry toggles (TODO).
-- [ ] Provide instrumentation hooks (per-thread names, counters, timing) to integrate with future profiling tools.
+- [x] Provide instrumentation hooks (per-thread names, counters, timing) to integrate with future profiling tools.
 	- [ ] Emit tracing events on job enqueue/dequeue/complete.
-	- [ ] Surface per-thread counters accessible via debug console/API.
+	- [x] Surface per-thread counters accessible via debug console/API.
 	- [ ] Integrate with existing logging/assert systems for anomalies.
 - [ ] Define named thread descriptors for `RHI`, `Rendering`, `Gameplay`, and `Audio` including their startup order and run-loop responsibilities.
 	- [ ] Capture initialization contracts per named thread (modules they bootstrap, required services).

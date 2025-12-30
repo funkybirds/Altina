@@ -6,11 +6,13 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
+#include "../../Public/Instrumentation/Instrumentation.h"
 // Use engine public mutex header already included above (relative include present)
 #include "../../Public/Threading/ConditionVariable.h"
 #include "../../Public/Container/SmartPtr.h"
 #include "../../Public/Container/HashMap.h"
 #include "../../Public/Container/HashSet.h"
+#include "../../Public/Container/ThreadSafeQueue.h"
 
 namespace AltinaEngine::Core::Jobs
 {
@@ -29,7 +31,10 @@ namespace AltinaEngine::Core::Jobs
         for (usize i = 0; i < count; ++i)
         {
             // allocate std::thread on heap and store opaque pointer in public TVector<void*>
-            auto* t = new std::thread([this]() -> void { WorkerMain(); });
+            auto* t = new std::thread([this]() -> void {
+                AltinaEngine::Core::Instrumentation::SetCurrentThreadName("JobWorker");
+                WorkerMain();
+            });
             mThreads.PushBack(t);
         }
     }
@@ -186,11 +191,16 @@ namespace AltinaEngine::Core::Jobs
     using Container::THashMap;
     using Container::THashSet;
     using Container::TShared;
-    static THashMap<u64, TShared<JobState>> gJobs;
-    static FWorkerPool*                     gDefaultPool = nullptr;
+    static THashMap<u64, TShared<JobState>>                          gJobs;
+    static FWorkerPool*                                              gDefaultPool = nullptr;
+    // Queue for jobs submitted to the GameThread (main thread). Consumers
+    // must call `FJobSystem::ProcessGameThreadJobs()` on the registered
+    // game thread to execute these tasks.
+    static Container::TThreadSafeQueue<Container::TFunction<void()>> gGameThreadQueue;
+    static Threading::TAtomic<i32>                                   gGameThreadRegistered{ 0 };
 
     // Helper to ensure a default pool exists
-    static auto                             EnsureDefaultPool() -> FWorkerPool*
+    static auto                                                      EnsureDefaultPool() -> FWorkerPool*
     {
         AltinaEngine::Core::Threading::FScopedLock lg(gJobsMutex);
         if (!gDefaultPool)
@@ -262,6 +272,40 @@ namespace AltinaEngine::Core::Jobs
             gJobs.emplace(id, state);
         }
 
+        // If affinity targets a named thread, route accordingly. For now
+        // we treat ENamedThread::GameThread specially and enqueue to the
+        // game-thread queue; otherwise use the default worker pool.
+        if ((desc.AffinityMask & static_cast<AltinaEngine::u32>(ENamedThread::GameThread)) != 0)
+        {
+            // Wrap the user's callback as before but push into game queue
+            TShared<TFunction<void()>>   cbptr         = MakeShared<Container::TFunction<void()>>(Move(desc.Callback));
+            TVector<FJobHandle>          prereqHandles = Move(desc.Prerequisites);
+
+            Container::TFunction<void()> wrapper = [cbptr, prereqHandles, state]() mutable -> void {
+                for (usize i = 0; i < prereqHandles.Size(); ++i)
+                {
+                    Wait(prereqHandles[i]);
+                }
+                try
+                {
+                    if (cbptr && static_cast<bool>(*cbptr))
+                        (*cbptr)();
+                }
+                catch (...)
+                {
+                }
+
+                {
+                    Threading::FScopedLock lg(state->mtx);
+                    state->completed = true;
+                }
+                state->cv.NotifyAll();
+            };
+
+            gGameThreadQueue.Push(Move(wrapper));
+            return FJobHandle(id);
+        }
+
         // Ensure pool
         FWorkerPool*                 pool = EnsureDefaultPool();
 
@@ -308,6 +352,39 @@ namespace AltinaEngine::Core::Jobs
             gJobs.emplace(id, state);
         }
 
+        // Route to game-thread if requested
+        if ((desc.AffinityMask & static_cast<AltinaEngine::u32>(ENamedThread::GameThread)) != 0)
+        {
+            TShared<TFunction<void()>> cbptr          = MakeShared<TFunction<void()>>(Move(desc.Callback));
+            TVector<FJobHandle>        prereqHandles2 = Move(desc.Prerequisites);
+
+            TFunction<void()>          wrapper = [cbptr, state, &outFence, prereqHandles2]() mutable -> void {
+                for (usize i = 0; i < prereqHandles2.Size(); ++i)
+                {
+                    Wait(prereqHandles2[i]);
+                }
+
+                try
+                {
+                    if (cbptr && static_cast<bool>(*cbptr))
+                        (*cbptr)();
+                }
+                catch (...)
+                {
+                }
+
+                {
+                    Threading::FScopedLock lg(state->mtx);
+                    state->completed = true;
+                }
+                state->cv.NotifyAll();
+                outFence.Signal();
+            };
+
+            gGameThreadQueue.Push(Move(wrapper));
+            return FJobHandle(id);
+        }
+
         FWorkerPool*               pool = EnsureDefaultPool();
 
         TShared<TFunction<void()>> cbptr          = MakeShared<TFunction<void()>>(Move(desc.Callback));
@@ -338,6 +415,32 @@ namespace AltinaEngine::Core::Jobs
 
         pool->Submit(Move(wrapper));
         return FJobHandle(id);
+    }
+
+    void FJobSystem::RegisterGameThread() noexcept
+    {
+        // Mark registered and set thread name for instrumentation
+        gGameThreadRegistered.Store(1);
+        AltinaEngine::Core::Instrumentation::SetCurrentThreadName("GameThread");
+    }
+
+    void FJobSystem::ProcessGameThreadJobs() noexcept
+    {
+        // Only the registered game thread should call this; we don't enforce that
+        // but it's the intended usage. Drain and execute queued jobs.
+        while (!gGameThreadQueue.IsEmpty())
+        {
+            auto job = gGameThreadQueue.Front();
+            gGameThreadQueue.Pop();
+            try
+            {
+                if (job && static_cast<bool>(job))
+                    job();
+            }
+            catch (...)
+            {
+            }
+        }
     }
 
     void FJobSystem::Wait(FJobHandle h) noexcept

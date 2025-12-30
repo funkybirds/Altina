@@ -203,6 +203,8 @@ namespace AltinaEngine::Core::TypeMeta
         void               CallDestructor(void* obj) const { mDestructor(obj); }
         auto               CallCopyConstructor(void* obj) const -> void* { return mCopyConstructor(obj); }
 
+        [[nodiscard]] auto operator==(const FMetaTypeInfo& p) const -> bool { return mHash == p.mHash; }
+
     private:
         FMetaTypeInfo()
             : mDefaultConstructible(false)

@@ -9,6 +9,20 @@
 #include "../Container/Vector.h"
 #include "../Threading/Atomic.h"
 
+// Bring common fixed-size aliases into the including translation unit for
+// convenience and compatibility with existing tests that expect unqualified
+// names like `u32` to be available.
+using AltinaEngine::i16;
+using AltinaEngine::i32;
+using AltinaEngine::i64;
+using AltinaEngine::i8;
+using AltinaEngine::isize;
+using AltinaEngine::u16;
+using AltinaEngine::u32;
+using AltinaEngine::u64;
+using AltinaEngine::u8;
+using AltinaEngine::usize;
+
 namespace std
 {
     class thread;
@@ -30,6 +44,18 @@ namespace AltinaEngine::Core::Jobs
         usize mMinThreads = 1;
         usize mMaxThreads = 4;
         bool  mAllowSteal = false; // reserved for future
+    };
+
+    // Named thread identifiers (used as affinity mask bits). Consumers can set
+    // `FJobDescriptor::AffinityMask` to route a job to a named thread instead
+    // of the general worker pool. Values are bitflags so multiple targets can
+    // be expressed (implementation will pick the first available).
+    enum class ENamedThread : AltinaEngine::u32
+    {
+        GameThread = 1u << 0,
+        RHI        = 1u << 1,
+        Rendering  = 1u << 2,
+        Audio      = 1u << 3,
     };
 
     // Forward declare the pool type so the JobSystem API can reference it.
@@ -87,7 +113,7 @@ namespace AltinaEngine::Core::Jobs
         TFunction<void()>   Callback;
         void*               Payload      = nullptr; // optional user data
         const char*         DebugLabel   = nullptr;
-        u32                 AffinityMask = 0; // mapping to named thread / pool ids (implementation-defined)
+        AltinaEngine::u32   AffinityMask = 0; // mapping to named thread / pool ids (implementation-defined)
         int                 Priority     = 0; // advisory priority
         // List of job handles this job depends on. The runtime will wait for
         // each prerequisite to complete before executing this job's callback.
@@ -106,6 +132,16 @@ namespace AltinaEngine::Core::Jobs
 
         // Wait for a handle to complete. Returns immediately if handle invalid.
         AE_CORE_API void Wait(FJobHandle h) noexcept;
+
+        // Register the current thread as the `GameThread` (main thread).
+        // This sets up internal routing so jobs targeting `GameThread` will
+        // be queued for the registered thread and must be drained via
+        // `ProcessGameThreadJobs()` on that thread.
+        AE_CORE_API void RegisterGameThread() noexcept;
+
+        // Process queued work submitted to `GameThread`. Call from the
+        // registered game thread to execute pending tasks targeted at it.
+        AE_CORE_API void ProcessGameThreadJobs() noexcept;
 
         // Create/destroy worker pools (optional convenience)
         AE_CORE_API auto CreateWorkerPool(const FWorkerPoolConfig& cfg) noexcept -> FWorkerPool*;

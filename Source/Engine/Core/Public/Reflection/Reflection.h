@@ -20,7 +20,8 @@ namespace AltinaEngine::Core::Reflection
         template <typename T, typename R, typename... Args, usize... I>
         auto MemberFunctorInvokerWrapperImpl(R (T::*f)(Args...), T& obj, TSpan<FObject> vec, TIndexSequence<I...>) -> R
         {
-            return (obj.*f)(vec[I].template As<Args>()...);
+            return (obj.*f)(
+                vec[I].template As<Args>()...); // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         }
 
         template <typename T, typename R, typename... Args>

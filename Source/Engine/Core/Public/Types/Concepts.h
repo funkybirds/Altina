@@ -52,6 +52,15 @@ namespace AltinaEngine
     template <typename From, typename To>
     concept IDynamicConvertible = TTypeIsDynamicConvertible<To, From>::Value;
 
+    template <typename T>
+    concept IClass = TTypeIsClass_v<T>;
+
+    template <typename T>
+    concept IUnion = TTypeIsUnion_v<T>;
+
+    template <typename TBase, typename TDerived>
+    concept IClassBaseOf = TTypeIsBaseOf<TBase, TDerived>::Value;
+
     // Range concepts
     template <typename R>
     concept IRange = requires(R r) {

@@ -1,36 +1,21 @@
 #pragma once
 
+#include "InternalTraits.h"
 #include "Aliases.h"
 #include "Container/Tuple.h"
 
 // Forward-declare TTuple to avoid ordering issues when used in traits specializations
-namespace AltinaEngine
+
+namespace AltinaEngine::Core::Container
 {
-    namespace Core
-    {
-        namespace Container
-        {
-            template <typename...> struct TTuple;
-        }
-    } // namespace Core
-} // namespace AltinaEngine
+    template <typename...> struct TTuple;
+}
 
 namespace AltinaEngine
 {
-
-    template <bool TValue> struct TBoolConstant
-    {
-        static constexpr bool Value = TValue;
-    };
-
-    using TTrueType  = TBoolConstant<true>;
-    using TFalseType = TBoolConstant<false>;
-
-    template <typename T> auto Declval() noexcept -> T&&;
 
     namespace Detail
     {
-
         template <typename T, typename... Args>
         auto TestConstructParen(int) -> decltype(T(Declval<Args>()...), TTrueType{});
 
@@ -91,7 +76,6 @@ namespace AltinaEngine
                 Declval<It&>() -= usize{}, Declval<It&>()[usize{}], Declval<It>() - Declval<It>(), TTrueType{});
 
         template <typename It> TFalseType TestRandomAccessIterator(...);
-
     } // namespace Detail
 
     template <typename... Types> struct TTypeSet
@@ -224,6 +208,38 @@ namespace AltinaEngine
     template <typename T> struct TTypeIsMovable : TTypeIsConstructible<T, T&&>
     {
     };
+
+    template <typename T> struct TTypeIsUnion : Detail::CompilerTraits::TTypeIsUnionImpl<T>
+    {
+    };
+
+    namespace Detail
+    {
+        template <class T> auto TestClassPtr(int T::*) -> TBoolConstant<!TTypeIsUnion<T>::Value>;
+        template <class> auto   TestClassPtr(...) -> TBoolConstant<false>;
+    } // namespace Detail
+
+    template <typename T> struct TTypeIsClass : decltype(Detail::TestClassPtr<T>(nullptr))
+    {
+    };
+
+    namespace Detail
+    {
+        template <typename B> auto             TestPtrConv(const volatile B*) -> TTrueType;
+        template <typename> auto               TestPtrConv(const volatile void*) -> TFalseType;
+
+        template <typename B, typename D> auto TestIsBaseOf(int) -> decltype(TestPtrConv<B>(static_cast<D*>(nullptr)));
+        template <typename, typename> auto     TestIsBaseOf(...) -> TTrueType; // private or ambiguous base
+    } // namespace Detail
+
+    template <typename TBase, typename TDerived>
+    struct TTypeIsBaseOf :
+        TBoolConstant<TTypeIsClass<TBase>::Value
+            && TTypeIsClass<TDerived>::Value&& decltype(Detail::TestIsBaseOf<TBase, TDerived>(0))::Value>
+    {
+    };
+
+    // Utils
 
     template <typename T> struct TRemoveReference
     {
@@ -379,6 +395,18 @@ namespace AltinaEngine
     template <typename T, typename U>
     inline constexpr bool TTypeIsDynamicConvertible_v = // NOLINT(*-identifier-naming)
         TTypeIsDynamicConvertible<T, U>::Value;
+
+    template <typename T>
+    inline constexpr bool TTypeIsUnion_v = // NOLINT(*-identifier-naming)
+        TTypeIsUnion<T>::Value;
+
+    template <typename T>
+    inline constexpr bool TTypeIsClass_v = // NOLINT(*-identifier-naming)
+        TTypeIsClass<T>::Value;
+
+    template <typename TBase, typename TDerived>
+    inline constexpr bool TTypeIsBaseOf_v = // NOLINT(*-identifier-naming)
+        TTypeIsBaseOf<TBase, TDerived>::Value;
 
     template <typename T, typename U = T>
     inline constexpr bool TTypeLessComparable_v = TTypeLessComparable<T, U>::Value; // NOLINT(*-identifier-naming)

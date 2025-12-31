@@ -56,6 +56,8 @@ namespace AltinaEngine::Core::Container
             return *this;
         }
         ~THashSet() = default;
+
+        void Insert(const Key& key) { TBase::insert(key); }
     };
 
 } // namespace AltinaEngine::Core::Container

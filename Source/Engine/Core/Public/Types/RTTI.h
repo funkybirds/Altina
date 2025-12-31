@@ -15,10 +15,11 @@ namespace AltinaEngine
     using FTypeInfo = void; // NOLINT
 #endif
 
+    template <typename T> [[nodiscard]] auto GetRttiTypeInfo() -> const FTypeInfo& { return typeid(T); }
+    template <typename T> [[nodiscard]] auto GetRttiTypeHash() -> usize { return typeid(T).hash_code(); }
 
-    template <typename T>
-    auto GetRttiTypeHash() -> usize
+    [[nodiscard]] inline auto                GetRttiTypeObjectHash(const FTypeInfo& stdTypeInfo) -> usize
     {
-        return typeid(T).hash_code();
+        return stdTypeInfo.hash_code();
     }
 } // namespace AltinaEngine

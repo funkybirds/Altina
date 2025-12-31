@@ -100,6 +100,7 @@ namespace AltinaEngine::Core::Reflection
             FMetaTypeInfo metadata = FMetaTypeInfo::Create<T>();
             return FObject(pObject, metadata);
         }
+        static auto CreateFromMetadata(void* ptr, const FMetaTypeInfo& meta) { return FObject(ptr, meta); }
 
     private:
         // Private Constructor

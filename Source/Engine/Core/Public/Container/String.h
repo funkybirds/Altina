@@ -10,22 +10,22 @@
 namespace AltinaEngine::Core::Container
 {
 
-    class FString : public TVector<TChar>
+    template <typename T> class TBasicString : public TVector<T>
     {
     public:
-        using TSuper = TVector;
+        using TSuper = TVector<T>;
         using TSuper::TConstReference;
         using TSuper::TReference;
         using TSuper::TSizeType;
         using TSuper::TValueType;
 
-        FString() = default;
+        TBasicString() = default;
 
-        explicit FString(const TValueType* Text) { Append(Text); }
+        explicit TBasicString(const TValueType* Text) { Append(Text); }
 
-        FString(const TValueType* Text, usize Length) { Append(Text, Length); }
+        TBasicString(const TValueType* Text, usize Length) { Append(Text, Length); }
 
-        FString(std::initializer_list<TValueType> Init)
+        TBasicString(std::initializer_list<TValueType> Init)
         {
             Reserve(Init.size());
             for (const auto& character : Init)
@@ -34,7 +34,7 @@ namespace AltinaEngine::Core::Container
             }
         }
 
-        auto operator=(const TValueType* Text) -> FString&
+        auto operator=(const TValueType* Text) -> TBasicString&
         {
             TSuper::Clear();
             Append(Text);
@@ -82,9 +82,9 @@ namespace AltinaEngine::Core::Container
 
         [[nodiscard]] auto ToView() const noexcept -> FStringView { return { this->GetData(), this->Length() }; }
 
-        [[nodiscard]] operator FStringView() const noexcept { return ToView(); }
+        [[nodiscard]]      operator FStringView() const noexcept { return ToView(); }
 
-        void ToLower()
+        void               ToLower()
         {
             TransformCharacters([](TValueType Character) -> TValueType { return LowerChar(Character); });
         }
@@ -94,16 +94,16 @@ namespace AltinaEngine::Core::Container
             TransformCharacters([](TValueType Character) -> TValueType { return UpperChar(Character); });
         }
 
-        [[nodiscard]] auto ToLowerCopy() const -> FString
+        [[nodiscard]] auto ToLowerCopy() const -> TBasicString
         {
-            FString copy(*this);
+            TBasicString copy(*this);
             copy.ToLower();
             return copy;
         }
 
-        [[nodiscard]] auto ToUpperCopy() const -> FString
+        [[nodiscard]] auto ToUpperCopy() const -> TBasicString
         {
-            FString copy(*this);
+            TBasicString copy(*this);
             copy.ToUpper();
             return copy;
         }
@@ -137,4 +137,6 @@ namespace AltinaEngine::Core::Container
             return length;
         }
     };
+    using FString       = TBasicString<TChar>;
+    using FNativeString = TBasicString<char>;
 } // namespace AltinaEngine::Core::Container

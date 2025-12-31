@@ -13,6 +13,9 @@ namespace AltinaEngine::Core::Reflection
         TypeNotDestructible      = 2,
         CorruptedAnyCast         = 3,
         MismatchedArgumentNumber = 4,
+
+        TypeHashConflict = 5,
+        TypeUnregistered = 6
     };
 
     struct FReflectionDumpData

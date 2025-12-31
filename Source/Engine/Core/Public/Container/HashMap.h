@@ -51,6 +51,8 @@ namespace AltinaEngine::Core::Container
             return *this;
         }
         ~THashMap() = default;
+
+        [[nodiscard]] auto HasKey(const Key& rhs) -> bool { return this->count(rhs) != 0; }
     };
 
 } // namespace AltinaEngine::Core::Container

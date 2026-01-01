@@ -13,10 +13,10 @@ TEST_CASE("Ref.Basic")
 
     // MakeRef helper
     auto r1 = MakeRef(value);
-    REQUIRE_EQ(r1.get(), 10);
+    REQUIRE_EQ(r1.Get(), 10);
 
     // Mutate through reference wrapper
-    r1.get() = 20;
+    r1.Get() = 20;
     REQUIRE_EQ(value, 20);
 
     // operator T& conversion
@@ -29,7 +29,7 @@ TEST_CASE("Ref.Basic")
 
     // Direct construction and copy semantics
     TRef<int> r3(value);
-    REQUIRE_EQ(r3.get(), 20);
+    REQUIRE_EQ(r3.Get(), 20);
 
     auto r4 = r3; // copy should refer to same int
     r4()    = 33;

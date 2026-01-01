@@ -14,13 +14,13 @@ namespace AltinaEngine::Core::Container
         explicit TRef(T& ref) noexcept : mPtr(std::addressof(ref)) {}
 
         // Access
-        auto get() const noexcept -> T& { return *mPtr; }
+        auto Get() const noexcept -> T& { return *mPtr; }
         auto operator()() const noexcept -> T& { return *mPtr; }
-        operator T&() const noexcept { return *mPtr; }
+             operator T&() const noexcept { return *mPtr; }
 
         // No ownership semantics: copyable and assignable
-        TRef(const TRef& other) noexcept                  = default;
-        TRef&       operator=(const TRef& other) noexcept = default;
+        TRef(const TRef& other) noexcept                           = default;
+        auto        operator=(const TRef& other) noexcept -> TRef& = default;
 
         // Helpers
         static auto From(T& v) noexcept -> TRef { return TRef(v); }
@@ -30,6 +30,6 @@ namespace AltinaEngine::Core::Container
     };
 
     // Helper to deduce type like std::ref
-    template <typename T> inline auto MakeRef(T& v) noexcept -> TRef<T> { return TRef<T>(v); }
+    template <typename T> auto MakeRef(T& v) noexcept -> TRef<T> { return TRef<T>(v); }
 
 } // namespace AltinaEngine::Core::Container

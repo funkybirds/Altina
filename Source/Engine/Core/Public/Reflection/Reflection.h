@@ -5,10 +5,11 @@
 #include "Container/IndexSequence.h"
 #include "Reflection/ReflectionBase.h"
 #include "Utility/CompilerHint.h"
-
+#include "Container/Ref.h"
 namespace AltinaEngine::Core::Reflection
 {
     using Container::FNativeStringView;
+    using Container::MakeRef;
     using Container::TIndexSequence;
     using Container::TSpan;
 
@@ -40,12 +41,12 @@ namespace AltinaEngine::Core::Reflection
         struct TAutoMemberAccessor : TMemberType<decltype(Member)>
         {
             using TSuper = TMemberType<decltype(Member)>;
-            static auto Get(typename TSuper::TClassType& object) -> TSuper::TClassType& { return object.*Member; }
+            static auto Get(typename TSuper::TClassType& object) -> TSuper::TBaseType& { return object.*Member; }
             static auto GetAccessor() -> TFnMemberPropertyAccessor
             {
                 return [](FObject& obj) -> FObject {
                     auto& classObject = obj.As<typename TSuper::TClassType>();
-                    return FObject::CreateClone(MakeRef(Get(classObject)));
+                    return FObject::CreateClone(Container::MakeRef(Get(classObject)));
                 };
             }
         };
@@ -73,9 +74,10 @@ namespace AltinaEngine::Core::Reflection
 
         AE_CORE_API void RegisterType(const FTypeInfo& stdTypeInfo, const FMetaTypeInfo& meta);
         AE_CORE_API void RegisterPolymorphicRelation(FTypeMetaHash baseType, FTypeMetaHash derivedType);
-        AE_CORE_API void RegisterPropertyField(const FMetaTypeInfo& valueMeta, FNativeStringView name,
-            TFnMemberPropertyAccessor accessor, FTypeMetaHash classTypeMetaHash);
+        AE_CORE_API void RegisterPropertyField(
+            const FMetaPropertyInfo& propMeta, FNativeStringView name, TFnMemberPropertyAccessor accessor);
         AE_CORE_API auto ConstructObject(FTypeMetaHash classHash) -> FObject;
+        AE_CORE_API auto GetProperty(FObject& object, FTypeMetaHash propHash, FTypeMetaHash classHash) -> FObject;
 
     } // namespace Detail
 
@@ -98,13 +100,16 @@ namespace AltinaEngine::Core::Reflection
     {
         using TAccessor = Detail::TAutoMemberAccessor<Member>;
         auto propField  = FMetaPropertyInfo::Create<Member>();
-        auto classHash  = propField.GetClassTypeMetadata().GetHash();
-        Detail::RegisterPropertyField(propField.GetPropertyTypeMetadata(), name, TAccessor::GetAccessor(), classHash);
+        Detail::RegisterPropertyField(propField, name, TAccessor::GetAccessor());
     }
 
     inline auto ConstructObject(const FMetaTypeInfo& valueMeta) -> FObject
     {
         return Detail::ConstructObject(valueMeta.GetHash());
+    }
+    inline auto GetProperty(FObject& object, const FMetaPropertyInfo& propMeta) -> FObject
+    {
+        return Detail::GetProperty(object, propMeta.GetHash(), propMeta.GetClassTypeMetadata().GetHash());
     }
 
 } // namespace AltinaEngine::Core::Reflection

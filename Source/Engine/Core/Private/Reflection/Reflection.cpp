@@ -2,14 +2,25 @@
 #include "Container/HashMap.h"
 #include "Container/HashSet.h"
 #include "Types/NonCopyable.h"
+#include "Container/String.h"
 namespace AltinaEngine::Core::Reflection::Detail
 {
+    using Container::FNativeString;
     using Container::THashMap;
     using Container::THashSet;
     using TStdHashType = decltype(Declval<FTypeInfo>().hash_code());
 
     struct FPropertyField
     {
+        FNativeString             mName;
+        FMetaPropertyInfo         mMeta;
+        TFnMemberPropertyAccessor mAccessor;
+
+        FPropertyField() : mMeta(FMetaPropertyInfo::CreatePlaceHolder()), mAccessor(nullptr) {}
+        FPropertyField(FNativeStringView name, const FMetaPropertyInfo& meta, TFnMemberPropertyAccessor accessor)
+            : mName(name), mMeta(meta), mAccessor(accessor)
+        {
+        }
     };
 
     struct FMethodField
@@ -79,13 +90,25 @@ namespace AltinaEngine::Core::Reflection::Detail
         }
     }
 
-    AE_CORE_API void RegisterPropertyField(const FMetaTypeInfo& valueMeta, FNativeStringView name,
-        TFnMemberPropertyAccessor accessor, FTypeMetaHash classTypeMetaHash)
+    AE_CORE_API void RegisterPropertyField(
+        const FMetaPropertyInfo& propMeta, FNativeStringView name, TFnMemberPropertyAccessor accessor)
     {
-        (void)valueMeta;
-        (void)name;
-        (void)accessor;
-        (void)classTypeMetaHash;
+        auto& manager           = GetReflectionManager();
+        auto  classTypeMetaHash = propMeta.GetClassTypeMetadata().GetHash();
+        if (!ReflectionAssert(manager.mRegistry.HasKey(classTypeMetaHash), EReflectionErrorCode::TypeUnregistered,
+                FReflectionDumpData{})) [[unlikely]]
+        {
+            Utility::CompilerHint::Unreachable();
+        }
+        auto& tpMeta   = manager.mRegistry[classTypeMetaHash];
+        auto  propHash = propMeta.GetHash();
+        if (ReflectionAssert(!tpMeta.mProperties.HasKey(propHash), EReflectionErrorCode::TypeHashConflict,
+                FReflectionDumpData{})) [[likely]]
+        {
+            tpMeta.mProperties[propHash] = FPropertyField(name, propMeta, accessor);
+            return;
+        }
+        Utility::CompilerHint::Unreachable();
     }
 
     AE_CORE_API auto ConstructObject(FTypeMetaHash classHash) -> FObject
@@ -100,6 +123,29 @@ namespace AltinaEngine::Core::Reflection::Detail
             return obj;
         }
         Utility::CompilerHint::Unreachable();
+    }
+    AE_CORE_API auto GetProperty(FObject& object, FTypeMetaHash propHash, FTypeMetaHash classHash) -> FObject
+    {
+        auto&      manager         = GetReflectionManager();
+        const auto actualClassHash = object.GetTypeHash();
+        if (!ReflectionAssert(classHash == actualClassHash, EReflectionErrorCode::ObjectAndTypeMismatch,
+                FReflectionDumpData{})) [[unlikely]]
+        {
+            Utility::CompilerHint::Unreachable();
+        }
+        if (!ReflectionAssert(manager.mRegistry.HasKey(classHash), EReflectionErrorCode::TypeUnregistered,
+                FReflectionDumpData{})) [[unlikely]]
+        {
+            Utility::CompilerHint::Unreachable();
+        }
+        auto& tpMeta = manager.mRegistry[classHash];
+        if (!ReflectionAssert(tpMeta.mProperties.HasKey(propHash), EReflectionErrorCode::PropertyUnregistered,
+                FReflectionDumpData{})) [[unlikely]]
+        {
+            Utility::CompilerHint::Unreachable();
+        }
+        auto& entry = tpMeta.mProperties[propHash];
+        return entry.mAccessor(object);
     }
 
 } // namespace AltinaEngine::Core::Reflection::Detail

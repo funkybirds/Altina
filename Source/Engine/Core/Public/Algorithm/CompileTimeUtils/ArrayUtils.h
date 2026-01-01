@@ -41,19 +41,6 @@ namespace AltinaEngine::Core::Algorithm
         return pos;
     }
 
-    // Refined variants kept for compatibility with Meta.h parsing code.
-    template <typename T, unsigned N>
-    consteval auto GetOccurrencePositionRefined(TArray<T, N> const& str, T c, u64 o) -> u64
-    {
-        return GetOccurrencePosition(str, c, o);
-    }
-
-    template <typename T, unsigned N>
-    consteval auto GetLastOccurrencePositionRefined(TArray<T, N> const& str, T c) -> u64
-    {
-        return GetLastOccurrencePosition(str, c);
-    }
-
     template <unsigned S, unsigned N1, unsigned N2>
     consteval static auto HasPrefix(TArray<char, N1> const& str, TArray<char, N2> const& prefix) -> bool
     {

@@ -14,10 +14,10 @@ namespace AltinaEngine::Core::Container
     {
     public:
         using TSuper = TVector<T>;
-        using TSuper::TConstReference;
-        using TSuper::TReference;
-        using TSuper::TSizeType;
-        using TSuper::TValueType;
+        using typename TSuper::TConstReference;
+        using typename TSuper::TReference;
+        using typename TSuper::TSizeType;
+        using typename TSuper::TValueType;
 
         TBasicString() = default;
 
@@ -33,6 +33,8 @@ namespace AltinaEngine::Core::Container
                 this->PushBack(character);
             }
         }
+
+        TBasicString(TBasicStringView<T> strView) { Append(strView.Data(), strView.Length()); }
 
         auto operator=(const TValueType* Text) -> TBasicString&
         {
@@ -64,7 +66,7 @@ namespace AltinaEngine::Core::Container
                 return;
             }
 
-            Reserve(this->Size() + Length);
+            this->Reserve(this->Size() + Length);
             for (usize index = 0; index < Length; ++index)
             {
                 this->PushBack(Text[index]);

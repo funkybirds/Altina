@@ -14,8 +14,10 @@ namespace AltinaEngine::Core::Reflection
         CorruptedAnyCast         = 3,
         MismatchedArgumentNumber = 4,
 
-        TypeHashConflict = 5,
-        TypeUnregistered = 6
+        TypeHashConflict      = 5,
+        TypeUnregistered      = 6,
+        ObjectAndTypeMismatch = 7,
+        PropertyUnregistered  = 8,
     };
 
     struct FReflectionDumpData

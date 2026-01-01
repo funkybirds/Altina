@@ -98,10 +98,13 @@ namespace AltinaEngine::Core::TypeMeta
         {
             using namespace Core::Algorithm;
             constexpr auto kFunctionSignature = GetFuncNameToArray<T>();
-            constexpr u64  kFirstPos          = GetOccurrencePosition(kFunctionSignature, '<', 0) + 1;
-            constexpr u64  kLastPos           = GetLastOccurrencePosition(kFunctionSignature, '>') + 1;
-            constexpr int  kFinalOffset       = kFirstPos + 0 + 0;
-            constexpr auto kSubArray          = GetSubArray<kFinalOffset, kLastPos>(kFunctionSignature);
+            constexpr u64  kFirstPos =
+                Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(kFunctionSignature, '<', 0) + 1;
+            constexpr u64 kLastPos =
+                Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(kFunctionSignature, '>') + 1;
+            constexpr int  kFinalOffset = kFirstPos + 0 + 0;
+            constexpr auto kSubArray =
+                GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(kFunctionSignature);
             return kSubArray;
         }
 
@@ -109,22 +112,25 @@ namespace AltinaEngine::Core::TypeMeta
         {
             using namespace Core::Algorithm;
             constexpr auto kFunctionSignature = GetVarNameToArray<T>();
-            constexpr u64  kFirstPos          = GetOccurrencePositionRefined(kFunctionSignature, '<', 0) + 1;
-            constexpr u64  kLastPos           = GetLastOccurrencePositionRefined(kFunctionSignature, '>') + 1;
-            constexpr int  kFinalOffset       = kFirstPos + 0 + 0;
-            constexpr auto kSubArray          = GetSubArray<kFinalOffset, kLastPos>(kFunctionSignature);
+            constexpr u64  kFirstPos =
+                Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(kFunctionSignature, '<', 0) + 1;
+            constexpr u64 kLastPos =
+                Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(kFunctionSignature, '>') + 1;
+            constexpr int  kFinalOffset = kFirstPos + 0 + 0;
+            constexpr auto kSubArray =
+                GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(kFunctionSignature);
             return kSubArray;
         }
 
         template <typename T> consteval static auto GetFuncNameHashId() -> FTypeMetaHash
         {
             constexpr auto kArr = GetActualClassNameArray<T>();
-            return GetFuncNameHashImpl(kArr);
+            return GetFuncNameHashImpl<kArr.Size()>(kArr);
         }
         template <auto T> consteval static auto GetVarNameHashId() -> FTypeMetaHash
         {
-            constexpr auto arr = GetActualVarNameArray<T>();
-            return GetFuncNameHashImpl(arr);
+            constexpr auto kArr = GetActualVarNameArray<T>();
+            return GetFuncNameHashImpl<kArr.Size()>(kArr);
         }
     } // namespace Detail
 
@@ -149,15 +155,17 @@ namespace AltinaEngine::Core::TypeMeta
             if constexpr (kDestructible)
                 delete static_cast<T*>(p);
         }
-        static auto InvokeCopyCtor(void* p)
+        static auto InvokeCopyCtor(void* p) -> void*
         {
             if constexpr (kCopyConstructible)
                 return static_cast<void*>(new T(*static_cast<T*>(p)));
+            return nullptr;
         }
-        static auto InvokeDefaultCtor()
+        static auto InvokeDefaultCtor() -> void*
         {
             if constexpr (kDefaultConstructible)
                 return static_cast<void*>(new T());
+            return nullptr;
         }
     };
 
@@ -276,6 +284,12 @@ namespace AltinaEngine::Core::TypeMeta
             using TClassType    = TMetaPropertyInfo<Member>::TClassType;
             return FMetaPropertyInfo(FMetaTypeInfo::Create<TClassType>(), FMetaTypeInfo::Create<TPropertyType>(),
                 TMetaPropertyInfo<Member>::kHash, TMetaPropertyInfo<Member>::kName);
+        }
+
+        static auto CreatePlaceHolder()
+        {
+            return FMetaPropertyInfo(
+                FMetaTypeInfo::CreatePlaceHolder(), FMetaTypeInfo::CreatePlaceHolder(), 0, FNativeStringView{});
         }
 
     private:

@@ -1,5 +1,5 @@
 #pragma once
-
+#include <cstdlib>
 namespace AltinaEngine::Core::Utility::CompilerHint
 {
     [[noreturn]] inline void Unreachable()

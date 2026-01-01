@@ -15,7 +15,7 @@ namespace AltinaEngine::Core::Reflection
             rhs.mPtr      = nullptr;
             rhs.mMetadata = FMetaTypeInfo::CreatePlaceHolder();
         }
-        FObject(const FObject& rhs) : mMetadata(rhs.mMetadata) { ConstructFromMetadataCopyCtor(rhs); }
+        FObject(const FObject& rhs) : mPtr(nullptr), mMetadata(rhs.mMetadata) { ConstructFromMetadataCopyCtor(rhs); }
         ~FObject() { DestructFromMetadata(); }
 
         auto operator=(FObject&& rhs) noexcept -> FObject&
@@ -81,6 +81,9 @@ namespace AltinaEngine::Core::Reflection
             }
             Utility::CompilerHint::Unreachable();
         }
+        // Metadata
+        [[nodiscard]] auto GetTypeHash() const noexcept -> FTypeMetaHash { return mMetadata.GetHash(); }
+        [[nodiscard]] auto GetTypeInfo() const noexcept -> FTypeInfo const& { return mMetadata.GetTypeInfo(); }
 
         // Constructors
         template <INonVoid T, typename... TArgs> static auto Create(TArgs&&... args) -> FObject

@@ -170,7 +170,7 @@ namespace AltinaEngine::Core::TypeMeta
     };
 
     template <auto T>
-        requires IMemberFunctionPointer<decltype(T)>
+        requires CMemberFunctionPointer<decltype(T)>
     struct TMetaMemberFunctionInfo
     {
         static constexpr FTypeMetaHash kHash      = Detail::GetVarNameHashId<T>();
@@ -183,7 +183,7 @@ namespace AltinaEngine::Core::TypeMeta
     };
 
     template <auto T>
-        requires IMemberPointer<decltype(T)>
+        requires CMemberPointer<decltype(T)>
     struct TMetaPropertyInfo
     {
         static constexpr FTypeMetaHash kHash      = Detail::GetVarNameHashId<T>();
@@ -277,7 +277,7 @@ namespace AltinaEngine::Core::TypeMeta
         [[nodiscard]] auto GetClassTypeMetadata() const noexcept -> FMetaTypeInfo const& { return mClassTypeInfo; }
 
         template <auto Member>
-            requires IMemberPointer<decltype(Member)>
+            requires CMemberPointer<decltype(Member)>
         static auto Create() -> FMetaPropertyInfo
         {
             using TPropertyType = TMetaPropertyInfo<Member>::TBaseType;
@@ -313,7 +313,7 @@ namespace AltinaEngine::Core::TypeMeta
         [[nodiscard]] auto GetClassTypeMetadata() const noexcept -> FMetaTypeInfo const& { return mClassTypeInfo; }
 
         template <auto Member>
-            requires IMemberFunctionPointer<decltype(Member)>
+            requires CMemberFunctionPointer<decltype(Member)>
         static auto Create() -> FMetaMethodInfo
         {
             using TReturnType = TMetaMemberFunctionInfo<Member>::TReturnType;

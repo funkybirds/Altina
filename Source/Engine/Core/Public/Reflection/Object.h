@@ -50,7 +50,7 @@ namespace AltinaEngine::Core::Reflection
         }
 
         // Copy Constructors
-        template <ICopyConstructible T> auto operator=(T& rhs) -> FObject&
+        template <CCopyConstructible T> auto operator=(T& rhs) -> FObject&
         {
             if (mPtr != &rhs) [[likely]]
             {
@@ -64,7 +64,7 @@ namespace AltinaEngine::Core::Reflection
         }
 
         // Casting
-        template <IDecayed T> auto As() -> T&
+        template <CDecayed T> auto As() -> T&
         {
             ReflectionAssert(mPtr != nullptr, EReflectionErrorCode::DereferenceNullptr, FReflectionDumpData{});
             if (mMetadata.GetTypeInfo() == typeid(T) && mPtr) [[likely]]
@@ -78,7 +78,7 @@ namespace AltinaEngine::Core::Reflection
             ReflectionAssert(false, EReflectionErrorCode::CorruptedAnyCast, FReflectionDumpData{});
             Utility::CompilerHint::Unreachable();
         }
-        template <IDecayed T> auto As() const -> const T&
+        template <CDecayed T> auto As() const -> const T&
         {
             ReflectionAssert(mPtr != nullptr, EReflectionErrorCode::DereferenceNullptr, FReflectionDumpData{});
             if (mMetadata.GetTypeInfo() == typeid(T) && mPtr) [[likely]]
@@ -97,18 +97,18 @@ namespace AltinaEngine::Core::Reflection
         [[nodiscard]] auto GetTypeInfo() const noexcept -> FTypeInfo const& { return mMetadata.GetTypeInfo(); }
 
         // Constructors
-        template <INonVoid T, typename... TArgs> static auto Create(TArgs&&... args) -> FObject
+        template <CNonVoid T, typename... TArgs> static auto Create(TArgs&&... args) -> FObject
         {
             T*            pObject  = new T(Forward<TArgs>(args)...);
             FMetaTypeInfo metadata = FMetaTypeInfo::Create<T>();
             return FObject(pObject, metadata);
         }
-        template <IVoid> static auto Create()
+        template <CVoid> static auto Create()
         {
             FMetaTypeInfo metadata = FMetaTypeInfo::CreateVoid();
             return FObject(nullptr, metadata);
         }
-        template <ICopyConstructible T, typename... TArgs> static auto CreateClone(const T& value) -> FObject
+        template <CCopyConstructible T, typename... TArgs> static auto CreateClone(const T& value) -> FObject
         {
             T*            pObject  = new T(value);
             FMetaTypeInfo metadata = FMetaTypeInfo::Create<T>();
@@ -120,7 +120,7 @@ namespace AltinaEngine::Core::Reflection
         // Private Constructor
         FObject(void* ptr, const FMetaTypeInfo& metadata) noexcept : mPtr(ptr), mMetadata(metadata) {}
 
-        template <ICopyConstructible T> void ConstructFromCopyCtor(const T& rhs)
+        template <CCopyConstructible T> void ConstructFromCopyCtor(const T& rhs)
         {
             mPtr      = new T(rhs);
             mMetadata = FMetaTypeInfo::Create<T>();

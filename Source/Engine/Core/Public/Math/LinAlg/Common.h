@@ -9,7 +9,7 @@
 namespace AltinaEngine::Core::Math::LinAlg
 {
     // Identity matrix of size N x N (1 on diagonal, 0 elsewhere)
-    template <IScalar T, u32 N> [[nodiscard]] constexpr auto Identity() noexcept -> TMatrix<T, N, N>
+    template <CScalar T, u32 N> [[nodiscard]] constexpr auto Identity() noexcept -> TMatrix<T, N, N>
     {
         TMatrix<T, N, N> m(T{});
         for (u32 i = 0U; i < N; ++i)
@@ -20,7 +20,7 @@ namespace AltinaEngine::Core::Math::LinAlg
     }
 
     // Matrix trace (sum of diagonal elements)
-    template <IScalar T, u32 N> [[nodiscard]] constexpr auto MatTrace(const TMatrix<T, N, N>& M) noexcept -> T
+    template <CScalar T, u32 N> [[nodiscard]] constexpr auto MatTrace(const TMatrix<T, N, N>& M) noexcept -> T
     {
         T sum = T{};
         for (u32 i = 0U; i < N; ++i)
@@ -31,26 +31,26 @@ namespace AltinaEngine::Core::Math::LinAlg
     }
 
     // Zero matrix R x C
-    template <IScalar T, u32 R, u32 C> [[nodiscard]] constexpr auto ZeroMatrix() noexcept -> TMatrix<T, R, C>
+    template <CScalar T, u32 R, u32 C> [[nodiscard]] constexpr auto ZeroMatrix() noexcept -> TMatrix<T, R, C>
     {
         return TMatrix<T, R, C>(T{});
     }
 
     // Determinant for 2x2
-    template <IScalar T> [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 2, 2>& M) noexcept -> T
+    template <CScalar T> [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 2, 2>& M) noexcept -> T
     {
         return M(0, 0) * M(1, 1) - M(0, 1) * M(1, 0);
     }
 
     // Determinant for 3x3
-    template <IScalar T> [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 3, 3>& M) noexcept -> T
+    template <CScalar T> [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 3, 3>& M) noexcept -> T
     {
         return M(0, 0) * (M(1, 1) * M(2, 2) - M(1, 2) * M(2, 1)) - M(0, 1) * (M(1, 0) * M(2, 2) - M(1, 2) * M(2, 0))
             + M(0, 2) * (M(1, 0) * M(2, 1) - M(1, 1) * M(2, 0));
     }
 
     // Determinant for 4x4 (expand along row 0 using 3x3 minors)
-    template <IScalar T> [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 4, 4>& M) noexcept -> T
+    template <CScalar T> [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 4, 4>& M) noexcept -> T
     {
         auto det3Excluding = [&](u32 excludeCol) constexpr -> T {
             // collect columns != excludeCol for rows 1..3
@@ -80,7 +80,7 @@ namespace AltinaEngine::Core::Math::LinAlg
     }
 
     // Inverse for 2x2
-    template <IScalar T> [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 2, 2>& M) noexcept -> TMatrix<T, 2, 2>
+    template <CScalar T> [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 2, 2>& M) noexcept -> TMatrix<T, 2, 2>
     {
         T                det    = Determinant(M);
         T                invdet = static_cast<T>(1) / det;
@@ -93,7 +93,7 @@ namespace AltinaEngine::Core::Math::LinAlg
     }
 
     // Inverse for 3x3
-    template <IScalar T> [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 3, 3>& M) noexcept -> TMatrix<T, 3, 3>
+    template <CScalar T> [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 3, 3>& M) noexcept -> TMatrix<T, 3, 3>
     {
         T                det    = Determinant(M);
         T                invdet = static_cast<T>(1) / det;
@@ -115,7 +115,7 @@ namespace AltinaEngine::Core::Math::LinAlg
     }
 
     // Inverse for 4x4 (templated, works for float/double)
-    template <IScalar T> [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 4, 4>& p) noexcept -> TMatrix<T, 4, 4>
+    template <CScalar T> [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 4, 4>& p) noexcept -> TMatrix<T, 4, 4>
     {
         // Adapted from common 4x4 inversion algorithm
         T a2323 = p[2][2] * p[3][3] - p[2][3] * p[3][2];

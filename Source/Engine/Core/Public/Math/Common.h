@@ -32,13 +32,13 @@ namespace AltinaEngine::Core::Math
     inline constexpr f64 kInvTwoPiD = 0.15915494309189533577;
 
     // Casting Utilities
-    template <IIntegral TDst, IFloatingPoint TSrc>
+    template <CIntegral TDst, CFloatingPoint TSrc>
     [[nodiscard]] AE_FORCEINLINE constexpr auto TruncatedCast(TSrc Value) noexcept -> TDst
     {
         return static_cast<TDst>(Value);
     }
 
-    template <IIntegral TDst, IFloatingPoint TSrc>
+    template <CIntegral TDst, CFloatingPoint TSrc>
     [[nodiscard]] AE_FORCEINLINE constexpr auto RoundedCast(TSrc Value) noexcept -> TDst
     {
         return static_cast<TDst>(
@@ -46,13 +46,13 @@ namespace AltinaEngine::Core::Math
     }
 
     // Generic Utilities
-    template <IIntegral T>
+    template <CIntegral T>
     [[nodiscard]] AE_FORCEINLINE constexpr auto DivRoundUp(T Numerator, T Denominator) noexcept -> T
     {
         return (Numerator + Denominator - static_cast<T>(1)) / Denominator;
     }
 
-    template <IIntegral T> [[nodiscard]] AE_FORCEINLINE constexpr auto IntegerLog2(T value) noexcept -> T
+    template <CIntegral T> [[nodiscard]] AE_FORCEINLINE constexpr auto IntegerLog2(T value) noexcept -> T
     {
         T result = static_cast<T>(0);
         while (value >>= static_cast<T>(1))
@@ -72,8 +72,8 @@ namespace AltinaEngine::Core::Math
     }
 
     // Max / Min (scalar only, identical types)
-    template <IScalar T, IScalar... Ts>
-        requires(ISameAsAll<T, Ts...>)
+    template <CScalar T, CScalar... Ts>
+        requires(CSameAsAll<T, Ts...>)
     [[nodiscard]] AE_FORCEINLINE constexpr auto Max(T first, Ts... rest) noexcept -> T
     {
         if constexpr (sizeof...(rest) == 0)
@@ -86,8 +86,8 @@ namespace AltinaEngine::Core::Math
         return result;
     }
 
-    template <IScalar T, IScalar... Ts>
-        requires(ISameAsAll<T, Ts...>)
+    template <CScalar T, CScalar... Ts>
+        requires(CSameAsAll<T, Ts...>)
     [[nodiscard]] AE_FORCEINLINE constexpr auto Min(T first, Ts... rest) noexcept -> T
     {
         if constexpr (sizeof...(rest) == 0)
@@ -101,14 +101,14 @@ namespace AltinaEngine::Core::Math
     }
 
     // Floor / Ceil (signed integral destination, f32ing-point source)
-    template <ISignedIntegral TDst, IFloatingPoint TSrc>
+    template <CSignedIntegral TDst, CFloatingPoint TSrc>
     [[nodiscard]] AE_FORCEINLINE constexpr auto Floor(TSrc value) noexcept -> TDst
     {
         const TDst truncated = static_cast<TDst>(value);
         return (static_cast<TSrc>(truncated) > value) ? static_cast<TDst>(truncated - static_cast<TDst>(1)) : truncated;
     }
 
-    template <ISignedIntegral TDst, IFloatingPoint TSrc>
+    template <CSignedIntegral TDst, CFloatingPoint TSrc>
     [[nodiscard]] AE_FORCEINLINE constexpr auto Ceil(TSrc value) noexcept -> TDst
     {
         const TDst truncated = static_cast<TDst>(value);
@@ -116,13 +116,13 @@ namespace AltinaEngine::Core::Math
     }
 
     // Linear interpolation (f32ing point only, identical types)
-    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE constexpr auto Lerp(T a, T b, T t) noexcept -> T
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE constexpr auto Lerp(T a, T b, T t) noexcept -> T
     {
         return a + (b - a) * t;
     }
 
     // Clamp (scalar only, identical types)
-    template <IScalar T>
+    template <CScalar T>
     [[nodiscard]] AE_FORCEINLINE constexpr auto Clamp(T value, T minValue, T maxValue) noexcept -> T
     {
         const T clampedLower = (value < minValue) ? minValue : value;
@@ -130,17 +130,17 @@ namespace AltinaEngine::Core::Math
     }
 
     // Abs
-    template <ISignedIntegral T> [[nodiscard]] AE_FORCEINLINE constexpr auto Abs(T value) noexcept -> T
+    template <CSignedIntegral T> [[nodiscard]] AE_FORCEINLINE constexpr auto Abs(T value) noexcept -> T
     {
         return (value < static_cast<T>(0)) ? -value : value;
     }
-    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE constexpr auto Abs(T value) noexcept -> T
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE constexpr auto Abs(T value) noexcept -> T
     {
         return (value < static_cast<T>(0)) ? -value : value;
     }
 
     // Sin, Cos (radians, floating-point)
-    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sin(T radians) noexcept -> T
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sin(T radians) noexcept -> T
     {
         if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>)
         {
@@ -152,7 +152,7 @@ namespace AltinaEngine::Core::Math
         }
     }
 
-    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Cos(T radians) noexcept -> T
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Cos(T radians) noexcept -> T
     {
         if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>)
         {
@@ -164,13 +164,13 @@ namespace AltinaEngine::Core::Math
         }
     }
 
-    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Tan(T radians) noexcept -> T
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Tan(T radians) noexcept -> T
     {
         return Sin(radians) / Cos(radians);
     }
 
     // Sqrt (floating-point)
-    template <IFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sqrt(T value) noexcept -> T
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sqrt(T value) noexcept -> T
     {
         if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>)
         {

@@ -6,7 +6,7 @@
 namespace AltinaEngine::Core::Math
 {
 
-    template <IScalar T, u32 ComponentCount> struct TVector
+    template <CScalar T, u32 ComponentCount> struct TVector
     {
         T                            mComponents[ComponentCount]{};
 
@@ -129,7 +129,7 @@ namespace AltinaEngine::Core::Math
         }
     };
 
-    template <IScalar T, u32 ComponentCount>
+    template <CScalar T, u32 ComponentCount>
     [[nodiscard]] constexpr auto operator+(
         TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
     {
@@ -137,7 +137,7 @@ namespace AltinaEngine::Core::Math
         return Lhs;
     }
 
-    template <IScalar T, u32 ComponentCount>
+    template <CScalar T, u32 ComponentCount>
     [[nodiscard]] constexpr auto operator-(
         TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
     {
@@ -145,7 +145,7 @@ namespace AltinaEngine::Core::Math
         return Lhs;
     }
 
-    template <IScalar T, u32 ComponentCount>
+    template <CScalar T, u32 ComponentCount>
     [[nodiscard]] constexpr auto operator*(
         TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
     {
@@ -153,7 +153,7 @@ namespace AltinaEngine::Core::Math
         return Lhs;
     }
 
-    template <IScalar T, u32 ComponentCount>
+    template <CScalar T, u32 ComponentCount>
     [[nodiscard]] constexpr auto operator/(
         TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
     {

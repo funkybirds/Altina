@@ -8,7 +8,6 @@
 #endif
 
 #include <chrono>
-#include <cstdint>
 
 using namespace AltinaEngine;
 using namespace AltinaEngine::Application;

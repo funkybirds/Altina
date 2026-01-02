@@ -7,8 +7,8 @@
 
 namespace AltinaEngine
 {
-    template <ITriviallyConstructible TDst, typename TSrc>
-        requires(ISameSizeAs<TDst, TSrc>)
+    template <CTriviallyConstructible TDst, typename TSrc>
+        requires(CSameSizeAs<TDst, TSrc>)
     [[nodiscard]] AE_FORCEINLINE constexpr auto BitCast(const TSrc& Value) noexcept -> TDst
     {
         TDst dst;

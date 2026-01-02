@@ -11,12 +11,12 @@ using TVec      = TVector<int>;
 using TVecIter  = TVec::TIterator;
 using TVecCIter = TVec::TConstIterator;
 
-static_assert(IReadableIterator<TVecIter>);
-static_assert(IWritableIterator<TVecIter>);
-static_assert(IRandomAccessIterator<TVecIter>);
+static_assert(CReadableIterator<TVecIter>);
+static_assert(CWritableIterator<TVecIter>);
+static_assert(CRandomAccessIterator<TVecIter>);
 
-static_assert(IReadableIterator<TVecCIter>);
-static_assert(IRandomAccessIterator<TVecCIter>);
+static_assert(CReadableIterator<TVecCIter>);
+static_assert(CRandomAccessIterator<TVecCIter>);
 
 TEST_CASE("TVector - push back and access")
 {

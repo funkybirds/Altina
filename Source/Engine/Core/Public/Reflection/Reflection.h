@@ -28,7 +28,7 @@ namespace AltinaEngine::Core::Reflection
 
         // Accessors
         template <auto Member>
-            requires IMemberPointer<decltype(Member)>
+            requires CMemberPointer<decltype(Member)>
         struct TAutoMemberAccessor : TMemberType<decltype(Member)>
         {
             using TSuper = TMemberType<decltype(Member)>;
@@ -42,7 +42,7 @@ namespace AltinaEngine::Core::Reflection
             }
         };
         template <auto Member>
-            requires IMemberFunctionPointer<decltype(Member)>
+            requires CMemberFunctionPointer<decltype(Member)>
         struct TAutoMemberFunctionAccessor : TMemberFunctionTrait<decltype(Member)>
         {
             using TSuper = TMemberFunctionTrait<decltype(Member)>;
@@ -64,7 +64,7 @@ namespace AltinaEngine::Core::Reflection
         };
 
         template <typename TBase, typename TDerived>
-            requires(IClassBaseOf<TBase, TDerived>)
+            requires(CClassBaseOf<TBase, TDerived>)
         struct TPolymorphismInfo
         {
             static constexpr auto GetStaticUpCastWrapper() -> void* (*)(void*)
@@ -77,13 +77,13 @@ namespace AltinaEngine::Core::Reflection
 
     } // namespace Detail
 
-    template <IDecayed T> void RegisterType()
+    template <CDecayed T> void RegisterType()
     {
         Detail::RegisterType(GetRttiTypeInfo<T>(), FMetaTypeInfo::Create<T>());
     }
 
-    template <IDecayed TBase, IDecayed TDerived>
-        requires IClassBaseOf<TBase, TDerived>
+    template <CDecayed TBase, CDecayed TDerived>
+        requires CClassBaseOf<TBase, TDerived>
     void RegisterPolymorphicRelation()
     {
         using TInheritanceInfo = Detail::TPolymorphismInfo<TBase, TDerived>;
@@ -92,7 +92,7 @@ namespace AltinaEngine::Core::Reflection
     }
 
     template <auto Member>
-        requires IMemberPointer<decltype(Member)>
+        requires CMemberPointer<decltype(Member)>
     void RegisterPropertyField(FNativeStringView name)
     {
         using TAccessor = Detail::TAutoMemberAccessor<Member>;
@@ -101,7 +101,7 @@ namespace AltinaEngine::Core::Reflection
     }
 
     template <auto Member>
-        requires IMemberFunctionPointer<decltype(Member)>
+        requires CMemberFunctionPointer<decltype(Member)>
     void RegisterMethodField(FNativeStringView name)
     {
         using TInvoker   = Detail::TAutoMemberFunctionAccessor<Member>;

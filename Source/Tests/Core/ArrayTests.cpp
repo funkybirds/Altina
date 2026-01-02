@@ -7,8 +7,8 @@ using namespace AltinaEngine;
 using namespace AltinaEngine::Core::Container;
 
 // Compile-time checks for TArray
-static_assert(IRandomReadable<TArray<int, 4>>);
-static_assert(IRandomWritable<TArray<int, 4>>);
+static_assert(CRandomReadable<TArray<int, 4>>);
+static_assert(CRandomWritable<TArray<int, 4>>);
 
 TEST_CASE("TArray - basic properties")
 {

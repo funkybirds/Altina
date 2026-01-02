@@ -4,9 +4,11 @@ AltinaEngine follows Unreal Engine inspired naming and layout conventions. Keep 
 
 ## Naming
 
-- **Templates & Concepts**: Prefix with `T` (e.g., `TVector`, `TOptional`).
+- **Templates**: Prefix with `T` (e.g., `TVector`, `TOptional`).
+- **Concepts** (C++20 compile-time constraints): Prefix with `C` (e.g., `CScalar`, `CSerializable`). This distinguishes them from runtime interfaces (`I` prefix) and clarifies zero-overhead compile-time constraints.
 - **Enums**: Prefix with `E` (e.g., `EColorSpace`). Enumerators use `CamelCase`.
-- **Structs & Plain Classes**: Prefix with `F` (e.g., `FTransform`). And interfaces use `I`.
+- **Structs & Plain Classes**: Prefix with `F` (e.g., `FTransform`).
+- **Interfaces** (abstract base classes with virtual functions): Prefix with `I` (e.g., `ISerializer`, `IDrawable`). This distinguishes runtime polymorphic interfaces from compile-time concepts (`C` prefix).
 - **Type Aliases**: Prefix with `T` and keep `CamelCase` (e.g., `TSeconds`).
 - **Globals**: Prefix variables with `g` (`gEngineConfig`).
 - **Constants / constexpr**: Prefix with `k` (`kDefaultWindowWidth`).

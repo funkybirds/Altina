@@ -19,6 +19,10 @@ CheckOptions:
     value: T
   - key: readability-identifier-naming.StructTemplatePrefix
     value: T
+  - key: readability-identifier-naming.ConceptCase
+    value: CamelCase
+  - key: readability-identifier-naming.ConceptPrefix
+    value: C
   - key: readability-identifier-naming.TypeAliasCase
     value: CamelCase
   - key: readability-identifier-naming.TypeAliasPrefix

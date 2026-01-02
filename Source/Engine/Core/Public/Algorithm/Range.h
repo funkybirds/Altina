@@ -5,7 +5,7 @@
 
 namespace AltinaEngine::Core::Algorithm
 {
-    template <IForwardRange R, typename Comp = TLess<>>
+    template <CForwardRange R, typename Comp = TLess<>>
     [[nodiscard]] constexpr auto MaxElement(R&& range, Comp comp = Comp{})
     {
         auto it = range.begin();
@@ -22,7 +22,7 @@ namespace AltinaEngine::Core::Algorithm
         return best;
     }
 
-    template <IForwardRange R, typename Comp = AltinaEngine::TLess<>>
+    template <CForwardRange R, typename Comp = AltinaEngine::TLess<>>
     [[nodiscard]] constexpr auto MinElement(R&& range, Comp comp = Comp{})
     {
         auto it = range.begin();
@@ -39,7 +39,7 @@ namespace AltinaEngine::Core::Algorithm
         return best;
     }
 
-    template <IRange R, typename Pred> [[nodiscard]] constexpr auto AnyOf(R&& range, Pred pred) -> bool
+    template <CRange R, typename Pred> [[nodiscard]] constexpr auto AnyOf(R&& range, Pred pred) -> bool
     {
         for (auto it = range.begin(); it != range.end(); ++it)
             if (pred(*it))
@@ -47,8 +47,8 @@ namespace AltinaEngine::Core::Algorithm
         return false;
     }
 
-    template <IRange R, typename Pred>
-        requires IPredicateForRange<R, Pred>
+    template <CRange R, typename Pred>
+        requires CPredicateForRange<R, Pred>
     [[nodiscard]] constexpr auto AllOf(R&& range, Pred pred) -> bool
     {
         for (auto it = range.begin(); it != range.end(); ++it)
@@ -57,14 +57,14 @@ namespace AltinaEngine::Core::Algorithm
         return true;
     }
 
-    template <IRange R, typename Pred>
-        requires IPredicateForRange<R, Pred>
+    template <CRange R, typename Pred>
+        requires CPredicateForRange<R, Pred>
     [[nodiscard]] constexpr auto NoneOf(R&& range, Pred pred) -> bool
     {
         return !AnyOf(static_cast<R&&>(range), pred);
     }
 
-    template <IRange R, typename Comp = TLess<>>
+    template <CRange R, typename Comp = TLess<>>
     [[nodiscard]] constexpr auto IsSorted(R&& range, Comp comp = Comp{}) -> bool
     {
         if (range.begin() == range.end())

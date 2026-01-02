@@ -6,116 +6,116 @@ namespace AltinaEngine
 {
     // Predicates
     template <typename T, typename U>
-    concept ISameSizeAs = sizeof(T) == sizeof(U);
+    concept CSameSizeAs = sizeof(T) == sizeof(U);
 
     template <typename T, typename... Ts>
-    concept ISameAsAll = (sizeof...(Ts) == 0) || (TTypeSameAs<T, Ts>::Value && ...);
+    concept CSameAsAll = (sizeof...(Ts) == 0) || (TTypeSameAs<T, Ts>::Value && ...);
 
     // Basic Traits
     template <typename T>
-    concept ICharType = TTypeSameAs_v<T, char>
+    concept CCharType = TTypeSameAs_v<T, char>
 #if defined(__cpp_char8_t)
         || TTypeSameAs_v<T, char8_t>
 #endif
         || TTypeSameAs_v<T, char16_t> || TTypeSameAs_v<T, char32_t> || TTypeSameAs_v<T, wchar_t>;
 
     template <typename T>
-    concept IScalar = TTypeIsIntegral<T>::Value || TTypeIsFloatingPoint<T>::Value;
+    concept CScalar = TTypeIsIntegral<T>::Value || TTypeIsFloatingPoint<T>::Value;
 
     template <typename T>
-    concept INonVoid = !TTypeIsVoid_v<T>;
+    concept CNonVoid = !TTypeIsVoid_v<T>;
 
     template <typename T>
-    concept IVoid = TTypeIsVoid_v<T>;
+    concept CVoid = TTypeIsVoid_v<T>;
 
     template <typename T>
-    concept IIntegral = TTypeIsIntegral<T>::Value;
+    concept CIntegral = TTypeIsIntegral<T>::Value;
 
     template <typename T>
-    concept IFloatingPoint = TTypeIsFloatingPoint<T>::Value;
+    concept CFloatingPoint = TTypeIsFloatingPoint<T>::Value;
 
     template <typename T>
-    concept ISignedIntegral = TTypeIsIntegral<T>::Value && TTypeIsSigned<T>::Value;
+    concept CSignedIntegral = TTypeIsIntegral<T>::Value && TTypeIsSigned<T>::Value;
 
     template <typename T>
-    concept IRandomReadable = TTypeIsRandomReadable<T>::Value;
+    concept CRandomReadable = TTypeIsRandomReadable<T>::Value;
 
     template <typename T>
-    concept IRandomWritable = TTypeIsRandomWritable<T>::Value;
+    concept CRandomWritable = TTypeIsRandomWritable<T>::Value;
 
     template <typename From, typename To>
-    concept IDynamicConvertible = TTypeIsDynamicConvertible<To, From>::Value;
+    concept CDynamicConvertible = TTypeIsDynamicConvertible<To, From>::Value;
 
     template <typename T>
-    concept IDefaultConstructible = TTypeIsDefaultConstructible_v<T>;
+    concept CDefaultConstructible = TTypeIsDefaultConstructible_v<T>;
 
     template <typename T>
-    concept ITriviallyConstructible = TTypeIsTriviallyConstructible<T>::Value;
+    concept CTriviallyConstructible = TTypeIsTriviallyConstructible<T>::Value;
 
     template <typename T>
-    concept IClass = TTypeIsClass_v<T>;
+    concept CClass = TTypeIsClass_v<T>;
 
     template <typename T>
-    concept IUnion = TTypeIsUnion_v<T>;
+    concept CUnion = TTypeIsUnion_v<T>;
 
     template <typename TBase, typename TDerived>
-    concept IClassBaseOf = TTypeIsBaseOf<TBase, TDerived>::Value;
+    concept CClassBaseOf = TTypeIsBaseOf<TBase, TDerived>::Value;
 
     template <typename T>
-    concept IDecayed = TTypeIsDecayed<T>::Value;
+    concept CDecayed = TTypeIsDecayed<T>::Value;
 
     // Iterators
     template <typename It>
-    concept IReadableIterator = TTypeIsReadableIterator<It>::Value;
+    concept CReadableIterator = TTypeIsReadableIterator<It>::Value;
 
     template <typename It>
-    concept IWritableIterator = TTypeIsWritableIterator<It>::Value;
+    concept CWritableIterator = TTypeIsWritableIterator<It>::Value;
 
     template <typename It>
-    concept IRandomAccessIterator = TTypeIsRandomAccessIterator<It>::Value;
+    concept CRandomAccessIterator = TTypeIsRandomAccessIterator<It>::Value;
 
     // Range concepts
     template <typename R, typename Pred>
-    concept IPredicateForRange = requires(Pred p, decltype(Declval<R>().begin()) it) {
+    concept CPredicateForRange = requires(Pred p, decltype(Declval<R>().begin()) it) {
         { p(*it) };
         { static_cast<bool>(p(*it)) };
     };
 
     template <typename R>
-    concept IRange = requires(R r) {
+    concept CRange = requires(R r) {
         { r.begin() };
         { r.end() };
     };
 
     template <typename R>
-    concept ICommonRange =
-        IRange<R> && TTypeSameAs<decltype(Declval<R>().begin()), decltype(Declval<R>().end())>::Value;
+    concept CCommonRange =
+        CRange<R> && TTypeSameAs<decltype(Declval<R>().begin()), decltype(Declval<R>().end())>::Value;
 
     template <typename R>
-    concept IReadableRange = IRange<R> && IReadableIterator<decltype(Declval<R>().begin())>;
+    concept CReadableRange = CRange<R> && CReadableIterator<decltype(Declval<R>().begin())>;
 
     template <typename R>
-    concept IWritableRange = IRange<R> && IWritableIterator<decltype(Declval<R>().begin())>;
+    concept CWritableRange = CRange<R> && CWritableIterator<decltype(Declval<R>().begin())>;
 
     template <typename It>
-    concept IIncrementable = requires(It it) {
+    concept CIncrementable = requires(It it) {
         { ++it };
         { it++ };
     };
 
     template <typename R>
-    concept IForwardRange = IRange<R> && IIncrementable<decltype(Declval<R>().begin())>
-        && IReadableIterator<decltype(Declval<R>().begin())>;
+    concept CForwardRange = CRange<R> && CIncrementable<decltype(Declval<R>().begin())>
+        && CReadableIterator<decltype(Declval<R>().begin())>;
 
     // Extractor Concepts
     template <typename T>
-    concept IMemberPointer = requires(T t) {
+    concept CMemberPointer = requires(T t) {
         typename TMemberType<T>::TBaseType;
         typename TMemberType<T>::TClassType;
     };
 
     template <typename T>
-    concept IMemberFunctionPointer = requires(T t) {
+    concept CMemberFunctionPointer = requires(T t) {
         typename TMemberFunctionTrait<T>::TReturnType;
         typename TMemberFunctionTrait<T>::TClassType;
         typename TMemberFunctionTrait<T>::TArgsTuple;
@@ -123,6 +123,6 @@ namespace AltinaEngine
 
     // Constructor Concepts
     template <typename T>
-    concept ICopyConstructible = TTypeIsCopyConstructible_v<T>;
+    concept CCopyConstructible = TTypeIsCopyConstructible_v<T>;
 
 } // namespace AltinaEngine

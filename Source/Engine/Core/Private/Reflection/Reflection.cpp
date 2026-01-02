@@ -3,6 +3,8 @@
 #include "Container/HashSet.h"
 #include "Types/NonCopyable.h"
 #include "Container/String.h"
+#include "Utility/CompilerHint.h"
+
 namespace AltinaEngine::Core::Reflection::Detail
 {
     using Container::FNativeString;
@@ -25,6 +27,20 @@ namespace AltinaEngine::Core::Reflection::Detail
 
     struct FMethodField
     {
+        FNativeString            mName;
+        FMetaMethodInfo          mMeta;
+        TFnMemberFunctionInvoker mInvoker;
+
+        FMethodField() : mMeta(FMetaMethodInfo::CreatePlaceHolder()), mInvoker(nullptr) {}
+        FMethodField(FNativeStringView name, const FMetaMethodInfo& meta, TFnMemberFunctionInvoker invoker)
+            : mName(name), mMeta(meta), mInvoker(invoker)
+        {
+        }
+    };
+
+    struct FBaseTypeEntry
+    {
+        TFnPolymorphismUpCaster mUpCaster;
     };
 
     struct FReflectionTypeMetaInfo
@@ -33,7 +49,7 @@ namespace AltinaEngine::Core::Reflection::Detail
         THashMap<FTypeMetaHash, FPropertyField> mProperties;
         THashMap<FTypeMetaHash, FMethodField>   mMethods;
         THashSet<FTypeMetaHash>                 mDerivedTypes;
-        THashSet<FTypeMetaHash>                 mBaseTypes;
+        THashMap<FTypeMetaHash, FBaseTypeEntry> mBaseTypes;
         bool                                    mIsPolymorphic = false;
 
         FReflectionTypeMetaInfo() : mMeta(FMetaTypeInfo::CreatePlaceHolder()) {}
@@ -72,21 +88,31 @@ namespace AltinaEngine::Core::Reflection::Detail
         }
     }
 
-    AE_CORE_API void RegisterPolymorphicRelation(FTypeMetaHash baseType, FTypeMetaHash derivedType)
+    AE_CORE_API void RegisterPolymorphicRelation(
+        FTypeMetaHash baseType, FTypeMetaHash derivedType, TFnPolymorphismUpCaster upCaster)
     {
         auto& manager         = GetReflectionManager();
         auto  bBaseRegistered = ReflectionAssert(
             manager.mRegistry.HasKey(baseType), EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{});
         auto bDerivedRegistered = ReflectionAssert(
-            manager.mRegistry.HasKey(baseType), EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{});
+            manager.mRegistry.HasKey(derivedType), EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{});
         if (bBaseRegistered && bDerivedRegistered) [[likely]]
         {
             auto& baseEntry    = manager.mRegistry[baseType];
             auto& derivedEntry = manager.mRegistry[derivedType];
             baseEntry.mDerivedTypes.Insert(derivedType);
-            baseEntry.mIsPolymorphic = true;
-            derivedEntry.mBaseTypes.Insert(baseType);
-            derivedEntry.mIsPolymorphic = true;
+            baseEntry.mIsPolymorphic          = true;
+            derivedEntry.mBaseTypes[baseType] = FBaseTypeEntry(upCaster);
+            derivedEntry.mIsPolymorphic       = true;
+
+            // Copy base class properties to derived class so they can be accessed
+            for (auto& [propHash, propField] : baseEntry.mProperties)
+            {
+                if (!derivedEntry.mProperties.HasKey(propHash))
+                {
+                    derivedEntry.mProperties[propHash] = propField;
+                }
+            }
         }
     }
 
@@ -110,6 +136,26 @@ namespace AltinaEngine::Core::Reflection::Detail
         }
         Utility::CompilerHint::Unreachable();
     }
+    AE_CORE_API void RegisterMethodField(
+        const FMetaMethodInfo& methodMeta, FNativeStringView name, TFnMemberFunctionInvoker invoker)
+    {
+        auto& manager           = GetReflectionManager();
+        auto  classTypeMetaHash = methodMeta.GetClassTypeMetadata().GetHash();
+        if (!ReflectionAssert(manager.mRegistry.HasKey(classTypeMetaHash), EReflectionErrorCode::TypeUnregistered,
+                FReflectionDumpData{})) [[unlikely]]
+        {
+            Utility::CompilerHint::Unreachable();
+        }
+        auto& tpMeta     = manager.mRegistry[classTypeMetaHash];
+        auto  methodHash = methodMeta.GetHash();
+        if (ReflectionAssert(!tpMeta.mMethods.HasKey(methodHash), EReflectionErrorCode::TypeHashConflict,
+                FReflectionDumpData{})) [[likely]]
+        {
+            tpMeta.mMethods[methodHash] = FMethodField(name, methodMeta, invoker);
+            return;
+        }
+        Utility::CompilerHint::Unreachable();
+    }
 
     AE_CORE_API auto ConstructObject(FTypeMetaHash classHash) -> FObject
     {
@@ -126,13 +172,7 @@ namespace AltinaEngine::Core::Reflection::Detail
     }
     AE_CORE_API auto GetProperty(FObject& object, FTypeMetaHash propHash, FTypeMetaHash classHash) -> FObject
     {
-        auto&      manager         = GetReflectionManager();
-        const auto actualClassHash = object.GetTypeHash();
-        if (!ReflectionAssert(classHash == actualClassHash, EReflectionErrorCode::ObjectAndTypeMismatch,
-                FReflectionDumpData{})) [[unlikely]]
-        {
-            Utility::CompilerHint::Unreachable();
-        }
+        auto& manager = GetReflectionManager();
         if (!ReflectionAssert(manager.mRegistry.HasKey(classHash), EReflectionErrorCode::TypeUnregistered,
                 FReflectionDumpData{})) [[unlikely]]
         {
@@ -146,6 +186,48 @@ namespace AltinaEngine::Core::Reflection::Detail
         }
         auto& entry = tpMeta.mProperties[propHash];
         return entry.mAccessor(object);
+    }
+    AE_CORE_API auto InvokeMethod(FObject& object, FTypeMetaHash methodHash, TSpan<FObject> args) -> FObject
+    {
+        auto& manager   = GetReflectionManager();
+        auto  classHash = object.GetTypeHash();
+        if (!ReflectionAssert(manager.mRegistry.HasKey(classHash), EReflectionErrorCode::TypeUnregistered,
+                FReflectionDumpData{})) [[unlikely]]
+        {
+            Utility::CompilerHint::Unreachable();
+        }
+        auto& tpMeta = manager.mRegistry[classHash];
+        if (!ReflectionAssert(tpMeta.mMethods.HasKey(methodHash), EReflectionErrorCode::PropertyUnregistered,
+                FReflectionDumpData{})) [[unlikely]]
+        {
+            Utility::CompilerHint::Unreachable();
+        }
+        auto& entry = tpMeta.mMethods[methodHash];
+        return entry.mInvoker(object, args);
+    }
+
+    AE_CORE_API auto TryChainedUpcast(void* ptr, FTypeMetaHash srcType, FTypeMetaHash dstType) -> void*
+    {
+        if (ptr == nullptr) [[unlikely]]
+            return nullptr;
+
+        auto& manager = GetReflectionManager();
+        if (srcType == dstType)
+            return ptr;
+        if (!manager.mRegistry.HasKey(srcType))
+            return nullptr;
+        auto& tpEntry = manager.mRegistry[srcType];
+        void* ret     = nullptr;
+        for (const auto& [baseHash, entry] : tpEntry.mBaseTypes)
+        {
+            const auto upcasted = entry.mUpCaster(ptr);
+            if (const auto rPtr = TryChainedUpcast(upcasted, baseHash, dstType))
+            {
+                ret = rPtr;
+                break;
+            }
+        }
+        return ret;
     }
 
 } // namespace AltinaEngine::Core::Reflection::Detail

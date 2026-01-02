@@ -18,6 +18,8 @@ namespace AltinaEngine::Core::Reflection
         TypeUnregistered      = 6,
         ObjectAndTypeMismatch = 7,
         PropertyUnregistered  = 8,
+
+        DereferenceNullptr = 9
     };
 
     struct FReflectionDumpData

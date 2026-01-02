@@ -10,7 +10,7 @@
 
 namespace AltinaEngine::Core::TypeMeta
 {
-    using FTypeMetaHash = u64;
+    using FTypeMetaHash = u64; // NOLINT
 
     namespace Detail
     {
@@ -320,6 +320,12 @@ namespace AltinaEngine::Core::TypeMeta
             using TClassType  = TMetaMemberFunctionInfo<Member>::TClassType;
             return FMetaMethodInfo(FMetaTypeInfo::Create<TClassType>(), FMetaTypeInfo::Create<TReturnType>(),
                 TMetaMemberFunctionInfo<Member>::kHash, TMetaMemberFunctionInfo<Member>::kName);
+        }
+
+        static auto CreatePlaceHolder()
+        {
+            return FMetaMethodInfo(
+                FMetaTypeInfo::CreatePlaceHolder(), FMetaTypeInfo::CreatePlaceHolder(), 0, FNativeStringView{});
         }
 
     private:

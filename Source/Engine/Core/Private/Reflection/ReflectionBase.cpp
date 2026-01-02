@@ -30,6 +30,9 @@ namespace AltinaEngine::Core::Reflection
             case EReflectionErrorCode::PropertyUnregistered:
                 LogErrorCat(TEXT("Core.Reflection"), TEXT("Property is not registered"));
                 break;
+            case EReflectionErrorCode::DereferenceNullptr:
+                LogErrorCat(TEXT("Core.Reflection"), TEXT("Dereferencing null pointer"));
+                break;
             default:
                 LogErrorCat(TEXT("Core.Reflection"), TEXT("Unknown error"));
         }

@@ -1,23 +1,14 @@
 #pragma once
 
-#include "Container/Span.h"
 #include "Reflection/Object.h"
-#include "Container/IndexSequence.h"
 #include "Reflection/ReflectionBase.h"
-#include "Utility/CompilerHint.h"
-#include "Container/Ref.h"
+#include "Reflection/ReflectionFwd.h"
+
 namespace AltinaEngine::Core::Reflection
 {
-    using Container::FNativeStringView;
-    using Container::MakeRef;
-    using Container::TIndexSequence;
-    using Container::TSpan;
 
     namespace Detail
     {
-        using TFnMemberFunctionInvoker  = FObject (*)(FObject&, TSpan<FObject>);
-        using TFnMemberPropertyAccessor = FObject (*)(FObject&);
-
         template <typename T, typename R, typename... Args, usize... I>
         auto MemberFunctorInvokerWrapperImpl(R (T::*f)(Args...), T& obj, TSpan<FObject> vec, TIndexSequence<I...>) -> R
         {
@@ -41,7 +32,7 @@ namespace AltinaEngine::Core::Reflection
         struct TAutoMemberAccessor : TMemberType<decltype(Member)>
         {
             using TSuper = TMemberType<decltype(Member)>;
-            static auto Get(typename TSuper::TClassType& object) -> TSuper::TBaseType& { return object.*Member; }
+            static auto Get(TSuper::TClassType& object) -> TSuper::TBaseType& { return object.*Member; }
             static auto GetAccessor() -> TFnMemberPropertyAccessor
             {
                 return [](FObject& obj) -> FObject {
@@ -72,26 +63,32 @@ namespace AltinaEngine::Core::Reflection
             };
         };
 
-        AE_CORE_API void RegisterType(const FTypeInfo& stdTypeInfo, const FMetaTypeInfo& meta);
-        AE_CORE_API void RegisterPolymorphicRelation(FTypeMetaHash baseType, FTypeMetaHash derivedType);
-        AE_CORE_API void RegisterPropertyField(
-            const FMetaPropertyInfo& propMeta, FNativeStringView name, TFnMemberPropertyAccessor accessor);
-        AE_CORE_API auto ConstructObject(FTypeMetaHash classHash) -> FObject;
-        AE_CORE_API auto GetProperty(FObject& object, FTypeMetaHash propHash, FTypeMetaHash classHash) -> FObject;
+        template <typename TBase, typename TDerived>
+            requires(IClassBaseOf<TBase, TDerived>)
+        struct TPolymorphismInfo
+        {
+            static constexpr auto GetStaticUpCastWrapper() -> void* (*)(void*)
+            {
+                return [](void* ptr) -> void* {
+                    return static_cast<void*>(static_cast<TBase*>(static_cast<TDerived*>(ptr)));
+                };
+            }
+        };
 
     } // namespace Detail
 
-    template <typename T> void RegisterType()
+    template <IDecayed T> void RegisterType()
     {
         Detail::RegisterType(GetRttiTypeInfo<T>(), FMetaTypeInfo::Create<T>());
     }
 
-    template <typename TBase, typename TDerived>
+    template <IDecayed TBase, IDecayed TDerived>
         requires IClassBaseOf<TBase, TDerived>
     void RegisterPolymorphicRelation()
     {
-        Detail::RegisterPolymorphicRelation(
-            FMetaTypeInfo::Create<TBase>().GetHash(), FMetaTypeInfo::Create<TDerived>().GetHash());
+        using TInheritanceInfo = Detail::TPolymorphismInfo<TBase, TDerived>;
+        Detail::RegisterPolymorphicRelation(FMetaTypeInfo::Create<TBase>().GetHash(),
+            FMetaTypeInfo::Create<TDerived>().GetHash(), TInheritanceInfo::GetStaticUpCastWrapper());
     }
 
     template <auto Member>
@@ -103,6 +100,15 @@ namespace AltinaEngine::Core::Reflection
         Detail::RegisterPropertyField(propField, name, TAccessor::GetAccessor());
     }
 
+    template <auto Member>
+        requires IMemberFunctionPointer<decltype(Member)>
+    void RegisterMethodField(FNativeStringView name)
+    {
+        using TInvoker   = Detail::TAutoMemberFunctionAccessor<Member>;
+        auto methodField = FMetaMethodInfo::Create<Member>();
+        Detail::RegisterMethodField(methodField, name, TInvoker::GetInvoker());
+    }
+
     inline auto ConstructObject(const FMetaTypeInfo& valueMeta) -> FObject
     {
         return Detail::ConstructObject(valueMeta.GetHash());
@@ -110,6 +116,10 @@ namespace AltinaEngine::Core::Reflection
     inline auto GetProperty(FObject& object, const FMetaPropertyInfo& propMeta) -> FObject
     {
         return Detail::GetProperty(object, propMeta.GetHash(), propMeta.GetClassTypeMetadata().GetHash());
+    }
+    inline auto InvokeMethod(FObject& object, const FMetaPropertyInfo& propMeta, TSpan<FObject> args) -> FObject
+    {
+        return Detail::InvokeMethod(object, propMeta.GetHash(), args);
     }
 
 } // namespace AltinaEngine::Core::Reflection

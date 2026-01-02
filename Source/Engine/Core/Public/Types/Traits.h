@@ -201,6 +201,11 @@ namespace AltinaEngine
     {
     };
 
+    template <typename T>
+    struct TTypeIsTriviallyConstructible : Detail::CompilerTraits::TTypeIsTriviallyConstructibleImpl<T>
+    {
+    };
+
     template <typename T> struct TTypeIsCopyConstructible : TTypeIsConstructible<T, const T&>
     {
     };

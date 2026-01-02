@@ -2,6 +2,7 @@
 #include "Types/Meta.h"
 #include "ReflectionBase.h"
 #include "Utility/CompilerHint.h"
+#include "ReflectionFwd.h"
 namespace AltinaEngine::Core::Reflection
 {
     using namespace TypeMeta;
@@ -63,22 +64,32 @@ namespace AltinaEngine::Core::Reflection
         }
 
         // Casting
-        template <typename T> auto As() -> T&
+        template <IDecayed T> auto As() -> T&
         {
-            if (ReflectionAssert(mMetadata.GetTypeInfo() == typeid(T), EReflectionErrorCode::CorruptedAnyCast,
-                    FReflectionDumpData{})) [[likely]]
+            ReflectionAssert(mPtr != nullptr, EReflectionErrorCode::DereferenceNullptr, FReflectionDumpData{});
+            if (mMetadata.GetTypeInfo() == typeid(T) && mPtr) [[likely]]
             {
                 return *static_cast<T*>(mPtr);
             }
+            if (auto casted = Detail::TryChainedUpcast(mPtr, mMetadata.GetHash(), FMetaTypeInfo::Create<T>().GetHash()))
+            {
+                return *static_cast<T*>(casted);
+            }
+            ReflectionAssert(false, EReflectionErrorCode::CorruptedAnyCast, FReflectionDumpData{});
             Utility::CompilerHint::Unreachable();
         }
-        template <typename T> auto As() const -> T&
+        template <IDecayed T> auto As() const -> const T&
         {
-            if (ReflectionAssert(mMetadata.GetTypeInfo() == typeid(T), EReflectionErrorCode::CorruptedAnyCast,
-                    FReflectionDumpData{})) [[likely]]
+            ReflectionAssert(mPtr != nullptr, EReflectionErrorCode::DereferenceNullptr, FReflectionDumpData{});
+            if (mMetadata.GetTypeInfo() == typeid(T) && mPtr) [[likely]]
             {
-                return *static_cast<T*>(mPtr);
+                return *static_cast<const T*>(mPtr);
             }
+            if (auto casted = Detail::TryChainedUpcast(mPtr, mMetadata.GetHash(), FMetaTypeInfo::Create<T>().GetHash()))
+            {
+                return *static_cast<const T*>(casted);
+            }
+            ReflectionAssert(false, EReflectionErrorCode::CorruptedAnyCast, FReflectionDumpData{});
             Utility::CompilerHint::Unreachable();
         }
         // Metadata

@@ -3,18 +3,16 @@
 #include "Aliases.h"
 #include "Concepts.h"
 #include "../Base/AltinaBase.h"
-
-#include <cstring>
+#include "Platform/PlatformIntrinsic.h"
 
 namespace AltinaEngine
 {
-
-    template <typename TDst, typename TSrc>
+    template <ITriviallyConstructible TDst, typename TSrc>
         requires(ISameSizeAs<TDst, TSrc>)
-    [[nodiscard]] AE_FORCEINLINE constexpr auto BitCast(TSrc Value) noexcept -> TDst
+    [[nodiscard]] AE_FORCEINLINE constexpr auto BitCast(const TSrc& Value) noexcept -> TDst
     {
         TDst dst;
-        std::memcpy(&dst, &Value, sizeof(TDst));
+        Core::Platform::Generic::Memcpy(&dst, &Value, sizeof(TDst));
         return dst;
     }
 

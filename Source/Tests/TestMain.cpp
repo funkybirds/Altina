@@ -8,5 +8,6 @@ int main() {
         return 0;
     }
     std::cerr << failures << " test(s) failed\n";
+
     return 1;
 }

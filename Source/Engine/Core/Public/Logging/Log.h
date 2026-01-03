@@ -20,7 +20,7 @@ namespace AltinaEngine::Core::Logging {
     using Container::FStringView;
 
     template <typename... Args>
-    using TFormatString = TSelect<TTypeSameAs_v<TChar, wchar_t>, std::wformat_string<Args...>,
+    using TFormatString = TSelect<CSameAs<TChar, wchar_t>, std::wformat_string<Args...>,
         std::format_string<Args...>>::Type;
 
     enum class ELogLevel : u8 {

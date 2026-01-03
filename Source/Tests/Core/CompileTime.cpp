@@ -5,15 +5,15 @@
 
 using namespace AltinaEngine;
 
-static_assert(TTypeIsIntegral_v<int>);
-static_assert(TTypeIsIntegral_v<unsigned long long>);
-static_assert(!TTypeIsIntegral_v<float>);
-static_assert(TTypeIsFloatingPoint_v<double>);
+static_assert(CIntegral<int>);
+static_assert(CIntegral<unsigned long long>);
+static_assert(!CIntegral<float>);
+static_assert(CFloatingPoint<double>);
 
-static_assert(TTypeIsDefaultConstructible_v<int>);
-static_assert(TTypeIsCopyConstructible_v<int>);
-static_assert(TTypeIsMovable_v<int>);
+static_assert(CDefaultConstructible<int>);
+static_assert(CCopyConstructible<int>);
+static_assert(CMoveConstructible<int>);
 
-static_assert(TTypeLessComparable_v<int>);
-static_assert(TTypeEqualComparable_v<int>);
-static_assert(TTypeGreaterComparable_v<int>);
+static_assert(CLessComparable<int>);
+static_assert(CEqualComparable<int>);
+static_assert(CGreaterComparable<int>);

@@ -134,7 +134,7 @@ namespace AltinaEngine::Core::Math {
 
     // Sin, Cos (radians, floating-point)
     template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sin(T radians) noexcept -> T {
-        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>) {
+        if constexpr (CSameAs<T, f32>) {
             return Details::SinF(radians);
         } else {
             return static_cast<T>(Details::SinD(static_cast<f64>(radians)));
@@ -142,7 +142,7 @@ namespace AltinaEngine::Core::Math {
     }
 
     template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Cos(T radians) noexcept -> T {
-        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>) {
+        if constexpr (CSameAs<T, f32>) {
             return Details::CosF(radians);
         } else {
             return static_cast<T>(Details::CosD(static_cast<f64>(radians)));
@@ -155,7 +155,7 @@ namespace AltinaEngine::Core::Math {
 
     // Sqrt (floating-point)
     template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sqrt(T value) noexcept -> T {
-        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>) {
+        if constexpr (CSameAs<T, f32>) {
             return Details::SqrtF(value);
         } else {
             return static_cast<T>(Details::SqrtD(static_cast<f64>(value)));

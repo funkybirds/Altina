@@ -5,6 +5,10 @@ Checks: >
   modernize-*,
   -modernize-avoid-c-arrays,
   readability-identifier-naming,
+  readability-non-const-parameter,
+  readability-implicit-bool-conversion,
+  readability-enum-initial-value,
+  readability-simplify-boolean-expr,
   cppcoreguidelines-*,
   -cppcoreguidelines-avoid-c-arrays
 WarningsAsErrors: ''

@@ -19,9 +19,9 @@ namespace AltinaEngine::Core::Container {
 
         // Construct from callable (disable for TFunction itself)
         template <typename F>
-            requires(!AltinaEngine::TTypeSameAs_v<typename TDecay<F>::Type, TFunction>)
+            requires(!CSameAs<typename TDecay<F>::TType, TFunction>)
         TFunction(F&& f) noexcept {
-            using TDecayF = TRemoveReference<F>::Type;
+            using TDecayF = typename TRemoveReference<F>::TType;
             Init<TDecayF>(AltinaEngine::Move(f));
         }
 
@@ -72,6 +72,16 @@ namespace AltinaEngine::Core::Container {
             return *this;
         }
 
+        // Assignment from callable (disable for TFunction itself)
+        template <typename F>
+            requires(!CSameAs<typename TDecay<F>::TType, TFunction>)
+        auto operator=(F&& f) noexcept -> TFunction& {
+            Reset();
+            using TDecayF = typename TRemoveReference<F>::TType;
+            Init<TDecayF>(AltinaEngine::Move(f));
+            return *this;
+        }
+
         ~TFunction() { Reset(); }
 
         explicit operator bool() const noexcept { return mVTable != nullptr; }
@@ -109,7 +119,7 @@ namespace AltinaEngine::Core::Container {
         }
 
         template <typename F> static void CopyImpl(const void* src, void* dst) {
-            if constexpr (AltinaEngine::TTypeIsCopyConstructible_v<F>) {
+            if constexpr (CCopyConstructible<F>) {
                 new (dst) F(*reinterpret_cast<const F*>(src));
             } else {
                 // Should not be called when type is non-copyable; guard at vtable level.
@@ -134,7 +144,7 @@ namespace AltinaEngine::Core::Container {
         }
 
         template <typename F> static void CopyHeapImpl(const void* src, void* dst) {
-            if constexpr (AltinaEngine::TTypeIsCopyConstructible_v<F>) {
+            if constexpr (CCopyConstructible<F>) {
                 F* srcPtr                   = *reinterpret_cast<F* const*>(src);
                 *reinterpret_cast<F**>(dst) = new F(*srcPtr);
             } else {
@@ -153,20 +163,20 @@ namespace AltinaEngine::Core::Container {
         }
 
         template <typename F> void Init(F&& f) noexcept {
-            using T = TRemoveReference<F>::Type;
+            using T = typename TRemoveReference<F>::TType;
 
             if constexpr (sizeof(T) <= sizeof(StorageT)) {
                 static const VTable vt = { &DestroyImpl<T>,
-                    (AltinaEngine::TTypeIsCopyConstructible_v<T> ? &CopyImpl<T> : nullptr),
-                    &MoveImpl<T>, &InvokeImpl<T> };
+                    (CCopyConstructible<T> ? &CopyImpl<T> : nullptr), &MoveImpl<T>,
+                    &InvokeImpl<T> };
 
                 // Placement new into storage
                 new (&mStorage) T(AltinaEngine::Move(f));
                 mVTable = &vt;
             } else {
                 static const VTable vt = { &DestroyHeapImpl<T>,
-                    (AltinaEngine::TTypeIsCopyConstructible_v<T> ? &CopyHeapImpl<T> : nullptr),
-                    &MoveHeapImpl<T>, &InvokeHeapImpl<T> };
+                    (CCopyConstructible<T> ? &CopyHeapImpl<T> : nullptr), &MoveHeapImpl<T>,
+                    &InvokeHeapImpl<T> };
 
                 // allocate on heap and store pointer in storage
                 T*                  heapObj       = new T(AltinaEngine::Move(f));

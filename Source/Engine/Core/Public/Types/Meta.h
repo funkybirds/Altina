@@ -136,9 +136,9 @@ namespace AltinaEngine::Core::TypeMeta {
         static constexpr FTypeMetaHash kHash      = Detail::GetFuncNameHashId<T>();
         static constexpr auto          kNameArray = Detail::GetActualClassNameArray<T>();
         static constexpr auto kName = FNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
-        static constexpr bool kDefaultConstructible = TTypeIsDefaultConstructible_v<T>;
-        static constexpr bool kDestructible         = TTypeIsDestructible_v<T>;
-        static constexpr bool kCopyConstructible    = TTypeIsCopyConstructible_v<T>;
+        static constexpr bool kDefaultConstructible = CDefaultConstructible<T>;
+        static constexpr bool kDestructible         = CDestructible<T>;
+        static constexpr bool kCopyConstructible    = CCopyConstructible<T>;
 
         static auto           GetTypeInfo() -> FTypeInfo const& {
             static FTypeInfo const* typeInfo = &typeid(T);

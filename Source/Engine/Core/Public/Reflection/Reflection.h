@@ -46,7 +46,7 @@ namespace AltinaEngine::Core::Reflection {
             static auto GetInvoker() -> TFnMemberFunctionInvoker {
                 return [](FObject& classObject, TSpan<FObject> args) -> FObject {
                     auto& obj = classObject.As<typename TSuper::TClassType>();
-                    if constexpr (TTypeIsVoid_v<typename TSuper::TReturnType>) {
+                    if constexpr (CVoid<typename TSuper::TReturnType>) {
                         MemberFunctorInvokerWrapper(Member, obj, args);
                         return FObject::Create<void>();
                     } else {

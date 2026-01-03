@@ -9,7 +9,7 @@ namespace AltinaEngine {
     // static_cast. This single template handles pointers, references and
     // value conversions.
     template <typename To, typename From> auto CheckedCast(From&& from) noexcept -> To {
-        if constexpr (TTypeIsDynamicConvertible<To, From>::Value) {
+        if constexpr (CDynamicConvertible<From, To>) {
             return dynamic_cast<To>(static_cast<From&&>(from));
         } else {
             return static_cast<To>(static_cast<From&&>(from));

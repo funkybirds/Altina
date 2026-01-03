@@ -67,13 +67,13 @@ namespace AltinaEngine::Core::Container {
             Other.Deleter = AltinaEngine::Move(tmpDeleter);
         }
 
-        TPointer get() const noexcept { return Ptr; }
-        D&       get_deleter() noexcept { return Deleter; }
-        const D& get_deleter() const noexcept { return Deleter; }
-        explicit operator bool() const noexcept { return Ptr != nullptr; }
+        TPointer                    get() const noexcept { return Ptr; }
+        D&                          get_deleter() noexcept { return Deleter; }
+        const D&                    get_deleter() const noexcept { return Deleter; }
+        explicit                    operator bool() const noexcept { return Ptr != nullptr; }
 
-        typename TRemoveReference<T>::Type& operator*() const { return *Ptr; }
-        TPointer                            operator->() const noexcept { return Ptr; }
+        TRemoveReference<T>::TType& operator*() const { return *Ptr; }
+        TPointer                    operator->() const noexcept { return Ptr; }
 
     private:
         TPointer Ptr;
@@ -297,7 +297,7 @@ namespace AltinaEngine::Core::Container {
         auto UseCount() const noexcept -> usize { return mControl ? mControl->GetRefCount() : 0U; }
 
     private:
-        template <typename D> using TDecayDeleter = typename AltinaEngine::TDecay<D>::Type;
+        template <typename D> using TDecayDeleter = TDecay<D>::TType;
 
         template <typename D> void InitializeControlBlock(D&& InDeleter) {
             using TStorageType = TDecayDeleter<D>;

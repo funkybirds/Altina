@@ -64,8 +64,7 @@ namespace AltinaEngine::Core::Threading {
     public:
         using TValueType = T;
 
-        static_assert(
-            AltinaEngine::TTypeIsIntegral_v<T>, "TAtomic currently supports integral types only");
+        static_assert(CIntegral<T>, "TAtomic currently supports integral types only");
         static_assert(sizeof(T) == 4 || sizeof(T) == 8,
             "TAtomic supports 32-bit and 64-bit integral types only");
 
@@ -134,19 +133,19 @@ namespace AltinaEngine::Core::Threading {
         [[nodiscard]] operator T() const noexcept { return Load(); }
 
         template <typename U = T>
-            requires(AltinaEngine::TTypeIsIntegral_v<U>)
+            requires(CIntegral<U>)
         auto FetchAdd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U {
             return static_cast<U>(mImpl.ExchangeAdd(static_cast<TSignedType>(arg)));
         }
 
         template <typename U = T>
-            requires(AltinaEngine::TTypeIsIntegral_v<U>)
+            requires(CIntegral<U>)
         auto FetchSub(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U {
             return static_cast<U>(mImpl.ExchangeAdd(-static_cast<TSignedType>(arg)));
         }
 
         template <typename U = T>
-            requires(AltinaEngine::TTypeIsIntegral_v<U>)
+            requires(CIntegral<U>)
         auto FetchAnd(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U {
             TSignedType expected, desired;
             do {
@@ -157,7 +156,7 @@ namespace AltinaEngine::Core::Threading {
         }
 
         template <typename U = T>
-            requires(AltinaEngine::TTypeIsIntegral_v<U>)
+            requires(CIntegral<U>)
         auto FetchOr(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U {
             TSignedType expected, desired;
             do {
@@ -168,7 +167,7 @@ namespace AltinaEngine::Core::Threading {
         }
 
         template <typename U = T>
-            requires(AltinaEngine::TTypeIsIntegral_v<U>)
+            requires(CIntegral<U>)
         auto FetchXor(U arg, EMemoryOrder = EMemoryOrder::SequentiallyConsistent) noexcept -> U {
             TSignedType expected, desired;
             do {

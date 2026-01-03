@@ -8,8 +8,7 @@
 #include "../Types/Aliases.h"
 #include "Allocator.h"
 
-namespace AltinaEngine::Core::Container
-{
+namespace AltinaEngine::Core::Container {
 
     // Dynamic array similar to std::vector, using the engine allocator.
     template <typename T, typename TAllocatorType = TAllocator<T>> struct TVector {
@@ -31,14 +30,12 @@ namespace AltinaEngine::Core::Container
         explicit TVector(TSizeType count, TConstReference value = TValueType{},
             const TAllocatorType& allocator = TAllocatorType())
             : mData(nullptr), mSize(0), mCapacity(0), mAllocator(allocator) {
-            if (count == 0)
-            {
+            if (count == 0) {
                 return;
             }
 
             Reserve(count);
-            for (TSizeType i = 0; i < count; ++i)
-            {
+            for (TSizeType i = 0; i < count; ++i) {
                 mAllocator.Construct(mData + i, value);
             }
             mSize = count;
@@ -47,16 +44,14 @@ namespace AltinaEngine::Core::Container
         TVector(std::initializer_list<TValueType> init,
             const TAllocatorType&                 allocator = TAllocatorType())
             : mData(nullptr), mSize(0), mCapacity(0), mAllocator(allocator) {
-            if (init.size() == 0)
-            {
+            if (init.size() == 0) {
                 return;
             }
 
             const auto count = static_cast<TSizeType>(init.size());
             Reserve(count);
             TSizeType index = 0;
-            for (const auto& element : init)
-            {
+            for (const auto& element : init) {
                 mAllocator.Construct(mData + index, element);
                 ++index;
             }
@@ -65,14 +60,12 @@ namespace AltinaEngine::Core::Container
 
         TVector(const TVector& other)
             : mData(nullptr), mSize(0), mCapacity(0), mAllocator(other.mAllocator) {
-            if (other.mSize == 0)
-            {
+            if (other.mSize == 0) {
                 return;
             }
 
             Reserve(other.mSize);
-            for (TSizeType i = 0; i < other.mSize; ++i)
-            {
+            for (TSizeType i = 0; i < other.mSize; ++i) {
                 mAllocator.Construct(mData + i, other.mData[i]);
             }
             mSize = other.mSize;
@@ -90,8 +83,7 @@ namespace AltinaEngine::Core::Container
 
         ~TVector() {
             Clear();
-            if (mData != nullptr)
-            {
+            if (mData != nullptr) {
                 mAllocator.Deallocate(mData, mCapacity);
                 mData     = nullptr;
                 mSize     = 0;
@@ -100,8 +92,7 @@ namespace AltinaEngine::Core::Container
         }
 
         TVector& operator=(const TVector& other) {
-            if (this == &other)
-            {
+            if (this == &other) {
                 return *this;
             }
 
@@ -110,14 +101,12 @@ namespace AltinaEngine::Core::Container
         }
 
         TVector& operator=(TVector&& other) noexcept {
-            if (this == &other)
-            {
+            if (this == &other) {
                 return *this;
             }
 
             Clear();
-            if (mData != nullptr)
-            {
+            if (mData != nullptr) {
                 mAllocator.Deallocate(mData, mCapacity);
             }
 
@@ -187,22 +176,19 @@ namespace AltinaEngine::Core::Container
         [[nodiscard]] constexpr auto Capacity() const noexcept -> TSizeType { return mCapacity; }
 
         void                         Reserve(TSizeType newCapacity) {
-            if (newCapacity <= mCapacity)
-            {
+            if (newCapacity <= mCapacity) {
                 return;
             }
 
             TPointer newData =
                 mAllocator.Allocate(static_cast<typename TAllocatorType::TSizeType>(newCapacity));
 
-            for (TSizeType i = 0; i < mSize; ++i)
-            {
+            for (TSizeType i = 0; i < mSize; ++i) {
                 mAllocator.Construct(newData + i, AltinaEngine::Move(mData[i]));
                 mAllocator.Destroy(mData + i);
             }
 
-            if (mData != nullptr)
-            {
+            if (mData != nullptr) {
                 mAllocator.Deallocate(mData, mCapacity);
             }
 
@@ -211,24 +197,20 @@ namespace AltinaEngine::Core::Container
         }
 
         void Resize(TSizeType newSize) {
-            if (newSize < mSize)
-            {
+            if (newSize < mSize) {
                 // destroy extra elements
-                for (TSizeType i = newSize; i < mSize; ++i)
-                {
+                for (TSizeType i = newSize; i < mSize; ++i) {
                     mAllocator.Destroy(mData + i);
                 }
                 mSize = newSize;
                 return;
             }
 
-            if (newSize > mCapacity)
-            {
+            if (newSize > mCapacity) {
                 Reserve(newSize);
             }
 
-            for (TSizeType i = mSize; i < newSize; ++i)
-            {
+            for (TSizeType i = mSize; i < newSize; ++i) {
                 mAllocator.Construct(mData + i);
             }
 
@@ -236,8 +218,7 @@ namespace AltinaEngine::Core::Container
         }
 
         void Clear() noexcept {
-            for (TSizeType i = 0; i < mSize; ++i)
-            {
+            for (TSizeType i = 0; i < mSize; ++i) {
                 mAllocator.Destroy(mData + i);
             }
             mSize = 0;
@@ -264,8 +245,7 @@ namespace AltinaEngine::Core::Container
         }
 
         void PopBack() noexcept {
-            if (mSize == 0)
-            {
+            if (mSize == 0) {
                 return;
             }
 
@@ -275,8 +255,7 @@ namespace AltinaEngine::Core::Container
 
     private:
         void EnsureCapacityForOneMore() {
-            if (mSize < mCapacity)
-            {
+            if (mSize < mCapacity) {
                 return;
             }
 
@@ -287,10 +266,8 @@ namespace AltinaEngine::Core::Container
         void AssignFrom(const TVector& other) {
             Clear();
 
-            if (other.mSize > mCapacity)
-            {
-                if (mData != nullptr)
-                {
+            if (other.mSize > mCapacity) {
+                if (mData != nullptr) {
                     mAllocator.Deallocate(mData, mCapacity);
                 }
 
@@ -300,8 +277,7 @@ namespace AltinaEngine::Core::Container
                 Reserve(other.mSize);
             }
 
-            for (TSizeType i = 0; i < other.mSize; ++i)
-            {
+            for (TSizeType i = 0; i < other.mSize; ++i) {
                 mAllocator.Construct(mData + i, other.mData[i]);
             }
 

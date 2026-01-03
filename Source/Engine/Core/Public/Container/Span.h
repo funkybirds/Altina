@@ -13,7 +13,7 @@ namespace AltinaEngine::Core::Container {
     template <typename T, usize Extent = FNumericConstants::kDynamicSized> class TSpan {
     public:
         using TElementType    = T;
-        using TValueType      = TRemoveCV<T>::Type;
+        using TValueType      = TRemoveCV<T>::TType;
         using TSizeType       = usize;
         using TDifferenceType = isize;
         using TPointer        = TElementType*;

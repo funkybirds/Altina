@@ -6,6 +6,9 @@
 namespace AltinaEngine::Core::Reflection {
     using namespace TypeMeta;
 
+    class ISerializer;
+    class IDeserializer;
+
     class FObject {
     public:
         FObject() noexcept : mPtr(nullptr), mMetadata(FMetaTypeInfo::CreatePlaceHolder()) {}
@@ -87,6 +90,10 @@ namespace AltinaEngine::Core::Reflection {
         [[nodiscard]] auto GetTypeInfo() const noexcept -> FTypeInfo const& {
             return mMetadata.GetTypeInfo();
         }
+
+        // Serialization
+        void Serialize(ISerializer& serializer) const;
+        void Deserialize(IDeserializer& deserializer);
 
         // Constructors
         template <CNonVoid T, typename... TArgs> static auto Create(TArgs&&... args) -> FObject {

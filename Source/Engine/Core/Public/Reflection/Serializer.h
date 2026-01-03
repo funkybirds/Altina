@@ -1,18 +1,20 @@
 #pragma once
+
 #include "Traits.h"
-#include "Types/Concepts.h"
 #include "Container/String.h"
+#include "Types/NonCopyable.h"
 
 namespace AltinaEngine::Core::Reflection {
     class FArchive;
+    class FObject;
 
-    class ISerializer {
+    class AE_CORE_API ISerializer : public NonCopyableClass {
     public:
-        ISerializer()          = default;
-        virtual ~ISerializer() = default;
+        ISerializer()           = default;
+        ~ISerializer() override = default;
 
-        ISerializer(const ISerializer&)            = delete;
-        ISerializer& operator=(const ISerializer&) = delete;
+        ISerializer(const ISerializer&)                            = delete;
+        auto         operator=(const ISerializer&) -> ISerializer& = delete;
 
         virtual void WriteInt8(i8 value) { WriteBytes(&value, sizeof(value)); }
         virtual void WriteInt16(i16 value) { WriteBytes(&value, sizeof(value)); }
@@ -29,11 +31,11 @@ namespace AltinaEngine::Core::Reflection {
             WriteBytes(value.Data(), value.Length());
         }
 
-        virtual void              BeginObject(Container::FStringView name = {}) {}
+        virtual void              BeginObject(Container::FStringView /*name*/) {}
         virtual void              EndObject() {}
-        virtual void              BeginArray(usize size) {}
+        virtual void              BeginArray(usize /*size*/) {}
         virtual void              EndArray() {}
-        virtual void              WriteFieldName(Container::FStringView name) {}
+        virtual void              WriteFieldName(Container::FStringView /*name*/) {}
 
         template <CScalar T> void Write(const T& value) {
             if constexpr (CSameAs<T, i8>)
@@ -63,8 +65,8 @@ namespace AltinaEngine::Core::Reflection {
         }
 
         template <CEnum T> void Write(const T& value) {
-            using UnderlyingType = TUnderlyingType<T>;
-            Write(static_cast<UnderlyingType>(value));
+            using TUnderlyingType = TUnderlyingType<T>;
+            Write(static_cast<TUnderlyingType>(value));
         }
 
         template <CCustomExternalSerializable T> void Write(const T& value) {
@@ -78,67 +80,66 @@ namespace AltinaEngine::Core::Reflection {
         virtual void WriteBytes(const void* data, usize size) = 0;
     };
 
-    class IDeserializer {
+    class AE_CORE_API IDeserializer : public NonCopyableClass {
     public:
-        IDeserializer()          = default;
-        virtual ~IDeserializer() = default;
+        IDeserializer()           = default;
+        ~IDeserializer() override = default;
 
-        IDeserializer(const IDeserializer&)            = delete;
-        IDeserializer& operator=(const IDeserializer&) = delete;
+        IDeserializer(const IDeserializer&)                            = delete;
+        auto         operator=(const IDeserializer&) -> IDeserializer& = delete;
 
-        // 基础类型的语义化读取接口（文本格式可重写）
-        virtual i8     ReadInt8() {
-            i8 v;
+        virtual auto ReadInt8() -> i8 {
+            i8 v = 0;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual i16 ReadInt16() {
+        virtual auto ReadInt16() -> i16 {
             i16 v;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual i32 ReadInt32() {
-            i32 v;
+        virtual auto ReadInt32() -> i32 {
+            i32 v = 0;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual i64 ReadInt64() {
-            i64 v;
+        virtual auto ReadInt64() -> i64 {
+            i64 v = 0;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual u8 ReadUInt8() {
-            u8 v;
+        virtual auto ReadUInt8() -> u8 {
+            u8 v = 0;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual u16 ReadUInt16() {
-            u16 v;
+        virtual auto ReadUInt16() -> u16 {
+            u16 v = 0;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual u32 ReadUInt32() {
-            u32 v;
+        virtual auto ReadUInt32() -> u32 {
+            u32 v = 0;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual u64 ReadUInt64() {
-            u64 v;
+        virtual auto ReadUInt64() -> u64 {
+            u64 v = 0;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual f32 ReadFloat() {
-            f32 v;
+        virtual auto ReadFloat() -> f32 {
+            f32 v = NAN;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual f64 ReadDouble() {
-            f64 v;
+        virtual auto ReadDouble() -> f64 {
+            f64 v = NAN;
             ReadBytes(&v, sizeof(v));
             return v;
         }
-        virtual bool ReadBool() {
-            bool v;
+        virtual auto ReadBool() -> bool {
+            bool v = false;
             ReadBytes(&v, sizeof(v));
             return v;
         }
@@ -147,9 +148,11 @@ namespace AltinaEngine::Core::Reflection {
         virtual void EndObject() {}
         virtual void BeginArray(usize& outSize) { outSize = 0; }
         virtual void EndArray() {}
-        virtual bool TryReadFieldName(Container::FStringView expectedName) { return true; }
+        virtual auto TryReadFieldName(Container::FStringView /*expectedName*/) -> bool {
+            return true;
+        }
 
-        template <CScalar T> T Read() {
+        template <CScalar T> auto Read() -> T {
             if constexpr (CSameAs<T, i8>)
                 return ReadInt8();
             else if constexpr (CSameAs<T, i16>)
@@ -179,18 +182,17 @@ namespace AltinaEngine::Core::Reflection {
             }
         }
 
-        template <CEnum T> T Read() {
-            using UnderlyingType = TUnderlyingType<T>;
-            return static_cast<T>(Read<UnderlyingType>());
+        template <CEnum T> auto Read() -> T {
+            using TUnderlyingType = TUnderlyingType<T>;
+            return static_cast<T>(Read<TUnderlyingType>());
         }
 
-        template <CCustomExternalSerializable T> T Read() {
+        template <CCustomExternalSerializable T> auto Read() -> T {
             return TCustomSerializeRule<T>::Deserialize(*this);
         }
 
-        template <typename T> T Deserialize() { return Read<T>(); }
-
-        usize                   ReadSize() { return static_cast<usize>(Read<u64>()); }
+        template <typename T> auto Deserialize() -> T { return Read<T>(); }
+        auto                       ReadSize() -> usize { return static_cast<usize>(Read<u64>()); }
 
     protected:
         virtual void ReadBytes(void* data, usize size) = 0;

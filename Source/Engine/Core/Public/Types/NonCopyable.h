@@ -5,8 +5,8 @@ namespace AltinaEngine {
     // Base class to disable copy semantics for classes
     class FNonCopyableClass {
     public:
-        FNonCopyableClass()  = default;
-        ~FNonCopyableClass() = default;
+        FNonCopyableClass()          = default;
+        virtual ~FNonCopyableClass() = default;
 
         FNonCopyableClass(const FNonCopyableClass&)                    = delete;
         FNonCopyableClass(FNonCopyableClass&&)                         = default;

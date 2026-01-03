@@ -190,18 +190,18 @@ namespace AltinaEngine::Core::TypeMeta {
                 TMetaTypeInfo<T>::kCopyConstructible, TMetaTypeInfo<T>::kDestructible,
                 TMetaTypeInfo<T>::kHash, TMetaTypeInfo<T>::kName, &TMetaTypeInfo<T>::GetTypeInfo,
                 &TMetaTypeInfo<T>::InvokeDtor, &TMetaTypeInfo<T>::InvokeCopyCtor,
-                &TMetaTypeInfo<T>::InvokeDefaultCtor);
+                &TMetaTypeInfo<T>::InvokeDefaultCtor, true, nullptr, true, nullptr);
         }
-        static auto CreateVoid() {
+        static auto CreateVoid() -> FMetaTypeInfo {
             return FMetaTypeInfo(
                 false, false, false, 0, FNativeStringView{},
                 []() -> FTypeInfo const& {
                     static FTypeInfo const* typeInfo = &typeid(void);
                     return *typeInfo;
                 },
-                nullptr, nullptr, nullptr);
+                nullptr, nullptr, nullptr, false, nullptr, false, nullptr);
         }
-        static auto CreatePlaceHolder() { return FMetaTypeInfo(); }
+        static auto CreatePlaceHolder() -> FMetaTypeInfo { return FMetaTypeInfo(); }
 
         friend struct FMetaPropertyInfo;
         friend struct FMetaMethodInfo;
@@ -215,12 +215,24 @@ namespace AltinaEngine::Core::TypeMeta {
             return mCopyConstructible;
         }
         [[nodiscard]] auto IsDestructible() const noexcept -> bool { return mDestructible; }
+        [[nodiscard]] auto IsSerializable() const noexcept -> bool { return mSerializable; }
+        [[nodiscard]] auto IsDeserializable() const noexcept -> bool { return mDeserializable; }
 
         void               CallDestructor(void* obj) const { mDestructor(obj); }
         [[nodiscard]] auto CallCopyConstructor(void* obj) const -> void* {
             return mCopyConstructor(obj);
         }
         [[nodiscard]] auto CallDefaultConstructor() const -> void* { return mDefaultConstructor(); }
+        void               CallSerializeRule(void* obj, void* serializer) const {
+            if (mSerializeRule) {
+                mSerializeRule(obj, serializer);
+            }
+        }
+        void CallDeserializeRule(void* obj, void* deserializer) const {
+            if (mDeserializeRule) {
+                mDeserializeRule(obj, deserializer);
+            }
+        }
 
         [[nodiscard]] auto operator==(const FMetaTypeInfo& p) const -> bool {
             return mHash == p.mHash;
@@ -235,10 +247,16 @@ namespace AltinaEngine::Core::TypeMeta {
             , mGetTypeInfo(nullptr)
             , mDestructor(nullptr)
             , mCopyConstructor(nullptr)
-            , mDefaultConstructor(nullptr) {}
+            , mDefaultConstructor(nullptr)
+            , mSerializable(false)
+            , mSerializeRule(nullptr)
+            , mDeserializable(false)
+            , mDeserializeRule(nullptr) {}
         FMetaTypeInfo(bool bDefaultConstructible, bool bCopyConstructible, bool bDestructible,
             FTypeMetaHash hash, FNativeStringView name, FTypeInfo const& (*getTypeInfo)(),
-            void (*destructor)(void*), void* (*copyCtor)(void*), void* (*defaultCtor)())
+            void (*destructor)(void*), void* (*copyCtor)(void*), void* (*defaultCtor)(),
+            bool bSerializable, void (*serializeRule)(void*, void*), bool bDeserializable,
+            void (*deserializeRule)(void*, void*))
             : mDefaultConstructible(bDefaultConstructible)
             , mCopyConstructible(bCopyConstructible)
             , mDestructible(bDestructible)
@@ -247,7 +265,11 @@ namespace AltinaEngine::Core::TypeMeta {
             , mGetTypeInfo(getTypeInfo)
             , mDestructor(destructor)
             , mCopyConstructor(copyCtor)
-            , mDefaultConstructor(defaultCtor) {}
+            , mDefaultConstructor(defaultCtor)
+            , mSerializable(bSerializable)
+            , mSerializeRule(serializeRule)
+            , mDeserializable(bDeserializable)
+            , mDeserializeRule(deserializeRule) {}
 
         bool              mDefaultConstructible;
         bool              mCopyConstructible;
@@ -259,6 +281,10 @@ namespace AltinaEngine::Core::TypeMeta {
         void (*mDestructor)(void*);
         void* (*mCopyConstructor)(void*);
         void* (*mDefaultConstructor)();
+        bool mSerializable;
+        void (*mSerializeRule)(void*, void*);
+        bool mDeserializable;
+        void (*mDeserializeRule)(void*, void*);
     };
 
     struct FMetaPropertyInfo {

@@ -3,8 +3,21 @@
 #include "Reflection/Object.h"
 #include "Reflection/ReflectionBase.h"
 #include "Reflection/ReflectionFwd.h"
+#include "Container/Vector.h"
+#include "Container/String.h"
 
 namespace AltinaEngine::Core::Reflection {
+    using Container::FString;
+    using Container::TVector;
+
+    struct FPropertyDesc {
+        FString mName;
+        FObject mProperty;
+
+        FPropertyDesc() = default;
+        FPropertyDesc(FString name, FObject property)
+            : mName(Move(name)), mProperty(Move(property)) {}
+    };
 
     namespace Detail {
         template <typename T, typename R, typename... Args, usize... I>
@@ -108,5 +121,7 @@ namespace AltinaEngine::Core::Reflection {
         FObject& object, const FMetaPropertyInfo& propMeta, TSpan<FObject> args) -> FObject {
         return Detail::InvokeMethod(object, propMeta.GetHash(), args);
     }
+
+    AE_CORE_API auto GetAllProperties(FObject& object) -> TVector<FPropertyDesc>;
 
 } // namespace AltinaEngine::Core::Reflection

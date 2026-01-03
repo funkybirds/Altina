@@ -1,4 +1,5 @@
 #include "Reflection/Reflection.h"
+#include "Reflection/Serializer.h"
 #include "Container/HashMap.h"
 #include "Container/HashSet.h"
 #include "Types/NonCopyable.h"
@@ -202,4 +203,99 @@ namespace AltinaEngine::Core::Reflection::Detail {
         return ret;
     }
 
+    AE_CORE_API void DynamicSerializeInvokerImpl(void* ptr, ISerializer& serializer, u64 hash) {
+        auto& manager = GetReflectionManager();
+
+        // Check if hash is registered
+        if (!ReflectionAssert(manager.mRegistry.HasKey(hash),
+                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+            Utility::CompilerHint::Unreachable();
+        }
+
+        const auto& tpMeta = manager.mRegistry[hash];
+
+        // Construct FObject from void* and hash
+        FObject     obj = FObject::CreateFromMetadata(ptr, tpMeta.mMeta);
+        serializer.BeginObject("object");
+        serializer.BeginObject("object_data");
+        serializer.WriteFieldName("AE_REFLHASH");
+        serializer.Write(hash);
+        serializer.EndObject();
+        for (const auto& [propHash, propField] : tpMeta.mProperties) {
+            serializer.BeginObject(propField.mName);
+            FObject propValue = propField.mAccessor(obj);
+            propValue.Serialize(serializer);
+            serializer.EndObject();
+        }
+        serializer.EndObject();
+    }
+
+    AE_CORE_API void DynamicDeserializeInvokerImpl(
+        void* ptr, IDeserializer& deserializer, u64 hash) {
+        auto& manager = GetReflectionManager();
+
+        // Check if hash is registered
+        if (!ReflectionAssert(manager.mRegistry.HasKey(hash),
+                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+            Utility::CompilerHint::Unreachable();
+        }
+
+        const auto& tpMeta = manager.mRegistry[hash];
+
+        // Construct FObject from void* and hash
+        FObject     obj = FObject::CreateFromMetadata(ptr, tpMeta.mMeta);
+
+        // Begin object twice (matching serialization)
+        deserializer.BeginObject();
+        deserializer.BeginObject();
+
+        // Read field AE_REFLHASH and verify type hash
+        if (deserializer.TryReadFieldName("AE_REFLHASH")) {
+            u64 readHash = deserializer.Read<u64>();
+            ReflectionAssert(readHash == hash, EReflectionErrorCode::ObjectAndTypeMismatch,
+                FReflectionDumpData{});
+        }
+
+        // End object once
+        deserializer.EndObject();
+
+        // Deserialize all properties
+        for (const auto& [propHash, propField] : tpMeta.mProperties) {
+            deserializer.BeginObject();
+            FObject propValue = propField.mAccessor(obj);
+            propValue.Deserialize(deserializer);
+            deserializer.EndObject();
+        }
+        deserializer.EndObject();
+    }
+
 } // namespace AltinaEngine::Core::Reflection::Detail
+
+namespace AltinaEngine::Core::Reflection {
+    using Container::FString;
+    using Container::TVector;
+
+    AE_CORE_API auto GetAllProperties(FObject& object) -> TVector<FPropertyDesc> {
+        using Detail::GetReflectionManager;
+
+        auto&                  manager   = GetReflectionManager();
+        auto                   classHash = object.GetTypeHash();
+        TVector<FPropertyDesc> result;
+
+        if (!ReflectionAssert(manager.mRegistry.HasKey(classHash),
+                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+            return result;
+        }
+
+        const auto& tpMeta = manager.mRegistry[classHash];
+        result.Reserve(tpMeta.mProperties.size());
+
+        for (const auto& [propHash, propField] : tpMeta.mProperties) {
+            FObject propObject = propField.mAccessor(object);
+            result.PushBack(FPropertyDesc(FString(propField.mName), Move(propObject)));
+        }
+
+        return result;
+    }
+
+} // namespace AltinaEngine::Core::Reflection

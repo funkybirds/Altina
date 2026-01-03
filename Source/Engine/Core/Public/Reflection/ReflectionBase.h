@@ -28,7 +28,7 @@ namespace AltinaEngine::Core::Reflection {
     [[noreturn]] AE_CORE_API void ReflectionAbort(
         EReflectionErrorCode errorCode, const FReflectionDumpData& dumpData);
 
-    inline auto ReflectionAssert(bool condition, EReflectionErrorCode errorCode,
+    constexpr auto ReflectionAssert(bool condition, EReflectionErrorCode errorCode,
         const FReflectionDumpData& dumpData) -> bool {
         if constexpr (kEnableRuntimeSanityCheck) {
             if (!condition) [[unlikely]] {

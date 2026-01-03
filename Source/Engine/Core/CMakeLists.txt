@@ -50,6 +50,7 @@ target_compile_definitions(${TargetName}
 set(Warnings
     $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
     $<$<CXX_COMPILER_ID:MSVC>:/w14242 /w14254 /w14263 /w14265 /w14287 /we4289 /w14296 /w14311 /w14826 /w14905 /w14906 /w14928>
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4275>
     $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Wpedantic>
     $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wall -Wextra -Wpedantic>
 )

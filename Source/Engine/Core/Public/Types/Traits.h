@@ -78,7 +78,9 @@ namespace AltinaEngine
         template <typename It> TFalseType TestRandomAccessIterator(...);
     } // namespace Detail
 
-    template <typename... Types> struct TTypeSet
+    template <typename...> using TVoid = void;
+
+    template <typename...> struct TTypeSet
     {
     };
 
@@ -215,6 +217,9 @@ namespace AltinaEngine
     };
 
     template <typename T> struct TTypeIsUnion : Detail::CompilerTraits::TTypeIsUnionImpl<T>
+    {
+    };
+    template <typename T> struct TTypeIsEnum : Detail::CompilerTraits::TTypeIsEnumImpl<T>
     {
     };
 
@@ -485,8 +490,13 @@ namespace AltinaEngine
     {
         using TReturnType = R;
         using TClassType  = C;
-        using TArgsTuple  = ::AltinaEngine::Core::Container::TTuple<Args...>;
+        using TArgsTuple  = Core::Container::TTuple<Args...>;
     };
+
+    // Enum Utility
+    template <typename T>
+        requires TTypeIsEnum<T>::Value
+    using TUnderlyingType = Detail::CompilerTraits::TUnderlyingTypeImpl<T>::Type;
 
     // Const evaluated context
     constexpr auto IsConstantEvaluated() noexcept -> bool
@@ -495,10 +505,7 @@ namespace AltinaEngine
         {
             return true;
         }
-        else
-        {
-            return false;
-        }
+        return false;
     }
 
 } // namespace AltinaEngine

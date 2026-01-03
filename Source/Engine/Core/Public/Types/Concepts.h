@@ -5,6 +5,12 @@
 namespace AltinaEngine
 {
     // Predicates
+    template <typename T>
+    concept CDefinedType = requires { sizeof(T); };
+
+    template <typename T, typename U>
+    concept CSameAs = TTypeSameAs<T, U>::Value;
+
     template <typename T, typename U>
     concept CSameSizeAs = sizeof(T) == sizeof(U);
 
@@ -57,6 +63,9 @@ namespace AltinaEngine
 
     template <typename T>
     concept CUnion = TTypeIsUnion_v<T>;
+
+    template <typename T>
+    concept CEnum = TTypeIsEnum<T>::Value;
 
     template <typename TBase, typename TDerived>
     concept CClassBaseOf = TTypeIsBaseOf<TBase, TDerived>::Value;

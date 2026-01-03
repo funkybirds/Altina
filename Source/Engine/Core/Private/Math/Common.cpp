@@ -1,8 +1,7 @@
 #include "../../Public/Math/Common.h"
 #include <cmath>
 
-namespace AltinaEngine::Core::Math::Details
-{
+namespace AltinaEngine::Core::Math::Details {
     AE_CORE_API auto SinF(f32 radians) noexcept -> f32 { return sin(radians); }
 
     AE_CORE_API auto SinD(f64 radians) noexcept -> f64 { return sin(radians); }

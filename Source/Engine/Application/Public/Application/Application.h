@@ -4,13 +4,11 @@
 #include "Application/PlatformWindow.h"
 #include "Container/SmartPtr.h"
 
-namespace AltinaEngine::Application
-{
+namespace AltinaEngine::Application {
     using Core::Container::TOwner;
     using FWindowOwner = TOwner<FPlatformWindow>; // NOLINT(*-identifier-naming)
 
-    class AE_APPLICATION_API FApplication
-    {
+    class AE_APPLICATION_API FApplication {
     public:
         explicit FApplication(const FStartupParameters& InStartupParameters);
         virtual ~FApplication();

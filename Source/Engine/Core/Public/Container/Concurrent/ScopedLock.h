@@ -2,12 +2,10 @@
 
 #include "../../Threading/Mutex.h"
 
-namespace AltinaEngine::Core::Container
-{
+namespace AltinaEngine::Core::Container {
 
     // Lightweight RAII scoped lock using engine FMutex
-    class FScopedLock
-    {
+    class FScopedLock {
     public:
         explicit FScopedLock(Threading::FMutex& m) noexcept : mLock(m) {}
 

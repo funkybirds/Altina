@@ -12,32 +12,27 @@ using namespace AltinaEngine::Core::TypeMeta;
 using AltinaEngine::u64;
 
 // Test type definitions - shared across all reflection tests
-struct FSimpleTestStruct
-{
+struct FSimpleTestStruct {
     int    mIntValue    = 42;
     float  mFloatValue  = 3.14f;
     double mDoubleValue = 2.718;
 };
 
-struct FNestedTestStruct
-{
+struct FNestedTestStruct {
     int               mId = 100;
     FSimpleTestStruct mNested;
 };
 
-struct FPolymorphicBase
-{
+struct FPolymorphicBase {
     virtual ~FPolymorphicBase() = default;
     int mBaseValue              = 10;
 };
 
-struct FPolymorphicDerived : FPolymorphicBase
-{
+struct FPolymorphicDerived : FPolymorphicBase {
     int mDerivedValue = 20;
 };
 
-struct FComplexStruct
-{
+struct FComplexStruct {
     int    mA = 1;
     int    mB = 2;
     int    mC = 3;
@@ -46,13 +41,11 @@ struct FComplexStruct
     double mZ = 3.0;
 };
 
-struct FLargeStruct
-{
+struct FLargeStruct {
     int    mValues[100];
     double mDoubles[50];
 
-    FLargeStruct()
-    {
+    FLargeStruct() {
         for (int i = 0; i < 100; ++i)
             mValues[i] = i;
         for (int i = 0; i < 50; ++i)
@@ -60,13 +53,11 @@ struct FLargeStruct
     }
 };
 
-struct FEmptyStruct
-{
+struct FEmptyStruct {
     // Intentionally empty
 };
 
-namespace ReflectionTestHelpers
-{
+namespace ReflectionTestHelpers {
     // Thread-safe, one-time registration for all reflection test types
     // Declaration only - implementation in .cpp file
     void EnsureTypesRegistered();

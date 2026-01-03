@@ -4,11 +4,9 @@
 
 #include <string>
 
-namespace AltinaEngine
-{
+namespace AltinaEngine {
 
-    struct FStartupParameters
-    {
+    struct FStartupParameters {
         std::string mCommandLine; // Raw command-line passed to the engine.
     };
 

@@ -3,13 +3,11 @@
 
 #include "../Types/Aliases.h"
 
-namespace AltinaEngine::Core::Container
-{
+namespace AltinaEngine::Core::Container {
 
     // Fixed-size array, analogous to std::array.
 
-    template <typename T, usize N> struct TArray
-    {
+    template <typename T, usize N> struct TArray {
         using TValueType      = T;
         using TSizeType       = usize;
         using TPointer        = TValueType*;
@@ -27,24 +25,37 @@ namespace AltinaEngine::Core::Container
 
         [[nodiscard]] constexpr auto        Data() const noexcept -> TConstPointer { return mData; }
 
-        [[nodiscard]] constexpr auto        operator[](TSizeType index) noexcept -> TReference { return mData[index]; }
-
-        [[nodiscard]] constexpr auto        operator[](TSizeType index) const noexcept -> TConstReference
-        {
+        [[nodiscard]] constexpr auto        operator[](TSizeType index) noexcept -> TReference {
             return mData[index];
         }
 
-        [[nodiscard]] auto begin() noexcept -> TIterator { return mData; } // NOLINT(*-identifier-naming)
+        [[nodiscard]] constexpr auto operator[](TSizeType index) const noexcept -> TConstReference {
+            return mData[index];
+        }
 
-        [[nodiscard]] auto begin() const noexcept -> TConstIterator { return mData; } // NOLINT(*-identifier-naming)
+        [[nodiscard]] auto begin() noexcept -> TIterator {
+            return mData;
+        } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] auto cbegin() const noexcept -> TConstIterator { return mData; } // NOLINT(*-identifier-naming)
+        [[nodiscard]] auto begin() const noexcept -> TConstIterator {
+            return mData;
+        } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] auto end() noexcept -> TIterator { return mData + N; } // NOLINT(*-identifier-naming)
+        [[nodiscard]] auto cbegin() const noexcept -> TConstIterator {
+            return mData;
+        } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] auto end() const noexcept -> TConstIterator { return mData + N; } // NOLINT(*-identifier-naming)
+        [[nodiscard]] auto end() noexcept -> TIterator {
+            return mData + N;
+        } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] auto cend() const noexcept -> TConstIterator { return mData + N; } // NOLINT(*-identifier-naming)
+        [[nodiscard]] auto end() const noexcept -> TConstIterator {
+            return mData + N;
+        } // NOLINT(*-identifier-naming)
+
+        [[nodiscard]] auto cend() const noexcept -> TConstIterator {
+            return mData + N;
+        } // NOLINT(*-identifier-naming)
 
     private:
         TValueType mData[N > 0 ? N : 1]{}; // NOLINT

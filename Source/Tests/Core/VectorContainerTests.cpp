@@ -18,8 +18,7 @@ static_assert(CRandomAccessIterator<TVecIter>);
 static_assert(CReadableIterator<TVecCIter>);
 static_assert(CRandomAccessIterator<TVecCIter>);
 
-TEST_CASE("TVector - push back and access")
-{
+TEST_CASE("TVector - push back and access") {
     TVector<int> vec;
     REQUIRE(vec.IsEmpty());
 
@@ -36,8 +35,7 @@ TEST_CASE("TVector - push back and access")
     REQUIRE(vec.Back() == 3);
 }
 
-TEST_CASE("TVector - reserve and resize")
-{
+TEST_CASE("TVector - reserve and resize") {
     TVector<int> vec;
     vec.Reserve(10);
     REQUIRE(vec.Capacity() >= 10);
@@ -45,8 +43,7 @@ TEST_CASE("TVector - reserve and resize")
     vec.Resize(5);
     REQUIRE(vec.Size() == 5);
 
-    for (usize i = 0; i < vec.Size(); ++i)
-    {
+    for (usize i = 0; i < vec.Size(); ++i) {
         vec[i] = static_cast<int>(i);
     }
 
@@ -57,8 +54,7 @@ TEST_CASE("TVector - reserve and resize")
     REQUIRE(vec[2] == 2);
 }
 
-TEST_CASE("TVector - copy and move semantics")
-{
+TEST_CASE("TVector - copy and move semantics") {
     TVector<int> vec;
     vec.PushBack(10);
     vec.PushBack(20);

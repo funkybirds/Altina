@@ -8,17 +8,14 @@
 #include "Types/Traits.h"
 #include "Types/RTTI.h"
 
-namespace AltinaEngine::Core::TypeMeta
-{
+namespace AltinaEngine::Core::TypeMeta {
     using FTypeMetaHash = u64; // NOLINT
 
-    namespace Detail
-    {
+    namespace Detail {
         constexpr FTypeMetaHash kHashingMultiplier = 257;
         using Container::TArray;
 
-        template <class T> consteval static auto GetFuncNameRaw() -> const char*
-        {
+        template <class T> consteval static auto GetFuncNameRaw() -> const char* {
 #ifdef AE_COMPILER_MSVC
             return __FUNCSIG__;
 #else
@@ -29,8 +26,7 @@ namespace AltinaEngine::Core::TypeMeta
     #endif
 #endif
         }
-        template <auto T> consteval static auto GetVarNameRaw() -> const char*
-        {
+        template <auto T> consteval static auto GetVarNameRaw() -> const char* {
 #ifdef AE_COMPILER_MSVC
             return __FUNCSIG__;
 #else
@@ -42,127 +38,123 @@ namespace AltinaEngine::Core::TypeMeta
 #endif
         }
 
-        template <class T> consteval static auto GetFuncNameLength() -> u64
-        {
+        template <class T> consteval static auto GetFuncNameLength() -> u64 {
             constexpr auto kRaw = GetFuncNameRaw<T>();
             u64            len  = 0;
             while (kRaw[len] != '\0')
                 ++len;
             return len;
         }
-        template <auto T> consteval static auto GetVarNameLength() -> u64
-        {
+        template <auto T> consteval static auto GetVarNameLength() -> u64 {
             constexpr auto kRaw = GetVarNameRaw<T>();
             u64            len  = 0;
             while (kRaw[len] != '\0')
                 ++len;
             return len;
         }
-        template <class T> consteval static auto GetFuncNameToArray() -> TArray<char, GetFuncNameLength<T>() + 1>
-        {
+        template <class T>
+        consteval static auto GetFuncNameToArray() -> TArray<char, GetFuncNameLength<T>() + 1> {
             using TRet          = TArray<char, GetFuncNameLength<T>() + 1>;
             constexpr auto kRaw = GetFuncNameRaw<T>();
             constexpr u64  kLen = GetFuncNameLength<T>();
 
             TRet           arr = {};
-            for (u64 i = 0; i <= kLen; ++i)
-            {
+            for (u64 i = 0; i <= kLen; ++i) {
                 arr[i] = kRaw[i];
             }
             return arr;
         }
 
-        template <auto T> consteval static auto GetVarNameToArray() -> TArray<char, GetVarNameLength<T>() + 1>
-        {
+        template <auto T>
+        consteval static auto GetVarNameToArray() -> TArray<char, GetVarNameLength<T>() + 1> {
             using TRet          = TArray<char, GetVarNameLength<T>() + 1>;
             constexpr auto kRaw = GetVarNameRaw<T>();
             constexpr u64  kLen = GetVarNameLength<T>();
 
             TRet           arr = {};
-            for (u64 i = 0; i <= kLen; ++i)
-            {
+            for (u64 i = 0; i <= kLen; ++i) {
                 arr[i] = kRaw[i];
             }
             return arr;
         }
-        template <unsigned N> consteval auto GetFuncNameHashImpl(TArray<char, N> const& str) -> FTypeMetaHash
-        {
+        template <unsigned N>
+        consteval auto GetFuncNameHashImpl(TArray<char, N> const& str) -> FTypeMetaHash {
             FTypeMetaHash hash = 0;
-            for (FTypeMetaHash i = 0; i < static_cast<FTypeMetaHash>(str.Size()); ++i)
-            {
+            for (FTypeMetaHash i = 0; i < static_cast<FTypeMetaHash>(str.Size()); ++i) {
                 hash = (hash + str[i] + 1) * kHashingMultiplier;
             }
             return hash;
         }
-        template <typename T> consteval static auto GetActualClassNameArray()
-        {
+        template <typename T> consteval static auto GetActualClassNameArray() {
             using namespace Core::Algorithm;
             constexpr auto kFunctionSignature = GetFuncNameToArray<T>();
             constexpr u64  kFirstPos =
-                Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(kFunctionSignature, '<', 0) + 1;
+                Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(
+                    kFunctionSignature, '<', 0)
+                + 1;
             constexpr u64 kLastPos =
-                Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(kFunctionSignature, '>') + 1;
+                Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(
+                    kFunctionSignature, '>')
+                + 1;
             constexpr int  kFinalOffset = kFirstPos + 0 + 0;
             constexpr auto kSubArray =
-                GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(kFunctionSignature);
+                GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(
+                    kFunctionSignature);
             return kSubArray;
         }
 
-        template <auto T> consteval static auto GetActualVarNameArray()
-        {
+        template <auto T> consteval static auto GetActualVarNameArray() {
             using namespace Core::Algorithm;
             constexpr auto kFunctionSignature = GetVarNameToArray<T>();
             constexpr u64  kFirstPos =
-                Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(kFunctionSignature, '<', 0) + 1;
+                Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(
+                    kFunctionSignature, '<', 0)
+                + 1;
             constexpr u64 kLastPos =
-                Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(kFunctionSignature, '>') + 1;
+                Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(
+                    kFunctionSignature, '>')
+                + 1;
             constexpr int  kFinalOffset = kFirstPos + 0 + 0;
             constexpr auto kSubArray =
-                GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(kFunctionSignature);
+                GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(
+                    kFunctionSignature);
             return kSubArray;
         }
 
-        template <typename T> consteval static auto GetFuncNameHashId() -> FTypeMetaHash
-        {
+        template <typename T> consteval static auto GetFuncNameHashId() -> FTypeMetaHash {
             constexpr auto kArr = GetActualClassNameArray<T>();
             return GetFuncNameHashImpl<kArr.Size()>(kArr);
         }
-        template <auto T> consteval static auto GetVarNameHashId() -> FTypeMetaHash
-        {
+        template <auto T> consteval static auto GetVarNameHashId() -> FTypeMetaHash {
             constexpr auto kArr = GetActualVarNameArray<T>();
             return GetFuncNameHashImpl<kArr.Size()>(kArr);
         }
     } // namespace Detail
 
     using Container::FNativeStringView;
-    template <class T> struct TMetaTypeInfo
-    {
+    template <class T> struct TMetaTypeInfo {
         static constexpr FTypeMetaHash kHash      = Detail::GetFuncNameHashId<T>();
         static constexpr auto          kNameArray = Detail::GetActualClassNameArray<T>();
-        static constexpr auto          kName      = FNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
-        static constexpr bool          kDefaultConstructible = TTypeIsDefaultConstructible_v<T>;
-        static constexpr bool          kDestructible         = TTypeIsDestructible_v<T>;
-        static constexpr bool          kCopyConstructible    = TTypeIsCopyConstructible_v<T>;
+        static constexpr auto kName = FNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
+        static constexpr bool kDefaultConstructible = TTypeIsDefaultConstructible_v<T>;
+        static constexpr bool kDestructible         = TTypeIsDestructible_v<T>;
+        static constexpr bool kCopyConstructible    = TTypeIsCopyConstructible_v<T>;
 
-        static auto                    GetTypeInfo() -> FTypeInfo const&
-        {
+        static auto           GetTypeInfo() -> FTypeInfo const& {
             static FTypeInfo const* typeInfo = &typeid(T);
             return *typeInfo;
         }
 
-        static auto InvokeDtor(void* p)
-        {
+        static auto InvokeDtor(void* p) {
             if constexpr (kDestructible)
                 delete static_cast<T*>(p);
         }
-        static auto InvokeCopyCtor(void* p) -> void*
-        {
+        static auto InvokeCopyCtor(void* p) -> void* {
             if constexpr (kCopyConstructible)
                 return static_cast<void*>(new T(*static_cast<T*>(p)));
             return nullptr;
         }
-        static auto InvokeDefaultCtor() -> void*
-        {
+        static auto InvokeDefaultCtor() -> void* {
             if constexpr (kDefaultConstructible)
                 return static_cast<void*>(new T());
             return nullptr;
@@ -171,11 +163,10 @@ namespace AltinaEngine::Core::TypeMeta
 
     template <auto T>
         requires CMemberFunctionPointer<decltype(T)>
-    struct TMetaMemberFunctionInfo
-    {
+    struct TMetaMemberFunctionInfo {
         static constexpr FTypeMetaHash kHash      = Detail::GetVarNameHashId<T>();
         static constexpr auto          kNameArray = Detail::GetActualVarNameArray<T>();
-        static constexpr auto          kName      = FNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
+        static constexpr auto kName = FNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
 
         using TReturnType = TMemberFunctionTrait<decltype(T)>::TReturnType;
         using TClassType  = TMemberFunctionTrait<decltype(T)>::TClassType;
@@ -184,27 +175,24 @@ namespace AltinaEngine::Core::TypeMeta
 
     template <auto T>
         requires CMemberPointer<decltype(T)>
-    struct TMetaPropertyInfo
-    {
+    struct TMetaPropertyInfo {
         static constexpr FTypeMetaHash kHash      = Detail::GetVarNameHashId<T>();
         static constexpr auto          kNameArray = Detail::GetActualVarNameArray<T>();
-        static constexpr auto          kName      = FNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
+        static constexpr auto kName = FNativeStringView(kNameArray.Data(), kNameArray.Size() - 1);
 
         using TBaseType  = TMemberType<decltype(T)>::TBaseType;
         using TClassType = TMemberType<decltype(T)>::TClassType;
     };
 
-    struct FMetaTypeInfo
-    {
-        template <class T> static auto Create() -> FMetaTypeInfo
-        {
-            return FMetaTypeInfo(TMetaTypeInfo<T>::kDefaultConstructible, TMetaTypeInfo<T>::kCopyConstructible,
-                TMetaTypeInfo<T>::kDestructible, TMetaTypeInfo<T>::kHash, TMetaTypeInfo<T>::kName,
-                &TMetaTypeInfo<T>::GetTypeInfo, &TMetaTypeInfo<T>::InvokeDtor, &TMetaTypeInfo<T>::InvokeCopyCtor,
+    struct FMetaTypeInfo {
+        template <class T> static auto Create() -> FMetaTypeInfo {
+            return FMetaTypeInfo(TMetaTypeInfo<T>::kDefaultConstructible,
+                TMetaTypeInfo<T>::kCopyConstructible, TMetaTypeInfo<T>::kDestructible,
+                TMetaTypeInfo<T>::kHash, TMetaTypeInfo<T>::kName, &TMetaTypeInfo<T>::GetTypeInfo,
+                &TMetaTypeInfo<T>::InvokeDtor, &TMetaTypeInfo<T>::InvokeCopyCtor,
                 &TMetaTypeInfo<T>::InvokeDefaultCtor);
         }
-        static auto CreateVoid()
-        {
+        static auto CreateVoid() {
             return FMetaTypeInfo(
                 false, false, false, 0, FNativeStringView{},
                 []() -> FTypeInfo const& {
@@ -220,15 +208,23 @@ namespace AltinaEngine::Core::TypeMeta
 
         [[nodiscard]] auto GetHash() const noexcept -> FTypeMetaHash { return mHash; }
         [[nodiscard]] auto GetName() const noexcept -> FNativeStringView { return mName; }
-        [[nodiscard]] auto GetTypeInfo() const noexcept -> FTypeInfo const& { return mGetTypeInfo(); }
-        [[nodiscard]] auto IsCopyConstructible() const noexcept -> bool { return mCopyConstructible; }
+        [[nodiscard]] auto GetTypeInfo() const noexcept -> FTypeInfo const& {
+            return mGetTypeInfo();
+        }
+        [[nodiscard]] auto IsCopyConstructible() const noexcept -> bool {
+            return mCopyConstructible;
+        }
         [[nodiscard]] auto IsDestructible() const noexcept -> bool { return mDestructible; }
 
         void               CallDestructor(void* obj) const { mDestructor(obj); }
-        [[nodiscard]] auto CallCopyConstructor(void* obj) const -> void* { return mCopyConstructor(obj); }
+        [[nodiscard]] auto CallCopyConstructor(void* obj) const -> void* {
+            return mCopyConstructor(obj);
+        }
         [[nodiscard]] auto CallDefaultConstructor() const -> void* { return mDefaultConstructor(); }
 
-        [[nodiscard]] auto operator==(const FMetaTypeInfo& p) const -> bool { return mHash == p.mHash; }
+        [[nodiscard]] auto operator==(const FMetaTypeInfo& p) const -> bool {
+            return mHash == p.mHash;
+        }
 
     private:
         FMetaTypeInfo()
@@ -239,12 +235,10 @@ namespace AltinaEngine::Core::TypeMeta
             , mGetTypeInfo(nullptr)
             , mDestructor(nullptr)
             , mCopyConstructor(nullptr)
-            , mDefaultConstructor(nullptr)
-        {
-        }
-        FMetaTypeInfo(bool bDefaultConstructible, bool bCopyConstructible, bool bDestructible, FTypeMetaHash hash,
-            FNativeStringView name, FTypeInfo const& (*getTypeInfo)(), void (*destructor)(void*),
-            void* (*copyCtor)(void*), void* (*defaultCtor)())
+            , mDefaultConstructor(nullptr) {}
+        FMetaTypeInfo(bool bDefaultConstructible, bool bCopyConstructible, bool bDestructible,
+            FTypeMetaHash hash, FNativeStringView name, FTypeInfo const& (*getTypeInfo)(),
+            void (*destructor)(void*), void* (*copyCtor)(void*), void* (*defaultCtor)())
             : mDefaultConstructible(bDefaultConstructible)
             , mCopyConstructible(bCopyConstructible)
             , mDestructible(bDestructible)
@@ -253,9 +247,7 @@ namespace AltinaEngine::Core::TypeMeta
             , mGetTypeInfo(getTypeInfo)
             , mDestructor(destructor)
             , mCopyConstructor(copyCtor)
-            , mDefaultConstructor(defaultCtor)
-        {
-        }
+            , mDefaultConstructor(defaultCtor) {}
 
         bool              mDefaultConstructible;
         bool              mCopyConstructible;
@@ -269,35 +261,38 @@ namespace AltinaEngine::Core::TypeMeta
         void* (*mDefaultConstructor)();
     };
 
-    struct FMetaPropertyInfo
-    {
+    struct FMetaPropertyInfo {
         [[nodiscard]] auto GetHash() const noexcept -> FTypeMetaHash { return mHash; }
         [[nodiscard]] auto GetName() const noexcept -> FNativeStringView { return mName; }
-        [[nodiscard]] auto GetPropertyTypeMetadata() const noexcept -> FMetaTypeInfo const& { return mMemberTypeInfo; }
-        [[nodiscard]] auto GetClassTypeMetadata() const noexcept -> FMetaTypeInfo const& { return mClassTypeInfo; }
+        [[nodiscard]] auto GetPropertyTypeMetadata() const noexcept -> FMetaTypeInfo const& {
+            return mMemberTypeInfo;
+        }
+        [[nodiscard]] auto GetClassTypeMetadata() const noexcept -> FMetaTypeInfo const& {
+            return mClassTypeInfo;
+        }
 
         template <auto Member>
             requires CMemberPointer<decltype(Member)>
-        static auto Create() -> FMetaPropertyInfo
-        {
+        static auto Create() -> FMetaPropertyInfo {
             using TPropertyType = TMetaPropertyInfo<Member>::TBaseType;
             using TClassType    = TMetaPropertyInfo<Member>::TClassType;
-            return FMetaPropertyInfo(FMetaTypeInfo::Create<TClassType>(), FMetaTypeInfo::Create<TPropertyType>(),
-                TMetaPropertyInfo<Member>::kHash, TMetaPropertyInfo<Member>::kName);
+            return FMetaPropertyInfo(FMetaTypeInfo::Create<TClassType>(),
+                FMetaTypeInfo::Create<TPropertyType>(), TMetaPropertyInfo<Member>::kHash,
+                TMetaPropertyInfo<Member>::kName);
         }
 
-        static auto CreatePlaceHolder()
-        {
-            return FMetaPropertyInfo(
-                FMetaTypeInfo::CreatePlaceHolder(), FMetaTypeInfo::CreatePlaceHolder(), 0, FNativeStringView{});
+        static auto CreatePlaceHolder() {
+            return FMetaPropertyInfo(FMetaTypeInfo::CreatePlaceHolder(),
+                FMetaTypeInfo::CreatePlaceHolder(), 0, FNativeStringView{});
         }
 
     private:
-        FMetaPropertyInfo(
-            FMetaTypeInfo classTypeInfo, FMetaTypeInfo memberTypeInfo, FTypeMetaHash hash, FNativeStringView name)
-            : mClassTypeInfo(classTypeInfo), mMemberTypeInfo(memberTypeInfo), mHash(hash), mName(name)
-        {
-        }
+        FMetaPropertyInfo(FMetaTypeInfo classTypeInfo, FMetaTypeInfo memberTypeInfo,
+            FTypeMetaHash hash, FNativeStringView name)
+            : mClassTypeInfo(classTypeInfo)
+            , mMemberTypeInfo(memberTypeInfo)
+            , mHash(hash)
+            , mName(name) {}
 
         FMetaTypeInfo     mClassTypeInfo;
         FMetaTypeInfo     mMemberTypeInfo;
@@ -305,35 +300,38 @@ namespace AltinaEngine::Core::TypeMeta
         FNativeStringView mName;
     };
 
-    struct FMetaMethodInfo
-    {
+    struct FMetaMethodInfo {
         [[nodiscard]] auto GetHash() const noexcept -> FTypeMetaHash { return mHash; }
         [[nodiscard]] auto GetName() const noexcept -> FNativeStringView { return mName; }
-        [[nodiscard]] auto GetReturnTypeMetadata() const noexcept -> FMetaTypeInfo const& { return mReturnTypeInfo; }
-        [[nodiscard]] auto GetClassTypeMetadata() const noexcept -> FMetaTypeInfo const& { return mClassTypeInfo; }
+        [[nodiscard]] auto GetReturnTypeMetadata() const noexcept -> FMetaTypeInfo const& {
+            return mReturnTypeInfo;
+        }
+        [[nodiscard]] auto GetClassTypeMetadata() const noexcept -> FMetaTypeInfo const& {
+            return mClassTypeInfo;
+        }
 
         template <auto Member>
             requires CMemberFunctionPointer<decltype(Member)>
-        static auto Create() -> FMetaMethodInfo
-        {
+        static auto Create() -> FMetaMethodInfo {
             using TReturnType = TMetaMemberFunctionInfo<Member>::TReturnType;
             using TClassType  = TMetaMemberFunctionInfo<Member>::TClassType;
-            return FMetaMethodInfo(FMetaTypeInfo::Create<TClassType>(), FMetaTypeInfo::Create<TReturnType>(),
-                TMetaMemberFunctionInfo<Member>::kHash, TMetaMemberFunctionInfo<Member>::kName);
+            return FMetaMethodInfo(FMetaTypeInfo::Create<TClassType>(),
+                FMetaTypeInfo::Create<TReturnType>(), TMetaMemberFunctionInfo<Member>::kHash,
+                TMetaMemberFunctionInfo<Member>::kName);
         }
 
-        static auto CreatePlaceHolder()
-        {
-            return FMetaMethodInfo(
-                FMetaTypeInfo::CreatePlaceHolder(), FMetaTypeInfo::CreatePlaceHolder(), 0, FNativeStringView{});
+        static auto CreatePlaceHolder() {
+            return FMetaMethodInfo(FMetaTypeInfo::CreatePlaceHolder(),
+                FMetaTypeInfo::CreatePlaceHolder(), 0, FNativeStringView{});
         }
 
     private:
-        FMetaMethodInfo(
-            FMetaTypeInfo classTypeInfo, FMetaTypeInfo returnTypeInfo, FTypeMetaHash hash, FNativeStringView name)
-            : mClassTypeInfo(classTypeInfo), mReturnTypeInfo(returnTypeInfo), mHash(hash), mName(name)
-        {
-        }
+        FMetaMethodInfo(FMetaTypeInfo classTypeInfo, FMetaTypeInfo returnTypeInfo,
+            FTypeMetaHash hash, FNativeStringView name)
+            : mClassTypeInfo(classTypeInfo)
+            , mReturnTypeInfo(returnTypeInfo)
+            , mHash(hash)
+            , mName(name) {}
 
         FMetaTypeInfo     mClassTypeInfo;
         FMetaTypeInfo     mReturnTypeInfo;

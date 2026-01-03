@@ -3,8 +3,7 @@
 #include "Types/NonCopyable.h"
 #include "Types/CheckedCast.h"
 
-TEST_CASE("NonCopyable and CheckedCast basics")
-{
+TEST_CASE("NonCopyable and CheckedCast basics") {
     // Verify NonCopyable types are instantiable
     {
         AltinaEngine::NonCopyableClass  a;
@@ -13,12 +12,10 @@ TEST_CASE("NonCopyable and CheckedCast basics")
     }
 
     // Polymorphic conversion test for CheckedCast
-    struct Base
-    {
+    struct Base {
         virtual ~Base() = default;
     };
-    struct Derived : Base
-    {
+    struct Derived : Base {
         int x = 42;
     };
 

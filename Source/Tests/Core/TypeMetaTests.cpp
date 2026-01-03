@@ -4,18 +4,17 @@
 
 using namespace AltinaEngine::Core::TypeMeta;
 
-TEST_CASE("TMetaTypeInfo_int")
-{
+TEST_CASE("TMetaTypeInfo_int") {
     REQUIRE(TMetaTypeInfo<int>::kName.Length() > 0);
     REQUIRE_EQ(TMetaTypeInfo<int>::kDefaultConstructible, true);
 }
 
-TEST_CASE("TMetaTypeInfo_hash_diff") { REQUIRE(TMetaTypeInfo<int>::kHash != TMetaTypeInfo<float>::kHash); }
+TEST_CASE("TMetaTypeInfo_hash_diff") {
+    REQUIRE(TMetaTypeInfo<int>::kHash != TMetaTypeInfo<float>::kHash);
+}
 
-TEST_CASE("TMetaTypeInfo_custom_no_default")
-{
-    struct NoDefault
-    {
+TEST_CASE("TMetaTypeInfo_custom_no_default") {
+    struct NoDefault {
         NoDefault(int) {}
     };
 
@@ -23,8 +22,7 @@ TEST_CASE("TMetaTypeInfo_custom_no_default")
     REQUIRE(TMetaTypeInfo<NoDefault>::kName.Length() > 0);
 }
 
-TEST_CASE("TMetaTypeInfo_name_int")
-{
+TEST_CASE("TMetaTypeInfo_name_int") {
     auto name = TMetaTypeInfo<int>::kName;
     REQUIRE(name.Length() >= 3);
     REQUIRE(name[0] == 'i');
@@ -32,10 +30,8 @@ TEST_CASE("TMetaTypeInfo_name_int")
     REQUIRE(name[2] == 't');
 }
 
-TEST_CASE("TMetaTypeInfo_name_custom_contains")
-{
-    struct NoDefault2
-    {
+TEST_CASE("TMetaTypeInfo_name_custom_contains") {
+    struct NoDefault2 {
         NoDefault2(int) {}
     };
 
@@ -43,19 +39,15 @@ TEST_CASE("TMetaTypeInfo_name_custom_contains")
     const char* needle    = "NoDefault2";
     const auto  needleLen = 10u;
     bool        found     = false;
-    for (AltinaEngine::usize i = 0; i + needleLen <= name.Length(); ++i)
-    {
+    for (AltinaEngine::usize i = 0; i + needleLen <= name.Length(); ++i) {
         bool ok = true;
-        for (AltinaEngine::usize j = 0; j < needleLen; ++j)
-        {
-            if (name[i + j] != needle[j])
-            {
+        for (AltinaEngine::usize j = 0; j < needleLen; ++j) {
+            if (name[i + j] != needle[j]) {
                 ok = false;
                 break;
             }
         }
-        if (ok)
-        {
+        if (ok) {
             found = true;
             break;
         }
@@ -63,10 +55,8 @@ TEST_CASE("TMetaTypeInfo_name_custom_contains")
     REQUIRE(found);
 }
 
-TEST_CASE("TMetaMemberFunctionInfo_name_contains")
-{
-    struct WithMethod
-    {
+TEST_CASE("TMetaMemberFunctionInfo_name_contains") {
+    struct WithMethod {
         double Foo(int) { return 0.0; }
     };
 
@@ -74,19 +64,15 @@ TEST_CASE("TMetaMemberFunctionInfo_name_contains")
     const char* needle    = "Foo";
     const auto  needleLen = 3u;
     bool        found     = false;
-    for (AltinaEngine::usize i = 0; i + needleLen <= name.Length(); ++i)
-    {
+    for (AltinaEngine::usize i = 0; i + needleLen <= name.Length(); ++i) {
         bool ok = true;
-        for (AltinaEngine::usize j = 0; j < needleLen; ++j)
-        {
-            if (name[i + j] != needle[j])
-            {
+        for (AltinaEngine::usize j = 0; j < needleLen; ++j) {
+            if (name[i + j] != needle[j]) {
                 ok = false;
                 break;
             }
         }
-        if (ok)
-        {
+        if (ok) {
             found = true;
             break;
         }
@@ -94,10 +80,8 @@ TEST_CASE("TMetaMemberFunctionInfo_name_contains")
     REQUIRE(found);
 }
 
-TEST_CASE("TMetaPropertyInfo_name_contains")
-{
-    struct WithProp
-    {
+TEST_CASE("TMetaPropertyInfo_name_contains") {
+    struct WithProp {
         int a;
     };
 
@@ -105,19 +89,15 @@ TEST_CASE("TMetaPropertyInfo_name_contains")
     const char* needle    = "a";
     const auto  needleLen = 1u;
     bool        found     = false;
-    for (AltinaEngine::usize i = 0; i + needleLen <= name.Length(); ++i)
-    {
+    for (AltinaEngine::usize i = 0; i + needleLen <= name.Length(); ++i) {
         bool ok = true;
-        for (AltinaEngine::usize j = 0; j < needleLen; ++j)
-        {
-            if (name[i + j] != needle[j])
-            {
+        for (AltinaEngine::usize j = 0; j < needleLen; ++j) {
+            if (name[i + j] != needle[j]) {
                 ok = false;
                 break;
             }
         }
-        if (ok)
-        {
+        if (ok) {
             found = true;
             break;
         }

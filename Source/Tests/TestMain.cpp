@@ -1,11 +1,9 @@
 #include <iostream>
 #include "TestHarness.h"
 
-int main()
-{
+int main() {
     const int failures = Test::run_all();
-    if (failures == 0)
-    {
+    if (failures == 0) {
         std::cout << "All tests passed\n";
         return 0;
     }

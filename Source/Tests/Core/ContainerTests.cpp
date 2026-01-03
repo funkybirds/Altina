@@ -6,8 +6,7 @@
 
 using namespace AltinaEngine::Core::Container;
 
-TEST_CASE("Deque basic ops")
-{
+TEST_CASE("Deque basic ops") {
     TDeque<int> d;
     REQUIRE(d.IsEmpty());
     d.PushBack(2);
@@ -22,8 +21,7 @@ TEST_CASE("Deque basic ops")
     REQUIRE_EQ(d.Back(), 2);
 }
 
-TEST_CASE("Queue basic ops")
-{
+TEST_CASE("Queue basic ops") {
     TQueue<int> q;
     REQUIRE(q.IsEmpty());
     q.Push(1);
@@ -34,8 +32,7 @@ TEST_CASE("Queue basic ops")
     REQUIRE_EQ(q.Front(), 2);
 }
 
-TEST_CASE("Stack basic ops")
-{
+TEST_CASE("Stack basic ops") {
     TStack<int> s;
     REQUIRE(s.IsEmpty());
     s.Push(1);

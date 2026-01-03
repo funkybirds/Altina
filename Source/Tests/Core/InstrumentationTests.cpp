@@ -5,8 +5,7 @@
 using namespace AltinaEngine::Core::Instrumentation;
 
 // Minimal tests using the project's test harness (matches TEST_CASE style in repository)
-TEST_CASE("Instrumentation: ThreadName and Counters")
-{
+TEST_CASE("Instrumentation: ThreadName and Counters") {
     // Thread name should be set and retrievable
     SetCurrentThreadName("UnitTestThread");
     const char* name = GetCurrentThreadName();

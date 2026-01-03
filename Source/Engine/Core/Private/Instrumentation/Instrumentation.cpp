@@ -9,21 +9,18 @@
 using namespace AltinaEngine;
 using namespace AltinaEngine::Core;
 
-namespace AltinaEngine::Core::Instrumentation
-{
+namespace AltinaEngine::Core::Instrumentation {
     using Container::MakeShared;
     using Container::THashMap;
     using Container::TShared;
     using std::string;
     using Threading::TAtomic;
 
-    struct FCounter
-    {
+    struct FCounter {
         Threading::TAtomic<long long> mValue{ 0 };
     };
 
-    struct FTiming
-    {
+    struct FTiming {
         Threading::TAtomic<unsigned long long> mTotalMs{ 0 };
         Threading::TAtomic<unsigned long long> mCount{ 0 };
     };
@@ -35,8 +32,7 @@ namespace AltinaEngine::Core::Instrumentation
     // Per-thread name stored in thread_local for fast reads.
     thread_local const char*                   tThreadName = nullptr;
 
-    void                                       SetCurrentThreadName(const char* name) noexcept
-    {
+    void                                       SetCurrentThreadName(const char* name) noexcept {
         tThreadName = name;
         if (!name)
             return;
@@ -44,23 +40,20 @@ namespace AltinaEngine::Core::Instrumentation
         // Ensure a placeholder counter entry exists for visibility tools.
         Threading::FScopedLock lk(gMutex);
         string                 key(name);
-        if (gCounters.find(key) == gCounters.end())
-        {
+        if (gCounters.find(key) == gCounters.end()) {
             gCounters.emplace(AltinaEngine::Move(key), MakeShared<FCounter>());
         }
     }
 
     const char* GetCurrentThreadName() noexcept { return tThreadName ? tThreadName : ""; }
 
-    void        IncrementCounter(const char* name, long long delta) noexcept
-    {
+    void        IncrementCounter(const char* name, long long delta) noexcept {
         if (!name)
             return;
         Threading::FScopedLock lk(gMutex);
         string                 key(name);
         auto                   it = gCounters.find(key);
-        if (it == gCounters.end())
-        {
+        if (it == gCounters.end()) {
             auto shared = MakeShared<FCounter>();
             shared->mValue.FetchAdd(static_cast<long long>(delta));
             gCounters.emplace(AltinaEngine::Move(key), shared);
@@ -69,8 +62,7 @@ namespace AltinaEngine::Core::Instrumentation
         it->second->mValue.FetchAdd(static_cast<long long>(delta));
     }
 
-    long long GetCounterValue(const char* name) noexcept
-    {
+    long long GetCounterValue(const char* name) noexcept {
         if (!name)
             return 0;
         Threading::FScopedLock lk(gMutex);
@@ -81,15 +73,13 @@ namespace AltinaEngine::Core::Instrumentation
         return it->second->mValue.Load();
     }
 
-    void RecordTimingMs(const char* name, unsigned long long ms) noexcept
-    {
+    void RecordTimingMs(const char* name, unsigned long long ms) noexcept {
         if (!name)
             return;
         Threading::FScopedLock lk(gMutex);
         string                 key(name);
         auto                   it = gTimings.find(key);
-        if (it == gTimings.end())
-        {
+        if (it == gTimings.end()) {
             auto shared = MakeShared<FTiming>();
             shared->mTotalMs.FetchAdd(ms);
             shared->mCount.FetchAdd(1);
@@ -100,8 +90,8 @@ namespace AltinaEngine::Core::Instrumentation
         it->second->mCount.FetchAdd(1);
     }
 
-    void GetTimingAggregate(const char* name, unsigned long long& outTotalMs, unsigned long long& outCount) noexcept
-    {
+    void GetTimingAggregate(
+        const char* name, unsigned long long& outTotalMs, unsigned long long& outCount) noexcept {
         outTotalMs = 0ULL;
         outCount   = 0ULL;
         if (!name)
@@ -116,17 +106,16 @@ namespace AltinaEngine::Core::Instrumentation
     }
 
     // Simple clock helper (ms)
-    static auto NowMs() -> unsigned long long
-    {
+    static auto NowMs() -> unsigned long long {
         using namespace std::chrono;
         auto now = steady_clock::now();
-        return static_cast<unsigned long long>(duration_cast<milliseconds>(now.time_since_epoch()).count());
+        return static_cast<unsigned long long>(
+            duration_cast<milliseconds>(now.time_since_epoch()).count());
     }
 
     FScopedTimer::FScopedTimer(const char* name) noexcept : mName(name), mStartMs(NowMs()) {}
 
-    FScopedTimer::~FScopedTimer() noexcept
-    {
+    FScopedTimer::~FScopedTimer() noexcept {
         if (!mName)
             return;
         const auto elapsed = NowMs() - mStartMs;

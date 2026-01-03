@@ -4,8 +4,7 @@
 #include "../Types/Aliases.h"
 #include "../Container/String.h"
 
-namespace AltinaEngine::Core::Instrumentation
-{
+namespace AltinaEngine::Core::Instrumentation {
     using Container::FString;
 
     // Set the name for the current thread. Name pointer is copied into engine string storage.
@@ -23,9 +22,9 @@ namespace AltinaEngine::Core::Instrumentation
     AE_CORE_API void        GetTimingAggregate(
                const char* name, unsigned long long& outTotalMs, unsigned long long& outCount) noexcept;
 
-    // Lightweight RAII timer that records the elapsed time (ms) to the named aggregate on destruction.
-    class AE_CORE_API FScopedTimer
-    {
+    // Lightweight RAII timer that records the elapsed time (ms) to the named aggregate on
+    // destruction.
+    class AE_CORE_API FScopedTimer {
     public:
         explicit FScopedTimer(const char* name) noexcept;
         ~FScopedTimer() noexcept;

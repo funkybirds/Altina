@@ -4,13 +4,11 @@
 #include "Vector.h"
 #include <cmath>
 
-namespace AltinaEngine::Core::Math
-{
+namespace AltinaEngine::Core::Math {
 
     // Simple quaternion type for 3D rotations. Public header only exposes
     // a minimal, well-tested API used by higher-level systems.
-    class FQuaternion
-    {
+    class FQuaternion {
     public:
         f32 x = 0.0f;
         f32 y = 0.0f;
@@ -19,13 +17,15 @@ namespace AltinaEngine::Core::Math
 
         constexpr FQuaternion() noexcept = default;
 
-        constexpr FQuaternion(f32 InX, f32 InY, f32 InZ, f32 InW) noexcept : x(InX), y(InY), z(InZ), w(InW) {}
+        constexpr FQuaternion(f32 InX, f32 InY, f32 InZ, f32 InW) noexcept
+            : x(InX), y(InY), z(InZ), w(InW) {}
 
-        static constexpr FQuaternion Identity() noexcept { return FQuaternion(0.0f, 0.0f, 0.0f, 1.0f); }
+        static constexpr FQuaternion Identity() noexcept {
+            return FQuaternion(0.0f, 0.0f, 0.0f, 1.0f);
+        }
 
         // Create quaternion representing rotation of `angleRad` around `axis`.
-        static FQuaternion           FromAxisAngle(const FVector3f& axis, f32 angleRad) noexcept
-        {
+        static FQuaternion FromAxisAngle(const FVector3f& axis, f32 angleRad) noexcept {
             // normalize axis
             FVector3f a   = axis;
             f32       len = std::sqrt(a.X() * a.X() + a.Y() * a.Y() + a.Z() * a.Z());
@@ -40,10 +40,11 @@ namespace AltinaEngine::Core::Math
             return FQuaternion(a.X() * s, a.Y() * s, a.Z() * s, std::cos(half));
         }
 
-        [[nodiscard]] f32         Length() const noexcept { return std::sqrt(x * x + y * y + z * z + w * w); }
+        [[nodiscard]] f32 Length() const noexcept {
+            return std::sqrt(x * x + y * y + z * z + w * w);
+        }
 
-        [[nodiscard]] FQuaternion Normalized() const noexcept
-        {
+        [[nodiscard]] FQuaternion Normalized() const noexcept {
             const f32 l = Length();
             if (l <= 0.0f)
                 return Identity();
@@ -53,8 +54,7 @@ namespace AltinaEngine::Core::Math
 
         [[nodiscard]] FQuaternion Conjugate() const noexcept { return FQuaternion(-x, -y, -z, w); }
 
-        [[nodiscard]] FQuaternion Inverse() const noexcept
-        {
+        [[nodiscard]] FQuaternion Inverse() const noexcept {
             const f32 norm2 = x * x + y * y + z * z + w * w;
             if (norm2 <= 0.0f)
                 return Identity();
@@ -64,8 +64,7 @@ namespace AltinaEngine::Core::Math
         }
 
         // Quaternion multiplication (this * other)
-        [[nodiscard]] FQuaternion operator*(const FQuaternion& other) const noexcept
-        {
+        [[nodiscard]] FQuaternion operator*(const FQuaternion& other) const noexcept {
             return FQuaternion(w * other.x + x * other.w + y * other.z - z * other.y,
                 w * other.y - x * other.z + y * other.w + z * other.x,
                 w * other.z + x * other.y - y * other.x + z * other.w,
@@ -73,8 +72,7 @@ namespace AltinaEngine::Core::Math
         }
 
         // Rotate a vector by this quaternion: q * (v as quaternion) * q^{-1}
-        [[nodiscard]] FVector3f RotateVector(const FVector3f& v) const noexcept
-        {
+        [[nodiscard]] FVector3f RotateVector(const FVector3f& v) const noexcept {
             // Convert vector to quaternion form (x,y,z,0)
             FQuaternion qv(v.X(), v.Y(), v.Z(), 0.0f);
             FQuaternion res = (*this) * qv * Inverse();

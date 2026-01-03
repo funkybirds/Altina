@@ -3,8 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace AltinaEngine
-{
+namespace AltinaEngine {
 
     using i8  = std::int8_t;  // NOLINT(*-identifier-naming)
     using i16 = std::int16_t; // NOLINT(*-identifier-naming)

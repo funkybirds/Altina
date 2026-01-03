@@ -6,8 +6,7 @@
 
 using namespace AltinaEngine::Core::Platform;
 
-TEST_CASE("Platform intrinsics (Windows)")
-{
+TEST_CASE("Platform intrinsics (Windows)") {
     STATIC_REQUIRE(PopCount32(0xFFFF0000U) == 16U);
     STATIC_REQUIRE(PopCount64(0xFFFF0000FFFF0000ULL) == 32U);
     STATIC_REQUIRE(CountLeadingZeros32(1U) == 31U);

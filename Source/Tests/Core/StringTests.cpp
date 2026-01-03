@@ -5,16 +5,14 @@
 
 using namespace AltinaEngine::Core::Container;
 
-TEST_CASE("FString constructs from literals")
-{
+TEST_CASE("FString constructs from literals") {
     FString Greeting(TEXT("Hello"));
     REQUIRE_EQ(Greeting.Length(), 5U);
     REQUIRE_EQ(Greeting[0], TEXT('H'));
     REQUIRE_EQ(Greeting[4], TEXT('o'));
 }
 
-TEST_CASE("FString append and case conversion")
-{
+TEST_CASE("FString append and case conversion") {
     FString Phrase(TEXT("HeLLo"));
     Phrase.Append(TEXT(" World"));
     REQUIRE_EQ(Phrase.Length(), 11U);
@@ -30,8 +28,7 @@ TEST_CASE("FString append and case conversion")
     REQUIRE_EQ(Phrase[6], TEXT('W'));
 }
 
-TEST_CASE("TStringView basic operations")
-{
+TEST_CASE("TStringView basic operations") {
     FStringView Literal(TEXT("Engine"));
     REQUIRE_EQ(Literal.Length(), 6U);
     REQUIRE_EQ(Literal[1], TEXT('n'));

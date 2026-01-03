@@ -12,8 +12,7 @@ namespace AltinaEngine::Core::Container
 {
 
     // Dynamic array similar to std::vector, using the engine allocator.
-    template <typename T, typename TAllocatorType = TAllocator<T>> struct TVector
-    {
+    template <typename T, typename TAllocatorType = TAllocator<T>> struct TVector {
         using TValueType      = T;
         using TSizeType       = usize;
         using TPointer        = TValueType*;
@@ -27,14 +26,11 @@ namespace AltinaEngine::Core::Container
         constexpr TVector() noexcept : mData(nullptr), mSize(0), mCapacity(0), mAllocator() {}
 
         explicit TVector(const TAllocatorType& allocator) noexcept
-            : mData(nullptr), mSize(0), mCapacity(0), mAllocator(allocator)
-        {
-        }
+            : mData(nullptr), mSize(0), mCapacity(0), mAllocator(allocator) {}
 
-        explicit TVector(
-            TSizeType count, TConstReference value = TValueType{}, const TAllocatorType& allocator = TAllocatorType())
-            : mData(nullptr), mSize(0), mCapacity(0), mAllocator(allocator)
-        {
+        explicit TVector(TSizeType count, TConstReference value = TValueType{},
+            const TAllocatorType& allocator = TAllocatorType())
+            : mData(nullptr), mSize(0), mCapacity(0), mAllocator(allocator) {
             if (count == 0)
             {
                 return;
@@ -48,9 +44,9 @@ namespace AltinaEngine::Core::Container
             mSize = count;
         }
 
-        TVector(std::initializer_list<TValueType> init, const TAllocatorType& allocator = TAllocatorType())
-            : mData(nullptr), mSize(0), mCapacity(0), mAllocator(allocator)
-        {
+        TVector(std::initializer_list<TValueType> init,
+            const TAllocatorType&                 allocator = TAllocatorType())
+            : mData(nullptr), mSize(0), mCapacity(0), mAllocator(allocator) {
             if (init.size() == 0)
             {
                 return;
@@ -67,8 +63,8 @@ namespace AltinaEngine::Core::Container
             mSize = count;
         }
 
-        TVector(const TVector& other) : mData(nullptr), mSize(0), mCapacity(0), mAllocator(other.mAllocator)
-        {
+        TVector(const TVector& other)
+            : mData(nullptr), mSize(0), mCapacity(0), mAllocator(other.mAllocator) {
             if (other.mSize == 0)
             {
                 return;
@@ -86,15 +82,13 @@ namespace AltinaEngine::Core::Container
             : mData(other.mData)
             , mSize(other.mSize)
             , mCapacity(other.mCapacity)
-            , mAllocator(AltinaEngine::Move(other.mAllocator))
-        {
+            , mAllocator(AltinaEngine::Move(other.mAllocator)) {
             other.mData     = nullptr;
             other.mSize     = 0;
             other.mCapacity = 0;
         }
 
-        ~TVector()
-        {
+        ~TVector() {
             Clear();
             if (mData != nullptr)
             {
@@ -105,8 +99,7 @@ namespace AltinaEngine::Core::Container
             }
         }
 
-        TVector& operator=(const TVector& other)
-        {
+        TVector& operator=(const TVector& other) {
             if (this == &other)
             {
                 return *this;
@@ -116,8 +109,7 @@ namespace AltinaEngine::Core::Container
             return *this;
         }
 
-        TVector& operator=(TVector&& other) noexcept
-        {
+        TVector& operator=(TVector&& other) noexcept {
             if (this == &other)
             {
                 return *this;
@@ -142,9 +134,13 @@ namespace AltinaEngine::Core::Container
         }
 
         // element access
-        [[nodiscard]] auto operator[](TSizeType index) noexcept -> TReference { return mData[index]; }
+        [[nodiscard]] auto operator[](TSizeType index) noexcept -> TReference {
+            return mData[index];
+        }
 
-        [[nodiscard]] auto operator[](TSizeType index) const noexcept -> TConstReference { return mData[index]; }
+        [[nodiscard]] auto operator[](TSizeType index) const noexcept -> TConstReference {
+            return mData[index];
+        }
 
         [[nodiscard]] auto Front() noexcept -> TReference { return mData[0]; }
 
@@ -159,21 +155,27 @@ namespace AltinaEngine::Core::Container
         [[nodiscard]] auto Data() const noexcept -> TConstPointer { return mData; }
 
         // iterators (std::vector-compatible names)
-        [[nodiscard]] auto begin() noexcept -> TIterator { return mData; } // NOLINT(*-identifier-naming)
+        [[nodiscard]] auto begin() noexcept -> TIterator {
+            return mData;
+        } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] auto begin() const noexcept -> TConstIterator { return mData; } // NOLINT(*-identifier-naming)
+        [[nodiscard]] auto begin() const noexcept -> TConstIterator {
+            return mData;
+        } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] auto cbegin() const noexcept -> TConstIterator { return mData; } // NOLINT(*-identifier-naming)
+        [[nodiscard]] auto cbegin() const noexcept -> TConstIterator {
+            return mData;
+        } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] auto end() noexcept -> TIterator { return mData + mSize; } // NOLINT(*-identifier-naming)
-
-        [[nodiscard]] auto end() const noexcept -> TConstIterator
-        {
+        [[nodiscard]] auto end() noexcept -> TIterator {
             return mData + mSize;
         } // NOLINT(*-identifier-naming)
 
-        [[nodiscard]] auto cend() const noexcept -> TConstIterator
-        {
+        [[nodiscard]] auto end() const noexcept -> TConstIterator {
+            return mData + mSize;
+        } // NOLINT(*-identifier-naming)
+
+        [[nodiscard]] auto cend() const noexcept -> TConstIterator {
             return mData + mSize;
         } // NOLINT(*-identifier-naming)
 
@@ -184,14 +186,14 @@ namespace AltinaEngine::Core::Container
 
         [[nodiscard]] constexpr auto Capacity() const noexcept -> TSizeType { return mCapacity; }
 
-        void                         Reserve(TSizeType newCapacity)
-        {
+        void                         Reserve(TSizeType newCapacity) {
             if (newCapacity <= mCapacity)
             {
                 return;
             }
 
-            TPointer newData = mAllocator.Allocate(static_cast<typename TAllocatorType::TSizeType>(newCapacity));
+            TPointer newData =
+                mAllocator.Allocate(static_cast<typename TAllocatorType::TSizeType>(newCapacity));
 
             for (TSizeType i = 0; i < mSize; ++i)
             {
@@ -208,8 +210,7 @@ namespace AltinaEngine::Core::Container
             mCapacity = newCapacity;
         }
 
-        void Resize(TSizeType newSize)
-        {
+        void Resize(TSizeType newSize) {
             if (newSize < mSize)
             {
                 // destroy extra elements
@@ -234,8 +235,7 @@ namespace AltinaEngine::Core::Container
             mSize = newSize;
         }
 
-        void Clear() noexcept
-        {
+        void Clear() noexcept {
             for (TSizeType i = 0; i < mSize; ++i)
             {
                 mAllocator.Destroy(mData + i);
@@ -244,30 +244,26 @@ namespace AltinaEngine::Core::Container
         }
 
         // modifiers
-        void PushBack(TConstReference value)
-        {
+        void PushBack(TConstReference value) {
             EnsureCapacityForOneMore();
             mAllocator.Construct(mData + mSize, value);
             ++mSize;
         }
 
-        void PushBack(TValueType&& value)
-        {
+        void PushBack(TValueType&& value) {
             EnsureCapacityForOneMore();
             mAllocator.Construct(mData + mSize, AltinaEngine::Move(value));
             ++mSize;
         }
 
-        template <typename... Args> auto EmplaceBack(Args&&... args) -> TReference
-        {
+        template <typename... Args> auto EmplaceBack(Args&&... args) -> TReference {
             EnsureCapacityForOneMore();
             mAllocator.Construct(mData + mSize, std::forward<Args>(args)...);
             ++mSize;
             return mData[mSize - 1];
         }
 
-        void PopBack() noexcept
-        {
+        void PopBack() noexcept {
             if (mSize == 0)
             {
                 return;
@@ -278,8 +274,7 @@ namespace AltinaEngine::Core::Container
         }
 
     private:
-        void EnsureCapacityForOneMore()
-        {
+        void EnsureCapacityForOneMore() {
             if (mSize < mCapacity)
             {
                 return;
@@ -289,8 +284,7 @@ namespace AltinaEngine::Core::Container
             Reserve(newCapacity);
         }
 
-        void AssignFrom(const TVector& other)
-        {
+        void AssignFrom(const TVector& other) {
             Clear();
 
             if (other.mSize > mCapacity)

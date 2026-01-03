@@ -2,17 +2,14 @@
 #include "../../Public/Threading/Mutex.h"
 #include "../../Public/Platform/Generic/GenericPlatformDecl.h"
 
-namespace AltinaEngine::Core::Threading
-{
+namespace AltinaEngine::Core::Threading {
 
     using namespace AltinaEngine::Core::Platform::Generic;
 
     FConditionVariable::FConditionVariable() noexcept : mImpl(PlatformCreateConditionVariable()) {}
 
-    FConditionVariable::~FConditionVariable() noexcept
-    {
-        if (mImpl)
-        {
+    FConditionVariable::~FConditionVariable() noexcept {
+        if (mImpl) {
             PlatformDeleteConditionVariable(mImpl);
             mImpl = nullptr;
         }
@@ -22,8 +19,7 @@ namespace AltinaEngine::Core::Threading
 
     void FConditionVariable::NotifyAll() noexcept { PlatformWakeAllConditionVariable(mImpl); }
 
-    auto FConditionVariable::Wait(FMutex& Mutex, unsigned long Milliseconds) noexcept -> bool
-    {
+    auto FConditionVariable::Wait(FMutex& Mutex, unsigned long Milliseconds) noexcept -> bool {
         return PlatformSleepConditionVariableCS(mImpl, Mutex.GetNative(), Milliseconds) != 0;
     }
 

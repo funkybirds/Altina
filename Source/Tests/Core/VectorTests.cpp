@@ -4,8 +4,7 @@
 
 using namespace AltinaEngine::Core::Math;
 
-TEST_CASE("Vector addition")
-{
+TEST_CASE("Vector addition") {
     FVector3f       VecA{ 1.0F, 2.0F, 3.0F };
     const FVector3f VecB{ 4.0F, 5.0F, 6.0F };
     const auto      VecAdd = VecA + VecB;
@@ -14,8 +13,7 @@ TEST_CASE("Vector addition")
     REQUIRE_CLOSE(VecAdd[2U], 9.0F, 1e-6F);
 }
 
-TEST_CASE("Vector subtraction")
-{
+TEST_CASE("Vector subtraction") {
     FVector3f       VecA{ 1.0F, 2.0F, 3.0F };
     const FVector3f VecB{ 4.0F, 5.0F, 6.0F };
     const auto      VecSub = VecB - VecA;
@@ -24,8 +22,7 @@ TEST_CASE("Vector subtraction")
     REQUIRE_CLOSE(VecSub[2U], 3.0F, 1e-6F);
 }
 
-TEST_CASE("Vector elementwise multiplication")
-{
+TEST_CASE("Vector elementwise multiplication") {
     FVector3f       VecA{ 1.0F, 2.0F, 3.0F };
     const FVector3f VecC{ 2.0F, 3.0F, 4.0F };
     const auto      VecMul = VecA * VecC;
@@ -34,8 +31,7 @@ TEST_CASE("Vector elementwise multiplication")
     REQUIRE_CLOSE(VecMul[2U], 12.0F, 1e-6F);
 }
 
-TEST_CASE("Vector compound ops and division")
-{
+TEST_CASE("Vector compound ops and division") {
     const FVector3f VecD{ 2.0F, 4.0F, 8.0F };
     const FVector3f VecDivisor{ 2.0F, 2.0F, 4.0F };
     const auto      VecDiv = VecD / VecDivisor;

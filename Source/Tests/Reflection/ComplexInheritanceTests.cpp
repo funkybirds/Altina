@@ -7,26 +7,22 @@
 using namespace AltinaEngine::Core::Reflection;
 
 // Complex multiple inheritance types for testing
-struct CBaseA
-{
+struct CBaseA {
     virtual ~CBaseA() = default;
     int mA            = 11;
 };
 
-struct CBaseB
-{
+struct CBaseB {
     virtual ~CBaseB() = default;
     double mB         = 22.5;
 };
 
-struct CDerived : CBaseA, CBaseB
-{
+struct CDerived : CBaseA, CBaseB {
     int64_t mD = 33;
     CDerived() = default;
 };
 
-TEST_CASE("Reflection.ComplexInheritance.AsMultipleBases")
-{
+TEST_CASE("Reflection.ComplexInheritance.AsMultipleBases") {
     // Register types and relations locally for this test
     RegisterType<CBaseA>();
     RegisterPropertyField<&CBaseA::mA>("mA");
@@ -58,8 +54,10 @@ TEST_CASE("Reflection.ComplexInheritance.AsMultipleBases")
     CBaseA* expectedA  = static_cast<CBaseA*>(derivedPtr);
     CBaseB* expectedB  = static_cast<CBaseB*>(derivedPtr);
 
-    REQUIRE_EQ(reinterpret_cast<uintptr_t>(&obj.As<CBaseA>()), reinterpret_cast<uintptr_t>(expectedA));
-    REQUIRE_EQ(reinterpret_cast<uintptr_t>(&obj.As<CBaseB>()), reinterpret_cast<uintptr_t>(expectedB));
+    REQUIRE_EQ(
+        reinterpret_cast<uintptr_t>(&obj.As<CBaseA>()), reinterpret_cast<uintptr_t>(expectedA));
+    REQUIRE_EQ(
+        reinterpret_cast<uintptr_t>(&obj.As<CBaseB>()), reinterpret_cast<uintptr_t>(expectedB));
 
     // Const correctness: const FObject should give const reference
     const auto  cobj  = obj;

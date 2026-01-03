@@ -9,8 +9,7 @@
 
 using namespace AltinaEngine::Core;
 
-TEST_CASE("FJobSystem Submit and Wait")
-{
+TEST_CASE("FJobSystem Submit and Wait") {
     using namespace AltinaEngine::Core::Jobs;
 
     bool           executed = false;
@@ -24,8 +23,7 @@ TEST_CASE("FJobSystem Submit and Wait")
     REQUIRE(executed);
 }
 
-TEST_CASE("FJobSystem bottom-up merge sort using job dependencies")
-{
+TEST_CASE("FJobSystem bottom-up merge sort using job dependencies") {
     using namespace AltinaEngine::Core::Jobs;
 
     // Prepare data
@@ -45,14 +43,12 @@ TEST_CASE("FJobSystem bottom-up merge sort using job dependencies")
     std::vector<int>*   src = &a;
     std::vector<int>*   dst = &b;
 
-    for (int width = 1; width < N; width *= 2)
-    {
+    for (int width = 1; width < N; width *= 2) {
         TVector<FJobHandle> currHandles;
         currHandles.Reserve((N + (2 * width) - 1) / (2 * width));
 
         int segIndex = 0;
-        for (int i = 0; i < N; i += 2 * width)
-        {
+        for (int i = 0; i < N; i += 2 * width) {
             int            left  = i;
             int            mid   = std::min(i + width, N);
             int            right = std::min(i + 2 * width, N);
@@ -63,8 +59,7 @@ TEST_CASE("FJobSystem bottom-up merge sort using job dependencies")
                 int li = left;
                 int ri = mid;
                 int wi = left;
-                while (li < mid && ri < right)
-                {
+                while (li < mid && ri < right) {
                     if ((*src)[li] <= (*src)[ri])
                         (*dst)[wi++] = (*src)[li++];
                     else
@@ -78,8 +73,7 @@ TEST_CASE("FJobSystem bottom-up merge sort using job dependencies")
 
             // Determine prerequisites from previous level: each merged segment depends
             // on the two child runs' handles if they exist.
-            if (width > 1)
-            {
+            if (width > 1) {
                 // Each prev handle corresponds to a run of size `width` from previous round
                 int leftChildIndex  = segIndex * 2;
                 int rightChildIndex = leftChildIndex + 1;
@@ -110,8 +104,7 @@ TEST_CASE("FJobSystem bottom-up merge sort using job dependencies")
     REQUIRE(std::is_sorted(a.begin(), a.end()));
 }
 
-TEST_CASE("FJobSystem SubmitWithFence signals fence")
-{
+TEST_CASE("FJobSystem SubmitWithFence signals fence") {
     using namespace AltinaEngine::Core::Jobs;
 
     FJobFence      fence;
@@ -125,24 +118,21 @@ TEST_CASE("FJobSystem SubmitWithFence signals fence")
     FJobSystem::Wait(h);
 }
 
-TEST_CASE("FJobDescriptor dependencies enforce ordering")
-{
+TEST_CASE("FJobDescriptor dependencies enforce ordering") {
     using namespace AltinaEngine::Core::Jobs;
 
     std::atomic<int> counter{ 0 };
 
     FJobHandle       prevHandle;
     const int        kCount = 100;
-    for (int i = 0; i < kCount; ++i)
-    {
+    for (int i = 0; i < kCount; ++i) {
         FJobDescriptor desc;
         desc.Callback = [&counter]() {
             int v = counter.load();
             counter.store(v + 1);
         };
 
-        if (prevHandle.IsValid())
-        {
+        if (prevHandle.IsValid()) {
             desc.Prerequisites.PushBack(prevHandle);
         }
 
@@ -153,8 +143,7 @@ TEST_CASE("FJobDescriptor dependencies enforce ordering")
     REQUIRE_EQ(counter.load(), kCount);
 }
 
-TEST_CASE("FJobDescriptor complex dependency graph")
-{
+TEST_CASE("FJobDescriptor complex dependency graph") {
     using namespace AltinaEngine::Core::Jobs;
 
     const int        totalJobs = 100;
@@ -171,11 +160,9 @@ TEST_CASE("FJobDescriptor complex dependency graph")
     // Build several independent ordered chains; each job in a chain increments
     // that chain's atomic counter using only load/store. Chains can run in
     // parallel but within a chain ordering is enforced by prerequisites.
-    for (int c = 0; c < chains; ++c)
-    {
+    for (int c = 0; c < chains; ++c) {
         FJobHandle prev;
-        for (int j = 0; j < perChain; ++j)
-        {
+        for (int j = 0; j < perChain; ++j) {
             FJobDescriptor desc;
             desc.Callback = [&chainCounters, c]() {
                 int v = chainCounters[c].load();

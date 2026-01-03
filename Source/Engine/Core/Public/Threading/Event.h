@@ -5,19 +5,17 @@
 
 #include "Common.h"
 
-namespace AltinaEngine::Core::Threading
-{
+namespace AltinaEngine::Core::Threading {
 
-    enum class EEventResetMode : u8
-    {
+    enum class EEventResetMode : u8 {
         Auto,
         Manual
     };
 
-    class AE_CORE_API FEvent
-    {
+    class AE_CORE_API FEvent {
     public:
-        FEvent(bool bInitiallySignaled = false, EEventResetMode ResetMode = EEventResetMode::Auto) noexcept;
+        FEvent(bool         bInitiallySignaled = false,
+            EEventResetMode ResetMode          = EEventResetMode::Auto) noexcept;
         ~FEvent() noexcept;
 
         void Set() noexcept;

@@ -1,9 +1,7 @@
 #pragma once
 
-namespace AltinaEngine
-{
-    template <bool TValue> struct TBoolConstant
-    {
+namespace AltinaEngine {
+    template <bool TValue> struct TBoolConstant {
         static constexpr bool Value = TValue; // NOLINT
     };
 

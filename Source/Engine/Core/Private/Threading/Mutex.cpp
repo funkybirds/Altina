@@ -1,17 +1,14 @@
 #include "../../Public/Threading/Mutex.h"
 #include "../../Public/Platform/Generic/GenericPlatformDecl.h"
 
-namespace AltinaEngine::Core::Threading
-{
+namespace AltinaEngine::Core::Threading {
 
     using namespace AltinaEngine::Core::Platform::Generic;
 
     FMutex::FMutex() noexcept { mImpl = PlatformCreateCriticalSection(); }
 
-    FMutex::~FMutex() noexcept
-    {
-        if (mImpl)
-        {
+    FMutex::~FMutex() noexcept {
+        if (mImpl) {
             PlatformDeleteCriticalSection(mImpl);
             mImpl = nullptr;
         }

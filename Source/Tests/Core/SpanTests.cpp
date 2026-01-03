@@ -8,8 +8,7 @@ using namespace AltinaEngine;
 using namespace AltinaEngine::Core;
 using namespace AltinaEngine::Core::Container;
 
-TEST_CASE("TSpan from C array, static extent")
-{
+TEST_CASE("TSpan from C array, static extent") {
     int data[3] = { 1, 2, 3 };
 
     using FSpan3 = TSpan<int, 3>;
@@ -25,8 +24,7 @@ TEST_CASE("TSpan from C array, static extent")
     REQUIRE_EQ(data[1], 42);
 }
 
-TEST_CASE("TSpan from C array, dynamic extent")
-{
+TEST_CASE("TSpan from C array, dynamic extent") {
     int data[4] = { 10, 20, 30, 40 };
 
     using FSpanDyn = TSpan<int>;
@@ -39,15 +37,13 @@ TEST_CASE("TSpan from C array, dynamic extent")
     REQUIRE_EQ(span[3], 40);
 
     usize sum = 0;
-    for (auto value : span)
-    {
+    for (auto value : span) {
         sum += static_cast<usize>(value);
     }
     REQUIRE_EQ(sum, static_cast<usize>(100));
 }
 
-TEST_CASE("TSpan from TArray")
-{
+TEST_CASE("TSpan from TArray") {
     TArray<int, 2> array{};
     array[0] = 7;
     array[1] = 9;
@@ -64,8 +60,7 @@ TEST_CASE("TSpan from TArray")
     REQUIRE_EQ(array[0], 11);
 }
 
-TEST_CASE("TSpan from TVector")
-{
+TEST_CASE("TSpan from TVector") {
     TVector<int> values;
     values.PushBack(5);
     values.PushBack(6);

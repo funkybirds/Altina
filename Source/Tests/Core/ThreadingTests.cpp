@@ -10,8 +10,7 @@
 
 using namespace AltinaEngine::Core::Threading;
 
-TEST_CASE("FScopedLock releases mutex after scope")
-{
+TEST_CASE("FScopedLock releases mutex after scope") {
     FMutex M;
     {
         FScopedLock Lock(M);
@@ -24,8 +23,7 @@ TEST_CASE("FScopedLock releases mutex after scope")
         M.Unlock();
 }
 
-TEST_CASE("FConditionVariable notify wakes waiter")
-{
+TEST_CASE("FConditionVariable notify wakes waiter") {
     FConditionVariable CV;
     FMutex             M;
     bool               Flag = false;
@@ -53,8 +51,7 @@ TEST_CASE("FConditionVariable notify wakes waiter")
     Worker.join();
 }
 
-TEST_CASE("FEvent signals waiter")
-{
+TEST_CASE("FEvent signals waiter") {
     FEvent      E(false, EEventResetMode::Auto);
 
     bool        WorkerSaw = false;
@@ -70,8 +67,7 @@ TEST_CASE("FEvent signals waiter")
     REQUIRE(WorkerSaw);
 }
 
-TEST_CASE("TAtomic concurrent increments")
-{
+TEST_CASE("TAtomic concurrent increments") {
     using CounterT = int;
     TAtomic<CounterT>        Counter(static_cast<CounterT>(0));
 
@@ -79,11 +75,9 @@ TEST_CASE("TAtomic concurrent increments")
     const int                IncrementsPerThread = 10000;
 
     std::vector<std::thread> workers;
-    for (int i = 0; i < Threads; ++i)
-    {
+    for (int i = 0; i < Threads; ++i) {
         workers.emplace_back([&]() {
-            for (int j = 0; j < IncrementsPerThread; ++j)
-            {
+            for (int j = 0; j < IncrementsPerThread; ++j) {
                 Counter.FetchAdd(1);
             }
         });

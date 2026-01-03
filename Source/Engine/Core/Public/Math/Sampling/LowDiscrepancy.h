@@ -3,10 +3,8 @@
 #include "../Common.h"
 #include "../Vector.h"
 
-namespace AltinaEngine::Core::Math
-{
-    [[nodiscard]] constexpr auto VanDeCorputRadicalInverse2(u32 bits) noexcept -> f32
-    {
+namespace AltinaEngine::Core::Math {
+    [[nodiscard]] constexpr auto VanDeCorputRadicalInverse2(u32 bits) noexcept -> f32 {
         // Reference:
         // https://github.com/Nadrin/PBR/blob/master/data/shaders/hlsl/spmap.hlsl
         // https://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
@@ -19,8 +17,7 @@ namespace AltinaEngine::Core::Math
         return static_cast<f32>(f64(bits) * 2.3283064365386963e-10); // / 0x100000000
     }
 
-    [[nodiscard]] AE_FORCEINLINE constexpr auto Hammersley2d(u32 x, u32 N) noexcept -> FVector2f
-    {
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Hammersley2d(u32 x, u32 N) noexcept -> FVector2f {
         f32 u1 = f32(x) / f32(N);
         f32 u2 = VanDeCorputRadicalInverse2(x);
         return FVector2f(u1, u2);

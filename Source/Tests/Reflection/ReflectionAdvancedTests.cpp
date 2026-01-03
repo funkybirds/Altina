@@ -7,8 +7,7 @@
 // Test: Multiple Property Registration and Access
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.MultiplePropertyAccess")
-{
+TEST_CASE("Reflection.Advanced.MultiplePropertyAccess") {
     ReflectionTestHelpers::EnsureTypesRegistered();
 
     auto obj = ConstructObject(FMetaTypeInfo::Create<FComplexStruct>());
@@ -59,8 +58,7 @@ TEST_CASE("Reflection.Advanced.MultiplePropertyAccess")
 // Test: Memory Layout Validation
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.MemoryLayout")
-{
+TEST_CASE("Reflection.Advanced.MemoryLayout") {
     ReflectionTestHelpers::EnsureTypesRegistered();
     auto  obj = ConstructObject(FMetaTypeInfo::Create<FComplexStruct>());
     auto& s   = obj.As<FComplexStruct>();
@@ -96,8 +94,7 @@ TEST_CASE("Reflection.Advanced.MemoryLayout")
 // Test: Large Structure Handling
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.LargeStructure")
-{
+TEST_CASE("Reflection.Advanced.LargeStructure") {
     auto  obj = ConstructObject(FMetaTypeInfo::Create<FLargeStruct>());
 
     auto& s = obj.As<FLargeStruct>();
@@ -119,8 +116,7 @@ TEST_CASE("Reflection.Advanced.LargeStructure")
 // Test: Empty Structure
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.EmptyStructure")
-{
+TEST_CASE("Reflection.Advanced.EmptyStructure") {
     auto  obj = ConstructObject(FMetaTypeInfo::Create<FEmptyStruct>());
 
     // Should be able to cast to empty struct
@@ -132,8 +128,7 @@ TEST_CASE("Reflection.Advanced.EmptyStructure")
 // Test: Type Hash Uniqueness
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.TypeHashUniqueness")
-{
+TEST_CASE("Reflection.Advanced.TypeHashUniqueness") {
     auto hash1 = FMetaTypeInfo::Create<FComplexStruct>().GetHash();
     auto hash2 = FMetaTypeInfo::Create<FLargeStruct>().GetHash();
     auto hash3 = FMetaTypeInfo::Create<FEmptyStruct>().GetHash();
@@ -160,8 +155,7 @@ TEST_CASE("Reflection.Advanced.TypeHashUniqueness")
 // Test: Property Hash Uniqueness
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.PropertyHashUniqueness")
-{
+TEST_CASE("Reflection.Advanced.PropertyHashUniqueness") {
     auto hashA = FMetaPropertyInfo::Create<&FComplexStruct::mA>().GetHash();
     auto hashB = FMetaPropertyInfo::Create<&FComplexStruct::mB>().GetHash();
     auto hashC = FMetaPropertyInfo::Create<&FComplexStruct::mC>().GetHash();
@@ -187,8 +181,7 @@ TEST_CASE("Reflection.Advanced.PropertyHashUniqueness")
 // Test: Object Copy Semantics
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.ObjectCopySemantics")
-{
+TEST_CASE("Reflection.Advanced.ObjectCopySemantics") {
     ReflectionTestHelpers::EnsureTypesRegistered();
 
     auto  obj1 = ConstructObject(FMetaTypeInfo::Create<FComplexStruct>());
@@ -215,8 +208,7 @@ TEST_CASE("Reflection.Advanced.ObjectCopySemantics")
 // Test: Multiple Object Instances
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.MultipleInstances")
-{
+TEST_CASE("Reflection.Advanced.MultipleInstances") {
     ReflectionTestHelpers::EnsureTypesRegistered(); // Create multiple instances
     auto obj1 = ConstructObject(FMetaTypeInfo::Create<FComplexStruct>());
     auto obj2 = ConstructObject(FMetaTypeInfo::Create<FComplexStruct>());
@@ -239,8 +231,7 @@ TEST_CASE("Reflection.Advanced.MultipleInstances")
 // Test: Property Type Information
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.PropertyTypeInformation")
-{
+TEST_CASE("Reflection.Advanced.PropertyTypeInformation") {
     auto  propMetaInt    = FMetaPropertyInfo::Create<&FComplexStruct::mA>();
     auto  propMetaFloat  = FMetaPropertyInfo::Create<&FComplexStruct::mX>();
     auto  propMetaDouble = FMetaPropertyInfo::Create<&FComplexStruct::mZ>();
@@ -269,8 +260,7 @@ TEST_CASE("Reflection.Advanced.PropertyTypeInformation")
 // Test: Const Correctness
 // ============================================================================
 
-TEST_CASE("Reflection.Advanced.ConstCorrectness")
-{
+TEST_CASE("Reflection.Advanced.ConstCorrectness") {
     ReflectionTestHelpers::EnsureTypesRegistered();
     const auto obj      = ConstructObject(FMetaTypeInfo::Create<FComplexStruct>());
     const auto typeMeta = FMetaTypeInfo::Create<FComplexStruct>();

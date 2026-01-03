@@ -11,8 +11,7 @@ using namespace AltinaEngine::Core;
 using namespace AltinaEngine::Core::Jobs;
 using namespace AltinaEngine::Core::Instrumentation;
 
-TEST_CASE("FWorkerPool: worker thread sets instrumentation name")
-{
+TEST_CASE("FWorkerPool: worker thread sets instrumentation name") {
     // Create a small pool with a single worker and verify that the worker
     // thread sets its instrumentation name to "JobWorker" when running.
     FWorkerPoolConfig cfg;
@@ -35,8 +34,7 @@ TEST_CASE("FWorkerPool: worker thread sets instrumentation name")
     // Wait for the worker to run and record the name (timeout to avoid hangs).
     const int maxWaitMs = 2000;
     int       waited    = 0;
-    while (true)
-    {
+    while (true) {
         {
             std::lock_guard<std::mutex> lk(mtx);
             if (!recordedName.empty())

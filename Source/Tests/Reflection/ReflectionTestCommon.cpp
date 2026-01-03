@@ -1,10 +1,8 @@
 #include "ReflectionTestCommon.h"
 #include <mutex>
 
-namespace ReflectionTestHelpers
-{
-    void EnsureTypesRegistered()
-    {
+namespace ReflectionTestHelpers {
+    void EnsureTypesRegistered() {
         static std::once_flag sRegistrationFlag;
         std::call_once(sRegistrationFlag, []() {
             // Register basic types

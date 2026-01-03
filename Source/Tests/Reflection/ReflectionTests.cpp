@@ -7,8 +7,7 @@
 // Test: Type Registration
 // ============================================================================
 
-TEST_CASE("Reflection.TypeRegistration")
-{
+TEST_CASE("Reflection.TypeRegistration") {
     ReflectionTestHelpers::EnsureTypesRegistered();
 
     // Verify we can construct an object
@@ -25,8 +24,7 @@ TEST_CASE("Reflection.TypeRegistration")
 // Test: Property Field Registration - Integer
 // ============================================================================
 
-TEST_CASE("Reflection.PropertyField.Integer")
-{
+TEST_CASE("Reflection.PropertyField.Integer") {
     ReflectionTestHelpers::EnsureTypesRegistered();
     // Create object
     auto  obj = ConstructObject(FMetaTypeInfo::Create<FSimpleTestStruct>());
@@ -56,8 +54,7 @@ TEST_CASE("Reflection.PropertyField.Integer")
 // Test: Property Field Registration - Float
 // ============================================================================
 
-TEST_CASE("Reflection.PropertyField.Float")
-{
+TEST_CASE("Reflection.PropertyField.Float") {
     ReflectionTestHelpers::EnsureTypesRegistered();
     auto  obj      = ConstructObject(FMetaTypeInfo::Create<FSimpleTestStruct>());
     auto  propMeta = FMetaPropertyInfo::Create<&FSimpleTestStruct::mFloatValue>();
@@ -77,8 +74,7 @@ TEST_CASE("Reflection.PropertyField.Float")
 // Test: Property Field Registration - Double
 // ============================================================================
 
-TEST_CASE("Reflection.PropertyField.Double")
-{
+TEST_CASE("Reflection.PropertyField.Double") {
     ReflectionTestHelpers::EnsureTypesRegistered();
     auto  obj      = ConstructObject(FMetaTypeInfo::Create<FSimpleTestStruct>());
     auto  propMeta = FMetaPropertyInfo::Create<&FSimpleTestStruct::mDoubleValue>();
@@ -98,8 +94,7 @@ TEST_CASE("Reflection.PropertyField.Double")
 // Test: Multiple Properties
 // ============================================================================
 
-TEST_CASE("Reflection.MultipleProperties")
-{
+TEST_CASE("Reflection.MultipleProperties") {
     ReflectionTestHelpers::EnsureTypesRegistered();
     auto obj = ConstructObject(FMetaTypeInfo::Create<FSimpleTestStruct>());
 
@@ -109,13 +104,13 @@ TEST_CASE("Reflection.MultipleProperties")
     intPropObj.As<TRef<int>>().Get() = 100;
 
     // Modify float
-    auto floatPropMeta                   = FMetaPropertyInfo::Create<&FSimpleTestStruct::mFloatValue>();
-    auto floatPropObj                    = GetProperty(obj, floatPropMeta);
+    auto floatPropMeta = FMetaPropertyInfo::Create<&FSimpleTestStruct::mFloatValue>();
+    auto floatPropObj  = GetProperty(obj, floatPropMeta);
     floatPropObj.As<TRef<float>>().Get() = 200.0f;
 
     // Modify double
-    auto doublePropMeta                    = FMetaPropertyInfo::Create<&FSimpleTestStruct::mDoubleValue>();
-    auto doublePropObj                     = GetProperty(obj, doublePropMeta);
+    auto doublePropMeta = FMetaPropertyInfo::Create<&FSimpleTestStruct::mDoubleValue>();
+    auto doublePropObj  = GetProperty(obj, doublePropMeta);
     doublePropObj.As<TRef<double>>().Get() = 300.0;
 
     // Verify all modifications
@@ -129,8 +124,7 @@ TEST_CASE("Reflection.MultipleProperties")
 // Test: Nested Structures
 // ============================================================================
 
-TEST_CASE("Reflection.NestedStructures")
-{
+TEST_CASE("Reflection.NestedStructures") {
     ReflectionTestHelpers::EnsureTypesRegistered();
     auto obj = ConstructObject(FMetaTypeInfo::Create<FNestedTestStruct>());
 
@@ -153,8 +147,7 @@ TEST_CASE("Reflection.NestedStructures")
 // Test: Type Metadata Query
 // ============================================================================
 
-TEST_CASE("Reflection.TypeMetadata.Query")
-{
+TEST_CASE("Reflection.TypeMetadata.Query") {
     auto intMeta = FMetaTypeInfo::Create<int>();
     REQUIRE(intMeta.GetHash() != 0);
 
@@ -171,8 +164,7 @@ TEST_CASE("Reflection.TypeMetadata.Query")
 // Test: Property Metadata Query
 // ============================================================================
 
-TEST_CASE("Reflection.PropertyMetadata.Query")
-{
+TEST_CASE("Reflection.PropertyMetadata.Query") {
     auto propMeta = FMetaPropertyInfo::Create<&FSimpleTestStruct::mIntValue>();
 
     REQUIRE(propMeta.GetHash() != 0);
@@ -189,8 +181,7 @@ TEST_CASE("Reflection.PropertyMetadata.Query")
 // Test: Object Validity
 // ============================================================================
 
-TEST_CASE("Reflection.Object.Validity")
-{
+TEST_CASE("Reflection.Object.Validity") {
     ReflectionTestHelpers::EnsureTypesRegistered();
 
     auto  obj = ConstructObject(FMetaTypeInfo::Create<FSimpleTestStruct>());
@@ -215,8 +206,7 @@ TEST_CASE("Reflection.Object.Validity")
 // Test: Reference Semantics
 // ============================================================================
 
-TEST_CASE("Reflection.ReferenceSematics")
-{
+TEST_CASE("Reflection.ReferenceSematics") {
     ReflectionTestHelpers::EnsureTypesRegistered();
     auto  obj = ConstructObject(FMetaTypeInfo::Create<FSimpleTestStruct>());
 

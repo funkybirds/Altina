@@ -4,8 +4,7 @@
 
 using namespace AltinaEngine::Core::Jobs;
 
-TEST_CASE("NamedThread: GameThread routing")
-{
+TEST_CASE("NamedThread: GameThread routing") {
     using namespace AltinaEngine::Core::Jobs;
 
     // Register current test thread as GameThread

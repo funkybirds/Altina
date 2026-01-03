@@ -6,19 +6,16 @@
 #include <iostream>
 #include <cmath>
 
-namespace Test
-{
+namespace Test {
 
     using TestFunc = void (*)();
 
-    struct Case
-    {
+    struct Case {
         const char* name;
         TestFunc    func;
     };
 
-    inline std::vector<Case>& cases()
-    {
+    inline std::vector<Case>& cases() {
         static std::vector<Case> v;
         return v;
     }
@@ -26,38 +23,31 @@ namespace Test
     inline int current_checks   = 0;
     inline int current_failures = 0;
 
-    struct Registrar
-    {
+    struct Registrar {
         Registrar(const char* name, TestFunc f) { cases().push_back({ name, f }); }
     };
 
-    inline int run_all()
-    {
+    inline int run_all() {
         int total_failures = 0;
         std::cout << "Running " << cases().size() << " test(s)\n";
-        for (auto& c : cases())
-        {
+        for (auto& c : cases()) {
             current_checks   = 0;
             current_failures = 0;
             std::cout << "[ RUN ] " << c.name << '\n';
-            try
-            {
+            try {
                 c.func();
-            }
-            catch (const std::exception& e)
-            {
+            } catch (const std::exception& e) {
                 std::cerr << "Unhandled exception in " << c.name << ": " << e.what() << '\n';
                 current_failures++;
-            }
-            catch (...)
-            {
+            } catch (...) {
                 std::cerr << "Unhandled non-standard exception in " << c.name << '\n';
                 current_failures++;
             }
             if (current_failures == 0)
                 std::cout << "[  OK  ] " << c.name << '\n';
             else
-                std::cout << "[FAILED] " << c.name << " (" << current_failures << " failed checks)" << '\n';
+                std::cout << "[FAILED] " << c.name << " (" << current_failures << " failed checks)"
+                          << '\n';
 
             total_failures += current_failures;
         }
@@ -68,10 +58,11 @@ namespace Test
 #define TEST_CONCAT2(a, b) a##b
 #define TEST_CONCAT(a, b) TEST_CONCAT2(a, b)
 
-#define TEST_CASE(name)                                                                              \
-    static void            TEST_CONCAT(test_fn_, __LINE__)();                                        \
-    static Test::Registrar TEST_CONCAT(test_reg_, __LINE__)(name, &TEST_CONCAT(test_fn_, __LINE__)); \
-    static void            TEST_CONCAT(test_fn_, __LINE__)()
+#define TEST_CASE(name)                                       \
+    static void            TEST_CONCAT(test_fn_, __LINE__)(); \
+    static Test::Registrar TEST_CONCAT(test_reg_, __LINE__)(  \
+        name, &TEST_CONCAT(test_fn_, __LINE__));              \
+    static void TEST_CONCAT(test_fn_, __LINE__)()
 
 #define STATIC_REQUIRE(x) static_assert((x))
 
@@ -83,24 +74,23 @@ namespace Test
 
     // Inline helpers replace previous do/while(0) macros to satisfy
     // cppcoreguidelines-avoid-do-while while preserving diagnostics.
-    template <typename T> inline void Require(T&& expr, const char* exprText, const char* file, int line)
-    {
+    template <typename T>
+    inline void Require(T&& expr, const char* exprText, const char* file, int line) {
         ++current_checks;
-        if (!static_cast<bool>(expr))
-        {
+        if (!static_cast<bool>(expr)) {
             ++current_failures;
             std::cerr << "FAIL: " << file << ":" << line << " - " << exprText << '\n';
         }
     }
 
     template <typename T, typename U, typename E>
-    inline void RequireClose(T a, U b, E eps, const char* aText, const char* bText, const char* file, int line)
-    {
+    inline void RequireClose(
+        T a, U b, E eps, const char* aText, const char* bText, const char* file, int line) {
         ++current_checks;
-        if (std::fabs((double)a - (double)b) > (double)eps)
-        {
+        if (std::fabs((double)a - (double)b) > (double)eps) {
             ++current_failures;
-            std::cerr << "FAIL: " << file << ":" << line << " - close(" << aText << "," << bText << ")" << '\n';
+            std::cerr << "FAIL: " << file << ":" << line << " - close(" << aText << "," << bText
+                      << ")" << '\n';
         }
     }
 

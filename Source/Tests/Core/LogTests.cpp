@@ -10,17 +10,14 @@ using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Container::FStringView;
 using namespace AltinaEngine::Core::Logging;
 
-namespace
-{
-    struct FCapturedLog
-    {
+namespace {
+    struct FCapturedLog {
         ELogLevel Level;
         FString   Category;
         FString   Message;
     };
 
-    void CaptureSink(ELogLevel Level, FStringView Category, FStringView Message, void* UserData)
-    {
+    void CaptureSink(ELogLevel Level, FStringView Category, FStringView Message, void* UserData) {
         auto*        Storage = static_cast<std::vector<FCapturedLog>*>(UserData);
         FCapturedLog Entry;
         Entry.Level    = Level;
@@ -30,8 +27,7 @@ namespace
     }
 } // namespace
 
-TEST_CASE("Logger formats text via sink")
-{
+TEST_CASE("Logger formats text via sink") {
     std::vector<FCapturedLog> Captured;
     FLogger::SetLogLevel(ELogLevel::Trace);
     FLogger::SetDefaultCategory(TEXT("Test"));
@@ -55,8 +51,7 @@ TEST_CASE("Logger formats text via sink")
     FLogger::ResetDefaultCategory();
 }
 
-TEST_CASE("Logger respects minimum log level")
-{
+TEST_CASE("Logger respects minimum log level") {
     std::vector<FCapturedLog> Captured;
     FLogger::SetLogSink(&CaptureSink, &Captured);
     FLogger::SetLogLevel(ELogLevel::Warning);

@@ -5,8 +5,7 @@
 
 using namespace AltinaEngine::Core::Container;
 
-TEST_CASE("Ref.Basic")
-{
+TEST_CASE("Ref.Basic") {
     static_assert(std::is_same_v<TRef<int>::Type, int>, "TRef<int>::Type should be int");
 
     int  value = 10;

@@ -2,8 +2,7 @@
 
 #include "Allocator.h"
 
-namespace AltinaEngine::Core::Container
-{
+namespace AltinaEngine::Core::Container {
 
     /**
      * TDeque<T, Alloc>
@@ -18,8 +17,7 @@ namespace AltinaEngine::Core::Container
      *   d.PushFront(0);
      *   for (auto it = d.begin(); it != d.end(); ++it) { // access element via *it }
      */
-    template <typename T, typename TAllocator = TAllocator<T>> class TDeque
-    {
+    template <typename T, typename TAllocator = TAllocator<T>> class TDeque {
     public:
         using TValueType     = T;
         using TAllocatorType = TAllocator;
@@ -27,34 +25,31 @@ namespace AltinaEngine::Core::Container
         using TPointer       = TValueType*;
         using TReference     = TValueType&;
 
-        struct Iterator
-        {
+        struct Iterator {
             TDeque*   mParent = nullptr;
             TSizeType mIndex  = 0;
 
             auto      operator*() const -> TReference { return mParent->AtIndex(mIndex); }
-            auto      operator++() -> Iterator&
-            {
+            auto      operator++() -> Iterator& {
                 ++mIndex;
                 return *this;
             }
-            auto operator++(int) -> Iterator
-            {
+            auto operator++(int) -> Iterator {
                 Iterator tmp = *this;
                 ++*this;
                 return tmp;
             }
-            auto operator!=(const Iterator& o) const -> bool { return mIndex != o.mIndex || mParent != o.mParent; }
+            auto operator!=(const Iterator& o) const -> bool {
+                return mIndex != o.mIndex || mParent != o.mParent;
+            }
             auto operator==(const Iterator& o) const -> bool { return !(*this != o); }
         };
 
         TDeque() noexcept : mData(nullptr), mAllocator() {}
 
-        ~TDeque()
-        {
+        ~TDeque() {
             Clear();
-            if (mData)
-            {
+            if (mData) {
                 TAllocatorTraits<TAllocatorType>::Deallocate(mAllocator, mData, mCapacity);
                 mData     = nullptr;
                 mCapacity = 0;
@@ -64,12 +59,9 @@ namespace AltinaEngine::Core::Container
         [[nodiscard]] auto IsEmpty() const noexcept -> bool { return mSize == 0; }
         [[nodiscard]] auto Size() const noexcept -> TSizeType { return mSize; }
 
-        void               Clear() noexcept
-        {
-            if (mData)
-            {
-                for (TSizeType i = 0; i < mSize; ++i)
-                {
+        void               Clear() noexcept {
+            if (mData) {
+                for (TSizeType i = 0; i < mSize; ++i) {
                     TSizeType idx = (mHead + i) % mCapacity;
                     TAllocatorTraits<TAllocatorType>::Destroy(mAllocator, mData + idx);
                 }
@@ -78,32 +70,29 @@ namespace AltinaEngine::Core::Container
             mHead = 0;
         }
 
-        void PushBack(const TValueType& v)
-        {
+        void PushBack(const TValueType& v) {
             EnsureCapacityForOneMore();
             TSizeType idx = (mHead + mSize) % mCapacity;
             TAllocatorTraits<TAllocatorType>::Construct(mAllocator, mData + idx, v);
             ++mSize;
         }
 
-        void PushBack(TValueType&& v)
-        {
+        void PushBack(TValueType&& v) {
             EnsureCapacityForOneMore();
             TSizeType idx = (mHead + mSize) % mCapacity;
-            TAllocatorTraits<TAllocatorType>::Construct(mAllocator, mData + idx, AltinaEngine::Forward<TValueType>(v));
+            TAllocatorTraits<TAllocatorType>::Construct(
+                mAllocator, mData + idx, AltinaEngine::Forward<TValueType>(v));
             ++mSize;
         }
 
-        void PushFront(const TValueType& v)
-        {
+        void PushFront(const TValueType& v) {
             EnsureCapacityForOneMore();
             mHead = (mHead + mCapacity - 1) % mCapacity;
             TAllocatorTraits<TAllocatorType>::Construct(mAllocator, mData + mHead, v);
             ++mSize;
         }
 
-        void PushFront(TValueType&& v)
-        {
+        void PushFront(TValueType&& v) {
             EnsureCapacityForOneMore();
             mHead = (mHead + mCapacity - 1) % mCapacity;
             TAllocatorTraits<TAllocatorType>::Construct(
@@ -111,8 +100,7 @@ namespace AltinaEngine::Core::Container
             ++mSize;
         }
 
-        void PopBack() noexcept
-        {
+        void PopBack() noexcept {
             if (mSize == 0)
                 return;
             TSizeType idx = (mHead + mSize - 1) % mCapacity;
@@ -120,8 +108,7 @@ namespace AltinaEngine::Core::Container
             --mSize;
         }
 
-        void PopFront() noexcept
-        {
+        void PopFront() noexcept {
             if (mSize == 0)
                 return;
             TAllocatorTraits<TAllocatorType>::Destroy(mAllocator, mData + mHead);
@@ -133,43 +120,46 @@ namespace AltinaEngine::Core::Container
         auto Front() const noexcept -> TReference { return const_cast<TDeque*>(this)->AtIndex(0); }
 
         auto Back() noexcept -> TReference { return AtIndex(mSize - 1); }
-        auto Back() const noexcept -> TReference { return const_cast<TDeque*>(this)->AtIndex(mSize - 1); }
+        auto Back() const noexcept -> TReference {
+            return const_cast<TDeque*>(this)->AtIndex(mSize - 1);
+        }
 
-        auto begin() noexcept -> Iterator { return Iterator{ this, 0 }; }   // NOLINT(*-identifier-naming)
-        auto end() noexcept -> Iterator { return Iterator{ this, mSize }; } // NOLINT(*-identifier-naming)
+        auto begin() noexcept -> Iterator {
+            return Iterator{ this, 0 };
+        } // NOLINT(*-identifier-naming)
+        auto end() noexcept -> Iterator {
+            return Iterator{ this, mSize };
+        } // NOLINT(*-identifier-naming)
 
     private:
-        auto AtIndex(TSizeType i) noexcept -> TReference
-        {
+        auto AtIndex(TSizeType i) noexcept -> TReference {
             TSizeType idx = (mHead + i) % mCapacity;
             return mData[idx];
         }
 
-        auto AtIndex(TSizeType i) const noexcept -> TReference { return const_cast<TDeque*>(this)->AtIndex(i); }
+        auto AtIndex(TSizeType i) const noexcept -> TReference {
+            return const_cast<TDeque*>(this)->AtIndex(i);
+        }
 
-        void EnsureCapacityForOneMore()
-        {
+        void EnsureCapacityForOneMore() {
             if (mSize < mCapacity && mCapacity > 0)
                 return;
             const TSizeType newCapacity = (mCapacity == 0) ? 4 : (mCapacity * 2);
             Reallocate(newCapacity);
         }
 
-        void Reallocate(TSizeType newCapacity)
-        {
+        void Reallocate(TSizeType newCapacity) {
             TPointer newData = TAllocatorTraits<TAllocatorType>::Allocate(
                 mAllocator, static_cast<TAllocatorType::TSizeType>(newCapacity));
             // move existing elements
-            for (TSizeType i = 0; i < mSize; ++i)
-            {
+            for (TSizeType i = 0; i < mSize; ++i) {
                 TSizeType oldIdx = (mHead + i) % (mCapacity == 0 ? 1 : mCapacity);
                 TAllocatorTraits<TAllocatorType>::Construct(
                     mAllocator, newData + i, AltinaEngine::Move(*(mData + oldIdx)));
                 if (mData)
                     TAllocatorTraits<TAllocatorType>::Destroy(mAllocator, mData + oldIdx);
             }
-            if (mData)
-            {
+            if (mData) {
                 TAllocatorTraits<TAllocatorType>::Deallocate(mAllocator, mData, mCapacity);
             }
             mData     = newData;

@@ -2,24 +2,19 @@
 
 #include "Logging/Log.h"
 
-namespace AltinaEngine::Application
-{
-    namespace
-    {
-        auto NormalizeWindowProperties(FPlatformWindowProperty Properties) -> FPlatformWindowProperty
-        {
-            if (Properties.mWidth == 0U)
-            {
+namespace AltinaEngine::Application {
+    namespace {
+        auto NormalizeWindowProperties(FPlatformWindowProperty Properties)
+            -> FPlatformWindowProperty {
+            if (Properties.mWidth == 0U) {
                 Properties.mWidth = 1U;
             }
 
-            if (Properties.mHeight == 0U)
-            {
+            if (Properties.mHeight == 0U) {
                 Properties.mHeight = 1U;
             }
 
-            if (Properties.mTitle.IsEmptyString())
-            {
+            if (Properties.mTitle.IsEmptyString()) {
                 Properties.mTitle.Assign(TEXT("AltinaEngine"));
             }
 
@@ -27,22 +22,18 @@ namespace AltinaEngine::Application
         }
     } // namespace
 
-    FApplication::FApplication(const FStartupParameters& InStartupParameters) : mStartupParameters(InStartupParameters)
-    {
-    }
+    FApplication::FApplication(const FStartupParameters& InStartupParameters)
+        : mStartupParameters(InStartupParameters) {}
 
     FApplication::~FApplication() { Shutdown(); }
 
-    void FApplication::Initialize()
-    {
-        if (mIsRunning)
-        {
+    void FApplication::Initialize() {
+        if (mIsRunning) {
             return;
         }
 
         EnsureWindow();
-        if (!mMainWindow)
-        {
+        if (!mMainWindow) {
             LogError(TEXT("Failed to create platform window."));
             return;
         }
@@ -53,32 +44,26 @@ namespace AltinaEngine::Application
         LogInfo(TEXT("AltinaEngine application initialized."));
     }
 
-    void FApplication::Tick(float InDeltaTime)
-    {
-        if (!mIsRunning)
-        {
+    void FApplication::Tick(float InDeltaTime) {
+        if (!mIsRunning) {
             return;
         }
 
         PumpPlatformMessages();
 
-        if (!mIsRunning)
-        {
+        if (!mIsRunning) {
             return;
         }
 
         LogInfo(TEXT("AltinaEngine application tick: {}s"), InDeltaTime);
     }
 
-    void FApplication::Shutdown()
-    {
-        if (!mIsRunning)
-        {
+    void FApplication::Shutdown() {
+        if (!mIsRunning) {
             return;
         }
 
-        if (mMainWindow)
-        {
+        if (mMainWindow) {
             mMainWindow->Hide();
             mMainWindow.reset();
         }
@@ -87,10 +72,8 @@ namespace AltinaEngine::Application
         LogInfo(TEXT("AltinaEngine application shutdown."));
     }
 
-    void FApplication::SetWindowProperties(const FPlatformWindowProperty& InProperties)
-    {
-        if (mIsRunning)
-        {
+    void FApplication::SetWindowProperties(const FPlatformWindowProperty& InProperties) {
+        if (mIsRunning) {
             LogWarning(TEXT("Cannot update window properties while the application is running."));
             return;
         }
@@ -98,12 +81,13 @@ namespace AltinaEngine::Application
         mWindowProperties = NormalizeWindowProperties(InProperties);
     }
 
-    auto FApplication::GetWindowProperties() const noexcept -> const FPlatformWindowProperty&
-    {
+    auto FApplication::GetWindowProperties() const noexcept -> const FPlatformWindowProperty& {
         return mWindowProperties;
     }
 
-    auto FApplication::GetStartupParameters() const noexcept -> const FStartupParameters& { return mStartupParameters; }
+    auto FApplication::GetStartupParameters() const noexcept -> const FStartupParameters& {
+        return mStartupParameters;
+    }
 
     auto FApplication::GetMainWindow() noexcept -> FPlatformWindow* { return mMainWindow.get(); }
 
@@ -111,24 +95,21 @@ namespace AltinaEngine::Application
 
     void FApplication::PumpPlatformMessages() {}
 
-    void FApplication::EnsureWindow()
-    {
-        if (mMainWindow)
-        {
+    void FApplication::EnsureWindow() {
+        if (mMainWindow) {
             return;
         }
 
-        const FPlatformWindowProperty normalizedProperties = NormalizeWindowProperties(mWindowProperties);
+        const FPlatformWindowProperty normalizedProperties =
+            NormalizeWindowProperties(mWindowProperties);
 
-        FWindowOwner                  platformWindow = CreatePlatformWindow();
-        if (!platformWindow)
-        {
+        FWindowOwner platformWindow = CreatePlatformWindow();
+        if (!platformWindow) {
             LogError(TEXT("CreatePlatformWindow returned null."));
             return;
         }
 
-        if (!platformWindow->Initialize(normalizedProperties))
-        {
+        if (!platformWindow->Initialize(normalizedProperties)) {
             LogError(TEXT("Platform window initialization failed."));
             return;
         }

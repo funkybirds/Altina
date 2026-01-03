@@ -6,52 +6,50 @@
 #include "Math/Vector.h"
 #include "Base/CoreAPI.h"
 
-namespace AltinaEngine::Core::Math::LinAlg
-{
+namespace AltinaEngine::Core::Math::LinAlg {
     // Identity matrix of size N x N (1 on diagonal, 0 elsewhere)
-    template <CScalar T, u32 N> [[nodiscard]] constexpr auto Identity() noexcept -> TMatrix<T, N, N>
-    {
+    template <CScalar T, u32 N>
+    [[nodiscard]] constexpr auto Identity() noexcept -> TMatrix<T, N, N> {
         TMatrix<T, N, N> m(T{});
-        for (u32 i = 0U; i < N; ++i)
-        {
+        for (u32 i = 0U; i < N; ++i) {
             m(i, i) = static_cast<T>(1);
         }
         return m;
     }
 
     // Matrix trace (sum of diagonal elements)
-    template <CScalar T, u32 N> [[nodiscard]] constexpr auto MatTrace(const TMatrix<T, N, N>& M) noexcept -> T
-    {
+    template <CScalar T, u32 N>
+    [[nodiscard]] constexpr auto MatTrace(const TMatrix<T, N, N>& M) noexcept -> T {
         T sum = T{};
-        for (u32 i = 0U; i < N; ++i)
-        {
+        for (u32 i = 0U; i < N; ++i) {
             sum += M(i, i);
         }
         return sum;
     }
 
     // Zero matrix R x C
-    template <CScalar T, u32 R, u32 C> [[nodiscard]] constexpr auto ZeroMatrix() noexcept -> TMatrix<T, R, C>
-    {
+    template <CScalar T, u32 R, u32 C>
+    [[nodiscard]] constexpr auto ZeroMatrix() noexcept -> TMatrix<T, R, C> {
         return TMatrix<T, R, C>(T{});
     }
 
     // Determinant for 2x2
-    template <CScalar T> [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 2, 2>& M) noexcept -> T
-    {
+    template <CScalar T>
+    [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 2, 2>& M) noexcept -> T {
         return M(0, 0) * M(1, 1) - M(0, 1) * M(1, 0);
     }
 
     // Determinant for 3x3
-    template <CScalar T> [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 3, 3>& M) noexcept -> T
-    {
-        return M(0, 0) * (M(1, 1) * M(2, 2) - M(1, 2) * M(2, 1)) - M(0, 1) * (M(1, 0) * M(2, 2) - M(1, 2) * M(2, 0))
+    template <CScalar T>
+    [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 3, 3>& M) noexcept -> T {
+        return M(0, 0) * (M(1, 1) * M(2, 2) - M(1, 2) * M(2, 1))
+            - M(0, 1) * (M(1, 0) * M(2, 2) - M(1, 2) * M(2, 0))
             + M(0, 2) * (M(1, 0) * M(2, 1) - M(1, 1) * M(2, 0));
     }
 
     // Determinant for 4x4 (expand along row 0 using 3x3 minors)
-    template <CScalar T> [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 4, 4>& M) noexcept -> T
-    {
+    template <CScalar T>
+    [[nodiscard]] constexpr auto Determinant(const TMatrix<T, 4, 4>& M) noexcept -> T {
         auto det3Excluding = [&](u32 excludeCol) constexpr -> T {
             // collect columns != excludeCol for rows 1..3
             u32 cols[3];
@@ -72,7 +70,8 @@ namespace AltinaEngine::Core::Math::LinAlg
             T a21 = M(3, cols[1]);
             T a22 = M(3, cols[2]);
 
-            return a00 * (a11 * a22 - a12 * a21) - a01 * (a10 * a22 - a12 * a20) + a02 * (a10 * a21 - a11 * a20);
+            return a00 * (a11 * a22 - a12 * a21) - a01 * (a10 * a22 - a12 * a20)
+                + a02 * (a10 * a21 - a11 * a20);
         };
 
         return M(0, 0) * det3Excluding(0) - M(0, 1) * det3Excluding(1) + M(0, 2) * det3Excluding(2)
@@ -80,8 +79,8 @@ namespace AltinaEngine::Core::Math::LinAlg
     }
 
     // Inverse for 2x2
-    template <CScalar T> [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 2, 2>& M) noexcept -> TMatrix<T, 2, 2>
-    {
+    template <CScalar T>
+    [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 2, 2>& M) noexcept -> TMatrix<T, 2, 2> {
         T                det    = Determinant(M);
         T                invdet = static_cast<T>(1) / det;
         TMatrix<T, 2, 2> out;
@@ -93,8 +92,8 @@ namespace AltinaEngine::Core::Math::LinAlg
     }
 
     // Inverse for 3x3
-    template <CScalar T> [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 3, 3>& M) noexcept -> TMatrix<T, 3, 3>
-    {
+    template <CScalar T>
+    [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 3, 3>& M) noexcept -> TMatrix<T, 3, 3> {
         T                det    = Determinant(M);
         T                invdet = static_cast<T>(1) / det;
         TMatrix<T, 3, 3> out;
@@ -115,8 +114,8 @@ namespace AltinaEngine::Core::Math::LinAlg
     }
 
     // Inverse for 4x4 (templated, works for float/double)
-    template <CScalar T> [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 4, 4>& p) noexcept -> TMatrix<T, 4, 4>
-    {
+    template <CScalar T>
+    [[nodiscard]] constexpr auto Inverse(const TMatrix<T, 4, 4>& p) noexcept -> TMatrix<T, 4, 4> {
         // Adapted from common 4x4 inversion algorithm
         T a2323 = p[2][2] * p[3][3] - p[2][3] * p[3][2];
         T a1323 = p[2][1] * p[3][3] - p[2][3] * p[3][1];
@@ -163,9 +162,8 @@ namespace AltinaEngine::Core::Math::LinAlg
 
     // Remap a 3D axis-aligned box from source to destination in homogeneous-space matrix form.
     // Produces a 4x4 affine transform that maps srcMin..srcMax to dstMin..dstMax.
-    [[nodiscard]] AE_FORCEINLINE auto CubeSpaceRemap(const FVector3f& srcMin, const FVector3f& srcMax,
-        const FVector3f& dstMin, const FVector3f& dstMax) -> FMatrix4x4f
-    {
+    [[nodiscard]] AE_FORCEINLINE auto CubeSpaceRemap(const FVector3f& srcMin,
+        const FVector3f& srcMax, const FVector3f& dstMin, const FVector3f& dstMax) -> FMatrix4x4f {
         f32         scaleX  = (dstMax.X() - dstMin.X()) / (srcMax.X() - srcMin.X());
         f32         scaleY  = (dstMax.Y() - dstMin.Y()) / (srcMax.Y() - srcMin.Y());
         f32         scaleZ  = (dstMax.Z() - dstMin.Z()) / (srcMax.Z() - srcMin.Z());
@@ -183,8 +181,7 @@ namespace AltinaEngine::Core::Math::LinAlg
     }
 
     // Create a skew-symmetric matrix such that CrossProductMatrix(a) * b = a x b
-    [[nodiscard]] AE_FORCEINLINE auto CrossProductMatrix(const FVector3f& v) -> FMatrix3x3f
-    {
+    [[nodiscard]] AE_FORCEINLINE auto CrossProductMatrix(const FVector3f& v) -> FMatrix3x3f {
         FMatrix3x3f result = ZeroMatrix<f32, 3, 3>();
 
         result[0][0] = 0.0f;

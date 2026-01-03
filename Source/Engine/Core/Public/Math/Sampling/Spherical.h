@@ -3,18 +3,15 @@
 #include "../Common.h"
 #include "../Vector.h"
 
-namespace AltinaEngine::Core::Math
-{
-    inline auto ConcentricOctahedralTransform(const FVector2f& sample) -> FVector3f
-    {
+namespace AltinaEngine::Core::Math {
+    inline auto ConcentricOctahedralTransform(const FVector2f& sample) -> FVector3f {
         // https://zhuanlan.zhihu.com/p/408898601
         // https://fileadmin.cs.lth.se/graphics/research/papers/2008/simdmapping/clarberg_simdmapping08_preprint.pdf
 
         f32       sx = sample.X();
         f32       sy = sample.Y();
         FVector2f sampleOffset(sx * 2.0f - 1.0f, sy * 2.0f - 1.0f);
-        if (sampleOffset.X() == 0.0f && sampleOffset.Y() == 0.0f)
-        {
+        if (sampleOffset.X() == 0.0f && sampleOffset.Y() == 0.0f) {
             return FVector3f(0.0f);
         }
 

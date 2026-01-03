@@ -20,8 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-StatementMacros: ['IF_PROPERTY', 'IF_FUNCTION', 'IF_CLASS', 'IF_STRUCT', 'IF_ENUM', 'IF_INTERFACE', 'GENERATED_BODY']
-AttributeMacros: ['IF_LIKELY', 'IF_UNLIKELY', 'IF_NODISCARD']
+StatementMacros: [ 'IF_PROPERTY', 'IF_FUNCTION', 'IF_CLASS', 'IF_STRUCT', 'IF_ENUM', 'IF_INTERFACE', 'GENERATED_BODY' ]
+AttributeMacros: [ 'IF_LIKELY', 'IF_UNLIKELY', 'IF_NODISCARD' ]
 
 Language: Cpp
 BasedOnStyle: LLVM
@@ -42,27 +42,28 @@ AllowShortFunctionsOnASingleLine: All
 AllowShortLambdasOnASingleLine: All
 BraceWrapping:
   AfterCaseLabel: true
-  AfterClass: true
-  AfterControlStatement: true
-  AfterEnum: true
-  AfterFunction: true
-  AfterNamespace: true
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
   AfterObjCDeclaration: true
-  AfterStruct: true
-  AfterUnion: true
-  AfterExternBlock: true
-  BeforeCatch: true
-  BeforeElse: true
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
   BeforeLambdaBody: false
-  BeforeWhile: true
+  BeforeWhile: false
   IndentBraces: false
+  SplitEmptyRecord: false
 BreakBeforeBinaryOperators: NonAssignment
 BreakBeforeBraces: Custom
 BreakInheritanceList: AfterColon
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeComma
 BreakStringLiterals: false
-ColumnLimit: 120
+ColumnLimit: 100
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 Cpp11BracedListStyle: false
 EmptyLineBeforeAccessModifier: LogicalBlock
@@ -75,4 +76,4 @@ PointerAlignment: Left
 SortIncludes: false
 SpaceBeforeCaseColon: false
 TabWidth: 4
-UseTab: false
+UseTab: Never

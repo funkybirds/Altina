@@ -7,19 +7,21 @@
     #include <typeinfo>
 #endif
 
-namespace AltinaEngine
-{
+namespace AltinaEngine {
 #ifdef AE_RTTI_ENABLED
     using FTypeInfo = std::type_info; // NOLINT
 #else
     using FTypeInfo = void; // NOLINT
 #endif
 
-    template <typename T> [[nodiscard]] auto GetRttiTypeInfo() -> const FTypeInfo& { return typeid(T); }
-    template <typename T> [[nodiscard]] auto GetRttiTypeHash() -> usize { return typeid(T).hash_code(); }
+    template <typename T> [[nodiscard]] auto GetRttiTypeInfo() -> const FTypeInfo& {
+        return typeid(T);
+    }
+    template <typename T> [[nodiscard]] auto GetRttiTypeHash() -> usize {
+        return typeid(T).hash_code();
+    }
 
-    [[nodiscard]] inline auto                GetRttiTypeObjectHash(const FTypeInfo& stdTypeInfo) -> usize
-    {
+    [[nodiscard]] inline auto GetRttiTypeObjectHash(const FTypeInfo& stdTypeInfo) -> usize {
         return stdTypeInfo.hash_code();
     }
 } // namespace AltinaEngine

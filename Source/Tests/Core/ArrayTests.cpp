@@ -10,8 +10,7 @@ using namespace AltinaEngine::Core::Container;
 static_assert(CRandomReadable<TArray<int, 4>>);
 static_assert(CRandomWritable<TArray<int, 4>>);
 
-TEST_CASE("TArray - basic properties")
-{
+TEST_CASE("TArray - basic properties") {
     using FArray4 = TArray<int, 4>;
 
     FArray4 arr{};
@@ -30,18 +29,15 @@ TEST_CASE("TArray - basic properties")
     REQUIRE(arr[3] == 4);
 }
 
-TEST_CASE("TArray - iteration and algorithms")
-{
+TEST_CASE("TArray - iteration and algorithms") {
     TArray<int, 4> arr{};
     int            value = 1;
-    for (auto& v : arr)
-    {
+    for (auto& v : arr) {
         v = value++;
     }
 
     int sum = 0;
-    for (auto v : arr)
-    {
+    for (auto v : arr) {
         sum += v;
     }
 

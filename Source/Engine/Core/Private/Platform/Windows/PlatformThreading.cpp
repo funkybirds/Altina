@@ -10,165 +10,140 @@
 
 using namespace AltinaEngine::Core::Platform::Generic;
 
-extern "C"
-{
+extern "C" {
 
-    auto PlatformCreateCriticalSection() -> void*
-    {
-        auto* cs = static_cast<CRITICAL_SECTION*>(::operator new(sizeof(CRITICAL_SECTION)));
-        ::InitializeCriticalSectionEx(cs, 4000, 0);
-        return cs;
-    }
+auto PlatformCreateCriticalSection() -> void* {
+    auto* cs = static_cast<CRITICAL_SECTION*>(::operator new(sizeof(CRITICAL_SECTION)));
+    ::InitializeCriticalSectionEx(cs, 4000, 0);
+    return cs;
+}
 
-    void PlatformDeleteCriticalSection(void* CS)
-    {
-        if (CS)
-        {
-            auto* cs = static_cast<CRITICAL_SECTION*>(CS);
-            DeleteCriticalSection(cs);
-            operator delete(cs);
-        }
-    }
-
-    void PlatformEnterCriticalSection(void* CS)
-    {
+void PlatformDeleteCriticalSection(void* CS) {
+    if (CS) {
         auto* cs = static_cast<CRITICAL_SECTION*>(CS);
-        EnterCriticalSection(cs);
+        DeleteCriticalSection(cs);
+        operator delete(cs);
     }
+}
 
-    auto PlatformTryEnterCriticalSection(void* CS) -> int
-    {
-        auto* cs = static_cast<CRITICAL_SECTION*>(CS);
-        return TryEnterCriticalSection(cs) ? 1 : 0;
-    }
+void PlatformEnterCriticalSection(void* CS) {
+    auto* cs = static_cast<CRITICAL_SECTION*>(CS);
+    EnterCriticalSection(cs);
+}
 
-    void PlatformLeaveCriticalSection(void* CS)
-    {
-        auto* cs = static_cast<CRITICAL_SECTION*>(CS);
-        LeaveCriticalSection(cs);
-    }
+auto PlatformTryEnterCriticalSection(void* CS) -> int {
+    auto* cs = static_cast<CRITICAL_SECTION*>(CS);
+    return TryEnterCriticalSection(cs) ? 1 : 0;
+}
 
-    auto PlatformCreateConditionVariable() -> void*
-    {
-        auto* cv = static_cast<CONDITION_VARIABLE*>(operator new(sizeof(CONDITION_VARIABLE)));
-        InitializeConditionVariable(cv);
-        return cv;
-    }
+void PlatformLeaveCriticalSection(void* CS) {
+    auto* cs = static_cast<CRITICAL_SECTION*>(CS);
+    LeaveCriticalSection(cs);
+}
 
-    void PlatformDeleteConditionVariable(void* CV)
-    {
-        if (CV)
-        {
-            ::operator delete(CV);
-        }
-    }
+auto PlatformCreateConditionVariable() -> void* {
+    auto* cv = static_cast<CONDITION_VARIABLE*>(operator new(sizeof(CONDITION_VARIABLE)));
+    InitializeConditionVariable(cv);
+    return cv;
+}
 
-    void PlatformWakeConditionVariable(void* CV)
-    {
-        auto* cv = static_cast<CONDITION_VARIABLE*>(CV);
-        WakeConditionVariable(cv);
+void PlatformDeleteConditionVariable(void* CV) {
+    if (CV) {
+        ::operator delete(CV);
     }
+}
 
-    void PlatformWakeAllConditionVariable(void* CV)
-    {
-        auto* cv = static_cast<CONDITION_VARIABLE*>(CV);
-        WakeAllConditionVariable(cv);
-    }
+void PlatformWakeConditionVariable(void* CV) {
+    auto* cv = static_cast<CONDITION_VARIABLE*>(CV);
+    WakeConditionVariable(cv);
+}
 
-    auto PlatformSleepConditionVariableCS(void* CV, void* CS, unsigned long Milliseconds) -> int
-    {
-        auto* cv = static_cast<CONDITION_VARIABLE*>(CV);
-        auto* cs = static_cast<CRITICAL_SECTION*>(CS);
-        BOOL  r  = ::SleepConditionVariableCS(cv, cs, Milliseconds);
-        return r ? 1 : 0;
-    }
+void PlatformWakeAllConditionVariable(void* CV) {
+    auto* cv = static_cast<CONDITION_VARIABLE*>(CV);
+    WakeAllConditionVariable(cv);
+}
 
-    auto PlatformCreateEvent(int bManualReset, int bInitiallySignaled) -> void*
-    {
-        HANDLE h = ::CreateEventA(nullptr, bManualReset ? TRUE : FALSE, bInitiallySignaled ? TRUE : FALSE, nullptr);
-        return static_cast<void*>(h);
-    }
+auto PlatformSleepConditionVariableCS(void* CV, void* CS, unsigned long Milliseconds) -> int {
+    auto* cv = static_cast<CONDITION_VARIABLE*>(CV);
+    auto* cs = static_cast<CRITICAL_SECTION*>(CS);
+    BOOL  r  = ::SleepConditionVariableCS(cv, cs, Milliseconds);
+    return r ? 1 : 0;
+}
 
-    void PlatformCloseEvent(void* Event)
-    {
-        if (Event)
-            CloseHandle(Event);
-    }
+auto PlatformCreateEvent(int bManualReset, int bInitiallySignaled) -> void* {
+    HANDLE h = ::CreateEventA(
+        nullptr, bManualReset ? TRUE : FALSE, bInitiallySignaled ? TRUE : FALSE, nullptr);
+    return static_cast<void*>(h);
+}
 
-    void PlatformSetEvent(void* Event)
-    {
-        if (Event)
-            SetEvent(Event);
-    }
+void PlatformCloseEvent(void* Event) {
+    if (Event)
+        CloseHandle(Event);
+}
 
-    void PlatformResetEvent(void* Event)
-    {
-        if (Event)
-            ::ResetEvent(Event);
-    }
+void PlatformSetEvent(void* Event) {
+    if (Event)
+        SetEvent(Event);
+}
 
-    auto PlatformWaitForEvent(void* Event, unsigned long Milliseconds) -> int
-    {
-        if (!Event)
-            return 0;
-        DWORD r = ::WaitForSingleObject(Event, Milliseconds);
-        return (r == WAIT_OBJECT_0) ? 1 : 0;
-    }
+void PlatformResetEvent(void* Event) {
+    if (Event)
+        ::ResetEvent(Event);
+}
 
-    auto PlatformInterlockedCompareExchange32(volatile int32_t* ptr, int32_t exchange, int32_t comparand) -> int32_t
-    {
-        return ::InterlockedCompareExchange(reinterpret_cast<volatile LONG*>(ptr), exchange, comparand);
-    }
+auto PlatformWaitForEvent(void* Event, unsigned long Milliseconds) -> int {
+    if (!Event)
+        return 0;
+    DWORD r = ::WaitForSingleObject(Event, Milliseconds);
+    return (r == WAIT_OBJECT_0) ? 1 : 0;
+}
 
-    auto PlatformInterlockedExchange32(volatile int32_t* ptr, int32_t value) -> int32_t
-    {
-        return ::InterlockedExchange(reinterpret_cast<volatile LONG*>(ptr), value);
-    }
+auto PlatformInterlockedCompareExchange32(
+    volatile int32_t* ptr, int32_t exchange, int32_t comparand) -> int32_t {
+    return ::InterlockedCompareExchange(reinterpret_cast<volatile LONG*>(ptr), exchange, comparand);
+}
 
-    auto PlatformInterlockedIncrement32(volatile int32_t* ptr) -> int32_t
-    {
-        return ::InterlockedIncrement(reinterpret_cast<volatile LONG*>(ptr));
-    }
+auto PlatformInterlockedExchange32(volatile int32_t* ptr, int32_t value) -> int32_t {
+    return ::InterlockedExchange(reinterpret_cast<volatile LONG*>(ptr), value);
+}
 
-    auto PlatformInterlockedDecrement32(volatile int32_t* ptr) -> int32_t
-    {
-        return ::InterlockedDecrement(reinterpret_cast<volatile LONG*>(ptr));
-    }
+auto PlatformInterlockedIncrement32(volatile int32_t* ptr) -> int32_t {
+    return ::InterlockedIncrement(reinterpret_cast<volatile LONG*>(ptr));
+}
 
-    auto PlatformInterlockedExchangeAdd32(volatile int32_t* ptr, int32_t add) -> int32_t
-    {
-        return ::InterlockedExchangeAdd(reinterpret_cast<volatile LONG*>(ptr), add);
-    }
+auto PlatformInterlockedDecrement32(volatile int32_t* ptr) -> int32_t {
+    return ::InterlockedDecrement(reinterpret_cast<volatile LONG*>(ptr));
+}
 
-    auto PlatformInterlockedCompareExchange64(volatile int64_t* ptr, int64_t exchange, int64_t comparand) -> int64_t
-    {
-        return ::InterlockedCompareExchange64(reinterpret_cast<volatile LONGLONG*>(ptr), exchange, comparand);
-    }
+auto PlatformInterlockedExchangeAdd32(volatile int32_t* ptr, int32_t add) -> int32_t {
+    return ::InterlockedExchangeAdd(reinterpret_cast<volatile LONG*>(ptr), add);
+}
 
-    auto PlatformInterlockedExchange64(volatile int64_t* ptr, int64_t value) -> int64_t
-    {
-        return ::InterlockedExchange64(reinterpret_cast<volatile LONGLONG*>(ptr), value);
-    }
+auto PlatformInterlockedCompareExchange64(
+    volatile int64_t* ptr, int64_t exchange, int64_t comparand) -> int64_t {
+    return ::InterlockedCompareExchange64(
+        reinterpret_cast<volatile LONGLONG*>(ptr), exchange, comparand);
+}
 
-    auto PlatformInterlockedIncrement64(volatile int64_t* ptr) -> int64_t
-    {
-        return ::InterlockedIncrement64(reinterpret_cast<volatile LONGLONG*>(ptr));
-    }
+auto PlatformInterlockedExchange64(volatile int64_t* ptr, int64_t value) -> int64_t {
+    return ::InterlockedExchange64(reinterpret_cast<volatile LONGLONG*>(ptr), value);
+}
 
-    auto PlatformInterlockedDecrement64(volatile int64_t* ptr) -> int64_t
-    {
-        return ::InterlockedDecrement64(reinterpret_cast<volatile LONGLONG*>(ptr));
-    }
+auto PlatformInterlockedIncrement64(volatile int64_t* ptr) -> int64_t {
+    return ::InterlockedIncrement64(reinterpret_cast<volatile LONGLONG*>(ptr));
+}
 
-    auto PlatformInterlockedExchangeAdd64(volatile int64_t* ptr, int64_t add) -> int64_t
-    {
-        return ::InterlockedExchangeAdd64(reinterpret_cast<volatile LONGLONG*>(ptr), add);
-    }
+auto PlatformInterlockedDecrement64(volatile int64_t* ptr) -> int64_t {
+    return ::InterlockedDecrement64(reinterpret_cast<volatile LONGLONG*>(ptr));
+}
+
+auto PlatformInterlockedExchangeAdd64(volatile int64_t* ptr, int64_t add) -> int64_t {
+    return ::InterlockedExchangeAdd64(reinterpret_cast<volatile LONGLONG*>(ptr), add);
+}
 
 } // extern "C"
 
-namespace AltinaEngine::Core::Platform::Generic
-{
+namespace AltinaEngine::Core::Platform::Generic {
 
     void PlatformSleepMilliseconds(unsigned long Milliseconds) { ::Sleep(Milliseconds); }
 

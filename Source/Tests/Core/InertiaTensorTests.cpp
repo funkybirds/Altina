@@ -6,16 +6,14 @@ using namespace AltinaEngine;
 using namespace AltinaEngine::Core::Math;
 using namespace AltinaEngine::Core::Math::Physics;
 
-TEST_CASE("Physics - Disk moment of inertia 2D")
-{
+TEST_CASE("Physics - Disk moment of inertia 2D") {
     f32 r      = 2.0f;
     f32 m      = 3.0f;
     f32 expect = 0.5f * m * r * r; // 6.0
     REQUIRE_CLOSE(DiskMomentOfInertiaWrtCenter2D(r, m), expect, 1e-6f);
 }
 
-TEST_CASE("Physics - Rectangle moment of inertia 2D")
-{
+TEST_CASE("Physics - Rectangle moment of inertia 2D") {
     f32 w      = 2.0f;
     f32 h      = 3.0f;
     f32 m      = 4.0f;
@@ -23,8 +21,7 @@ TEST_CASE("Physics - Rectangle moment of inertia 2D")
     REQUIRE_CLOSE(RectMomentOfInertiaWrtCenter2D(w, h, m), expect, 1e-6f);
 }
 
-TEST_CASE("Physics - Sphere inertia tensor 3D")
-{
+TEST_CASE("Physics - Sphere inertia tensor 3D") {
     f32         r    = 1.0f;
     f32         m    = 2.0f;
     f32         diag = (2.0f / 5.0f) * m * r * r; // 0.8
@@ -34,8 +31,7 @@ TEST_CASE("Physics - Sphere inertia tensor 3D")
     REQUIRE_CLOSE(I[2][2], diag, 1e-6f);
 }
 
-TEST_CASE("Physics - Cuboid inertia tensor 3D")
-{
+TEST_CASE("Physics - Cuboid inertia tensor 3D") {
     f32         w = 2.0f;
     f32         h = 3.0f;
     f32         d = 4.0f;

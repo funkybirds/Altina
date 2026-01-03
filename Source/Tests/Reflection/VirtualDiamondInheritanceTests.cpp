@@ -8,32 +8,27 @@
 using namespace AltinaEngine::Core::Reflection;
 
 // Virtual (diamond) inheritance test types
-struct VBase
-{
+struct VBase {
     virtual ~VBase() = default;
     int mBase        = 1;
 };
 
-struct VLeft : virtual VBase
-{
+struct VLeft : virtual VBase {
     virtual ~VLeft() = default;
     int mLeft        = 2;
 };
 
-struct VRight : virtual VBase
-{
+struct VRight : virtual VBase {
     virtual ~VRight() = default;
     int mRight        = 3;
 };
 
-struct VDerived : VLeft, VRight
-{
+struct VDerived : VLeft, VRight {
     int mDerived = 4;
     VDerived()   = default;
 };
 
-TEST_CASE("Reflection.VirtualDiamond.AsVirtualBases")
-{
+TEST_CASE("Reflection.VirtualDiamond.AsVirtualBases") {
     // Register types once per process to avoid duplicate registration crashes
     static std::once_flag sReg;
     std::call_once(sReg, []() {
@@ -76,7 +71,10 @@ TEST_CASE("Reflection.VirtualDiamond.AsVirtualBases")
     VRight* expectedR  = static_cast<VRight*>(derivedPtr);
     VBase*  expectedB  = static_cast<VBase*>(derivedPtr);
 
-    REQUIRE_EQ(reinterpret_cast<uintptr_t>(&obj.As<VLeft>()), reinterpret_cast<uintptr_t>(expectedL));
-    REQUIRE_EQ(reinterpret_cast<uintptr_t>(&obj.As<VRight>()), reinterpret_cast<uintptr_t>(expectedR));
-    REQUIRE_EQ(reinterpret_cast<uintptr_t>(&obj.As<VBase>()), reinterpret_cast<uintptr_t>(expectedB));
+    REQUIRE_EQ(
+        reinterpret_cast<uintptr_t>(&obj.As<VLeft>()), reinterpret_cast<uintptr_t>(expectedL));
+    REQUIRE_EQ(
+        reinterpret_cast<uintptr_t>(&obj.As<VRight>()), reinterpret_cast<uintptr_t>(expectedR));
+    REQUIRE_EQ(
+        reinterpret_cast<uintptr_t>(&obj.As<VBase>()), reinterpret_cast<uintptr_t>(expectedB));
 }

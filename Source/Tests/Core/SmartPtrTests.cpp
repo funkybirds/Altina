@@ -6,8 +6,7 @@
 
 using namespace AltinaEngine::Core::Container;
 
-TEST_CASE("TOwner release and reset")
-{
+TEST_CASE("TOwner release and reset") {
     auto Owner = MakeUnique<int>(42);
     REQUIRE(Owner);
     REQUIRE_EQ(*Owner, 42);
@@ -24,8 +23,7 @@ TEST_CASE("TOwner release and reset")
     REQUIRE(!Rewrapped);
 }
 
-TEST_CASE("TOwner move and swap semantics")
-{
+TEST_CASE("TOwner move and swap semantics") {
     auto        First  = MakeUnique<int>(5);
     auto        Second = MakeUnique<int>(9);
 
@@ -44,19 +42,16 @@ TEST_CASE("TOwner move and swap semantics")
     REQUIRE_EQ(*Assigned, 5);
 }
 
-struct FCountingDeleter
-{
+struct FCountingDeleter {
     int* CounterPtr;
 
-    void operator()(int* Ptr) const
-    {
+    void operator()(int* Ptr) const {
         ++(*CounterPtr);
         delete Ptr;
     }
 };
 
-TEST_CASE("TOwner custom deleter is invoked")
-{
+TEST_CASE("TOwner custom deleter is invoked") {
     int Counter = 0;
     {
         TOwner<int, FCountingDeleter> Owner(new int(7), FCountingDeleter{ &Counter });
@@ -65,22 +60,20 @@ TEST_CASE("TOwner custom deleter is invoked")
     REQUIRE_EQ(Counter, 1);
 }
 
-struct FArrayCountingDeleter
-{
+struct FArrayCountingDeleter {
     int* CounterPtr;
 
-    void operator()(int* Ptr) const
-    {
+    void operator()(int* Ptr) const {
         ++(*CounterPtr);
         delete[] Ptr;
     }
 };
 
-TEST_CASE("TOwner array specialization supports indexing")
-{
+TEST_CASE("TOwner array specialization supports indexing") {
     int Counter = 0;
     {
-        TOwner<int[], FArrayCountingDeleter> Owner(new int[3]{ 1, 2, 3 }, FArrayCountingDeleter{ &Counter });
+        TOwner<int[], FArrayCountingDeleter> Owner(
+            new int[3]{ 1, 2, 3 }, FArrayCountingDeleter{ &Counter });
         REQUIRE_EQ(Owner[1], 2);
         Owner[1] = 10;
         REQUIRE_EQ(Owner[1], 10);
@@ -88,16 +81,14 @@ TEST_CASE("TOwner array specialization supports indexing")
     REQUIRE_EQ(Counter, 1);
 }
 
-TEST_CASE("AllocateUnique constructs via allocator")
-{
+TEST_CASE("AllocateUnique constructs via allocator") {
     TAllocator<int> Allocator;
     auto            Owner = AllocateUnique<int>(Allocator, 55);
     REQUIRE(Owner);
     REQUIRE_EQ(*Owner, 55);
 }
 
-TEST_CASE("TShared basic reference counting")
-{
+TEST_CASE("TShared basic reference counting") {
     auto Shared = MakeShared<int>(99);
     REQUIRE(Shared);
     REQUIRE_EQ(*Shared, 99);
@@ -115,8 +106,7 @@ TEST_CASE("TShared basic reference counting")
     REQUIRE_EQ(Shared.UseCount(), 0U);
 }
 
-TEST_CASE("TShared move and reset semantics")
-{
+TEST_CASE("TShared move and reset semantics") {
     auto         Shared = MakeShared<int>(5);
     TShared<int> Copy   = Shared;
     REQUIRE_EQ(Shared.UseCount(), 2U);
@@ -129,19 +119,16 @@ TEST_CASE("TShared move and reset semantics")
     REQUIRE_EQ(Moved.UseCount(), 1U);
 }
 
-struct FSharedCountingDeleter
-{
+struct FSharedCountingDeleter {
     int* CounterPtr;
 
-    void operator()(int* Ptr) const
-    {
+    void operator()(int* Ptr) const {
         ++(*CounterPtr);
         delete Ptr;
     }
 };
 
-TEST_CASE("TShared custom deleter triggers once")
-{
+TEST_CASE("TShared custom deleter triggers once") {
     int Counter = 0;
     {
         TShared<int> Shared(new int(11), FSharedCountingDeleter{ &Counter });
@@ -156,8 +143,7 @@ TEST_CASE("TShared custom deleter triggers once")
     REQUIRE_EQ(Counter, 1);
 }
 
-TEST_CASE("AllocateShared produces owning reference")
-{
+TEST_CASE("AllocateShared produces owning reference") {
     TAllocator<int> Alloc;
     auto            Shared = AllocateShared<int>(Alloc, 72);
     REQUIRE(Shared);

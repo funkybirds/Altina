@@ -4,13 +4,11 @@
 
 #include "Common.h"
 
-namespace AltinaEngine::Core::Threading
-{
+namespace AltinaEngine::Core::Threading {
 
     class FMutex;
 
-    class AE_CORE_API FConditionVariable
-    {
+    class AE_CORE_API FConditionVariable {
     public:
         FConditionVariable() noexcept;
         ~FConditionVariable() noexcept;

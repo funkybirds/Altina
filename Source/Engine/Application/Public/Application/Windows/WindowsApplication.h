@@ -25,11 +25,9 @@ using LRESULT = long long;
 
 #include "Application/Application.h"
 
-namespace AltinaEngine::Application
-{
+namespace AltinaEngine::Application {
 
-    class AE_APPLICATION_API FWindowsPlatformWindow final : public FPlatformWindow
-    {
+    class AE_APPLICATION_API FWindowsPlatformWindow final : public FPlatformWindow {
     public:
         FWindowsPlatformWindow();
         ~FWindowsPlatformWindow() override;
@@ -47,11 +45,13 @@ namespace AltinaEngine::Application
         [[nodiscard]] auto GetWindowHandle() const noexcept -> void*;
 
     private:
-        static LRESULT CALLBACK WindowProc(HWND InWindowHandle, UINT InMessage, WPARAM InWParam, LPARAM InLParam);
+        static LRESULT CALLBACK WindowProc(
+            HWND InWindowHandle, UINT InMessage, WPARAM InWParam, LPARAM InLParam);
 
-        void                    RegisterWindowClass();
-        void                    UpdateCachedSizeFromClientRect();
-        [[nodiscard]] auto      ResolveWindowStyle(const FPlatformWindowProperty& InProperties) const noexcept -> DWORD;
+        void               RegisterWindowClass();
+        void               UpdateCachedSizeFromClientRect();
+        [[nodiscard]] auto ResolveWindowStyle(
+            const FPlatformWindowProperty& InProperties) const noexcept -> DWORD;
 
         void*                   mWindowHandle   = nullptr;
         void*                   mInstanceHandle = nullptr;
@@ -59,8 +59,7 @@ namespace AltinaEngine::Application
         FWindowExtent           mCachedSize{};
     };
 
-    class AE_APPLICATION_API FWindowsApplication final : public FApplication
-    {
+    class AE_APPLICATION_API FWindowsApplication final : public FApplication {
     public:
         explicit FWindowsApplication(const FStartupParameters& InStartupParameters);
         ~FWindowsApplication() override = default;

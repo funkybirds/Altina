@@ -1,13 +1,11 @@
 #pragma once
 #include "Base/CoreAPI.h"
 #include "Types/Meta.h"
-namespace AltinaEngine::Core::Reflection
-{
+namespace AltinaEngine::Core::Reflection {
     using namespace TypeMeta;
     constexpr bool kEnableRuntimeSanityCheck = true;
 
-    enum class EReflectionErrorCode : u8
-    {
+    enum class EReflectionErrorCode : u8 {
         Success                  = 0,
         TypeNotCopyConstructible = 1,
         TypeNotDestructible      = 2,
@@ -22,21 +20,18 @@ namespace AltinaEngine::Core::Reflection
         DereferenceNullptr = 9
     };
 
-    struct FReflectionDumpData
-    {
+    struct FReflectionDumpData {
         void*            mObjInfo;
         FMetaMethodInfo* mMethodInfo;
     };
 
-    [[noreturn]] AE_CORE_API void ReflectionAbort(EReflectionErrorCode errorCode, const FReflectionDumpData& dumpData);
+    [[noreturn]] AE_CORE_API void ReflectionAbort(
+        EReflectionErrorCode errorCode, const FReflectionDumpData& dumpData);
 
-    inline auto ReflectionAssert(bool condition, EReflectionErrorCode errorCode, const FReflectionDumpData& dumpData)
-        -> bool
-    {
-        if constexpr (kEnableRuntimeSanityCheck)
-        {
-            if (!condition) [[unlikely]]
-            {
+    inline auto ReflectionAssert(bool condition, EReflectionErrorCode errorCode,
+        const FReflectionDumpData& dumpData) -> bool {
+        if constexpr (kEnableRuntimeSanityCheck) {
+            if (!condition) [[unlikely]] {
                 ReflectionAbort(errorCode, dumpData);
             }
         }

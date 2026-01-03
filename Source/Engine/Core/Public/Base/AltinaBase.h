@@ -55,5 +55,6 @@
     #define AE_DLLIMPORT
     #define AE_FORCEINLINE inline __attribute__((always_inline))
 #else
-    #error "Unknown compiler, please define AE_DLLEXPORT, AE_DLLIMPORT, and AE_FORCEINLINE for your compiler"
+    #error \
+        "Unknown compiler, please define AE_DLLEXPORT, AE_DLLIMPORT, and AE_FORCEINLINE for your compiler"
 #endif

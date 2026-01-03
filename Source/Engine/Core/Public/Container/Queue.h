@@ -2,11 +2,9 @@
 
 #include "Deque.h"
 
-namespace AltinaEngine::Core::Container
-{
+namespace AltinaEngine::Core::Container {
 
-    template <typename T, typename C = TDeque<T>> class TQueue
-    {
+    template <typename T, typename C = TDeque<T>> class TQueue {
     public:
         using TValueType = T;
         using TSizeType  = usize;

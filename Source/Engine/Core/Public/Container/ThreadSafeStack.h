@@ -3,53 +3,44 @@
 #include "Stack.h"
 #include "../Threading/Mutex.h"
 
-namespace AltinaEngine::Core::Container
-{
+namespace AltinaEngine::Core::Container {
 
-    template <typename T, typename C = TDeque<T>> class TThreadSafeStack
-    {
+    template <typename T, typename C = TDeque<T>> class TThreadSafeStack {
     public:
         using TValueType = T;
         using TSizeType  = usize;
 
-        auto IsEmpty() const noexcept -> bool
-        {
+        auto IsEmpty() const noexcept -> bool {
             Threading::FScopedLock lock(const_cast<Threading::FMutex&>(mMutex));
             return mStack.IsEmpty();
         }
 
-        auto Size() const noexcept -> TSizeType
-        {
+        auto Size() const noexcept -> TSizeType {
             Threading::FScopedLock lock(const_cast<Threading::FMutex&>(mMutex));
             return mStack.Size();
         }
 
-        void Push(const TValueType& v)
-        {
+        void Push(const TValueType& v) {
             Threading::FScopedLock lock(mMutex);
             mStack.Push(v);
         }
 
-        void Push(TValueType&& v)
-        {
+        void Push(TValueType&& v) {
             Threading::FScopedLock lock(mMutex);
             mStack.Push(AltinaEngine::Move(v));
         }
 
-        void Pop()
-        {
+        void Pop() {
             Threading::FScopedLock lock(mMutex);
             mStack.Pop();
         }
 
-        auto Top() -> TValueType
-        {
+        auto Top() -> TValueType {
             Threading::FScopedLock lock(mMutex);
             return mStack.Top();
         }
 
-        auto TopConst() const -> TValueType
-        {
+        auto TopConst() const -> TValueType {
             Threading::FScopedLock lock(const_cast<Threading::FMutex&>(mMutex));
             return mStack.Top();
         }

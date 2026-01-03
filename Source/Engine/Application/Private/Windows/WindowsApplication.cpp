@@ -7,19 +7,15 @@
 
     #include "Logging/Log.h"
 
-namespace AltinaEngine::Application
-{
+namespace AltinaEngine::Application {
     using AltinaEngine::Core::Container::FString;
     using AltinaEngine::Core::Container::MakeUnique;
 
-    namespace
-    {
+    namespace {
         constexpr const TChar* kWindowClassName = TEXT("AltinaEngineWindowClass");
 
-        auto                   ToWin32DisplayMode(EWindowDisplayMode DisplayMode) -> DWORD
-        {
-            switch (DisplayMode)
-            {
+        auto                   ToWin32DisplayMode(EWindowDisplayMode DisplayMode) -> DWORD {
+            switch (DisplayMode) {
                 case EWindowDisplayMode::Fullscreen:
                     return WS_POPUP;
                 case EWindowDisplayMode::Borderless:
@@ -30,24 +26,24 @@ namespace AltinaEngine::Application
             }
         }
 
-        class FWindowTitleCStr
-        {
+        class FWindowTitleCStr {
         public:
-            explicit FWindowTitleCStr(const FString& Title) : mBuffer(Title) { EnsureNullTerminated(); }
+            explicit FWindowTitleCStr(const FString& Title) : mBuffer(Title) {
+                EnsureNullTerminated();
+            }
 
-            auto Get() const noexcept -> const TChar* { return mBuffer.IsEmptyString() ? TEXT("") : mBuffer.GetData(); }
+            auto Get() const noexcept -> const TChar* {
+                return mBuffer.IsEmptyString() ? TEXT("") : mBuffer.GetData();
+            }
 
         private:
-            void EnsureNullTerminated()
-            {
-                if (mBuffer.IsEmptyString())
-                {
+            void EnsureNullTerminated() {
+                if (mBuffer.IsEmptyString()) {
                     mBuffer.Append(TEXT("AltinaEngine"));
                 }
 
                 const usize length = mBuffer.Length();
-                if ((length == 0U) || (mBuffer[length - 1U] != static_cast<TChar>(0)))
-                {
+                if ((length == 0U) || (mBuffer[length - 1U] != static_cast<TChar>(0))) {
                     mBuffer.Append(static_cast<TChar>(0));
                 }
             }
@@ -56,23 +52,23 @@ namespace AltinaEngine::Application
         };
     } // namespace
 
-    FWindowsPlatformWindow::FWindowsPlatformWindow() { mInstanceHandle = static_cast<void*>(GetModuleHandle(nullptr)); }
+    FWindowsPlatformWindow::FWindowsPlatformWindow() {
+        mInstanceHandle = static_cast<void*>(GetModuleHandle(nullptr));
+    }
 
-    FWindowsPlatformWindow::~FWindowsPlatformWindow()
-    {
-        if (mWindowHandle)
-        {
+    FWindowsPlatformWindow::~FWindowsPlatformWindow() {
+        if (mWindowHandle) {
             DestroyWindow(static_cast<HWND>(mWindowHandle));
             mWindowHandle = nullptr;
         }
     }
 
-    auto FWindowsPlatformWindow::Initialize(const FPlatformWindowProperty& InProperties) -> bool
-    {
+    auto FWindowsPlatformWindow::Initialize(const FPlatformWindowProperty& InProperties) -> bool {
         RegisterWindowClass();
 
         const DWORD windowStyle = ResolveWindowStyle(InProperties);
-        RECT        windowRect{ 0, 0, static_cast<LONG>(InProperties.mWidth), static_cast<LONG>(InProperties.mHeight) };
+        RECT        windowRect{ 0, 0, static_cast<LONG>(InProperties.mWidth),
+            static_cast<LONG>(InProperties.mHeight) };
         AdjustWindowRect(&windowRect, windowStyle, FALSE);
 
         const i32              width  = windowRect.right - windowRect.left;
@@ -80,17 +76,17 @@ namespace AltinaEngine::Application
 
         const FWindowTitleCStr titleCStr(InProperties.mTitle);
 
-        mWindowHandle =
-            static_cast<void*>(CreateWindowEx(0, kWindowClassName, titleCStr.Get(), windowStyle, CW_USEDEFAULT,
-                CW_USEDEFAULT, width, height, nullptr, nullptr, static_cast<HINSTANCE>(mInstanceHandle), this));
+        mWindowHandle = static_cast<void*>(CreateWindowEx(0, kWindowClassName, titleCStr.Get(),
+            windowStyle, CW_USEDEFAULT, CW_USEDEFAULT, width, height, nullptr, nullptr,
+            static_cast<HINSTANCE>(mInstanceHandle), this));
 
-        if (!mWindowHandle)
-        {
+        if (!mWindowHandle) {
             LogError(TEXT("Failed to create Win32 window (error {})."), GetLastError());
             return false;
         }
 
-        SetWindowLongPtr(static_cast<HWND>(mWindowHandle), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+        SetWindowLongPtr(
+            static_cast<HWND>(mWindowHandle), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
         mProperties = InProperties;
         UpdateCachedSizeFromClientRect();
@@ -98,10 +94,8 @@ namespace AltinaEngine::Application
         return true;
     }
 
-    void FWindowsPlatformWindow::Show()
-    {
-        if (!mWindowHandle)
-        {
+    void FWindowsPlatformWindow::Show() {
+        if (!mWindowHandle) {
             return;
         }
 
@@ -109,20 +103,16 @@ namespace AltinaEngine::Application
         UpdateWindow(static_cast<HWND>(mWindowHandle));
     }
 
-    void FWindowsPlatformWindow::Hide()
-    {
-        if (!mWindowHandle)
-        {
+    void FWindowsPlatformWindow::Hide() {
+        if (!mWindowHandle) {
             return;
         }
 
         ShowWindow(static_cast<HWND>(mWindowHandle), SW_HIDE);
     }
 
-    void FWindowsPlatformWindow::Resize(u32 InWidth, u32 InHeight)
-    {
-        if (!mWindowHandle)
-        {
+    void FWindowsPlatformWindow::Resize(u32 InWidth, u32 InHeight) {
+        if (!mWindowHandle) {
             return;
         }
 
@@ -134,10 +124,8 @@ namespace AltinaEngine::Application
         UpdateCachedSizeFromClientRect();
     }
 
-    void FWindowsPlatformWindow::MoveTo(i32 InPositionX, i32 InPositionY)
-    {
-        if (!mWindowHandle)
-        {
+    void FWindowsPlatformWindow::MoveTo(i32 InPositionX, i32 InPositionY) {
+        if (!mWindowHandle) {
             return;
         }
 
@@ -145,20 +133,16 @@ namespace AltinaEngine::Application
             SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    void FWindowsPlatformWindow::Minimalize()
-    {
-        if (!mWindowHandle)
-        {
+    void FWindowsPlatformWindow::Minimalize() {
+        if (!mWindowHandle) {
             return;
         }
 
         ShowWindow(static_cast<HWND>(mWindowHandle), SW_MINIMIZE);
     }
 
-    void FWindowsPlatformWindow::Maximalize()
-    {
-        if (!mWindowHandle)
-        {
+    void FWindowsPlatformWindow::Maximalize() {
+        if (!mWindowHandle) {
             return;
         }
 
@@ -167,46 +151,38 @@ namespace AltinaEngine::Application
 
     auto FWindowsPlatformWindow::GetSize() const noexcept -> FWindowExtent { return mCachedSize; }
 
-    auto FWindowsPlatformWindow::GetProperties() const -> FPlatformWindowProperty
-    {
-        if (mWindowHandle)
-        {
+    auto FWindowsPlatformWindow::GetProperties() const -> FPlatformWindowProperty {
+        if (mWindowHandle) {
             const_cast<FWindowsPlatformWindow*>(this)->UpdateCachedSizeFromClientRect();
         }
         return mProperties;
     }
 
-    auto             FWindowsPlatformWindow::GetWindowHandle() const noexcept -> void* { return mWindowHandle; }
+    auto FWindowsPlatformWindow::GetWindowHandle() const noexcept -> void* { return mWindowHandle; }
 
     LRESULT CALLBACK FWindowsPlatformWindow::WindowProc(
-        HWND InWindowHandle, UINT InMessage, WPARAM InWParam, LPARAM InLParam)
-    {
+        HWND InWindowHandle, UINT InMessage, WPARAM InWParam, LPARAM InLParam) {
         FWindowsPlatformWindow* window = nullptr;
 
-        if (InMessage == WM_NCCREATE)
-        {
+        if (InMessage == WM_NCCREATE) {
             const auto* createStruct = reinterpret_cast<CREATESTRUCT*>(InLParam);
-            window                   = static_cast<FWindowsPlatformWindow*>(createStruct->lpCreateParams);
+            window = static_cast<FWindowsPlatformWindow*>(createStruct->lpCreateParams);
             SetWindowLongPtr(InWindowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
-        }
-        else
-        {
-            window = reinterpret_cast<FWindowsPlatformWindow*>(GetWindowLongPtr(InWindowHandle, GWLP_USERDATA));
+        } else {
+            window = reinterpret_cast<FWindowsPlatformWindow*>(
+                GetWindowLongPtr(InWindowHandle, GWLP_USERDATA));
         }
 
-        if (window)
-        {
+        if (window) {
             window->mWindowHandle = static_cast<void*>(InWindowHandle);
         }
 
-        switch (InMessage)
-        {
+        switch (InMessage) {
             case WM_DESTROY:
                 PostQuitMessage(0);
                 return 0;
             case WM_SIZE:
-                if (window)
-                {
+                if (window) {
                     window->UpdateCachedSizeFromClientRect();
                 }
                 break;
@@ -217,11 +193,9 @@ namespace AltinaEngine::Application
         return DefWindowProc(InWindowHandle, InMessage, InWParam, InLParam);
     }
 
-    void FWindowsPlatformWindow::RegisterWindowClass()
-    {
+    void FWindowsPlatformWindow::RegisterWindowClass() {
         static bool bClassRegistered = false;
-        if (bClassRegistered)
-        {
+        if (bClassRegistered) {
             return;
         }
 
@@ -233,11 +207,9 @@ namespace AltinaEngine::Application
         windowClass.hCursor       = LoadCursor(nullptr, IDC_ARROW);
         windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
 
-        if (!RegisterClass(&windowClass))
-        {
+        if (!RegisterClass(&windowClass)) {
             const DWORD errorCode = GetLastError();
-            if (errorCode != ERROR_CLASS_ALREADY_EXISTS)
-            {
+            if (errorCode != ERROR_CLASS_ALREADY_EXISTS) {
                 LogError(TEXT("RegisterClass failed (error {})."), errorCode);
             }
         }
@@ -245,10 +217,8 @@ namespace AltinaEngine::Application
         bClassRegistered = true;
     }
 
-    void FWindowsPlatformWindow::UpdateCachedSizeFromClientRect()
-    {
-        if (!mWindowHandle)
-        {
+    void FWindowsPlatformWindow::UpdateCachedSizeFromClientRect() {
+        if (!mWindowHandle) {
             return;
         }
 
@@ -260,29 +230,23 @@ namespace AltinaEngine::Application
         mProperties.mHeight = mCachedSize.mHeight;
     }
 
-    DWORD FWindowsPlatformWindow::ResolveWindowStyle(const FPlatformWindowProperty& InProperties) const noexcept
-    {
+    DWORD FWindowsPlatformWindow::ResolveWindowStyle(
+        const FPlatformWindowProperty& InProperties) const noexcept {
         return ToWin32DisplayMode(InProperties.mDisplayMode);
     }
 
     FWindowsApplication::FWindowsApplication(const FStartupParameters& InStartupParameters)
-        : FApplication(InStartupParameters)
-    {
-    }
+        : FApplication(InStartupParameters) {}
 
-    auto FWindowsApplication::CreatePlatformWindow() -> FWindowOwner
-    {
+    auto FWindowsApplication::CreatePlatformWindow() -> FWindowOwner {
         auto window = MakeUnique<FWindowsPlatformWindow>();
         return FWindowOwner(window.release());
     }
 
-    void FWindowsApplication::PumpPlatformMessages()
-    {
+    void FWindowsApplication::PumpPlatformMessages() {
         MSG message{};
-        while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
-        {
-            if (message.message == WM_QUIT)
-            {
+        while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE)) {
+            if (message.message == WM_QUIT) {
                 RequestShutdown();
                 break;
             }

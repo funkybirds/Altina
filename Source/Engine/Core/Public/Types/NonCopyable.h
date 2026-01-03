@@ -1,11 +1,9 @@
 #pragma once
 
-namespace AltinaEngine
-{
+namespace AltinaEngine {
 
     // Base class to disable copy semantics for classes
-    class FNonCopyableClass
-    {
+    class FNonCopyableClass {
     public:
         FNonCopyableClass()  = default;
         ~FNonCopyableClass() = default;
@@ -17,8 +15,7 @@ namespace AltinaEngine
     };
 
     // Base struct to disable copy semantics for POD-like structs
-    struct FNonCopyableStruct
-    {
+    struct FNonCopyableStruct {
         FNonCopyableStruct()  = default;
         ~FNonCopyableStruct() = default;
 
@@ -28,8 +25,7 @@ namespace AltinaEngine
         auto operator=(FNonCopyableStruct&&) -> FNonCopyableStruct&      = default;
     };
 
-    struct FNonMovableStruct
-    {
+    struct FNonMovableStruct {
         FNonMovableStruct()                                            = default;
         FNonMovableStruct(FNonMovableStruct const&)                    = delete;
         FNonMovableStruct(FNonMovableStruct&&)                         = delete;
@@ -37,8 +33,7 @@ namespace AltinaEngine
         auto operator=(FNonMovableStruct&&) -> FNonMovableStruct&      = delete;
         ~FNonMovableStruct()                                           = default;
     };
-    class FNonMovableClass
-    {
+    class FNonMovableClass {
     public:
         FNonMovableClass()                                           = default;
         ~FNonMovableClass()                                          = default;

@@ -3,53 +3,44 @@
 #include "Queue.h"
 #include "../Threading/Mutex.h"
 
-namespace AltinaEngine::Core::Container
-{
+namespace AltinaEngine::Core::Container {
 
-    template <typename T, typename C = TDeque<T>> class TThreadSafeQueue
-    {
+    template <typename T, typename C = TDeque<T>> class TThreadSafeQueue {
     public:
         using TValueType = T;
         using TSizeType  = usize;
 
-        auto IsEmpty() const noexcept -> bool
-        {
+        auto IsEmpty() const noexcept -> bool {
             Threading::FScopedLock lock(const_cast<Threading::FMutex&>(mMutex));
             return mQueue.IsEmpty();
         }
 
-        auto Size() const noexcept -> TSizeType
-        {
+        auto Size() const noexcept -> TSizeType {
             Threading::FScopedLock lock(const_cast<Threading::FMutex&>(mMutex));
             return mQueue.Size();
         }
 
-        void Push(const TValueType& v)
-        {
+        void Push(const TValueType& v) {
             Threading::FScopedLock lock(mMutex);
             mQueue.Push(v);
         }
 
-        void Push(TValueType&& v)
-        {
+        void Push(TValueType&& v) {
             Threading::FScopedLock lock(mMutex);
             mQueue.Push(AltinaEngine::Move(v));
         }
 
-        void Pop()
-        {
+        void Pop() {
             Threading::FScopedLock lock(mMutex);
             mQueue.Pop();
         }
 
-        auto Front() -> TValueType
-        {
+        auto Front() -> TValueType {
             Threading::FScopedLock lock(mMutex);
             return mQueue.Front();
         }
 
-        auto FrontConst() const -> TValueType
-        {
+        auto FrontConst() const -> TValueType {
             Threading::FScopedLock lock(const_cast<Threading::FMutex&>(mMutex));
             return mQueue.Front();
         }

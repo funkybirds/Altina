@@ -2,11 +2,9 @@
 #pragma once
 #include "../Base/CoreAPI.h"
 
-namespace AltinaEngine::Core::Threading
-{
+namespace AltinaEngine::Core::Threading {
 
-    class AE_CORE_API FMutex
-    {
+    class AE_CORE_API FMutex {
     public:
         FMutex() noexcept;
         ~FMutex() noexcept;
@@ -25,8 +23,7 @@ namespace AltinaEngine::Core::Threading
         void* mImpl; // Opaque pointer to platform implementation
     };
 
-    class AE_CORE_API FScopedLock
-    {
+    class AE_CORE_API FScopedLock {
     public:
         explicit FScopedLock(FMutex& InMutex) noexcept;
         ~FScopedLock() noexcept;

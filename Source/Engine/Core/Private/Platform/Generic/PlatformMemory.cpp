@@ -8,24 +8,18 @@
     #include <malloc.h>
 #endif
 
-namespace AltinaEngine::Core::Platform
-{
+namespace AltinaEngine::Core::Platform {
 
-    namespace
-    {
+    namespace {
         // Normalize alignment to a sensible power-of-two minimum.
-        [[nodiscard]] constexpr auto NormalizeAlignment(usize Alignment) noexcept -> usize
-        {
-            if (Alignment == 0U)
-            {
+        [[nodiscard]] constexpr auto NormalizeAlignment(usize Alignment) noexcept -> usize {
+            if (Alignment == 0U) {
                 return alignof(std::max_align_t);
             }
 
-            if ((Alignment & (Alignment - 1U)) != 0U)
-            {
+            if ((Alignment & (Alignment - 1U)) != 0U) {
                 usize powerOfTwo = 1U;
-                while (powerOfTwo < Alignment)
-                {
+                while (powerOfTwo < Alignment) {
                     powerOfTwo <<= 1U;
                 }
                 Alignment = powerOfTwo;
@@ -35,13 +29,10 @@ namespace AltinaEngine::Core::Platform
         }
     } // namespace
 
-    class FDefaultMemoryAllocator final : public FMemoryAllocator
-    {
+    class FDefaultMemoryAllocator final : public FMemoryAllocator {
     public:
-        auto MemoryAllocate(usize Size, usize Alignment) -> void* override
-        {
-            if (Size == 0U)
-            {
+        auto MemoryAllocate(usize Size, usize Alignment) -> void* override {
+            if (Size == 0U) {
                 return nullptr;
             }
 
@@ -50,8 +41,7 @@ namespace AltinaEngine::Core::Platform
 #if AE_PLATFORM_WIN
             return _aligned_malloc(Size, normalizedAlignment);
 #else
-            if (NormalizedAlignment <= alignof(std::max_align_t))
-            {
+            if (NormalizedAlignment <= alignof(std::max_align_t)) {
                 return std::malloc(Size);
             }
 
@@ -61,15 +51,12 @@ namespace AltinaEngine::Core::Platform
 #endif
         }
 
-        auto MemoryReallocate(void* Ptr, usize NewSize, usize Alignment) -> void* override
-        {
-            if (Ptr == nullptr)
-            {
+        auto MemoryReallocate(void* Ptr, usize NewSize, usize Alignment) -> void* override {
+            if (Ptr == nullptr) {
                 return MemoryAllocate(NewSize, Alignment);
             }
 
-            if (NewSize == 0U)
-            {
+            if (NewSize == 0U) {
                 MemoryFree(Ptr);
                 return nullptr;
             }
@@ -79,16 +66,14 @@ namespace AltinaEngine::Core::Platform
 #if AE_PLATFORM_WIN
             return _aligned_realloc(Ptr, NewSize, normalizedAlignment);
 #else
-            if (NormalizedAlignment <= alignof(std::max_align_t))
-            {
+            if (NormalizedAlignment <= alignof(std::max_align_t)) {
                 return std::realloc(Ptr, NewSize);
             }
 
             void*     Result = nullptr;
             const int Error  = posix_memalign(&Result, NormalizedAlignment, NewSize);
 
-            if (Error != 0)
-            {
+            if (Error != 0) {
                 return nullptr;
             }
 
@@ -98,8 +83,7 @@ namespace AltinaEngine::Core::Platform
 #endif
         }
 
-        void MemoryFree(void* Ptr) override
-        {
+        void MemoryFree(void* Ptr) override {
 #if AE_PLATFORM_WIN
             _aligned_free(Ptr);
 #else
@@ -108,8 +92,7 @@ namespace AltinaEngine::Core::Platform
         }
     };
 
-    auto GetGlobalMemoryAllocator() noexcept -> FMemoryAllocator*
-    {
+    auto GetGlobalMemoryAllocator() noexcept -> FMemoryAllocator* {
         static FDefaultMemoryAllocator gDefaultAllocator;
         return &gDefaultAllocator;
     }

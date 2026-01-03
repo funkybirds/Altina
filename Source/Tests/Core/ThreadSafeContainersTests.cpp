@@ -10,8 +10,7 @@
 
 using namespace AltinaEngine::Core::Container;
 
-TEST_CASE("TThreadSafeQueue concurrent producers/consumer")
-{
+TEST_CASE("TThreadSafeQueue concurrent producers/consumer") {
     TThreadSafeQueue<int>    Q;
     const int                Producers        = 4;
     const int                ItemsPerProducer = 2000;
@@ -22,16 +21,12 @@ TEST_CASE("TThreadSafeQueue concurrent producers/consumer")
 
     // Start consumer
     std::thread              consumer([&]() {
-        while (consumed.load() < Total)
-        {
-            if (!Q.IsEmpty())
-            {
+        while (consumed.load() < Total) {
+            if (!Q.IsEmpty()) {
                 int v = Q.Front();
                 Q.Pop();
                 consumed.fetch_add(1);
-            }
-            else
-            {
+            } else {
                 std::this_thread::sleep_for(std::chrono::microseconds(50));
             }
         }
@@ -39,11 +34,9 @@ TEST_CASE("TThreadSafeQueue concurrent producers/consumer")
 
     // Start producers
     std::vector<std::thread> workers;
-    for (int p = 0; p < Producers; ++p)
-    {
+    for (int p = 0; p < Producers; ++p) {
         workers.emplace_back([&]() {
-            for (int i = 0; i < ItemsPerProducer; ++i)
-            {
+            for (int i = 0; i < ItemsPerProducer; ++i) {
                 Q.Push(i);
                 produced.fetch_add(1);
             }
@@ -59,8 +52,7 @@ TEST_CASE("TThreadSafeQueue concurrent producers/consumer")
     REQUIRE_EQ(consumed.load(), Total);
 }
 
-TEST_CASE("TThreadSafeStack concurrent producers/consumer")
-{
+TEST_CASE("TThreadSafeStack concurrent producers/consumer") {
     TThreadSafeStack<int>    S;
     const int                Producers        = 4;
     const int                ItemsPerProducer = 2000;
@@ -71,16 +63,12 @@ TEST_CASE("TThreadSafeStack concurrent producers/consumer")
 
     // Start popper
     std::thread              popper([&]() {
-        while (popped.load() < Total)
-        {
-            if (!S.IsEmpty())
-            {
+        while (popped.load() < Total) {
+            if (!S.IsEmpty()) {
                 int v = S.Top();
                 S.Pop();
                 popped.fetch_add(1);
-            }
-            else
-            {
+            } else {
                 std::this_thread::sleep_for(std::chrono::microseconds(50));
             }
         }
@@ -88,11 +76,9 @@ TEST_CASE("TThreadSafeStack concurrent producers/consumer")
 
     // Producers
     std::vector<std::thread> workers;
-    for (int p = 0; p < Producers; ++p)
-    {
+    for (int p = 0; p < Producers; ++p) {
         workers.emplace_back([&]() {
-            for (int i = 0; i < ItemsPerProducer; ++i)
-            {
+            for (int i = 0; i < ItemsPerProducer; ++i) {
                 S.Push(i);
                 produced.fetch_add(1);
             }

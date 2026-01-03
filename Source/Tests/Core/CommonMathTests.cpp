@@ -31,8 +31,7 @@ static_assert(Clamp(5, 0, 10) == 5);
 static_assert(Clamp(-1, 0, 10) == 0);
 static_assert(Clamp(42, 0, 10) == 10);
 
-TEST_CASE("Math Common - MaxMin runtime")
-{
+TEST_CASE("Math Common - MaxMin runtime") {
     REQUIRE(Max(3, 7, 5) == 7);
     REQUIRE(Min(3, 7, 5) == 3);
 
@@ -40,8 +39,7 @@ TEST_CASE("Math Common - MaxMin runtime")
     REQUIRE_CLOSE(Min(-1.5F, -1.6F, -1.4F), -1.6F, 1e-6F);
 }
 
-TEST_CASE("Math Common - Floor/Ceil")
-{
+TEST_CASE("Math Common - Floor/Ceil") {
     REQUIRE(Floor<i32>(3.9F) == 3);
     REQUIRE(Floor<i32>(-3.1F) == -4);
 
@@ -49,14 +47,12 @@ TEST_CASE("Math Common - Floor/Ceil")
     REQUIRE(Ceil<i32>(-3.9F) == -3);
 }
 
-TEST_CASE("Math Common - Lerp")
-{
+TEST_CASE("Math Common - Lerp") {
     REQUIRE_CLOSE(Lerp<f32>(0.0F, 10.0F, 0.5F), 5.0F, 1e-6F);
     REQUIRE_CLOSE(Lerp<f64>(-2.0, 2.0, 0.25), -1.0, 1e-12);
 }
 
-TEST_CASE("Math Common - Clamp")
-{
+TEST_CASE("Math Common - Clamp") {
     REQUIRE(Clamp(5, 0, 10) == 5);
     REQUIRE(Clamp(-5, 0, 10) == 0);
     REQUIRE(Clamp(15, 0, 10) == 10);
@@ -64,8 +60,7 @@ TEST_CASE("Math Common - Clamp")
     REQUIRE_CLOSE(Clamp(1.5F, 0.0F, 1.0F), 1.0F, 1e-6F);
 }
 
-TEST_CASE("Math Common - Sin/Cos")
-{
+TEST_CASE("Math Common - Sin/Cos") {
     // f32 checks
     REQUIRE_CLOSE(Sin<f32>(0.0F), 0.0F, 1e-6F);
     REQUIRE_CLOSE(Cos<f32>(0.0F), 1.0F, 1e-6F);
@@ -87,8 +82,7 @@ TEST_CASE("Math Common - Sin/Cos")
     REQUIRE_CLOSE(Cos<f64>(kPiD), -1.0, 1e-12);
 }
 
-TEST_CASE("Math Common - Hammersley2d")
-{
+TEST_CASE("Math Common - Hammersley2d") {
     const u32 N = 4;
 
     {
@@ -116,8 +110,7 @@ TEST_CASE("Math Common - Hammersley2d")
     }
 }
 
-TEST_CASE("Math Sampling - ConcentricOctahedralTransform")
-{
+TEST_CASE("Math Sampling - ConcentricOctahedralTransform") {
     // center sample should map to zero vector
     const FVector2f center{ 0.5F, 0.5F };
     const auto      v = ConcentricOctahedralTransform(center);

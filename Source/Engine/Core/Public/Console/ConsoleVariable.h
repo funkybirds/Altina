@@ -10,8 +10,7 @@
 #include <cstdlib>
 #include <cctype>
 
-namespace AltinaEngine::Core::Console
-{
+namespace AltinaEngine::Core::Console {
 
     using Container::FString;
     using Container::TFunction;
@@ -20,11 +19,9 @@ namespace AltinaEngine::Core::Console
     using Threading::FMutex;
     using Threading::FScopedLock;
 
-    class AE_CORE_API FConsoleVariable
-    {
+    class AE_CORE_API FConsoleVariable {
     public:
-        enum class EType
-        {
+        enum class EType {
             String,
             Int,
             Float,
@@ -48,7 +45,8 @@ namespace AltinaEngine::Core::Console
         EType                    GetType() const noexcept { return mType; }
 
         // Registry helpers (header-only convenience API)
-        static FConsoleVariable* Register(const FString& name, const FString& defaultValue) noexcept;
+        static FConsoleVariable* Register(
+            const FString& name, const FString& defaultValue) noexcept;
 
         static FConsoleVariable* Find(const FString& name) noexcept;
 
@@ -63,13 +61,11 @@ namespace AltinaEngine::Core::Console
         EType          mType;
 
         // Hash / equality helpers for FString as THashMap key
-        struct FStringHash
-        {
+        struct FStringHash {
             auto operator()(const FString& s) const noexcept -> size_t;
         };
 
-        struct FStringEqual
-        {
+        struct FStringEqual {
             auto operator()(const FString& a, const FString& b) const noexcept -> bool;
         };
 

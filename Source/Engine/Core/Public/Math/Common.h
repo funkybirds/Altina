@@ -6,11 +6,9 @@
 
 #include "../Platform/Generic/PlatformIntrinsicGeneric.h"
 
-namespace AltinaEngine::Core::Math
-{
+namespace AltinaEngine::Core::Math {
     // Details
-    namespace Details
-    {
+    namespace Details {
         AE_CORE_API auto SinF(f32 radians) noexcept -> f32;
         AE_CORE_API auto SinD(f64 radians) noexcept -> f64;
         AE_CORE_API auto CosF(f32 radians) noexcept -> f32;
@@ -33,51 +31,46 @@ namespace AltinaEngine::Core::Math
 
     // Casting Utilities
     template <CIntegral TDst, CFloatingPoint TSrc>
-    [[nodiscard]] AE_FORCEINLINE constexpr auto TruncatedCast(TSrc Value) noexcept -> TDst
-    {
+    [[nodiscard]] AE_FORCEINLINE constexpr auto TruncatedCast(TSrc Value) noexcept -> TDst {
         return static_cast<TDst>(Value);
     }
 
     template <CIntegral TDst, CFloatingPoint TSrc>
-    [[nodiscard]] AE_FORCEINLINE constexpr auto RoundedCast(TSrc Value) noexcept -> TDst
-    {
-        return static_cast<TDst>(
-            Value + (Value >= static_cast<TSrc>(0) ? static_cast<TSrc>(0.5) : static_cast<TSrc>(-0.5)));
+    [[nodiscard]] AE_FORCEINLINE constexpr auto RoundedCast(TSrc Value) noexcept -> TDst {
+        return static_cast<TDst>(Value
+            + (Value >= static_cast<TSrc>(0) ? static_cast<TSrc>(0.5) : static_cast<TSrc>(-0.5)));
     }
 
     // Generic Utilities
     template <CIntegral T>
-    [[nodiscard]] AE_FORCEINLINE constexpr auto DivRoundUp(T Numerator, T Denominator) noexcept -> T
-    {
+    [[nodiscard]] AE_FORCEINLINE constexpr auto DivRoundUp(T Numerator, T Denominator) noexcept
+        -> T {
         return (Numerator + Denominator - static_cast<T>(1)) / Denominator;
     }
 
-    template <CIntegral T> [[nodiscard]] AE_FORCEINLINE constexpr auto IntegerLog2(T value) noexcept -> T
-    {
+    template <CIntegral T>
+    [[nodiscard]] AE_FORCEINLINE constexpr auto IntegerLog2(T value) noexcept -> T {
         T result = static_cast<T>(0);
-        while (value >>= static_cast<T>(1))
-        {
+        while (value >>= static_cast<T>(1)) {
             ++result;
         }
         return result;
     }
 
-    template <> [[nodiscard]] AE_FORCEINLINE constexpr auto IntegerLog2<u32>(u32 value) noexcept -> u32
-    {
+    template <>
+    [[nodiscard]] AE_FORCEINLINE constexpr auto IntegerLog2<u32>(u32 value) noexcept -> u32 {
         return 31U - Platform::CountLeadingZeros32(value);
     }
-    template <> [[nodiscard]] AE_FORCEINLINE constexpr auto IntegerLog2<u64>(u64 value) noexcept -> u64
-    {
+    template <>
+    [[nodiscard]] AE_FORCEINLINE constexpr auto IntegerLog2<u64>(u64 value) noexcept -> u64 {
         return 63U - Platform::CountLeadingZeros64(value);
     }
 
     // Max / Min (scalar only, identical types)
     template <CScalar T, CScalar... Ts>
         requires(CSameAsAll<T, Ts...>)
-    [[nodiscard]] AE_FORCEINLINE constexpr auto Max(T first, Ts... rest) noexcept -> T
-    {
-        if constexpr (sizeof...(rest) == 0)
-        {
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Max(T first, Ts... rest) noexcept -> T {
+        if constexpr (sizeof...(rest) == 0) {
             return first;
         }
 
@@ -88,10 +81,8 @@ namespace AltinaEngine::Core::Math
 
     template <CScalar T, CScalar... Ts>
         requires(CSameAsAll<T, Ts...>)
-    [[nodiscard]] AE_FORCEINLINE constexpr auto Min(T first, Ts... rest) noexcept -> T
-    {
-        if constexpr (sizeof...(rest) == 0)
-        {
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Min(T first, Ts... rest) noexcept -> T {
+        if constexpr (sizeof...(rest) == 0) {
             return first;
         }
 
@@ -102,82 +93,71 @@ namespace AltinaEngine::Core::Math
 
     // Floor / Ceil (signed integral destination, f32ing-point source)
     template <CSignedIntegral TDst, CFloatingPoint TSrc>
-    [[nodiscard]] AE_FORCEINLINE constexpr auto Floor(TSrc value) noexcept -> TDst
-    {
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Floor(TSrc value) noexcept -> TDst {
         const TDst truncated = static_cast<TDst>(value);
-        return (static_cast<TSrc>(truncated) > value) ? static_cast<TDst>(truncated - static_cast<TDst>(1)) : truncated;
+        return (static_cast<TSrc>(truncated) > value)
+            ? static_cast<TDst>(truncated - static_cast<TDst>(1))
+            : truncated;
     }
 
     template <CSignedIntegral TDst, CFloatingPoint TSrc>
-    [[nodiscard]] AE_FORCEINLINE constexpr auto Ceil(TSrc value) noexcept -> TDst
-    {
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Ceil(TSrc value) noexcept -> TDst {
         const TDst truncated = static_cast<TDst>(value);
-        return (static_cast<TSrc>(truncated) < value) ? static_cast<TDst>(truncated + static_cast<TDst>(1)) : truncated;
+        return (static_cast<TSrc>(truncated) < value)
+            ? static_cast<TDst>(truncated + static_cast<TDst>(1))
+            : truncated;
     }
 
     // Linear interpolation (f32ing point only, identical types)
-    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE constexpr auto Lerp(T a, T b, T t) noexcept -> T
-    {
+    template <CFloatingPoint T>
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Lerp(T a, T b, T t) noexcept -> T {
         return a + (b - a) * t;
     }
 
     // Clamp (scalar only, identical types)
     template <CScalar T>
-    [[nodiscard]] AE_FORCEINLINE constexpr auto Clamp(T value, T minValue, T maxValue) noexcept -> T
-    {
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Clamp(T value, T minValue, T maxValue) noexcept
+        -> T {
         const T clampedLower = (value < minValue) ? minValue : value;
         return (clampedLower > maxValue) ? maxValue : clampedLower;
     }
 
     // Abs
-    template <CSignedIntegral T> [[nodiscard]] AE_FORCEINLINE constexpr auto Abs(T value) noexcept -> T
-    {
+    template <CSignedIntegral T>
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Abs(T value) noexcept -> T {
         return (value < static_cast<T>(0)) ? -value : value;
     }
-    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE constexpr auto Abs(T value) noexcept -> T
-    {
+    template <CFloatingPoint T>
+    [[nodiscard]] AE_FORCEINLINE constexpr auto Abs(T value) noexcept -> T {
         return (value < static_cast<T>(0)) ? -value : value;
     }
 
     // Sin, Cos (radians, floating-point)
-    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sin(T radians) noexcept -> T
-    {
-        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>)
-        {
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sin(T radians) noexcept -> T {
+        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>) {
             return Details::SinF(radians);
-        }
-        else
-        {
+        } else {
             return static_cast<T>(Details::SinD(static_cast<f64>(radians)));
         }
     }
 
-    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Cos(T radians) noexcept -> T
-    {
-        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>)
-        {
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Cos(T radians) noexcept -> T {
+        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>) {
             return Details::CosF(radians);
-        }
-        else
-        {
+        } else {
             return static_cast<T>(Details::CosD(static_cast<f64>(radians)));
         }
     }
 
-    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Tan(T radians) noexcept -> T
-    {
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Tan(T radians) noexcept -> T {
         return Sin(radians) / Cos(radians);
     }
 
     // Sqrt (floating-point)
-    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sqrt(T value) noexcept -> T
-    {
-        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>)
-        {
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Sqrt(T value) noexcept -> T {
+        if constexpr (AltinaEngine::TTypeSameAs_v<T, f32>) {
             return Details::SqrtF(value);
-        }
-        else
-        {
+        } else {
             return static_cast<T>(Details::SqrtD(static_cast<f64>(value)));
         }
     }

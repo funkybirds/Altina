@@ -3,15 +3,17 @@
 #include "Types/Aliases.h"
 #include "Types/Concepts.h"
 
-namespace AltinaEngine::Core::Math
-{
+namespace AltinaEngine::Core::Math {
 
-    template <CScalar T, u32 ComponentCount> struct TVector
-    {
+    template <CScalar T, u32 ComponentCount> struct TVector {
         T                            mComponents[ComponentCount]{};
 
-        [[nodiscard]] constexpr auto operator[](u32 Index) noexcept -> T& { return mComponents[Index]; }
-        [[nodiscard]] constexpr auto operator[](u32 Index) const noexcept -> const T& { return mComponents[Index]; }
+        [[nodiscard]] constexpr auto operator[](u32 Index) noexcept -> T& {
+            return mComponents[Index];
+        }
+        [[nodiscard]] constexpr auto operator[](u32 Index) const noexcept -> const T& {
+            return mComponents[Index];
+        }
 
         // Convenience constructors for common vector sizes
         explicit constexpr TVector(T a, T b) noexcept
@@ -39,10 +41,8 @@ namespace AltinaEngine::Core::Math
         }
 
         // Set all components to the same value
-        explicit constexpr TVector(T x) noexcept
-        {
-            for (u32 i = 0U; i < ComponentCount; ++i)
-            {
+        explicit constexpr TVector(T x) noexcept {
+            for (u32 i = 0U; i < ComponentCount; ++i) {
                 mComponents[i] = x;
             }
         }
@@ -92,37 +92,29 @@ namespace AltinaEngine::Core::Math
             return mComponents[3];
         }
 
-        constexpr auto operator+=(const TVector& Rhs) noexcept -> TVector&
-        {
-            for (u32 i = 0U; i < ComponentCount; ++i)
-            {
+        constexpr auto operator+=(const TVector& Rhs) noexcept -> TVector& {
+            for (u32 i = 0U; i < ComponentCount; ++i) {
                 mComponents[i] += Rhs.mComponents[i];
             }
             return *this;
         }
 
-        constexpr auto operator-=(const TVector& Rhs) noexcept -> TVector&
-        {
-            for (u32 i = 0U; i < ComponentCount; ++i)
-            {
+        constexpr auto operator-=(const TVector& Rhs) noexcept -> TVector& {
+            for (u32 i = 0U; i < ComponentCount; ++i) {
                 mComponents[i] -= Rhs.mComponents[i];
             }
             return *this;
         }
 
-        constexpr auto operator*=(const TVector& Rhs) noexcept -> TVector&
-        {
-            for (u32 i = 0U; i < ComponentCount; ++i)
-            {
+        constexpr auto operator*=(const TVector& Rhs) noexcept -> TVector& {
+            for (u32 i = 0U; i < ComponentCount; ++i) {
                 mComponents[i] *= Rhs.mComponents[i];
             }
             return *this;
         }
 
-        constexpr auto operator/=(const TVector& Rhs) noexcept -> TVector&
-        {
-            for (u32 i = 0U; i < ComponentCount; ++i)
-            {
+        constexpr auto operator/=(const TVector& Rhs) noexcept -> TVector& {
+            for (u32 i = 0U; i < ComponentCount; ++i) {
                 mComponents[i] /= Rhs.mComponents[i];
             }
             return *this;
@@ -130,33 +122,29 @@ namespace AltinaEngine::Core::Math
     };
 
     template <CScalar T, u32 ComponentCount>
-    [[nodiscard]] constexpr auto operator+(
-        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
-    {
+    [[nodiscard]] constexpr auto operator+(TVector<T, ComponentCount> Lhs,
+        const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount> {
         Lhs += Rhs;
         return Lhs;
     }
 
     template <CScalar T, u32 ComponentCount>
-    [[nodiscard]] constexpr auto operator-(
-        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
-    {
+    [[nodiscard]] constexpr auto operator-(TVector<T, ComponentCount> Lhs,
+        const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount> {
         Lhs -= Rhs;
         return Lhs;
     }
 
     template <CScalar T, u32 ComponentCount>
-    [[nodiscard]] constexpr auto operator*(
-        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
-    {
+    [[nodiscard]] constexpr auto operator*(TVector<T, ComponentCount> Lhs,
+        const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount> {
         Lhs *= Rhs;
         return Lhs;
     }
 
     template <CScalar T, u32 ComponentCount>
-    [[nodiscard]] constexpr auto operator/(
-        TVector<T, ComponentCount> Lhs, const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount>
-    {
+    [[nodiscard]] constexpr auto operator/(TVector<T, ComponentCount> Lhs,
+        const TVector<T, ComponentCount>& Rhs) noexcept -> TVector<T, ComponentCount> {
         Lhs /= Rhs;
         return Lhs;
     }

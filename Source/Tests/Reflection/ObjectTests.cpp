@@ -1,14 +1,13 @@
 #include "TestHarness.h"
 
 #include "Reflection/Object.h"
-//#include "Reflection/Reflection.h"
+// #include "Reflection/Reflection.h"
 
 #include <utility>
 
 using namespace AltinaEngine::Core::Reflection;
 
-struct TestStruct
-{
+struct TestStruct {
     int        v;
     static int constructed;
     static int copied;
@@ -23,8 +22,7 @@ int TestStruct::constructed = 0;
 int TestStruct::copied      = 0;
 int TestStruct::destructed  = 0;
 
-TEST_CASE("FObject Create and As")
-{
+TEST_CASE("FObject Create and As") {
     TestStruct::constructed = 0;
     TestStruct::copied      = 0;
     TestStruct::destructed  = 0;
@@ -39,8 +37,7 @@ TEST_CASE("FObject Create and As")
     REQUIRE_EQ(TestStruct::destructed, 1);
 }
 
-TEST_CASE("FObject copy and move semantics")
-{
+TEST_CASE("FObject copy and move semantics") {
     TestStruct::constructed = 0;
     TestStruct::copied      = 0;
     TestStruct::destructed  = 0;

@@ -2,8 +2,7 @@
 
 #include "Traits.h"
 
-namespace AltinaEngine
-{
+namespace AltinaEngine {
     // Predicates
     template <typename T>
     concept CDefinedType = requires { sizeof(T); };
@@ -62,7 +61,7 @@ namespace AltinaEngine
     concept CClass = TTypeIsClass_v<T>;
 
     template <typename T>
-    concept CUnion = TTypeIsUnion_v<T>;
+    concept CUnion = TTypeIsUnion<T>::Value;
 
     template <typename T>
     concept CEnum = TTypeIsEnum<T>::Value;
@@ -97,8 +96,8 @@ namespace AltinaEngine
     };
 
     template <typename R>
-    concept CCommonRange =
-        CRange<R> && TTypeSameAs<decltype(Declval<R>().begin()), decltype(Declval<R>().end())>::Value;
+    concept CCommonRange = CRange<R>
+        && TTypeSameAs<decltype(Declval<R>().begin()), decltype(Declval<R>().end())>::Value;
 
     template <typename R>
     concept CReadableRange = CRange<R> && CReadableIterator<decltype(Declval<R>().begin())>;

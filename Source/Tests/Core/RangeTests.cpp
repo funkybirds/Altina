@@ -7,8 +7,7 @@ using namespace AltinaEngine;
 using namespace AltinaEngine::Core::Container;
 using namespace AltinaEngine::Core::Algorithm;
 
-TEST_CASE("Range algorithms basic")
-{
+TEST_CASE("Range algorithms basic") {
     int        arr[] = { 1, 3, 2, 5, 4 };
     TSpan<int> s(arr);
 

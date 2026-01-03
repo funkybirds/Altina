@@ -5,8 +5,7 @@
 using namespace AltinaEngine::Core::Console;
 using AltinaEngine::Core::Container::FString;
 
-TEST_CASE("ConsoleVariable: basic register and parsing")
-{
+TEST_CASE("ConsoleVariable: basic register and parsing") {
     // Register variable with integer default
     FConsoleVariable* v = FConsoleVariable::Register(FString("test.var"), FString("123"));
     REQUIRE(v);

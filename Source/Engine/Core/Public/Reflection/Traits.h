@@ -1,8 +1,7 @@
 #pragma once
 #include "Types/Concepts.h"
 
-namespace AltinaEngine::Core::Reflection
-{
+namespace AltinaEngine::Core::Reflection {
     class FArchive;
     class ISerializer;
     class IDeserializer;
@@ -16,10 +15,11 @@ namespace AltinaEngine::Core::Reflection
     };
 
     template <typename T>
-    concept CCustomExternalSerializable = requires(const T t, ISerializer& serializer, IDeserializer& deserializer) {
-        { TCustomSerializeRule<T>::Serialize(t, serializer) } -> CSameAs<void>;
-        { TCustomSerializeRule<T>::Deserialize(deserializer) } -> CSameAs<T>;
-    };
+    concept CCustomExternalSerializable =
+        requires(const T t, ISerializer& serializer, IDeserializer& deserializer) {
+            { TCustomSerializeRule<T>::Serialize(t, serializer) } -> CSameAs<void>;
+            { TCustomSerializeRule<T>::Deserialize(deserializer) } -> CSameAs<T>;
+        };
 
     template <typename T>
     concept CCustomSerializable = CCustomInternalSerializable<T> || CCustomExternalSerializable<T>;

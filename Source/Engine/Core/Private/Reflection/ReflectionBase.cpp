@@ -1,11 +1,9 @@
 #include "Reflection/ReflectionBase.h"
 #include "Logging/Log.h"
-namespace AltinaEngine::Core::Reflection
-{
-    [[noreturn]] AE_CORE_API void ReflectionAbort(EReflectionErrorCode errorCode, const FReflectionDumpData& dumpData)
-    {
-        switch (errorCode)
-        {
+namespace AltinaEngine::Core::Reflection {
+    [[noreturn]] AE_CORE_API void ReflectionAbort(
+        EReflectionErrorCode errorCode, const FReflectionDumpData& dumpData) {
+        switch (errorCode) {
             case EReflectionErrorCode::TypeNotCopyConstructible:
                 LogErrorCat(TEXT("Core.Reflection"), TEXT("Type is not copy constructible"));
                 break;

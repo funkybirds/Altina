@@ -5,8 +5,7 @@
 using namespace AltinaEngine::Core::Math;
 using namespace AltinaEngine::Core::Math::LinAlg;
 
-TEST_CASE("LinAlg - Inverse round-trip 2x2")
-{
+TEST_CASE("LinAlg - Inverse round-trip 2x2") {
     TMatrix<float, 2, 2> M(float{});
     M(0, 0) = 4.0f;
     M(0, 1) = 7.0f;
@@ -22,8 +21,7 @@ TEST_CASE("LinAlg - Inverse round-trip 2x2")
             REQUIRE_CLOSE(prod(r, c), I(r, c), 1e-5f);
 }
 
-TEST_CASE("LinAlg - Inverse round-trip 3x3")
-{
+TEST_CASE("LinAlg - Inverse round-trip 3x3") {
     TMatrix<float, 3, 3> M(float{});
     M(0, 0) = 1.0f;
     M(0, 1) = 2.0f;
@@ -44,8 +42,7 @@ TEST_CASE("LinAlg - Inverse round-trip 3x3")
             REQUIRE_CLOSE(prod(r, c), I(r, c), 1e-5f);
 }
 
-TEST_CASE("LinAlg - Inverse round-trip 4x4")
-{
+TEST_CASE("LinAlg - Inverse round-trip 4x4") {
     TMatrix<float, 4, 4> M = ZeroMatrix<float, 4, 4>();
     M(0, 0)                = 2.0f;
     M(1, 1)                = 3.0f;

@@ -3,8 +3,7 @@
 
 using namespace AltinaEngine::Core::Container;
 
-TEST_CASE("Tuple_basic_access_and_size")
-{
+TEST_CASE("Tuple_basic_access_and_size") {
     TTuple<int, double, char> t(42, 3.14159, 'x');
     REQUIRE_EQ(Get<0>(t), 42);
     REQUIRE_CLOSE(Get<1>(t), 3.14159, 1e-9);
@@ -12,8 +11,7 @@ TEST_CASE("Tuple_basic_access_and_size")
     REQUIRE_EQ((TTuple<int, double, char>::Size()), 3);
 }
 
-TEST_CASE("Tuple_const_and_rvalue")
-{
+TEST_CASE("Tuple_const_and_rvalue") {
     const TTuple<int, char> ct(7, 'a');
     REQUIRE_EQ(Get<0>(ct), 7);
     REQUIRE_EQ(Get<1>(ct), 'a');

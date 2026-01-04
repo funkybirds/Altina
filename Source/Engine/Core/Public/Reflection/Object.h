@@ -23,7 +23,7 @@ namespace AltinaEngine::Core::Reflection {
 
         auto operator=(FObject&& rhs) noexcept -> FObject& {
             if (this != &rhs) [[likely]] {
-                if (mPtr) [[likely]] {
+                if (mPtr != nullptr) [[likely]] {
                     this->~FObject();
                 }
                 mPtr          = rhs.mPtr;
@@ -35,7 +35,7 @@ namespace AltinaEngine::Core::Reflection {
         }
         auto operator=(const FObject& rhs) noexcept -> FObject& {
             if (this != &rhs) [[likely]] {
-                if (mPtr) [[likely]] {
+                if (mPtr != nullptr) [[likely]] {
                     DestructFromMetadata();
                 }
                 // Ensure metadata matches the source before invoking copy constructor
@@ -132,7 +132,7 @@ namespace AltinaEngine::Core::Reflection {
             }
         }
         void DestructFromMetadata() const {
-            if (!mPtr)
+            if (mPtr == nullptr)
                 return;
             if (ReflectionAssert(mMetadata.IsDestructible(),
                     EReflectionErrorCode::TypeNotDestructible, FReflectionDumpData{})) [[likely]] {

@@ -8,7 +8,7 @@ namespace AltinaEngine::Core::Reflection {
     class FArchive;
     class FObject;
 
-    class AE_CORE_API ISerializer : public NonCopyableClass {
+    class AE_CORE_API ISerializer : public FNonCopyableClass {
     public:
         ISerializer()           = default;
         ~ISerializer() override = default;
@@ -80,7 +80,7 @@ namespace AltinaEngine::Core::Reflection {
         virtual void WriteBytes(const void* data, usize size) = 0;
     };
 
-    class AE_CORE_API IDeserializer : public NonCopyableClass {
+    class AE_CORE_API IDeserializer : public FNonCopyableClass {
     public:
         IDeserializer()           = default;
         ~IDeserializer() override = default;

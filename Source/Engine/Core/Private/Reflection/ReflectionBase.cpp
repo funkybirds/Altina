@@ -31,6 +31,9 @@ namespace AltinaEngine::Core::Reflection {
             case EReflectionErrorCode::DereferenceNullptr:
                 LogErrorCat(TEXT("Core.Reflection"), TEXT("Dereferencing null pointer"));
                 break;
+            case EReflectionErrorCode::DeserializeCorruptedArchive:
+                LogErrorCat(TEXT("Core.Reflection"), TEXT("Deserializing corrupted archive"));
+                break;
             default:
                 LogErrorCat(TEXT("Core.Reflection"), TEXT("Unknown error"));
         }

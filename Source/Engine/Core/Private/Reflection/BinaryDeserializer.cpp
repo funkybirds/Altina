@@ -1,5 +1,6 @@
 #include "Reflection/BinaryDeserializer.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
+#include "Reflection/ReflectionBase.h"
 
 namespace AltinaEngine::Core::Reflection {
 
@@ -9,8 +10,8 @@ namespace AltinaEngine::Core::Reflection {
         }
 
         if (mPosition + size > mBuffer.Size()) {
-            // Not enough data in buffer - this is an error condition
-            // For now, just return without reading
+            ReflectionAssert(
+                false, EReflectionErrorCode::DeserializeCorruptedArchive, FReflectionDumpData{});
             return;
         }
 

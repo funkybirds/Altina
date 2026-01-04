@@ -43,10 +43,4 @@ namespace AltinaEngine {
         auto operator=(FNonMovableClass&&) -> FNonMovableClass&      = delete;
     };
 
-    // Backwards-compatible aliases (older tests and code expect these names)
-    using NonCopyableClass  = FNonCopyableClass;
-    using NonCopyableStruct = FNonCopyableStruct;
-    using NonMovableStruct  = FNonMovableStruct;
-    using NonMovableClass   = FNonMovableClass;
-
 } // namespace AltinaEngine

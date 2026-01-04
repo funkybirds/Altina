@@ -7,7 +7,6 @@
 
 #include "Traits.h"
 #include "Serializer.h"
-#include "Object.h"
 #include "ReflectionBase.h"
 #include "Types/Meta.h"
 

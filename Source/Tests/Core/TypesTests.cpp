@@ -6,8 +6,8 @@
 TEST_CASE("NonCopyable and CheckedCast basics") {
     // Verify NonCopyable types are instantiable
     {
-        AltinaEngine::NonCopyableClass  a;
-        AltinaEngine::NonCopyableStruct s;
+        AltinaEngine::FNonCopyableClass  a;
+        AltinaEngine::FNonCopyableStruct s;
         REQUIRE(true);
     }
 

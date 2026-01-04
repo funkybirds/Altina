@@ -18,27 +18,9 @@ namespace AltinaEngine::Core::Reflection {
         FBinarySerializer()           = default;
         ~FBinarySerializer() override = default;
 
-        /**
-         * @brief Get the serialized data buffer.
-         * @return Const reference to the internal byte buffer.
-         */
         [[nodiscard]] auto GetBuffer() const -> const TVector<u8>& { return mBuffer; }
-
-        /**
-         * @brief Clear the internal buffer.
-         */
         void               Clear() { mBuffer.Clear(); }
-
-        /**
-         * @brief Reserve space in the buffer.
-         * @param capacity Number of bytes to reserve.
-         */
         void               Reserve(usize capacity) { mBuffer.Reserve(capacity); }
-
-        /**
-         * @brief Get the current size of the serialized data.
-         * @return Number of bytes in the buffer.
-         */
         [[nodiscard]] auto Size() const -> usize { return mBuffer.Size(); }
 
     protected:

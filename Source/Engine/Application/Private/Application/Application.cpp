@@ -1,6 +1,7 @@
 #include "Application/Application.h"
 
 #include "Logging/Log.h"
+#include "RhiModule.h"
 
 namespace AltinaEngine::Application {
     namespace {
@@ -28,6 +29,8 @@ namespace AltinaEngine::Application {
     FApplication::~FApplication() { Shutdown(); }
 
     void FApplication::Initialize() {
+        Rhi::FRhiModule::LogHelloWorld();
+
         if (mIsRunning) {
             return;
         }

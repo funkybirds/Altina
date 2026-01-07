@@ -1,20 +1,63 @@
 # AltinaEngine TODO
 
-## Core.Reflection
-
 - Note: Do not use any `std` headers. Use rust-like type aliases, like `u8` (already defined).
-    - Follow `CodingStyle.md` for naming conventions and file structure.
-        - Use trailing return types ALWAYS!
-        - `constexpr` and `[[nodiscard]]` as much as possible
-        - DO NOT USE ANY `try catch` and `exceptions`
-        - Do not use redundant namespace, following is not recommended
-            - Do not use`AltinaEngine::Core::Reflection::FObject`, use `using namespace` in `xxx::Detail` or
-              `using xxx::FObject` instead
-            - Do not use `Altina::TDecay<T>`, directly use `TDecay<T>`
-            - Do not use `Altina::f32` or `float`, use `f32` directly
-        - Do not use `std::vector<T>/std::unordered_map<K,V>/std::string` etc., use `TVector<T>/THashMap<K,V>/FString`
-          instead
-        - Do not use `if constexpr (Traits<T>::Value)`, use `if constexpr (CTrait<T>)` instead
+  - Follow `CodingStyle.md` for naming conventions and file structure.
+      - Use trailing return types ALWAYS!
+      - `constexpr` and `[[nodiscard]]` as much as possible
+      - DO NOT USE ANY `try catch` and `exceptions`
+      - Do not use redundant namespace, following is not recommended
+          - Do not use`AltinaEngine::Core::Reflection::FObject`, use `using namespace` in `xxx::Detail` or
+            `using xxx::FObject` instead
+          - Do not use `Altina::TDecay<T>`, directly use `TDecay<T>`
+          - Do not use `Altina::f32` or `float`, use `f32` directly
+      - Do not use `std::vector<T>/std::unordered_map<K,V>/std::string` etc., use `TVector<T>/THashMap<K,V>/FString`
+        instead
+        - Do not use functions derived from std containers (like `.data()` and `.size()`). Use `.Data()` and `.Size()` instead.
+          - If the required method is missing, create a wrapper in the container.
+      - Do not use `if constexpr (Traits<T>::Value)`, use `if constexpr (CTrait<T>)` instead
+        - When creating new traits, PREFER `concept` to `type trait`
+      - Use log as possible as 
+
+## Rhi.General 
+- Note: This is an independent compilation target (`Rhi.General`, not `Rhi`)
+- [ ] Draft (NOT CODE) a architecture for RHI abstraction, targeting legacy apis like `DX11`, `OpenGL` and modern apis like `DX12`,`Vulkan`. And fulfill the `Rhi.General` section with the architectural plan (DO NOT REMOVE THIS POINT).
+  - [ ] `RhiContext` should be interface abstraction for rhi utilities, like device cration, swapchain preparation, resource creation, etc.
+  - [ ] `RhiDevice` should be logical device abstraction (VkDevice&ID3D12Device). It should provides interfaces for device feature/caps querying (like `support bindless`,`support hwrt`,`support multithreaded command recording`)
+    - [ ] For limits, `RhiSupportedLimits` and `RhiSupportedFeatures` can be defined.
+    - [ ] `RhiQueue` should be defined. Although some apis does not support this concept explicitly.
+  - [ ] `RhiResource` and `RhiMemoryResource`. Abstraction for buffer, texture, shader, acceleration structures, samplers, pipelines or pso (graphics,compute,hwrt)
+    - [ ] some apis might have abstraction for `RhiAllocator` and `RhiMemory`. Keep these in `Rhi` scope, and do not expose to other modules.
+    - [ ] shader format should be defined. Unity-like `shaderlab` is favored. and `slang` is an option for shader lang and corresponding compiler. However, `slang` does not directly support shaderlab. Processing scripts should be planned.
+      - [ ] Also consider the portability for low-end and high-end devices, which have bindless support.
+      - [ ] Shader compilation and parsing should be done in `ShaderCompile` scope and not in `Rhi` scope.
+    - [ ] In `Core` scope, consider a container `TCountedRef<T>` and concept. which like (but not is) `TSharedPtr<T>`, and have custom deallocation function.
+  - [ ] `RhiResourceBinding` and `RhiResourceView`. Abstraction for `UAV`, `CBV` and `SRV`, etc. Use `DirectX` standard here.
+    - [ ] Refer to `webgpu` for `RhiResourceBinding` definitions.
+  - [ ] `RhiCommandBuffer` and `RhiCommandEncoder`. 
+    - [ ] Support for multithreaded rendering (if able). Should support async compute and transfer.
+    - [ ] Make sure design pattern choice for command encoders. Keeps idea and code simple. (A) encoder.transistion(RhiTransition{}) (B) transition.cmdTransition(encoder) (C) 
+    - [ ] Consider the design for sync primitives, like `RhiSemaphore` and `RhiFence`. Make proper management for these stuffs.
+    - [ ] Stateless!. `RenderGraph` is not a part of `Rhi`. So introduce utilties for explicit state transition.
+  - [ ] `RhiQuery`
+    - [ ] Provide utilities/debug markers.
+  - [ ] `RhiPipeline` and `RhiPipelineLayout`.
+    - [ ] Abstraction for `RootSignature` (DX12) / `PipelineLayout` (Vulkan). define the interface between resources and shaders.
+    - [ ] Pipeline State Object (PSO) creation is heavy (compile+link). Plan for `RhiPipelineCache` to support disk caching and runtime deduplication.
+    - [ ] Distinguish between `GraphicsPipeline`, `ComputePipeline` and `RayTracingPipeline`.
+  - [ ] `RhiRenderPassInfo`.
+    - [ ] Even with Dynamic Rendering features, an structure for describing RenderTargets, DepthStencil, Load/Store ops and ClearValues is required for `BeginRendering`.
+  - [ ] `RhiSampler`. Independent object for texture filtering and addressing modes.
+  - [ ] `RhiTransientResource` and `Staging`.
+    - [ ] Need a strategy for per-frame dynamic data (e.g. `RingBuffer` or `LinearAllocator` for dynamic constant buffers).
+    - [ ] Staging abstraction for efficient CPU-to-GPU data transfer (Upload Heaps).
+  - [ ] `RhiIndirectCommand`.
+    - [ ] Abstraction for `CommandSignature` to support GPU-Driven rendering (`ExecuteIndirect`).
+
+## Rhi.DirectX11
+
+## RenderCore.RenderGraph
+
+## Core.Reflection
 - [x] Reflection Support
     - [x] Add `FPropertyDesc` struct with `FString mName` and `FObject mProperty` member.
     - [x] Add `GetAllProperties(FObject&) -> TVector<FPropertyDesc>` function.

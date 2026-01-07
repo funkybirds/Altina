@@ -1,7 +1,7 @@
-set(TargetName AltinaEngineApplication)
+set(TargetName AltinaEngineRhiGeneral)
 
 add_library(${TargetName} SHARED)
-add_library(AltinaEngine::Application ALIAS ${TargetName})
+add_library(AltinaEngine::Rhi::General ALIAS ${TargetName})
 
 file(GLOB_RECURSE Target_Public_Headers
     CONFIGURE_DEPENDS
@@ -19,29 +19,17 @@ file(GLOB_RECURSE Target_Private_Sources
     ${CMAKE_CURRENT_SOURCE_DIR}/Private/*.mm
 )
 
-if(NOT Target_Private_Sources)
-    message(FATAL_ERROR "No private sources found for ${TargetName}")
-endif()
-
-if(NOT Target_Public_Headers)
-    message(FATAL_ERROR "No public headers found for ${TargetName}")
-endif()
-
-# Attach headers and sources to the new target.
 target_sources(${TargetName}
-    PUBLIC
-        FILE_SET public_headers
-            TYPE HEADERS
-            BASE_DIRS Public
-            FILES ${Target_Public_Headers}
     PRIVATE
         ${Target_Private_Sources}
+    PUBLIC
+        FILE_SET public_headers TYPE HEADERS BASE_DIRS Public FILES
+            ${Target_Public_Headers}
 )
 
 target_include_directories(${TargetName}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Public>
-        $<INSTALL_INTERFACE:include/AltinaEngine/Application>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/Private
 )
@@ -49,38 +37,16 @@ target_include_directories(${TargetName}
 target_link_libraries(${TargetName}
     PUBLIC
         AltinaEngine::Core
-        AltinaEngine::Rhi::General
-)
-
-
-if(WIN32)
-    target_link_libraries(${TargetName}
-        PRIVATE
-            user32
-            gdi32
-    )
-endif()
-
-target_compile_features(${TargetName}
-    PUBLIC
-        cxx_std_23
-)
-
-set(Warnings
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
-    $<$<CXX_COMPILER_ID:MSVC>:/w14242 /w14254 /w14263 /w14265 /w14287 /we4289 /w14296 /w14311 /w14826 /w14905 /w14906 /w14928>
-    $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wall -Wextra -Wpedantic>
-)
-
-target_compile_options(${TargetName}
-    PRIVATE
-        ${Warnings}
 )
 
 target_compile_definitions(${TargetName}
     PRIVATE
-        AE_APPLICATION_BUILD
+        AE_RHI_GENERAL_BUILD
+)
+
+set_target_properties(${TargetName} PROPERTIES
+    CXX_STANDARD 23
+    CXX_STANDARD_REQUIRED ON
 )
 
 set(AE_DEMO_MINIMAL_BIN_DIR ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)
@@ -100,8 +66,9 @@ add_custom_command(
     COMMENT "Copying ${TargetName} to consumer binaries"
 )
 
-set_target_properties(${TargetName}
-    PROPERTIES
-        OUTPUT_NAME AltinaEngineApplication
-        FOLDER "Engine/Application"
+set_target_properties(${TargetName} PROPERTIES
+    OUTPUT_NAME AltinaEngineRhiGeneral
+    FOLDER "Engine/Rhi.General"
 )
+
+

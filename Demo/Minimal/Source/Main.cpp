@@ -1,17 +1,12 @@
 #include "Base/AltinaBase.h"
+#include "Launch/EngineLoop.h"
 #include "Reflection/Reflection.h"
-
-#if AE_PLATFORM_WIN
-    #include "Application/Windows/WindowsApplication.h"
-#else
-    #error "AltinaEngine Minimal demo currently supports only Windows builds."
-#endif
 
 #include <chrono>
 
 using namespace AltinaEngine;
-using namespace AltinaEngine::Application;
 using namespace AltinaEngine::Core;
+using namespace AltinaEngine::Launch;
 
 struct Neko {
     int    mNya  = 114;
@@ -39,16 +34,22 @@ int main(int argc, char** argv) {
         StartupParams.mCommandLine = argv[1];
     }
 
-    FWindowsApplication Application(StartupParams);
-    Application.Initialize();
-
-    for (i32 FrameIndex = 0; FrameIndex < 600; ++FrameIndex) {
-        Application.Tick(1.0f / 60.0f);
-        AltinaEngine::Core::Platform::Generic::PlatformSleepMilliseconds(16);
-
-        LogError(TEXT("Frame {} processed."), FrameIndex);
+    FEngineLoop EngineLoop(StartupParams);
+    if (!EngineLoop.PreInit()) {
+        return 1;
+    }
+    if (!EngineLoop.Init()) {
+        EngineLoop.Exit();
+        return 1;
     }
 
-    Application.Shutdown();
+    for (i32 FrameIndex = 0; FrameIndex < 100; ++FrameIndex) {
+        EngineLoop.Tick(1.0f / 60.0f);
+        AltinaEngine::Core::Platform::Generic::PlatformSleepMilliseconds(16);
+
+        // LogError(TEXT("Frame {} processed."), FrameIndex);
+    }
+
+    EngineLoop.Exit();
     return 0;
 }

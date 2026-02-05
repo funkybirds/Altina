@@ -2,6 +2,7 @@
 
 #include "RhiD3D11/RhiD3D11Device.h"
 #include "Container/SmartPtr.h"
+#include "Logging/Log.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
 
@@ -229,9 +230,19 @@ namespace AltinaEngine::Rhi {
         if (!mState) {
             mState = new FRhiD3D11ContextState{};
         }
-        return CreateFactory(*mState, desc);
+        LogInfo(TEXT("RHI(D3D11): Initializing (DebugLayer={}, GPUValidation={})."),
+            desc.mEnableDebugLayer, desc.mEnableGpuValidation);
+
+        const bool ok = CreateFactory(*mState, desc);
+        if (!ok) {
+            LogError(TEXT("RHI(D3D11): Failed to create DXGI factory."));
+        } else {
+            LogInfo(TEXT("RHI(D3D11): DXGI factory created."));
+        }
+        return ok;
 #else
         (void)desc;
+        LogWarning(TEXT("RHI(D3D11): Initialization requested on non-Windows platform."));
         return false;
 #endif
     }

@@ -1,9 +1,11 @@
 #pragma once
 
+#include "Base/CoreAPI.h"
+
 namespace AltinaEngine {
 
     // Base class to disable copy semantics for classes
-    class FNonCopyableClass {
+    class AE_CORE_API FNonCopyableClass {
     public:
         FNonCopyableClass()          = default;
         virtual ~FNonCopyableClass() = default;

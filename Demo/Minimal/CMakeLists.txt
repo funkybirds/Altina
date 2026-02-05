@@ -13,7 +13,7 @@ target_sources(${TargetName}
 
 target_link_libraries(${TargetName}
     PRIVATE
-        AltinaEngine::Application
+        AltinaEngine::Launch
 )
 
 target_compile_features(${TargetName}

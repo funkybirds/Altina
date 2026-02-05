@@ -1,11 +1,10 @@
 #pragma once
 
 #include "RhiGeneralAPI.h"
-#include "Rhi/RhiFwd.h"
+#include "Rhi/RhiRefs.h"
 #include "Rhi/RhiStructs.h"
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiResourceDeleteQueue.h"
-#include "Container/CountRef.h"
 #include "Container/Vector.h"
 #include "Types/NonCopyable.h"
 
@@ -27,30 +26,30 @@ namespace AltinaEngine::Rhi {
         [[nodiscard]] auto GetSupportedLimits() const noexcept -> const FRhiSupportedLimits&;
         [[nodiscard]] auto IsFeatureSupported(ERhiFeature feature) const noexcept -> bool;
 
-        [[nodiscard]] auto GetQueue(ERhiQueueType type) const noexcept -> TCountRef<FRhiQueue>;
+        [[nodiscard]] auto GetQueue(ERhiQueueType type) const noexcept -> FRhiQueueRef;
 
-        virtual auto CreateBuffer(const FRhiBufferDesc& desc) -> TCountRef<FRhiBuffer> = 0;
-        virtual auto CreateTexture(const FRhiTextureDesc& desc) -> TCountRef<FRhiTexture> = 0;
-        virtual auto CreateSampler(const FRhiSamplerDesc& desc) -> TCountRef<FRhiSampler> = 0;
-        virtual auto CreateShader(const FRhiShaderDesc& desc) -> TCountRef<FRhiShader> = 0;
+        virtual auto CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef = 0;
+        virtual auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef = 0;
+        virtual auto CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef = 0;
+        virtual auto CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef = 0;
 
         virtual auto CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
-            -> TCountRef<FRhiPipeline> = 0;
+            -> FRhiPipelineRef = 0;
         virtual auto CreateComputePipeline(const FRhiComputePipelineDesc& desc)
-            -> TCountRef<FRhiPipeline> = 0;
+            -> FRhiPipelineRef = 0;
         virtual auto CreatePipelineLayout(const FRhiPipelineLayoutDesc& desc)
-            -> TCountRef<FRhiPipelineLayout> = 0;
+            -> FRhiPipelineLayoutRef = 0;
 
         virtual auto CreateBindGroupLayout(const FRhiBindGroupLayoutDesc& desc)
-            -> TCountRef<FRhiBindGroupLayout> = 0;
+            -> FRhiBindGroupLayoutRef = 0;
         virtual auto CreateBindGroup(const FRhiBindGroupDesc& desc)
-            -> TCountRef<FRhiBindGroup> = 0;
+            -> FRhiBindGroupRef = 0;
 
-        virtual auto CreateFence(bool signaled) -> TCountRef<FRhiFence> = 0;
-        virtual auto CreateSemaphore() -> TCountRef<FRhiSemaphore>      = 0;
+        virtual auto CreateFence(bool signaled) -> FRhiFenceRef = 0;
+        virtual auto CreateSemaphore() -> FRhiSemaphoreRef      = 0;
 
         virtual auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
-            -> TCountRef<FRhiCommandPool> = 0;
+            -> FRhiCommandPoolRef = 0;
 
         void ProcessResourceDeleteQueue(u64 completedSerial);
         void FlushResourceDeleteQueue();
@@ -60,7 +59,7 @@ namespace AltinaEngine::Rhi {
 
         void SetSupportedFeatures(const FRhiSupportedFeatures& features) noexcept;
         void SetSupportedLimits(const FRhiSupportedLimits& limits) noexcept;
-        void RegisterQueue(ERhiQueueType type, TCountRef<FRhiQueue> queue);
+        void RegisterQueue(ERhiQueueType type, FRhiQueueRef queue);
 
         template <typename TResource>
         auto AdoptResource(TResource* resource) -> TCountRef<TResource> {
@@ -72,8 +71,8 @@ namespace AltinaEngine::Rhi {
 
     private:
         struct FRhiQueueEntry {
-            ERhiQueueType       mType  = ERhiQueueType::Graphics;
-            TCountRef<FRhiQueue> mQueue = {};
+            ERhiQueueType mType  = ERhiQueueType::Graphics;
+            FRhiQueueRef  mQueue = {};
         };
 
         void NormalizeDebugName();

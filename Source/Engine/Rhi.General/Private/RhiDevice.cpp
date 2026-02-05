@@ -39,7 +39,7 @@ namespace AltinaEngine::Rhi {
         return mSupportedFeatures.IsSupported(feature);
     }
 
-    auto FRhiDevice::GetQueue(ERhiQueueType type) const noexcept -> TCountRef<FRhiQueue> {
+    auto FRhiDevice::GetQueue(ERhiQueueType type) const noexcept -> FRhiQueueRef {
         for (const auto& entry : mQueues) {
             if (entry.mType == type) {
                 return entry.mQueue;
@@ -57,7 +57,7 @@ namespace AltinaEngine::Rhi {
         mSupportedLimits = limits;
     }
 
-    void FRhiDevice::RegisterQueue(ERhiQueueType type, TCountRef<FRhiQueue> queue) {
+    void FRhiDevice::RegisterQueue(ERhiQueueType type, FRhiQueueRef queue) {
         for (auto& entry : mQueues) {
             if (entry.mType == type) {
                 entry.mQueue = AltinaEngine::Move(queue);

@@ -321,50 +321,50 @@ namespace AltinaEngine::Rhi {
                 }
             }
 
-            auto CreateBuffer(const FRhiBufferDesc& desc) -> TCountRef<FRhiBuffer> override {
+            auto CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef override {
                 return AdoptResource(new FRhiMockBuffer(desc, mCounters));
             }
-            auto CreateTexture(const FRhiTextureDesc& desc) -> TCountRef<FRhiTexture> override {
+            auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef override {
                 return AdoptResource(new FRhiMockTexture(desc, mCounters));
             }
-            auto CreateSampler(const FRhiSamplerDesc& desc) -> TCountRef<FRhiSampler> override {
+            auto CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef override {
                 return AdoptResource(new FRhiMockSampler(desc, mCounters));
             }
-            auto CreateShader(const FRhiShaderDesc& desc) -> TCountRef<FRhiShader> override {
+            auto CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef override {
                 return AdoptResource(new FRhiMockShader(desc, mCounters));
             }
 
             auto CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
-                -> TCountRef<FRhiPipeline> override {
+                -> FRhiPipelineRef override {
                 return AdoptResource(new FRhiMockGraphicsPipeline(desc, mCounters));
             }
             auto CreateComputePipeline(const FRhiComputePipelineDesc& desc)
-                -> TCountRef<FRhiPipeline> override {
+                -> FRhiPipelineRef override {
                 return AdoptResource(new FRhiMockComputePipeline(desc, mCounters));
             }
             auto CreatePipelineLayout(const FRhiPipelineLayoutDesc& desc)
-                -> TCountRef<FRhiPipelineLayout> override {
+                -> FRhiPipelineLayoutRef override {
                 return AdoptResource(new FRhiMockPipelineLayout(desc, mCounters));
             }
 
             auto CreateBindGroupLayout(const FRhiBindGroupLayoutDesc& desc)
-                -> TCountRef<FRhiBindGroupLayout> override {
+                -> FRhiBindGroupLayoutRef override {
                 return AdoptResource(new FRhiMockBindGroupLayout(desc, mCounters));
             }
             auto CreateBindGroup(const FRhiBindGroupDesc& desc)
-                -> TCountRef<FRhiBindGroup> override {
+                -> FRhiBindGroupRef override {
                 return AdoptResource(new FRhiMockBindGroup(desc, mCounters));
             }
 
-            auto CreateFence(bool /*signaled*/) -> TCountRef<FRhiFence> override {
+            auto CreateFence(bool /*signaled*/) -> FRhiFenceRef override {
                 return AdoptResource(new FRhiMockFence(mCounters));
             }
-            auto CreateSemaphore() -> TCountRef<FRhiSemaphore> override {
+            auto CreateSemaphore() -> FRhiSemaphoreRef override {
                 return AdoptResource(new FRhiMockSemaphore(mCounters));
             }
 
             auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
-                -> TCountRef<FRhiCommandPool> override {
+                -> FRhiCommandPoolRef override {
                 return AdoptResource(new FRhiMockCommandPool(desc, mCounters));
             }
 

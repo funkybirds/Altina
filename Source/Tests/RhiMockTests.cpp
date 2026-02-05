@@ -13,6 +13,7 @@ namespace {
     using AltinaEngine::Rhi::ERhiVendorId;
     using AltinaEngine::Rhi::FRhiAdapterDesc;
     using AltinaEngine::Rhi::FRhiBufferDesc;
+    using AltinaEngine::Rhi::FRhiBufferRef;
     using AltinaEngine::Rhi::FRhiInitDesc;
     using AltinaEngine::Rhi::FRhiMockContext;
     using AltinaEngine::Rhi::kRhiInvalidAdapterIndex;
@@ -99,7 +100,7 @@ TEST_CASE("RhiMock.ResourceDeleteQueueDelays") {
     REQUIRE_EQ(context.GetResourceDestroyedCount(), 0U);
 
     {
-        auto buffer = device->CreateBuffer(bufferDesc);
+        FRhiBufferRef buffer = device->CreateBuffer(bufferDesc);
         REQUIRE(buffer);
         buffer->SetRetireSerial(5U);
         REQUIRE_EQ(context.GetResourceCreatedCount(), 1U);

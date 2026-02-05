@@ -118,6 +118,9 @@ namespace AltinaEngine::Rhi {
     struct FRhiBufferDesc {
         FString mDebugName;
         u64     mSizeBytes = 0ULL;
+        ERhiResourceUsage   mUsage     = ERhiResourceUsage::Default;
+        ERhiBufferBindFlags mBindFlags = ERhiBufferBindFlags::None;
+        ERhiCpuAccess       mCpuAccess = ERhiCpuAccess::None;
     };
 
     struct FRhiTextureDesc {
@@ -126,6 +129,12 @@ namespace AltinaEngine::Rhi {
         u32     mHeight    = 0U;
         u32     mDepth     = 1U;
         u32     mMipLevels = 1U;
+        u32     mArrayLayers = 1U;
+        u32     mSampleCount = 1U;
+        ERhiFormat          mFormat    = ERhiFormat::R8G8B8A8_UNORM;
+        ERhiResourceUsage   mUsage     = ERhiResourceUsage::Default;
+        ERhiTextureBindFlags mBindFlags = ERhiTextureBindFlags::ShaderResource;
+        ERhiCpuAccess       mCpuAccess = ERhiCpuAccess::None;
     };
 
     struct FRhiSamplerDesc {

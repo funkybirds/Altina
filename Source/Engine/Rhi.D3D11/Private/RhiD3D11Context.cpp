@@ -1,22 +1,9 @@
 #include "RhiD3D11/RhiD3D11Context.h"
 
-#include "Rhi/RhiBindGroup.h"
-#include "Rhi/RhiBindGroupLayout.h"
-#include "Rhi/RhiBuffer.h"
-#include "Rhi/RhiCommandPool.h"
-#include "Rhi/RhiFence.h"
-#include "Rhi/RhiPipeline.h"
-#include "Rhi/RhiPipelineLayout.h"
-#include "Rhi/RhiQueue.h"
-#include "Rhi/RhiSampler.h"
-#include "Rhi/RhiSemaphore.h"
-#include "Rhi/RhiShader.h"
-#include "Rhi/RhiDevice.h"
-#include "Rhi/RhiTexture.h"
+#include "RhiD3D11/RhiD3D11Device.h"
 #include "Container/SmartPtr.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
-#include <type_traits>
 
 #if AE_PLATFORM_WIN
     #ifdef TEXT
@@ -36,6 +23,8 @@
     #include <dxgi1_6.h>
     #include <wrl/client.h>
 #endif
+
+#include <type_traits>
 
 namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
@@ -215,310 +204,10 @@ namespace AltinaEngine::Rhi {
             ComPtr<IDXGIAdapter1> mAdapter;
         };
 
-        class FRhiD3D11Buffer final : public FRhiBuffer {
-        public:
-            explicit FRhiD3D11Buffer(const FRhiBufferDesc& desc) : FRhiBuffer(desc) {}
-        };
-
-        class FRhiD3D11Texture final : public FRhiTexture {
-        public:
-            explicit FRhiD3D11Texture(const FRhiTextureDesc& desc) : FRhiTexture(desc) {}
-        };
-
-        class FRhiD3D11Sampler final : public FRhiSampler {
-        public:
-            explicit FRhiD3D11Sampler(const FRhiSamplerDesc& desc) : FRhiSampler(desc) {}
-        };
-
-        class FRhiD3D11Shader final : public FRhiShader {
-        public:
-            explicit FRhiD3D11Shader(const FRhiShaderDesc& desc) : FRhiShader(desc) {}
-        };
-
-        class FRhiD3D11GraphicsPipeline final : public FRhiPipeline {
-        public:
-            explicit FRhiD3D11GraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
-                : FRhiPipeline(desc) {}
-        };
-
-        class FRhiD3D11ComputePipeline final : public FRhiPipeline {
-        public:
-            explicit FRhiD3D11ComputePipeline(const FRhiComputePipelineDesc& desc)
-                : FRhiPipeline(desc) {}
-        };
-
-        class FRhiD3D11PipelineLayout final : public FRhiPipelineLayout {
-        public:
-            explicit FRhiD3D11PipelineLayout(const FRhiPipelineLayoutDesc& desc)
-                : FRhiPipelineLayout(desc) {}
-        };
-
-        class FRhiD3D11BindGroupLayout final : public FRhiBindGroupLayout {
-        public:
-            explicit FRhiD3D11BindGroupLayout(const FRhiBindGroupLayoutDesc& desc)
-                : FRhiBindGroupLayout(desc) {}
-        };
-
-        class FRhiD3D11BindGroup final : public FRhiBindGroup {
-        public:
-            explicit FRhiD3D11BindGroup(const FRhiBindGroupDesc& desc)
-                : FRhiBindGroup(desc) {}
-        };
-
-        class FRhiD3D11Fence final : public FRhiFence {
-        public:
-            FRhiD3D11Fence() : FRhiFence() {}
-        };
-
-        class FRhiD3D11Semaphore final : public FRhiSemaphore {
-        public:
-            FRhiD3D11Semaphore() : FRhiSemaphore() {}
-        };
-
-        class FRhiD3D11CommandPool final : public FRhiCommandPool {
-        public:
-            explicit FRhiD3D11CommandPool(const FRhiCommandPoolDesc& desc)
-                : FRhiCommandPool(desc) {}
-        };
-
-        class FRhiD3D11Queue final : public FRhiQueue {
-        public:
-            explicit FRhiD3D11Queue(ERhiQueueType type) : FRhiQueue(type) {}
-
-            void Submit(const FRhiSubmitInfo& /*info*/) override {}
-            void WaitIdle() override {}
-            void Present(const FRhiPresentInfo& /*info*/) override {}
-        };
-
-        class FRhiD3D11Device final : public FRhiDevice {
-        public:
-            FRhiD3D11Device(const FRhiDeviceDesc& desc, const FRhiAdapterDesc& adapterDesc,
-                ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> context,
-                D3D_FEATURE_LEVEL featureLevel)
-                : FRhiDevice(desc, adapterDesc)
-                , mDevice(AltinaEngine::Move(device))
-                , mImmediateContext(AltinaEngine::Move(context))
-                , mFeatureLevel(featureLevel) {
-                FRhiSupportedLimits limits;
-                limits.mMaxTextureDimension1D     = D3D11_REQ_TEXTURE1D_U_DIMENSION;
-                limits.mMaxTextureDimension2D     = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
-                limits.mMaxTextureDimension3D     = D3D11_REQ_TEXTURE3D_U_V_OR_W_DIMENSION;
-                limits.mMaxTextureArrayLayers     = D3D11_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION;
-                limits.mMaxSamplers               = D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT;
-                limits.mMaxColorAttachments       = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
-                SetSupportedLimits(limits);
-
-                RegisterQueue(ERhiQueueType::Graphics,
-                    AdoptResource(new FRhiD3D11Queue(ERhiQueueType::Graphics)));
-                RegisterQueue(ERhiQueueType::Compute,
-                    AdoptResource(new FRhiD3D11Queue(ERhiQueueType::Compute)));
-                RegisterQueue(ERhiQueueType::Copy,
-                    AdoptResource(new FRhiD3D11Queue(ERhiQueueType::Copy)));
-            }
-
-            auto CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef override {
-                return AdoptResource(new FRhiD3D11Buffer(desc));
-            }
-
-            auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef override {
-                return AdoptResource(new FRhiD3D11Texture(desc));
-            }
-
-            auto CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef override {
-                return AdoptResource(new FRhiD3D11Sampler(desc));
-            }
-
-            auto CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef override {
-                return AdoptResource(new FRhiD3D11Shader(desc));
-            }
-
-            auto CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
-                -> FRhiPipelineRef override {
-                return AdoptResource(new FRhiD3D11GraphicsPipeline(desc));
-            }
-
-            auto CreateComputePipeline(const FRhiComputePipelineDesc& desc)
-                -> FRhiPipelineRef override {
-                return AdoptResource(new FRhiD3D11ComputePipeline(desc));
-            }
-
-            auto CreatePipelineLayout(const FRhiPipelineLayoutDesc& desc)
-                -> FRhiPipelineLayoutRef override {
-                return AdoptResource(new FRhiD3D11PipelineLayout(desc));
-            }
-
-            auto CreateBindGroupLayout(const FRhiBindGroupLayoutDesc& desc)
-                -> FRhiBindGroupLayoutRef override {
-                return AdoptResource(new FRhiD3D11BindGroupLayout(desc));
-            }
-
-            auto CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef override {
-                return AdoptResource(new FRhiD3D11BindGroup(desc));
-            }
-
-            auto CreateFence(bool /*signaled*/) -> FRhiFenceRef override {
-                return AdoptResource(new FRhiD3D11Fence());
-            }
-
-            auto CreateSemaphore() -> FRhiSemaphoreRef override {
-                return AdoptResource(new FRhiD3D11Semaphore());
-            }
-
-            auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
-                -> FRhiCommandPoolRef override {
-                return AdoptResource(new FRhiD3D11CommandPool(desc));
-            }
-
-        private:
-            ComPtr<ID3D11Device>        mDevice;
-            ComPtr<ID3D11DeviceContext> mImmediateContext;
-            D3D_FEATURE_LEVEL           mFeatureLevel = D3D_FEATURE_LEVEL_11_0;
-        };
 #else
         class FRhiD3D11Adapter final : public FRhiAdapter {
         public:
             explicit FRhiD3D11Adapter(const FRhiAdapterDesc& desc) : FRhiAdapter(desc) {}
-        };
-
-        class FRhiD3D11Buffer final : public FRhiBuffer {
-        public:
-            explicit FRhiD3D11Buffer(const FRhiBufferDesc& desc) : FRhiBuffer(desc) {}
-        };
-
-        class FRhiD3D11Texture final : public FRhiTexture {
-        public:
-            explicit FRhiD3D11Texture(const FRhiTextureDesc& desc) : FRhiTexture(desc) {}
-        };
-
-        class FRhiD3D11Sampler final : public FRhiSampler {
-        public:
-            explicit FRhiD3D11Sampler(const FRhiSamplerDesc& desc) : FRhiSampler(desc) {}
-        };
-
-        class FRhiD3D11Shader final : public FRhiShader {
-        public:
-            explicit FRhiD3D11Shader(const FRhiShaderDesc& desc) : FRhiShader(desc) {}
-        };
-
-        class FRhiD3D11GraphicsPipeline final : public FRhiPipeline {
-        public:
-            explicit FRhiD3D11GraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
-                : FRhiPipeline(desc) {}
-        };
-
-        class FRhiD3D11ComputePipeline final : public FRhiPipeline {
-        public:
-            explicit FRhiD3D11ComputePipeline(const FRhiComputePipelineDesc& desc)
-                : FRhiPipeline(desc) {}
-        };
-
-        class FRhiD3D11PipelineLayout final : public FRhiPipelineLayout {
-        public:
-            explicit FRhiD3D11PipelineLayout(const FRhiPipelineLayoutDesc& desc)
-                : FRhiPipelineLayout(desc) {}
-        };
-
-        class FRhiD3D11BindGroupLayout final : public FRhiBindGroupLayout {
-        public:
-            explicit FRhiD3D11BindGroupLayout(const FRhiBindGroupLayoutDesc& desc)
-                : FRhiBindGroupLayout(desc) {}
-        };
-
-        class FRhiD3D11BindGroup final : public FRhiBindGroup {
-        public:
-            explicit FRhiD3D11BindGroup(const FRhiBindGroupDesc& desc)
-                : FRhiBindGroup(desc) {}
-        };
-
-        class FRhiD3D11Fence final : public FRhiFence {
-        public:
-            FRhiD3D11Fence() : FRhiFence() {}
-        };
-
-        class FRhiD3D11Semaphore final : public FRhiSemaphore {
-        public:
-            FRhiD3D11Semaphore() : FRhiSemaphore() {}
-        };
-
-        class FRhiD3D11CommandPool final : public FRhiCommandPool {
-        public:
-            explicit FRhiD3D11CommandPool(const FRhiCommandPoolDesc& desc)
-                : FRhiCommandPool(desc) {}
-        };
-
-        class FRhiD3D11Queue final : public FRhiQueue {
-        public:
-            explicit FRhiD3D11Queue(ERhiQueueType type) : FRhiQueue(type) {}
-
-            void Submit(const FRhiSubmitInfo& /*info*/) override {}
-            void WaitIdle() override {}
-            void Present(const FRhiPresentInfo& /*info*/) override {}
-        };
-
-        class FRhiD3D11Device final : public FRhiDevice {
-        public:
-            FRhiD3D11Device(const FRhiDeviceDesc& desc, const FRhiAdapterDesc& adapterDesc)
-                : FRhiDevice(desc, adapterDesc) {
-                RegisterQueue(ERhiQueueType::Graphics,
-                    AdoptResource(new FRhiD3D11Queue(ERhiQueueType::Graphics)));
-                RegisterQueue(ERhiQueueType::Compute,
-                    AdoptResource(new FRhiD3D11Queue(ERhiQueueType::Compute)));
-                RegisterQueue(ERhiQueueType::Copy,
-                    AdoptResource(new FRhiD3D11Queue(ERhiQueueType::Copy)));
-            }
-
-            auto CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef override {
-                return AdoptResource(new FRhiD3D11Buffer(desc));
-            }
-
-            auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef override {
-                return AdoptResource(new FRhiD3D11Texture(desc));
-            }
-
-            auto CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef override {
-                return AdoptResource(new FRhiD3D11Sampler(desc));
-            }
-
-            auto CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef override {
-                return AdoptResource(new FRhiD3D11Shader(desc));
-            }
-
-            auto CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
-                -> FRhiPipelineRef override {
-                return AdoptResource(new FRhiD3D11GraphicsPipeline(desc));
-            }
-
-            auto CreateComputePipeline(const FRhiComputePipelineDesc& desc)
-                -> FRhiPipelineRef override {
-                return AdoptResource(new FRhiD3D11ComputePipeline(desc));
-            }
-
-            auto CreatePipelineLayout(const FRhiPipelineLayoutDesc& desc)
-                -> FRhiPipelineLayoutRef override {
-                return AdoptResource(new FRhiD3D11PipelineLayout(desc));
-            }
-
-            auto CreateBindGroupLayout(const FRhiBindGroupLayoutDesc& desc)
-                -> FRhiBindGroupLayoutRef override {
-                return AdoptResource(new FRhiD3D11BindGroupLayout(desc));
-            }
-
-            auto CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef override {
-                return AdoptResource(new FRhiD3D11BindGroup(desc));
-            }
-
-            auto CreateFence(bool /*signaled*/) -> FRhiFenceRef override {
-                return AdoptResource(new FRhiD3D11Fence());
-            }
-
-            auto CreateSemaphore() -> FRhiSemaphoreRef override {
-                return AdoptResource(new FRhiD3D11Semaphore());
-            }
-
-            auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
-                -> FRhiCommandPoolRef override {
-                return AdoptResource(new FRhiD3D11CommandPool(desc));
-            }
         };
 #endif
     } // namespace
@@ -636,11 +325,12 @@ namespace AltinaEngine::Rhi {
         }
 
         return MakeSharedAs<FRhiDevice, FRhiD3D11Device>(
-            desc, adapter->GetDesc(), AltinaEngine::Move(device),
-            AltinaEngine::Move(context), featureLevel);
+            desc, adapter->GetDesc(), device.Detach(), context.Detach(),
+            static_cast<u32>(featureLevel));
 #else
         (void)desc;
-        return MakeSharedAs<FRhiDevice, FRhiD3D11Device>(desc, adapter->GetDesc());
+        return MakeSharedAs<FRhiDevice, FRhiD3D11Device>(
+            desc, adapter->GetDesc(), nullptr, nullptr, 0U);
 #endif
     }
 

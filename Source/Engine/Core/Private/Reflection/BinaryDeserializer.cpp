@@ -5,7 +5,7 @@
 namespace AltinaEngine::Core::Reflection {
 
     void FBinaryDeserializer::ReadBytes(void* data, usize size) {
-        if (!data || size == 0) {
+        if ((data == nullptr) || size == 0) {
             return;
         }
 

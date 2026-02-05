@@ -6,7 +6,7 @@
 namespace AltinaEngine::Core::Reflection {
 
     void FObject::Serialize(ISerializer& serializer) const {
-        if (!mPtr) {
+        if (mPtr == nullptr) {
             return;
         }
         Detail::DynamicSerializeInvokerImpl(
@@ -14,7 +14,7 @@ namespace AltinaEngine::Core::Reflection {
     }
 
     void FObject::Deserialize(IDeserializer& deserializer) {
-        if (!mPtr) {
+        if (mPtr == nullptr) {
             return;
         }
         Detail::DynamicDeserializeInvokerImpl(mPtr, deserializer, mMetadata.GetHash());

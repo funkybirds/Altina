@@ -4,7 +4,7 @@
 namespace AltinaEngine::Core::Reflection {
 
     void FBinarySerializer::WriteBytes(const void* data, usize size) {
-        if (!data || size == 0) {
+        if ((data == nullptr) || size == 0) {
             return;
         }
 

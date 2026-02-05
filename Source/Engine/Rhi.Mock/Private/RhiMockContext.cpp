@@ -1,0 +1,501 @@
+#include "RhiMock/RhiMockContext.h"
+
+#include "Rhi/RhiBindGroup.h"
+#include "Rhi/RhiBindGroupLayout.h"
+#include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiCommandPool.h"
+#include "Rhi/RhiFence.h"
+#include "Rhi/RhiPipeline.h"
+#include "Rhi/RhiPipelineLayout.h"
+#include "Rhi/RhiSampler.h"
+#include "Rhi/RhiSemaphore.h"
+#include "Rhi/RhiShader.h"
+#include "Rhi/RhiDevice.h"
+#include "Rhi/RhiTexture.h"
+#include "Container/SmartPtr.h"
+#include "Types/Traits.h"
+#include <type_traits>
+
+namespace AltinaEngine::Rhi {
+    namespace {
+        template <typename TBase, typename TDerived, typename... Args>
+        auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
+            using AllocatorType = Core::Container::TAllocator<TDerived>;
+            using Traits        = Core::Container::TAllocatorTraits<AllocatorType>;
+
+            static_assert(std::is_base_of_v<TBase, TDerived>,
+                "MakeSharedAs requires TDerived to derive from TBase.");
+
+            AllocatorType allocator;
+            TDerived*     ptr = Traits::Allocate(allocator, 1);
+            try {
+                Traits::Construct(allocator, ptr, AltinaEngine::Forward<Args>(args)...);
+            } catch (...) {
+                Traits::Deallocate(allocator, ptr, 1);
+                throw;
+            }
+
+            struct FDeleter {
+                AllocatorType mAllocator;
+                void          operator()(TBase* basePtr) {
+                    if (!basePtr) {
+                        return;
+                    }
+                    auto* derivedPtr = static_cast<TDerived*>(basePtr);
+                    Traits::Destroy(mAllocator, derivedPtr);
+                    Traits::Deallocate(mAllocator, derivedPtr, 1);
+                }
+            };
+
+            return TShared<TBase>(ptr, FDeleter{ allocator });
+        }
+
+        class FRhiMockAdapter final : public FRhiAdapter {
+        public:
+            FRhiMockAdapter(const FRhiAdapterDesc& desc, const FRhiSupportedFeatures& features,
+                const FRhiSupportedLimits& limits)
+                : FRhiAdapter(desc), mFeatures(features), mLimits(limits) {}
+
+            [[nodiscard]] auto GetFeatures() const noexcept -> const FRhiSupportedFeatures& {
+                return mFeatures;
+            }
+
+            [[nodiscard]] auto GetLimits() const noexcept -> const FRhiSupportedLimits& {
+                return mLimits;
+            }
+
+        private:
+            FRhiSupportedFeatures mFeatures;
+            FRhiSupportedLimits   mLimits;
+        };
+
+        class FRhiMockBuffer final : public FRhiBuffer {
+        public:
+            FRhiMockBuffer(const FRhiBufferDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiBuffer(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockBuffer() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockTexture final : public FRhiTexture {
+        public:
+            FRhiMockTexture(const FRhiTextureDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiTexture(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockTexture() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockSampler final : public FRhiSampler {
+        public:
+            FRhiMockSampler(const FRhiSamplerDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiSampler(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockSampler() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockShader final : public FRhiShader {
+        public:
+            FRhiMockShader(const FRhiShaderDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiShader(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockShader() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockGraphicsPipeline final : public FRhiPipeline {
+        public:
+            FRhiMockGraphicsPipeline(
+                const FRhiGraphicsPipelineDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiPipeline(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockGraphicsPipeline() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockComputePipeline final : public FRhiPipeline {
+        public:
+            FRhiMockComputePipeline(
+                const FRhiComputePipelineDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiPipeline(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockComputePipeline() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockPipelineLayout final : public FRhiPipelineLayout {
+        public:
+            FRhiMockPipelineLayout(
+                const FRhiPipelineLayoutDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiPipelineLayout(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockPipelineLayout() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockBindGroupLayout final : public FRhiBindGroupLayout {
+        public:
+            FRhiMockBindGroupLayout(
+                const FRhiBindGroupLayoutDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiBindGroupLayout(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockBindGroupLayout() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockBindGroup final : public FRhiBindGroup {
+        public:
+            FRhiMockBindGroup(const FRhiBindGroupDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiBindGroup(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockBindGroup() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockFence final : public FRhiFence {
+        public:
+            explicit FRhiMockFence(TShared<FRhiMockCounters> counters)
+                : FRhiFence(), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockFence() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockSemaphore final : public FRhiSemaphore {
+        public:
+            explicit FRhiMockSemaphore(TShared<FRhiMockCounters> counters)
+                : FRhiSemaphore(), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockSemaphore() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockCommandPool final : public FRhiCommandPool {
+        public:
+            FRhiMockCommandPool(
+                const FRhiCommandPoolDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiCommandPool(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockCommandPool() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockDevice final : public FRhiDevice {
+        public:
+            FRhiMockDevice(const FRhiDeviceDesc& desc, const FRhiAdapterDesc& adapterDesc,
+                const FRhiSupportedFeatures& features, const FRhiSupportedLimits& limits,
+                TShared<FRhiMockCounters> counters)
+                : FRhiDevice(desc, adapterDesc), mCounters(AltinaEngine::Move(counters)) {
+                SetSupportedFeatures(features);
+                SetSupportedLimits(limits);
+                if (mCounters) {
+                    ++mCounters->mDeviceCreated;
+                }
+            }
+
+            ~FRhiMockDevice() override {
+                if (mCounters) {
+                    ++mCounters->mDeviceDestroyed;
+                }
+            }
+
+            auto CreateBuffer(const FRhiBufferDesc& desc) -> TCountRef<FRhiBuffer> override {
+                return AdoptResource(new FRhiMockBuffer(desc, mCounters));
+            }
+            auto CreateTexture(const FRhiTextureDesc& desc) -> TCountRef<FRhiTexture> override {
+                return AdoptResource(new FRhiMockTexture(desc, mCounters));
+            }
+            auto CreateSampler(const FRhiSamplerDesc& desc) -> TCountRef<FRhiSampler> override {
+                return AdoptResource(new FRhiMockSampler(desc, mCounters));
+            }
+            auto CreateShader(const FRhiShaderDesc& desc) -> TCountRef<FRhiShader> override {
+                return AdoptResource(new FRhiMockShader(desc, mCounters));
+            }
+
+            auto CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
+                -> TCountRef<FRhiPipeline> override {
+                return AdoptResource(new FRhiMockGraphicsPipeline(desc, mCounters));
+            }
+            auto CreateComputePipeline(const FRhiComputePipelineDesc& desc)
+                -> TCountRef<FRhiPipeline> override {
+                return AdoptResource(new FRhiMockComputePipeline(desc, mCounters));
+            }
+            auto CreatePipelineLayout(const FRhiPipelineLayoutDesc& desc)
+                -> TCountRef<FRhiPipelineLayout> override {
+                return AdoptResource(new FRhiMockPipelineLayout(desc, mCounters));
+            }
+
+            auto CreateBindGroupLayout(const FRhiBindGroupLayoutDesc& desc)
+                -> TCountRef<FRhiBindGroupLayout> override {
+                return AdoptResource(new FRhiMockBindGroupLayout(desc, mCounters));
+            }
+            auto CreateBindGroup(const FRhiBindGroupDesc& desc)
+                -> TCountRef<FRhiBindGroup> override {
+                return AdoptResource(new FRhiMockBindGroup(desc, mCounters));
+            }
+
+            auto CreateFence(bool /*signaled*/) -> TCountRef<FRhiFence> override {
+                return AdoptResource(new FRhiMockFence(mCounters));
+            }
+            auto CreateSemaphore() -> TCountRef<FRhiSemaphore> override {
+                return AdoptResource(new FRhiMockSemaphore(mCounters));
+            }
+
+            auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
+                -> TCountRef<FRhiCommandPool> override {
+                return AdoptResource(new FRhiMockCommandPool(desc, mCounters));
+            }
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+    } // namespace
+
+    FRhiMockContext::FRhiMockContext()
+        : mCounters(Core::Container::MakeShared<FRhiMockCounters>()) {}
+
+    FRhiMockContext::~FRhiMockContext() { Shutdown(); }
+
+    void FRhiMockContext::AddAdapter(
+        const FRhiAdapterDesc& desc, const FRhiSupportedFeatures& features,
+        const FRhiSupportedLimits& limits) {
+        FRhiMockAdapterConfig config;
+        config.mDesc     = desc;
+        config.mFeatures = features;
+        config.mLimits   = limits;
+        mAdapterConfigs.PushBack(AltinaEngine::Move(config));
+        InvalidateAdapterCache();
+    }
+
+    void FRhiMockContext::AddAdapter(const FRhiMockAdapterConfig& config) {
+        mAdapterConfigs.PushBack(config);
+        InvalidateAdapterCache();
+    }
+
+    void FRhiMockContext::SetAdapters(TVector<FRhiMockAdapterConfig> configs) {
+        mAdapterConfigs = AltinaEngine::Move(configs);
+        InvalidateAdapterCache();
+    }
+
+    void FRhiMockContext::ClearAdapters() {
+        mAdapterConfigs.Clear();
+        InvalidateAdapterCache();
+    }
+
+    void FRhiMockContext::MarkAdaptersDirty() { InvalidateAdapterCache(); }
+
+    auto FRhiMockContext::GetCounters() const noexcept -> const FRhiMockCounters& {
+        return *mCounters;
+    }
+
+    auto FRhiMockContext::GetInitializeCallCount() const noexcept -> u32 {
+        return mCounters ? mCounters->mInitializeCalls : 0U;
+    }
+
+    auto FRhiMockContext::GetShutdownCallCount() const noexcept -> u32 {
+        return mCounters ? mCounters->mShutdownCalls : 0U;
+    }
+
+    auto FRhiMockContext::GetEnumerateAdapterCallCount() const noexcept -> u32 {
+        return mCounters ? mCounters->mEnumerateCalls : 0U;
+    }
+
+    auto FRhiMockContext::GetCreateDeviceCallCount() const noexcept -> u32 {
+        return mCounters ? mCounters->mCreateDeviceCalls : 0U;
+    }
+
+    auto FRhiMockContext::GetDeviceCreatedCount() const noexcept -> u32 {
+        return mCounters ? mCounters->mDeviceCreated : 0U;
+    }
+
+    auto FRhiMockContext::GetDeviceDestroyedCount() const noexcept -> u32 {
+        return mCounters ? mCounters->mDeviceDestroyed : 0U;
+    }
+
+    auto FRhiMockContext::GetDeviceLiveCount() const noexcept -> u32 {
+        return mCounters ? mCounters->GetDeviceLiveCount() : 0U;
+    }
+
+    auto FRhiMockContext::GetResourceCreatedCount() const noexcept -> u32 {
+        return mCounters ? mCounters->mResourceCreated : 0U;
+    }
+
+    auto FRhiMockContext::GetResourceDestroyedCount() const noexcept -> u32 {
+        return mCounters ? mCounters->mResourceDestroyed : 0U;
+    }
+
+    auto FRhiMockContext::GetResourceLiveCount() const noexcept -> u32 {
+        return mCounters ? mCounters->GetResourceLiveCount() : 0U;
+    }
+
+    auto FRhiMockContext::InitializeBackend(const FRhiInitDesc& /*desc*/) -> bool {
+        if (mCounters) {
+            ++mCounters->mInitializeCalls;
+        }
+        return true;
+    }
+
+    void FRhiMockContext::ShutdownBackend() {
+        if (mCounters) {
+            ++mCounters->mShutdownCalls;
+        }
+    }
+
+    void FRhiMockContext::EnumerateAdaptersInternal(TVector<TShared<FRhiAdapter>>& outAdapters) {
+        if (mCounters) {
+            ++mCounters->mEnumerateCalls;
+        }
+
+        outAdapters.Clear();
+        outAdapters.Reserve(mAdapterConfigs.Size());
+
+        for (const auto& config : mAdapterConfigs) {
+            outAdapters.PushBack(
+                MakeSharedAs<FRhiAdapter, FRhiMockAdapter>(config.mDesc, config.mFeatures,
+                    config.mLimits));
+        }
+    }
+
+    auto FRhiMockContext::CreateDeviceInternal(
+        const TShared<FRhiAdapter>& adapter, const FRhiDeviceDesc& desc) -> TShared<FRhiDevice> {
+        if (mCounters) {
+            ++mCounters->mCreateDeviceCalls;
+        }
+
+        if (!adapter) {
+            return {};
+        }
+
+        const auto* mockAdapter = static_cast<const FRhiMockAdapter*>(adapter.Get());
+        const FRhiSupportedFeatures features =
+            mockAdapter ? mockAdapter->GetFeatures() : FRhiSupportedFeatures{};
+        const FRhiSupportedLimits limits =
+            mockAdapter ? mockAdapter->GetLimits() : FRhiSupportedLimits{};
+
+        return MakeSharedAs<FRhiDevice, FRhiMockDevice>(
+            desc, adapter->GetDesc(), features, limits, mCounters);
+    }
+
+} // namespace AltinaEngine::Rhi

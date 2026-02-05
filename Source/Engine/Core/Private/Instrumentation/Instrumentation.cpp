@@ -34,7 +34,7 @@ namespace AltinaEngine::Core::Instrumentation {
 
     void                                       SetCurrentThreadName(const char* name) noexcept {
         tThreadName = name;
-        if (!name)
+        if (name == nullptr)
             return;
 
         // Ensure a placeholder counter entry exists for visibility tools.
@@ -45,9 +45,9 @@ namespace AltinaEngine::Core::Instrumentation {
         }
     }
 
-    const char* GetCurrentThreadName() noexcept { return tThreadName ? tThreadName : ""; }
+    auto GetCurrentThreadName() noexcept -> const char* { return tThreadName ? tThreadName : ""; }
 
-    void        IncrementCounter(const char* name, long long delta) noexcept {
+    void IncrementCounter(const char* name, long long delta) noexcept {
         if (!name)
             return;
         Threading::FScopedLock lk(gMutex);
@@ -62,8 +62,8 @@ namespace AltinaEngine::Core::Instrumentation {
         it->second->mValue.FetchAdd(static_cast<long long>(delta));
     }
 
-    long long GetCounterValue(const char* name) noexcept {
-        if (!name)
+    auto GetCounterValue(const char* name) noexcept -> long long {
+        if (name == nullptr)
             return 0;
         Threading::FScopedLock lk(gMutex);
         string                 key(name);
@@ -74,7 +74,7 @@ namespace AltinaEngine::Core::Instrumentation {
     }
 
     void RecordTimingMs(const char* name, unsigned long long ms) noexcept {
-        if (!name)
+        if (name == nullptr)
             return;
         Threading::FScopedLock lk(gMutex);
         string                 key(name);

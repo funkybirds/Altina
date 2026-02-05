@@ -1,11 +1,11 @@
 #include "TestHarness.h"
 #include "Types/Meta.h"
-#include <string>
 
 using namespace AltinaEngine::Core::TypeMeta;
 
 TEST_CASE("TMetaTypeInfo_int") {
-    REQUIRE(TMetaTypeInfo<int>::kName.Length() > 0);
+    const auto length = TMetaTypeInfo<int>::kName.Length();
+    REQUIRE(length > 0);
     REQUIRE_EQ(TMetaTypeInfo<int>::kDefaultConstructible, true);
 }
 

@@ -35,6 +35,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory(Source/Engine/Core)
 add_subdirectory(Source/Engine/Rhi.General)
+add_subdirectory(Source/Engine/Rhi.Mock)
 add_subdirectory(Source/Engine/Application)
 add_subdirectory(Demo/Minimal)
 add_subdirectory(Source/Tests)

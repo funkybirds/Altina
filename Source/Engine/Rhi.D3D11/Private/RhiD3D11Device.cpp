@@ -2,16 +2,13 @@
 
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
-#include "Rhi/RhiBuffer.h"
 #include "Rhi/RhiCommandPool.h"
 #include "Rhi/RhiFence.h"
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiQueue.h"
-#include "Rhi/RhiSampler.h"
 #include "Rhi/RhiSemaphore.h"
 #include "Rhi/RhiShader.h"
-#include "Rhi/RhiTexture.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
 
@@ -33,7 +30,6 @@
     #include <wrl/client.h>
 #endif
 
-#include <limits>
 #include <type_traits>
 
 namespace AltinaEngine::Rhi {
@@ -50,127 +46,6 @@ namespace AltinaEngine::Rhi {
 #endif
 
     namespace {
-#if AE_PLATFORM_WIN
-        auto ToD3D11Usage(ERhiResourceUsage usage) noexcept -> D3D11_USAGE {
-            switch (usage) {
-            case ERhiResourceUsage::Immutable:
-                return D3D11_USAGE_IMMUTABLE;
-            case ERhiResourceUsage::Dynamic:
-                return D3D11_USAGE_DYNAMIC;
-            case ERhiResourceUsage::Staging:
-                return D3D11_USAGE_STAGING;
-            case ERhiResourceUsage::Default:
-            default:
-                return D3D11_USAGE_DEFAULT;
-            }
-        }
-
-        auto ToD3D11CpuAccess(ERhiCpuAccess access) noexcept -> UINT {
-            UINT flags = 0U;
-            if (HasAnyFlags(access, ERhiCpuAccess::Read)) {
-                flags |= D3D11_CPU_ACCESS_READ;
-            }
-            if (HasAnyFlags(access, ERhiCpuAccess::Write)) {
-                flags |= D3D11_CPU_ACCESS_WRITE;
-            }
-            return flags;
-        }
-
-        auto ToD3D11BufferBindFlags(ERhiBufferBindFlags flags) noexcept -> UINT {
-            UINT result = 0U;
-            if (HasAnyFlags(flags, ERhiBufferBindFlags::Vertex)) {
-                result |= D3D11_BIND_VERTEX_BUFFER;
-            }
-            if (HasAnyFlags(flags, ERhiBufferBindFlags::Index)) {
-                result |= D3D11_BIND_INDEX_BUFFER;
-            }
-            if (HasAnyFlags(flags, ERhiBufferBindFlags::Constant)) {
-                result |= D3D11_BIND_CONSTANT_BUFFER;
-            }
-            if (HasAnyFlags(flags, ERhiBufferBindFlags::ShaderResource)) {
-                result |= D3D11_BIND_SHADER_RESOURCE;
-            }
-            if (HasAnyFlags(flags, ERhiBufferBindFlags::UnorderedAccess)) {
-                result |= D3D11_BIND_UNORDERED_ACCESS;
-            }
-            return result;
-        }
-
-        auto ToD3D11TextureBindFlags(ERhiTextureBindFlags flags) noexcept -> UINT {
-            UINT result = 0U;
-            if (HasAnyFlags(flags, ERhiTextureBindFlags::ShaderResource)) {
-                result |= D3D11_BIND_SHADER_RESOURCE;
-            }
-            if (HasAnyFlags(flags, ERhiTextureBindFlags::RenderTarget)) {
-                result |= D3D11_BIND_RENDER_TARGET;
-            }
-            if (HasAnyFlags(flags, ERhiTextureBindFlags::DepthStencil)) {
-                result |= D3D11_BIND_DEPTH_STENCIL;
-            }
-            if (HasAnyFlags(flags, ERhiTextureBindFlags::UnorderedAccess)) {
-                result |= D3D11_BIND_UNORDERED_ACCESS;
-            }
-            return result;
-        }
-
-        auto ToD3D11Format(ERhiFormat format) noexcept -> DXGI_FORMAT {
-            switch (format) {
-            case ERhiFormat::R8G8B8A8_UNORM:
-                return DXGI_FORMAT_R8G8B8A8_UNORM;
-            case ERhiFormat::R8G8B8A8_UNORM_SRGB:
-                return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-            case ERhiFormat::B8G8R8A8_UNORM:
-                return DXGI_FORMAT_B8G8R8A8_UNORM;
-            case ERhiFormat::B8G8R8A8_UNORM_SRGB:
-                return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-            case ERhiFormat::R16G16B16A16_FLOAT:
-                return DXGI_FORMAT_R16G16B16A16_FLOAT;
-            case ERhiFormat::R32_FLOAT:
-                return DXGI_FORMAT_R32_FLOAT;
-            case ERhiFormat::D24_UNORM_S8_UINT:
-                return DXGI_FORMAT_D24_UNORM_S8_UINT;
-            case ERhiFormat::D32_FLOAT:
-                return DXGI_FORMAT_D32_FLOAT;
-            case ERhiFormat::Unknown:
-            default:
-                return DXGI_FORMAT_UNKNOWN;
-            }
-        }
-
-        class FRhiD3D11Buffer final : public FRhiBuffer {
-        public:
-            FRhiD3D11Buffer(const FRhiBufferDesc& desc, ComPtr<ID3D11Buffer> buffer)
-                : FRhiBuffer(desc), mBuffer(AltinaEngine::Move(buffer)) {}
-
-        private:
-            ComPtr<ID3D11Buffer> mBuffer;
-        };
-
-        class FRhiD3D11Texture final : public FRhiTexture {
-        public:
-            FRhiD3D11Texture(const FRhiTextureDesc& desc, ComPtr<ID3D11Resource> resource)
-                : FRhiTexture(desc), mResource(AltinaEngine::Move(resource)) {}
-
-        private:
-            ComPtr<ID3D11Resource> mResource;
-        };
-#else
-        class FRhiD3D11Buffer final : public FRhiBuffer {
-        public:
-            explicit FRhiD3D11Buffer(const FRhiBufferDesc& desc) : FRhiBuffer(desc) {}
-        };
-
-        class FRhiD3D11Texture final : public FRhiTexture {
-        public:
-            explicit FRhiD3D11Texture(const FRhiTextureDesc& desc) : FRhiTexture(desc) {}
-        };
-#endif
-
-        class FRhiD3D11Sampler final : public FRhiSampler {
-        public:
-            explicit FRhiD3D11Sampler(const FRhiSamplerDesc& desc) : FRhiSampler(desc) {}
-        };
-
         class FRhiD3D11Shader final : public FRhiShader {
         public:
             explicit FRhiD3D11Shader(const FRhiShaderDesc& desc) : FRhiShader(desc) {}
@@ -294,169 +169,6 @@ namespace AltinaEngine::Rhi {
 #else
         return 0U;
 #endif
-    }
-
-    auto FRhiD3D11Device::CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef {
-#if AE_PLATFORM_WIN
-        if (!mState || !mState->mDevice || desc.mSizeBytes == 0ULL) {
-            return {};
-        }
-
-        if (desc.mSizeBytes > static_cast<u64>(std::numeric_limits<UINT>::max())) {
-            return {};
-        }
-
-        const D3D11_USAGE usage    = ToD3D11Usage(desc.mUsage);
-        UINT              bindFlags = ToD3D11BufferBindFlags(desc.mBindFlags);
-        const UINT        cpuAccess = ToD3D11CpuAccess(desc.mCpuAccess);
-        UINT              miscFlags = 0U;
-
-        if (HasAnyFlags(desc.mBindFlags, ERhiBufferBindFlags::Indirect)) {
-            miscFlags |= D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS;
-        }
-
-        if (usage == D3D11_USAGE_IMMUTABLE && cpuAccess != 0U) {
-            return {};
-        }
-        if (usage == D3D11_USAGE_DYNAMIC
-            && (cpuAccess & D3D11_CPU_ACCESS_WRITE) == 0U) {
-            return {};
-        }
-        if (usage == D3D11_USAGE_STAGING) {
-            if (bindFlags != 0U) {
-                return {};
-            }
-            if (cpuAccess == 0U) {
-                return {};
-            }
-        }
-
-        D3D11_BUFFER_DESC bufferDesc = {};
-        bufferDesc.ByteWidth      = static_cast<UINT>(desc.mSizeBytes);
-        bufferDesc.Usage          = usage;
-        bufferDesc.BindFlags      = bindFlags;
-        bufferDesc.CPUAccessFlags = cpuAccess;
-        bufferDesc.MiscFlags      = miscFlags;
-        bufferDesc.StructureByteStride = 0U;
-
-        ComPtr<ID3D11Buffer> buffer;
-        const HRESULT hr = mState->mDevice->CreateBuffer(&bufferDesc, nullptr, &buffer);
-        if (FAILED(hr) || !buffer) {
-            return {};
-        }
-
-        return AdoptResource(new FRhiD3D11Buffer(desc, AltinaEngine::Move(buffer)));
-#else
-        return AdoptResource(new FRhiD3D11Buffer(desc));
-#endif
-    }
-
-    auto FRhiD3D11Device::CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef {
-#if AE_PLATFORM_WIN
-        if (!mState || !mState->mDevice) {
-            return {};
-        }
-
-        if (desc.mWidth == 0U || desc.mHeight == 0U || desc.mMipLevels == 0U) {
-            return {};
-        }
-
-        if (desc.mArrayLayers == 0U) {
-            return {};
-        }
-
-        const DXGI_FORMAT format = ToD3D11Format(desc.mFormat);
-        if (format == DXGI_FORMAT_UNKNOWN) {
-            return {};
-        }
-
-        const D3D11_USAGE usage    = ToD3D11Usage(desc.mUsage);
-        UINT              bindFlags = ToD3D11TextureBindFlags(desc.mBindFlags);
-        const UINT        cpuAccess = ToD3D11CpuAccess(desc.mCpuAccess);
-
-        if (usage == D3D11_USAGE_IMMUTABLE && cpuAccess != 0U) {
-            return {};
-        }
-        if (usage == D3D11_USAGE_DYNAMIC
-            && (cpuAccess & D3D11_CPU_ACCESS_WRITE) == 0U) {
-            return {};
-        }
-        if (usage == D3D11_USAGE_STAGING) {
-            if (bindFlags != 0U) {
-                return {};
-            }
-            if (cpuAccess == 0U) {
-                return {};
-            }
-        }
-
-        if (desc.mDepth > 1U) {
-            if (desc.mArrayLayers > 1U) {
-                return {};
-            }
-            if (desc.mDepth > static_cast<u32>(std::numeric_limits<UINT>::max())) {
-                return {};
-            }
-
-            D3D11_TEXTURE3D_DESC texDesc = {};
-            texDesc.Width     = desc.mWidth;
-            texDesc.Height    = desc.mHeight;
-            texDesc.Depth     = desc.mDepth;
-            texDesc.MipLevels = desc.mMipLevels;
-            texDesc.Format    = format;
-            texDesc.Usage     = usage;
-            texDesc.BindFlags = bindFlags;
-            texDesc.CPUAccessFlags = cpuAccess;
-
-            ComPtr<ID3D11Texture3D> texture;
-            const HRESULT hr = mState->mDevice->CreateTexture3D(&texDesc, nullptr, &texture);
-            if (FAILED(hr) || !texture) {
-                return {};
-            }
-
-            ComPtr<ID3D11Resource> resource;
-            texture.As(&resource);
-            return AdoptResource(new FRhiD3D11Texture(desc, AltinaEngine::Move(resource)));
-        }
-
-        if (desc.mSampleCount == 0U) {
-            return {};
-        }
-        if (desc.mSampleCount > 1U && desc.mMipLevels > 1U) {
-            return {};
-        }
-        if (desc.mArrayLayers > static_cast<u32>(std::numeric_limits<UINT>::max())) {
-            return {};
-        }
-
-        D3D11_TEXTURE2D_DESC texDesc = {};
-        texDesc.Width              = desc.mWidth;
-        texDesc.Height             = desc.mHeight;
-        texDesc.MipLevels          = desc.mMipLevels;
-        texDesc.ArraySize          = desc.mArrayLayers;
-        texDesc.Format             = format;
-        texDesc.SampleDesc.Count   = desc.mSampleCount;
-        texDesc.SampleDesc.Quality = 0U;
-        texDesc.Usage              = usage;
-        texDesc.BindFlags          = bindFlags;
-        texDesc.CPUAccessFlags     = cpuAccess;
-
-        ComPtr<ID3D11Texture2D> texture;
-        const HRESULT hr = mState->mDevice->CreateTexture2D(&texDesc, nullptr, &texture);
-        if (FAILED(hr) || !texture) {
-            return {};
-        }
-
-        ComPtr<ID3D11Resource> resource;
-        texture.As(&resource);
-        return AdoptResource(new FRhiD3D11Texture(desc, AltinaEngine::Move(resource)));
-#else
-        return AdoptResource(new FRhiD3D11Texture(desc));
-#endif
-    }
-
-    auto FRhiD3D11Device::CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef {
-        return AdoptResource(new FRhiD3D11Sampler(desc));
     }
 
     auto FRhiD3D11Device::CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef {

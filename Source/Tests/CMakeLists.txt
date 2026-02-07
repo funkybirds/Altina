@@ -13,6 +13,7 @@ target_link_libraries(AltinaEngineTests PRIVATE
     AltinaEngine::ShaderCompiler
 )
 target_include_directories(AltinaEngineTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(AltinaEngineTests PRIVATE AE_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\")
 set_target_properties(AltinaEngineTests PROPERTIES FOLDER "Tests")
 
 # Register with CTest (CTest is enabled at the top level).

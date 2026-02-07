@@ -1,3 +1,4 @@
+#include "ShaderAutoBinding.h"
 #include "ShaderCompilerBackend.h"
 #include "ShaderCompilerUtils.h"
 #include "Container/String.h"
@@ -622,26 +623,37 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             args.EmplaceBack(text);
         }
 
-        void AppendVulkanBindingArgs(const FVulkanBindingOptions& options, TVector<FString>& args) {
+        void AppendVulkanBindingArgs(const FVulkanBindingOptions& options,
+            const TVector<u32>* spaces, TVector<FString>& args) {
             if (!options.mEnableAutoShift) {
                 return;
             }
 
-            AddArg(args, TEXT("-fvk-b-shift"));
-            args.PushBack(ToFString(options.mConstantBufferShift));
-            args.PushBack(ToFString(options.mSpace));
+            auto AppendShiftForSpace = [&](u32 space) {
+                AddArg(args, TEXT("-fvk-b-shift"));
+                args.PushBack(ToFString(options.mConstantBufferShift));
+                args.PushBack(ToFString(space));
 
-            AddArg(args, TEXT("-fvk-t-shift"));
-            args.PushBack(ToFString(options.mTextureShift));
-            args.PushBack(ToFString(options.mSpace));
+                AddArg(args, TEXT("-fvk-t-shift"));
+                args.PushBack(ToFString(options.mTextureShift));
+                args.PushBack(ToFString(space));
 
-            AddArg(args, TEXT("-fvk-s-shift"));
-            args.PushBack(ToFString(options.mSamplerShift));
-            args.PushBack(ToFString(options.mSpace));
+                AddArg(args, TEXT("-fvk-s-shift"));
+                args.PushBack(ToFString(options.mSamplerShift));
+                args.PushBack(ToFString(space));
 
-            AddArg(args, TEXT("-fvk-u-shift"));
-            args.PushBack(ToFString(options.mStorageShift));
-            args.PushBack(ToFString(options.mSpace));
+                AddArg(args, TEXT("-fvk-u-shift"));
+                args.PushBack(ToFString(options.mStorageShift));
+                args.PushBack(ToFString(space));
+            };
+
+            if (spaces != nullptr && !spaces->IsEmpty()) {
+                for (u32 space : *spaces) {
+                    AppendShiftForSpace(space);
+                }
+            } else {
+                AppendShiftForSpace(options.mSpace);
+            }
         }
     } // namespace
 
@@ -662,11 +674,21 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             return result;
         }
 
+        FAutoBindingOutput autoBinding;
+        if (!ApplyAutoBindings(request.mSource.mPath, request.mOptions.mTargetBackend,
+                autoBinding, result.mDiagnostics)) {
+            result.mSucceeded = false;
+            return result;
+        }
+
+        const FString sourcePath =
+            autoBinding.mApplied ? autoBinding.mSourcePath : request.mSource.mPath;
+
         const FString outputPath =
-            BuildTempOutputPath(request.mSource.mPath, FString(TEXT("slang")),
+            BuildTempOutputPath(sourcePath, FString(TEXT("slang")),
                 BuildOutputExtension(request.mOptions.mTargetBackend));
         const FString reflectionPath =
-            BuildTempOutputPath(request.mSource.mPath, FString(TEXT("slang")),
+            BuildTempOutputPath(sourcePath, FString(TEXT("slang")),
                 FString(TEXT(".json")));
 
         TVector<FString> args;
@@ -718,11 +740,21 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         AddArg(args, TEXT("-reflection-json"));
         args.PushBack(reflectionPath);
 
-        if (request.mOptions.mTargetBackend == Rhi::ERhiBackend::Vulkan) {
-            AppendVulkanBindingArgs(request.mOptions.mVulkanBinding, args);
+        TVector<u32> autoSpaces;
+        if (autoBinding.mApplied && request.mOptions.mTargetBackend == Rhi::ERhiBackend::Vulkan) {
+            for (u32 i = 0; i < static_cast<u32>(EAutoBindingGroup::Count); ++i) {
+                if (autoBinding.mLayout.mGroupUsed[i]) {
+                    autoSpaces.PushBack(i);
+                }
+            }
         }
 
-        args.PushBack(request.mSource.mPath);
+        if (request.mOptions.mTargetBackend == Rhi::ERhiBackend::Vulkan) {
+            AppendVulkanBindingArgs(request.mOptions.mVulkanBinding,
+                autoSpaces.IsEmpty() ? nullptr : &autoSpaces, args);
+        }
+
+        args.PushBack(sourcePath);
 
         FString compilerPath = request.mOptions.mCompilerPathOverride;
         if (compilerPath.IsEmptyString()) {

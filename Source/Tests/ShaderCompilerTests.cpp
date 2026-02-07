@@ -32,6 +32,18 @@ namespace {
         return out;
     }
 
+    auto GetShaderIncludeDir() -> std::filesystem::path {
+#if defined(AE_SOURCE_DIR)
+        return std::filesystem::path(AE_SOURCE_DIR) / "Source";
+#else
+        return std::filesystem::current_path();
+#endif
+    }
+
+    void AddShaderIncludeDir(FShaderCompileRequest& request) {
+        request.mSource.mIncludeDirs.PushBack(ToFString(GetShaderIncludeDir()));
+    }
+
     auto ToAsciiString(const FString& text) -> std::string {
         std::string out;
         const auto* data = text.GetData();
@@ -143,6 +155,48 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
     gOutTex[id.xy] = float4(1, 0, 0, 1);
 }
 )";
+
+    constexpr const char* kAutoBindingGroupedShaderHlsl = R"(#include "Shader/Bindings/ShaderBindings.hlsli"
+
+AE_PER_FRAME_CBUFFER(PerFrame) {
+    float4 mTint;
+};
+
+AE_PER_DRAW_CBUFFER(PerDraw) {
+    float4x4 mWorld;
+};
+
+AE_PER_MATERIAL_SRV(Texture2D, gTex);
+AE_PER_MATERIAL_SAMPLER(gSamp);
+AE_PER_DRAW_UAV(RWTexture2D<float4>, gOut);
+
+[numthreads(1, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID) {
+    float4 tex = gTex.SampleLevel(gSamp, float2(0.0, 0.0), 0);
+    gOut[id.xy] = tex + mTint + mWorld._11;
+}
+)";
+
+    constexpr const char* kAutoBindingGroupedShaderSlang = R"(#include "Shader/Bindings/ShaderBindings.slang"
+
+AE_PER_FRAME_CBUFFER(PerFrame) {
+    float4 mTint;
+};
+
+AE_PER_DRAW_CBUFFER(PerDraw) {
+    float4x4 mWorld;
+};
+
+AE_PER_MATERIAL_SRV(Texture2D, gTex);
+AE_PER_MATERIAL_SAMPLER(gSamp);
+AE_PER_DRAW_UAV(RWTexture2D<float4>, gOut);
+
+[numthreads(1, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID) {
+    float4 tex = gTex.SampleLevel(gSamp, float2(0.0, 0.0), 0);
+    gOut[id.xy] = tex + mTint + mWorld._11;
+}
+)";
 } // namespace
 
 TEST_CASE("ShaderCompiler.DXC.VS_PS_CS") {
@@ -167,4 +221,214 @@ TEST_CASE("ShaderCompiler.Slang.VS_PS_CS") {
         EShaderSourceLanguage::Slang, ERhiBackend::Vulkan, "Slang-PS"));
     REQUIRE(CompileShader(kCsShader, TEXT("CSMain"), EShaderStage::Compute,
         EShaderSourceLanguage::Slang, ERhiBackend::Vulkan, "Slang-CS"));
+}
+
+TEST_CASE("ShaderCompiler.Slang.VulkanAutoBinding") {
+    const auto shaderPath = WriteTempShaderFile("Slang-AutoBinding", kAutoBindingGroupedShaderSlang);
+
+    FShaderCompileRequest request;
+    request.mSource.mPath       = ToFString(shaderPath);
+    request.mSource.mEntryPoint = FString(TEXT("CSMain"));
+    request.mSource.mStage      = EShaderStage::Compute;
+    request.mSource.mLanguage   = EShaderSourceLanguage::Slang;
+    request.mOptions.mTargetBackend = ERhiBackend::Vulkan;
+    AddShaderIncludeDir(request);
+    request.mOptions.mVulkanBinding.mEnableAutoShift = true;
+    request.mOptions.mVulkanBinding.mConstantBufferShift = 0U;
+    request.mOptions.mVulkanBinding.mTextureShift        = 100U;
+    request.mOptions.mVulkanBinding.mSamplerShift        = 200U;
+    request.mOptions.mVulkanBinding.mStorageShift        = 300U;
+
+    const auto result = GetShaderCompiler().Compile(request);
+
+    std::error_code ec;
+    std::filesystem::remove(shaderPath, ec);
+
+    if (!result.mSucceeded && IsCompilerUnavailable(result)) {
+        std::cout << "[ SKIP ] Slang-AutoBinding compiler unavailable\n";
+        return;
+    }
+
+    if (!result.mSucceeded) {
+        std::cerr << "[FAIL] Slang-AutoBinding compile diagnostics:\n"
+                  << ToAsciiString(result.mDiagnostics) << "\n";
+    }
+
+    REQUIRE(result.mSucceeded);
+    REQUIRE(!result.mBytecode.IsEmpty());
+
+    auto FindResource = [&](const char* name)
+        -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
+        for (const auto& resource : result.mReflection.mResources) {
+            if (ToAsciiString(resource.mName) == name) {
+                return &resource;
+            }
+        }
+        return nullptr;
+    };
+
+    const auto* cb  = FindResource("PerFrame");
+    const auto* drawCb = FindResource("PerDraw");
+    const auto* tex = FindResource("gTex");
+    const auto* samp = FindResource("gSamp");
+    const auto* out = FindResource("gOut");
+
+    REQUIRE(cb != nullptr);
+    REQUIRE(drawCb != nullptr);
+    REQUIRE(tex != nullptr);
+    REQUIRE(samp != nullptr);
+    REQUIRE(out != nullptr);
+    if ((cb == nullptr) || (drawCb == nullptr) || (tex == nullptr) || (samp == nullptr)
+        || (out == nullptr)) {
+        return;
+    }
+
+    REQUIRE(cb->mSet == 0U);
+    REQUIRE(drawCb->mSet == 1U);
+    REQUIRE(tex->mSet == 2U);
+    REQUIRE(samp->mSet == 2U);
+    REQUIRE(out->mSet == 1U);
+
+    REQUIRE(cb->mBinding == 0U);
+    REQUIRE(drawCb->mBinding == 0U);
+    REQUIRE(tex->mBinding == 100U);
+    REQUIRE(samp->mBinding == 200U);
+    REQUIRE(out->mBinding == 300U);
+}
+
+TEST_CASE("ShaderCompiler.DXC.AutoBindingDX12") {
+    const auto shaderPath = WriteTempShaderFile("DXC-AutoBinding", kAutoBindingGroupedShaderHlsl);
+
+    FShaderCompileRequest request;
+    request.mSource.mPath       = ToFString(shaderPath);
+    request.mSource.mEntryPoint = FString(TEXT("CSMain"));
+    request.mSource.mStage      = EShaderStage::Compute;
+    request.mSource.mLanguage   = EShaderSourceLanguage::Hlsl;
+    request.mOptions.mTargetBackend = ERhiBackend::DirectX12;
+    AddShaderIncludeDir(request);
+
+    const auto result = GetShaderCompiler().Compile(request);
+
+    std::error_code ec;
+    std::filesystem::remove(shaderPath, ec);
+
+    if (!result.mSucceeded && IsCompilerUnavailable(result)) {
+        std::cout << "[ SKIP ] DXC-AutoBinding compiler unavailable\n";
+        return;
+    }
+
+    if (!result.mSucceeded) {
+        std::cerr << "[FAIL] DXC-AutoBinding compile diagnostics:\n"
+                  << ToAsciiString(result.mDiagnostics) << "\n";
+    }
+
+    REQUIRE(result.mSucceeded);
+    REQUIRE(!result.mBytecode.IsEmpty());
+
+    auto FindResource = [&](const char* name)
+        -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
+        for (const auto& resource : result.mReflection.mResources) {
+            if (ToAsciiString(resource.mName) == name) {
+                return &resource;
+            }
+        }
+        return nullptr;
+    };
+
+    const auto* cb  = FindResource("PerFrame");
+    const auto* drawCb = FindResource("PerDraw");
+    const auto* tex = FindResource("gTex");
+    const auto* samp = FindResource("gSamp");
+    const auto* out = FindResource("gOut");
+
+    REQUIRE(cb != nullptr);
+    REQUIRE(drawCb != nullptr);
+    REQUIRE(tex != nullptr);
+    REQUIRE(samp != nullptr);
+    REQUIRE(out != nullptr);
+    if ((cb == nullptr) || (drawCb == nullptr) || (tex == nullptr) || (samp == nullptr)
+        || (out == nullptr)) {
+        return;
+    }
+
+    REQUIRE(cb->mSet == 0U);
+    REQUIRE(drawCb->mSet == 1U);
+    REQUIRE(tex->mSet == 2U);
+    REQUIRE(samp->mSet == 2U);
+    REQUIRE(out->mSet == 1U);
+
+    REQUIRE(cb->mBinding == 0U);
+    REQUIRE(drawCb->mBinding == 0U);
+    REQUIRE(tex->mBinding == 0U);
+    REQUIRE(samp->mBinding == 0U);
+    REQUIRE(out->mBinding == 0U);
+}
+
+TEST_CASE("ShaderCompiler.DXC.AutoBindingDX11") {
+    const auto shaderPath =
+        WriteTempShaderFile("DXC-AutoBinding-DX11", kAutoBindingGroupedShaderHlsl);
+
+    FShaderCompileRequest request;
+    request.mSource.mPath       = ToFString(shaderPath);
+    request.mSource.mEntryPoint = FString(TEXT("CSMain"));
+    request.mSource.mStage      = EShaderStage::Compute;
+    request.mSource.mLanguage   = EShaderSourceLanguage::Hlsl;
+    request.mOptions.mTargetBackend = ERhiBackend::DirectX11;
+    AddShaderIncludeDir(request);
+
+    const auto result = GetShaderCompiler().Compile(request);
+
+    std::error_code ec;
+    std::filesystem::remove(shaderPath, ec);
+
+    if (!result.mSucceeded && IsCompilerUnavailable(result)) {
+        std::cout << "[ SKIP ] DXC-AutoBinding-DX11 compiler unavailable\n";
+        return;
+    }
+
+    if (!result.mSucceeded) {
+        std::cerr << "[FAIL] DXC-AutoBinding-DX11 compile diagnostics:\n"
+                  << ToAsciiString(result.mDiagnostics) << "\n";
+    }
+
+    REQUIRE(result.mSucceeded);
+    REQUIRE(!result.mBytecode.IsEmpty());
+
+    auto FindResource = [&](const char* name)
+        -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
+        for (const auto& resource : result.mReflection.mResources) {
+            if (ToAsciiString(resource.mName) == name) {
+                return &resource;
+            }
+        }
+        return nullptr;
+    };
+
+    const auto* cb  = FindResource("PerFrame");
+    const auto* drawCb = FindResource("PerDraw");
+    const auto* tex = FindResource("gTex");
+    const auto* samp = FindResource("gSamp");
+    const auto* out = FindResource("gOut");
+
+    REQUIRE(cb != nullptr);
+    REQUIRE(drawCb != nullptr);
+    REQUIRE(tex != nullptr);
+    REQUIRE(samp != nullptr);
+    REQUIRE(out != nullptr);
+    if ((cb == nullptr) || (drawCb == nullptr) || (tex == nullptr) || (samp == nullptr)
+        || (out == nullptr)) {
+        return;
+    }
+
+    REQUIRE(cb->mSet == 0U);
+    REQUIRE(drawCb->mSet == 0U);
+    REQUIRE(tex->mSet == 0U);
+    REQUIRE(samp->mSet == 0U);
+    REQUIRE(out->mSet == 0U);
+
+    REQUIRE(cb->mBinding == 0U);
+    REQUIRE(drawCb->mBinding == 4U);
+    REQUIRE(tex->mBinding == 32U);
+    REQUIRE(samp->mBinding == 8U);
+    REQUIRE(out->mBinding == 4U);
 }

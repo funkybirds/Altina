@@ -54,6 +54,7 @@ if(WIN32)
     target_link_libraries(${TargetName}
         PRIVATE
             d3dcompiler
+            dxcompiler
             dxguid
     )
 endif()

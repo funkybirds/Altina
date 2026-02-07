@@ -35,15 +35,15 @@ namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
         auto ToD3D11Usage(ERhiResourceUsage usage) noexcept -> D3D11_USAGE {
             switch (usage) {
-            case ERhiResourceUsage::Immutable:
-                return D3D11_USAGE_IMMUTABLE;
-            case ERhiResourceUsage::Dynamic:
-                return D3D11_USAGE_DYNAMIC;
-            case ERhiResourceUsage::Staging:
-                return D3D11_USAGE_STAGING;
-            case ERhiResourceUsage::Default:
-            default:
-                return D3D11_USAGE_DEFAULT;
+                case ERhiResourceUsage::Immutable:
+                    return D3D11_USAGE_IMMUTABLE;
+                case ERhiResourceUsage::Dynamic:
+                    return D3D11_USAGE_DYNAMIC;
+                case ERhiResourceUsage::Staging:
+                    return D3D11_USAGE_STAGING;
+                case ERhiResourceUsage::Default:
+                default:
+                    return D3D11_USAGE_DEFAULT;
             }
         }
 
@@ -97,25 +97,25 @@ namespace AltinaEngine::Rhi {
 
         auto ToD3D11Format(ERhiFormat format) noexcept -> DXGI_FORMAT {
             switch (format) {
-            case ERhiFormat::R8G8B8A8_UNORM:
-                return DXGI_FORMAT_R8G8B8A8_UNORM;
-            case ERhiFormat::R8G8B8A8_UNORM_SRGB:
-                return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-            case ERhiFormat::B8G8R8A8_UNORM:
-                return DXGI_FORMAT_B8G8R8A8_UNORM;
-            case ERhiFormat::B8G8R8A8_UNORM_SRGB:
-                return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-            case ERhiFormat::R16G16B16A16_FLOAT:
-                return DXGI_FORMAT_R16G16B16A16_FLOAT;
-            case ERhiFormat::R32_FLOAT:
-                return DXGI_FORMAT_R32_FLOAT;
-            case ERhiFormat::D24_UNORM_S8_UINT:
-                return DXGI_FORMAT_D24_UNORM_S8_UINT;
-            case ERhiFormat::D32_FLOAT:
-                return DXGI_FORMAT_D32_FLOAT;
-            case ERhiFormat::Unknown:
-            default:
-                return DXGI_FORMAT_UNKNOWN;
+                case ERhiFormat::R8G8B8A8_UNORM:
+                    return DXGI_FORMAT_R8G8B8A8_UNORM;
+                case ERhiFormat::R8G8B8A8_UNORM_SRGB:
+                    return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+                case ERhiFormat::B8G8R8A8_UNORM:
+                    return DXGI_FORMAT_B8G8R8A8_UNORM;
+                case ERhiFormat::B8G8R8A8_UNORM_SRGB:
+                    return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+                case ERhiFormat::R16G16B16A16_FLOAT:
+                    return DXGI_FORMAT_R16G16B16A16_FLOAT;
+                case ERhiFormat::R32_FLOAT:
+                    return DXGI_FORMAT_R32_FLOAT;
+                case ERhiFormat::D24_UNORM_S8_UINT:
+                    return DXGI_FORMAT_D24_UNORM_S8_UINT;
+                case ERhiFormat::D32_FLOAT:
+                    return DXGI_FORMAT_D32_FLOAT;
+                case ERhiFormat::Unknown:
+                default:
+                    return DXGI_FORMAT_UNKNOWN;
             }
         }
 
@@ -167,7 +167,7 @@ namespace AltinaEngine::Rhi {
     auto FRhiD3D11Device::CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef {
 #if AE_PLATFORM_WIN
         ID3D11Device* device = GetNativeDevice();
-        if (!device || desc.mSizeBytes == 0ULL) {
+        if ((device == nullptr) || desc.mSizeBytes == 0ULL) {
             return {};
         }
 
@@ -175,7 +175,7 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        const D3D11_USAGE usage    = ToD3D11Usage(desc.mUsage);
+        const D3D11_USAGE usage     = ToD3D11Usage(desc.mUsage);
         UINT              bindFlags = ToD3D11BufferBindFlags(desc.mBindFlags);
         const UINT        cpuAccess = ToD3D11CpuAccess(desc.mCpuAccess);
         UINT              miscFlags = 0U;
@@ -187,8 +187,7 @@ namespace AltinaEngine::Rhi {
         if (usage == D3D11_USAGE_IMMUTABLE && cpuAccess != 0U) {
             return {};
         }
-        if (usage == D3D11_USAGE_DYNAMIC
-            && (cpuAccess & D3D11_CPU_ACCESS_WRITE) == 0U) {
+        if (usage == D3D11_USAGE_DYNAMIC && (cpuAccess & D3D11_CPU_ACCESS_WRITE) == 0U) {
             return {};
         }
         if (usage == D3D11_USAGE_STAGING) {
@@ -200,17 +199,17 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        D3D11_BUFFER_DESC bufferDesc = {};
-        bufferDesc.ByteWidth      = static_cast<UINT>(desc.mSizeBytes);
-        bufferDesc.Usage          = usage;
-        bufferDesc.BindFlags      = bindFlags;
-        bufferDesc.CPUAccessFlags = cpuAccess;
-        bufferDesc.MiscFlags      = miscFlags;
+        D3D11_BUFFER_DESC bufferDesc   = {};
+        bufferDesc.ByteWidth           = static_cast<UINT>(desc.mSizeBytes);
+        bufferDesc.Usage               = usage;
+        bufferDesc.BindFlags           = bindFlags;
+        bufferDesc.CPUAccessFlags      = cpuAccess;
+        bufferDesc.MiscFlags           = miscFlags;
         bufferDesc.StructureByteStride = 0U;
 
         ComPtr<ID3D11Buffer> buffer;
-        const HRESULT hr = device->CreateBuffer(&bufferDesc, nullptr, &buffer);
-        if (FAILED(hr) || !buffer) {
+        const HRESULT        hr = device->CreateBuffer(&bufferDesc, nullptr, &buffer);
+        if (FAILED(hr) || (buffer == nullptr)) {
             return {};
         }
 
@@ -240,15 +239,14 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        const D3D11_USAGE usage    = ToD3D11Usage(desc.mUsage);
+        const D3D11_USAGE usage     = ToD3D11Usage(desc.mUsage);
         UINT              bindFlags = ToD3D11TextureBindFlags(desc.mBindFlags);
         const UINT        cpuAccess = ToD3D11CpuAccess(desc.mCpuAccess);
 
         if (usage == D3D11_USAGE_IMMUTABLE && cpuAccess != 0U) {
             return {};
         }
-        if (usage == D3D11_USAGE_DYNAMIC
-            && (cpuAccess & D3D11_CPU_ACCESS_WRITE) == 0U) {
+        if (usage == D3D11_USAGE_DYNAMIC && (cpuAccess & D3D11_CPU_ACCESS_WRITE) == 0U) {
             return {};
         }
         if (usage == D3D11_USAGE_STAGING) {
@@ -269,18 +267,18 @@ namespace AltinaEngine::Rhi {
             }
 
             D3D11_TEXTURE3D_DESC texDesc = {};
-            texDesc.Width     = desc.mWidth;
-            texDesc.Height    = desc.mHeight;
-            texDesc.Depth     = desc.mDepth;
-            texDesc.MipLevels = desc.mMipLevels;
-            texDesc.Format    = format;
-            texDesc.Usage     = usage;
-            texDesc.BindFlags = bindFlags;
-            texDesc.CPUAccessFlags = cpuAccess;
+            texDesc.Width                = desc.mWidth;
+            texDesc.Height               = desc.mHeight;
+            texDesc.Depth                = desc.mDepth;
+            texDesc.MipLevels            = desc.mMipLevels;
+            texDesc.Format               = format;
+            texDesc.Usage                = usage;
+            texDesc.BindFlags            = bindFlags;
+            texDesc.CPUAccessFlags       = cpuAccess;
 
             ComPtr<ID3D11Texture3D> texture;
-            const HRESULT hr = device->CreateTexture3D(&texDesc, nullptr, &texture);
-            if (FAILED(hr) || !texture) {
+            const HRESULT           hr = device->CreateTexture3D(&texDesc, nullptr, &texture);
+            if (FAILED(hr) || (texture == nullptr)) {
                 return {};
             }
 
@@ -300,20 +298,20 @@ namespace AltinaEngine::Rhi {
         }
 
         D3D11_TEXTURE2D_DESC texDesc = {};
-        texDesc.Width              = desc.mWidth;
-        texDesc.Height             = desc.mHeight;
-        texDesc.MipLevels          = desc.mMipLevels;
-        texDesc.ArraySize          = desc.mArrayLayers;
-        texDesc.Format             = format;
-        texDesc.SampleDesc.Count   = desc.mSampleCount;
-        texDesc.SampleDesc.Quality = 0U;
-        texDesc.Usage              = usage;
-        texDesc.BindFlags          = bindFlags;
-        texDesc.CPUAccessFlags     = cpuAccess;
+        texDesc.Width                = desc.mWidth;
+        texDesc.Height               = desc.mHeight;
+        texDesc.MipLevels            = desc.mMipLevels;
+        texDesc.ArraySize            = desc.mArrayLayers;
+        texDesc.Format               = format;
+        texDesc.SampleDesc.Count     = desc.mSampleCount;
+        texDesc.SampleDesc.Quality   = 0U;
+        texDesc.Usage                = usage;
+        texDesc.BindFlags            = bindFlags;
+        texDesc.CPUAccessFlags       = cpuAccess;
 
         ComPtr<ID3D11Texture2D> texture;
-        const HRESULT hr = device->CreateTexture2D(&texDesc, nullptr, &texture);
-        if (FAILED(hr) || !texture) {
+        const HRESULT           hr = device->CreateTexture2D(&texDesc, nullptr, &texture);
+        if (FAILED(hr) || (texture == nullptr)) {
             return {};
         }
 
@@ -328,28 +326,28 @@ namespace AltinaEngine::Rhi {
     auto FRhiD3D11Device::CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef {
 #if AE_PLATFORM_WIN
         ID3D11Device* device = GetNativeDevice();
-        if (!device) {
+        if (device == nullptr) {
             return {};
         }
 
         D3D11_SAMPLER_DESC samplerDesc = {};
-        samplerDesc.Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-        samplerDesc.AddressU       = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.AddressV       = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.AddressW       = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.MipLODBias     = 0.0f;
-        samplerDesc.MaxAnisotropy  = 1;
-        samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
-        samplerDesc.BorderColor[0] = 0.0f;
-        samplerDesc.BorderColor[1] = 0.0f;
-        samplerDesc.BorderColor[2] = 0.0f;
-        samplerDesc.BorderColor[3] = 0.0f;
-        samplerDesc.MinLOD         = 0.0f;
-        samplerDesc.MaxLOD         = D3D11_FLOAT32_MAX;
+        samplerDesc.Filter             = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        samplerDesc.AddressU           = D3D11_TEXTURE_ADDRESS_WRAP;
+        samplerDesc.AddressV           = D3D11_TEXTURE_ADDRESS_WRAP;
+        samplerDesc.AddressW           = D3D11_TEXTURE_ADDRESS_WRAP;
+        samplerDesc.MipLODBias         = 0.0f;
+        samplerDesc.MaxAnisotropy      = 1;
+        samplerDesc.ComparisonFunc     = D3D11_COMPARISON_ALWAYS;
+        samplerDesc.BorderColor[0]     = 0.0f;
+        samplerDesc.BorderColor[1]     = 0.0f;
+        samplerDesc.BorderColor[2]     = 0.0f;
+        samplerDesc.BorderColor[3]     = 0.0f;
+        samplerDesc.MinLOD             = 0.0f;
+        samplerDesc.MaxLOD             = D3D11_FLOAT32_MAX;
 
         ComPtr<ID3D11SamplerState> sampler;
-        const HRESULT hr = device->CreateSamplerState(&samplerDesc, &sampler);
-        if (FAILED(hr) || !sampler) {
+        const HRESULT              hr = device->CreateSamplerState(&samplerDesc, &sampler);
+        if (FAILED(hr) || (sampler == nullptr)) {
             return {};
         }
 

@@ -35,6 +35,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory(Source/Engine/Core)
 add_subdirectory(Source/Engine/Rhi.General)
+add_subdirectory(Source/Engine/ShaderCompiler)
 add_subdirectory(Source/Engine/Rhi.Mock)
 add_subdirectory(Source/Engine/Rhi.D3D11)
 add_subdirectory(Source/Engine/Application)

@@ -10,6 +10,7 @@ target_link_libraries(AltinaEngineTests PRIVATE
     AltinaEngine::Core
     AltinaEngine::Rhi::Mock
     AltinaEngine::Rhi::D3D11
+    AltinaEngine::ShaderCompiler
 )
 target_include_directories(AltinaEngineTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(AltinaEngineTests PROPERTIES FOLDER "Tests")

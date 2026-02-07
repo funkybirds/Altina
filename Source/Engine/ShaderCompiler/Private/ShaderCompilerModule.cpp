@@ -94,6 +94,7 @@ namespace AltinaEngine::ShaderCompiler {
         auto*   backend = SelectBackend(request, selectionNotes);
         if (backend == nullptr) {
             FShaderCompileResult result;
+            result.mStage = request.mSource.mStage;
             result.mSucceeded   = false;
             result.mDiagnostics = selectionNotes;
             return result;

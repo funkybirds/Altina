@@ -374,6 +374,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
     auto FDxcCompilerBackend::Compile(const FShaderCompileRequest& request)
         -> FShaderCompileResult {
         FShaderCompileResult result;
+        result.mStage = request.mSource.mStage;
         if (!IsAvailable()) {
             result.mSucceeded   = false;
             result.mDiagnostics = FString(kDxcDisabledMessage);

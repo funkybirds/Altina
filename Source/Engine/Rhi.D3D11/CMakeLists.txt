@@ -38,6 +38,8 @@ target_link_libraries(${TargetName}
     PUBLIC
         AltinaEngine::Core
         AltinaEngine::Rhi::General
+    PRIVATE
+        AltinaEngine::Shader
 )
 
 if(WIN32)

@@ -156,4 +156,12 @@ namespace AltinaEngine::ShaderCompiler {
         return result;
     }
 
+    auto BuildRhiShaderDesc(const FShaderCompileResult& result) -> Rhi::FRhiShaderDesc {
+        Rhi::FRhiShaderDesc desc{};
+        desc.mStage = result.mStage;
+        desc.mBytecode.mData = result.mBytecode;
+        desc.mReflection = result.mReflection;
+        return desc;
+    }
+
 } // namespace AltinaEngine::ShaderCompiler

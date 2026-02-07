@@ -34,6 +34,7 @@ endif()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory(Source/Engine/Core)
+add_subdirectory(Source/Engine/Shader)
 add_subdirectory(Source/Engine/Rhi.General)
 add_subdirectory(Source/Engine/ShaderCompiler)
 add_subdirectory(Source/Engine/Rhi.Mock)

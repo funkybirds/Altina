@@ -2,6 +2,8 @@
 
 #include "Rhi/RhiEnums.h"
 #include "Rhi/RhiFwd.h"
+#include "Shader/ShaderReflection.h"
+#include "Shader/ShaderTypes.h"
 #include "Container/String.h"
 #include "Container/StringView.h"
 #include "Container/Vector.h"
@@ -10,6 +12,9 @@ namespace AltinaEngine::Rhi {
     using Core::Container::FString;
     using Core::Container::FStringView;
     using Core::Container::TVector;
+    using Shader::EShaderStage;
+    using Shader::FShaderBytecode;
+    using Shader::FShaderReflection;
 
     inline constexpr u32 kRhiInvalidAdapterIndex = 0xFFFFFFFFu;
     inline constexpr u64 kRhiUnknownMemoryBytes  = 0ULL;
@@ -146,16 +151,40 @@ namespace AltinaEngine::Rhi {
 
     struct FRhiShaderDesc {
         FString mDebugName;
+        EShaderStage mStage = EShaderStage::Vertex;
+        FShaderBytecode mBytecode;
+        FShaderReflection mReflection;
+    };
+
+    struct FRhiVertexAttributeDesc {
+        FString   mSemanticName;
+        u32       mSemanticIndex    = 0U;
+        ERhiFormat mFormat          = ERhiFormat::R32_FLOAT;
+        u32       mInputSlot        = 0U;
+        u32       mAlignedByteOffset = 0U;
+        bool      mPerInstance      = false;
+        u32       mInstanceStepRate = 0U;
+    };
+
+    struct FRhiVertexLayoutDesc {
+        TVector<FRhiVertexAttributeDesc> mAttributes;
     };
 
     struct FRhiGraphicsPipelineDesc {
         FString mDebugName;
         FRhiPipelineLayout* mPipelineLayout = nullptr;
+        FRhiShader* mVertexShader = nullptr;
+        FRhiShader* mPixelShader  = nullptr;
+        FRhiShader* mGeometryShader = nullptr;
+        FRhiShader* mHullShader   = nullptr;
+        FRhiShader* mDomainShader = nullptr;
+        FRhiVertexLayoutDesc mVertexLayout;
     };
 
     struct FRhiComputePipelineDesc {
         FString mDebugName;
         FRhiPipelineLayout* mPipelineLayout = nullptr;
+        FRhiShader* mComputeShader = nullptr;
     };
 
     struct FRhiPushConstantRange {

@@ -1,14 +1,7 @@
-set(TargetName AltinaEngineShaderCompiler)
+set(TargetName AltinaEngineShader)
 
 add_library(${TargetName} SHARED)
-add_library(AltinaEngine::ShaderCompiler ALIAS ${TargetName})
-
-if(WIN32)
-    option(AE_ENABLE_DXC "Enable DXC shader compiler backend" ON)
-else()
-    option(AE_ENABLE_DXC "Enable DXC shader compiler backend" OFF)
-endif()
-option(AE_ENABLE_SLANG "Enable Slang shader compiler backend" ON)
+add_library(AltinaEngine::Shader ALIAS ${TargetName})
 
 file(GLOB_RECURSE Target_Public_Headers
     CONFIGURE_DEPENDS
@@ -39,7 +32,7 @@ target_sources(${TargetName}
 target_include_directories(${TargetName}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Public>
-        $<INSTALL_INTERFACE:include/AltinaEngine/ShaderCompiler>
+        $<INSTALL_INTERFACE:include/AltinaEngine/Shader>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/Private
 )
@@ -47,24 +40,11 @@ target_include_directories(${TargetName}
 target_link_libraries(${TargetName}
     PUBLIC
         AltinaEngine::Core
-        AltinaEngine::Shader
-        AltinaEngine::Rhi::General
 )
-
-if(WIN32)
-    target_link_libraries(${TargetName}
-        PRIVATE
-            d3dcompiler
-            dxcompiler
-            dxguid
-    )
-endif()
 
 target_compile_definitions(${TargetName}
     PRIVATE
-        AE_SHADER_COMPILER_BUILD
-        AE_SHADER_COMPILER_ENABLE_DXC=$<BOOL:${AE_ENABLE_DXC}>
-        AE_SHADER_COMPILER_ENABLE_SLANG=$<BOOL:${AE_ENABLE_SLANG}>
+        AE_SHADER_BUILD
 )
 
 set_target_properties(${TargetName} PROPERTIES
@@ -103,6 +83,6 @@ add_custom_command(
 
 set_target_properties(${TargetName}
     PROPERTIES
-        OUTPUT_NAME AltinaEngineShaderCompiler
-        FOLDER "Engine/ShaderCompiler"
+        OUTPUT_NAME AltinaEngineShader
+        FOLDER "Engine/Shader"
 )

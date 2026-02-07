@@ -2,6 +2,7 @@
 
 #include "ShaderCompiler/ShaderPermutation.h"
 #include "ShaderCompiler/ShaderReflection.h"
+#include "Shader/ShaderTypes.h"
 #include "Container/String.h"
 #include "Container/Vector.h"
 #include "Rhi/RhiEnums.h"
@@ -11,22 +12,11 @@
 namespace AltinaEngine::ShaderCompiler {
     using Core::Container::FString;
     using Core::Container::TVector;
+    using Shader::EShaderStage;
 
     enum class EShaderSourceLanguage : u8 {
         Hlsl = 0,
         Slang
-    };
-
-    enum class EShaderStage : u8 {
-        Vertex = 0,
-        Pixel,
-        Compute,
-        Geometry,
-        Hull,
-        Domain,
-        Mesh,
-        Amplification,
-        Library
     };
 
     enum class EShaderOptimization : u8 {
@@ -84,6 +74,7 @@ namespace AltinaEngine::ShaderCompiler {
     struct FShaderCompileResult {
         bool                mSucceeded = false;
         TVector<u8>         mBytecode;
+        EShaderStage        mStage = EShaderStage::Vertex;
         FShaderReflection   mReflection;
         FRhiShaderBindingLayout mRhiLayout;
         FString             mDiagnostics;

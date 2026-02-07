@@ -5,6 +5,7 @@
 #include "Container/String.h"
 #include "Container/Vector.h"
 #include "Rhi/RhiEnums.h"
+#include "Rhi/RhiStructs.h"
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::ShaderCompiler {
@@ -75,10 +76,16 @@ namespace AltinaEngine::ShaderCompiler {
         FShaderPermutationId mPermutationId;
     };
 
+    struct FRhiShaderBindingLayout {
+        Rhi::FRhiPipelineLayoutDesc          mPipelineLayout;
+        TVector<Rhi::FRhiBindGroupLayoutDesc> mBindGroupLayouts;
+    };
+
     struct FShaderCompileResult {
         bool                mSucceeded = false;
         TVector<u8>         mBytecode;
         FShaderReflection   mReflection;
+        FRhiShaderBindingLayout mRhiLayout;
         FString             mDiagnostics;
         FString             mOutputDebugPath;
     };

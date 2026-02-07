@@ -1,12 +1,15 @@
 #pragma once
 
 #include "Rhi/RhiEnums.h"
+#include "Rhi/RhiFwd.h"
 #include "Container/String.h"
 #include "Container/StringView.h"
+#include "Container/Vector.h"
 
 namespace AltinaEngine::Rhi {
     using Core::Container::FString;
     using Core::Container::FStringView;
+    using Core::Container::TVector;
 
     inline constexpr u32 kRhiInvalidAdapterIndex = 0xFFFFFFFFu;
     inline constexpr u64 kRhiUnknownMemoryBytes  = 0ULL;
@@ -147,22 +150,57 @@ namespace AltinaEngine::Rhi {
 
     struct FRhiGraphicsPipelineDesc {
         FString mDebugName;
+        FRhiPipelineLayout* mPipelineLayout = nullptr;
     };
 
     struct FRhiComputePipelineDesc {
         FString mDebugName;
+        FRhiPipelineLayout* mPipelineLayout = nullptr;
     };
 
-    struct FRhiPipelineLayoutDesc {
-        FString mDebugName;
+    struct FRhiPushConstantRange {
+        u32                 mOffset = 0U;
+        u32                 mSize   = 0U;
+        ERhiShaderStageFlags mVisibility = ERhiShaderStageFlags::All;
+    };
+
+    struct FRhiBindGroupLayoutEntry {
+        u32                  mBinding     = 0U;
+        ERhiBindingType      mType        = ERhiBindingType::ConstantBuffer;
+        ERhiShaderStageFlags mVisibility  = ERhiShaderStageFlags::All;
+        u32                  mArrayCount  = 1U;
+        bool                 mHasDynamicOffset = false;
     };
 
     struct FRhiBindGroupLayoutDesc {
-        FString mDebugName;
+        FString                         mDebugName;
+        u32                             mSetIndex = 0U;
+        TVector<FRhiBindGroupLayoutEntry> mEntries;
+        u64                             mLayoutHash = 0ULL;
+    };
+
+    struct FRhiBindGroupEntry {
+        u32             mBinding    = 0U;
+        ERhiBindingType mType       = ERhiBindingType::ConstantBuffer;
+        FRhiBuffer*     mBuffer = nullptr;
+        FRhiTexture*    mTexture = nullptr;
+        FRhiSampler*    mSampler = nullptr;
+        u64             mOffset     = 0ULL;
+        u64             mSize       = 0ULL;
+        u32             mArrayIndex = 0U;
     };
 
     struct FRhiBindGroupDesc {
-        FString mDebugName;
+        FString        mDebugName;
+        FRhiBindGroupLayout* mLayout = nullptr;
+        TVector<FRhiBindGroupEntry> mEntries;
+    };
+
+    struct FRhiPipelineLayoutDesc {
+        FString                         mDebugName;
+        TVector<FRhiBindGroupLayout*> mBindGroupLayouts;
+        TVector<FRhiPushConstantRange>  mPushConstants;
+        u64                             mLayoutHash = 0ULL;
     };
 
     struct FRhiCommandPoolDesc {

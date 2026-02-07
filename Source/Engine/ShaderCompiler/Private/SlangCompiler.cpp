@@ -1,6 +1,7 @@
 #include "ShaderAutoBinding.h"
 #include "ShaderCompilerBackend.h"
 #include "ShaderCompilerUtils.h"
+#include "ShaderCompiler/ShaderRhiBindings.h"
 #include "Container/String.h"
 #include "Container/StringView.h"
 #include "Platform/PlatformFileSystem.h"
@@ -793,6 +794,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         result.mOutputDebugPath = outputPath;
         result.mSucceeded       = true;
+        result.mRhiLayout       = BuildRhiBindingLayout(result.mReflection, request.mSource.mStage);
         return result;
     }
 

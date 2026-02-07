@@ -1,6 +1,7 @@
 #include "ShaderAutoBinding.h"
 #include "ShaderCompilerBackend.h"
 #include "ShaderCompilerUtils.h"
+#include "ShaderCompiler/ShaderRhiBindings.h"
 #include "Container/String.h"
 #include "Platform/PlatformFileSystem.h"
 #include "Platform/PlatformProcess.h"
@@ -444,6 +445,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         AppendDiagnosticLine(result.mDiagnostics,
             TEXT("DXC reflection extraction not supported on this platform."));
 #endif
+
+        result.mRhiLayout = BuildRhiBindingLayout(result.mReflection, request.mSource.mStage);
 
         return result;
     }

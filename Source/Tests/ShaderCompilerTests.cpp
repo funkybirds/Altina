@@ -6,6 +6,10 @@
 
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "TestHarness.h"
+#include "RhiMock/RhiMockContext.h"
+#include "Rhi/RhiDevice.h"
+#include "Rhi/RhiBindGroupLayout.h"
+#include "Rhi/RhiPipelineLayout.h"
 
 namespace {
     using AltinaEngine::ShaderCompiler::EShaderSourceLanguage;
@@ -15,6 +19,11 @@ namespace {
     using AltinaEngine::ShaderCompiler::GetShaderCompiler;
     using AltinaEngine::Core::Container::FString;
     using AltinaEngine::Rhi::ERhiBackend;
+    using AltinaEngine::Rhi::ERhiAdapterType;
+    using AltinaEngine::Rhi::ERhiVendorId;
+    using AltinaEngine::Rhi::FRhiAdapterDesc;
+    using AltinaEngine::Rhi::FRhiInitDesc;
+    using AltinaEngine::Rhi::FRhiMockContext;
 
     auto ToFString(const std::filesystem::path& path) -> FString {
         FString out;
@@ -68,6 +77,39 @@ namespace {
             return true;
         }
         return false;
+    }
+
+    auto CreateMockDevice(FRhiMockContext& context) -> AltinaEngine::Core::Container::TShared<
+        AltinaEngine::Rhi::FRhiDevice> {
+        FRhiAdapterDesc adapter{};
+        adapter.mName.Assign(TEXT("Mock GPU"));
+        adapter.mType    = ERhiAdapterType::Discrete;
+        adapter.mVendorId = ERhiVendorId::Nvidia;
+        context.AddAdapter(adapter);
+        REQUIRE(context.Init(FRhiInitDesc{}));
+        auto device = context.CreateDevice(0);
+        REQUIRE(device);
+        return device;
+    }
+
+    auto BuildPipelineLayoutFromResult(AltinaEngine::Rhi::FRhiDevice& device,
+        const FShaderCompileResult& result,
+        AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef>&
+            outLayouts) -> AltinaEngine::Rhi::FRhiPipelineLayoutRef {
+        auto pipelineDesc = result.mRhiLayout.mPipelineLayout;
+        pipelineDesc.mBindGroupLayouts.Clear();
+        pipelineDesc.mBindGroupLayouts.Reserve(result.mRhiLayout.mBindGroupLayouts.Size());
+        outLayouts.Clear();
+        outLayouts.Reserve(result.mRhiLayout.mBindGroupLayouts.Size());
+        for (const auto& layoutDesc : result.mRhiLayout.mBindGroupLayouts) {
+            auto layoutRef = device.CreateBindGroupLayout(layoutDesc);
+            REQUIRE(layoutRef);
+            outLayouts.PushBack(layoutRef);
+            pipelineDesc.mBindGroupLayouts.PushBack(layoutRef.Get());
+        }
+        auto pipelineLayout = device.CreatePipelineLayout(pipelineDesc);
+        REQUIRE(pipelineLayout);
+        return pipelineLayout;
     }
 
     auto WriteTempShaderFile(const char* prefix, const char* content) -> std::filesystem::path {
@@ -257,6 +299,11 @@ TEST_CASE("ShaderCompiler.Slang.VulkanAutoBinding") {
     REQUIRE(result.mSucceeded);
     REQUIRE(!result.mBytecode.IsEmpty());
 
+    FRhiMockContext context;
+    auto device = CreateMockDevice(context);
+    AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
+    BuildPipelineLayoutFromResult(*device, result, layouts);
+
     auto FindResource = [&](const char* name)
         -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
         for (const auto& resource : result.mReflection.mResources) {
@@ -324,6 +371,11 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX12") {
 
     REQUIRE(result.mSucceeded);
     REQUIRE(!result.mBytecode.IsEmpty());
+
+    FRhiMockContext context;
+    auto device = CreateMockDevice(context);
+    AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
+    BuildPipelineLayoutFromResult(*device, result, layouts);
 
     auto FindResource = [&](const char* name)
         -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
@@ -393,6 +445,11 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX11") {
 
     REQUIRE(result.mSucceeded);
     REQUIRE(!result.mBytecode.IsEmpty());
+
+    FRhiMockContext context;
+    auto device = CreateMockDevice(context);
+    AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
+    BuildPipelineLayoutFromResult(*device, result, layouts);
 
     auto FindResource = [&](const char* name)
         -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {

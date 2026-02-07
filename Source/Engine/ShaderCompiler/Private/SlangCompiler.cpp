@@ -2,6 +2,8 @@
 #include "ShaderCompilerUtils.h"
 #include "Container/String.h"
 #include "Container/StringView.h"
+#include "Platform/PlatformFileSystem.h"
+#include "Platform/PlatformProcess.h"
 
 #include <cctype>
 #include <cstdlib>
@@ -31,6 +33,10 @@
 
 namespace AltinaEngine::ShaderCompiler::Detail {
     using Core::Container::FString;
+    using Core::Platform::ReadFileBytes;
+    using Core::Platform::ReadFileTextUtf8;
+    using Core::Platform::RemoveFileIfExists;
+    using Core::Platform::RunProcess;
 
     namespace {
         using Core::Container::FNativeString;

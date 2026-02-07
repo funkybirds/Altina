@@ -1,6 +1,8 @@
 #include "ShaderCompilerBackend.h"
 #include "ShaderCompilerUtils.h"
 #include "Container/String.h"
+#include "Platform/PlatformFileSystem.h"
+#include "Platform/PlatformProcess.h"
 
 #include <cstring>
 #include <string>
@@ -30,6 +32,9 @@
 
 namespace AltinaEngine::ShaderCompiler::Detail {
     using Core::Container::FString;
+    using Core::Platform::ReadFileBytes;
+    using Core::Platform::RemoveFileIfExists;
+    using Core::Platform::RunProcess;
 
     namespace {
         constexpr const TChar* kDxcName = TEXT("DXC");

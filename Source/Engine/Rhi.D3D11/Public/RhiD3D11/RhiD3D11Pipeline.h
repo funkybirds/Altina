@@ -2,6 +2,7 @@
 
 #include "RhiD3D11API.h"
 #include "Rhi/RhiPipeline.h"
+#include "Rhi/RhiRefs.h"
 
 struct ID3D11Device;
 struct ID3D11InputLayout;
@@ -30,6 +31,12 @@ namespace AltinaEngine::Rhi {
     private:
         struct FState;
         FState* mState = nullptr;
+        FRhiPipelineLayoutRef mPipelineLayout;
+        FRhiShaderRef mVertexShader;
+        FRhiShaderRef mPixelShader;
+        FRhiShaderRef mGeometryShader;
+        FRhiShaderRef mHullShader;
+        FRhiShaderRef mDomainShader;
         TVector<FD3D11BindingMappingEntry> mBindings;
     };
 
@@ -42,6 +49,8 @@ namespace AltinaEngine::Rhi {
             -> const TVector<FD3D11BindingMappingEntry>&;
 
     private:
+        FRhiPipelineLayoutRef mPipelineLayout;
+        FRhiShaderRef mComputeShader;
         TVector<FD3D11BindingMappingEntry> mBindings;
     };
 

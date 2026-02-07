@@ -3,5 +3,5 @@
 #include "Shader/ShaderPermutation.h"
 
 namespace AltinaEngine::ShaderCompiler {
-    using Shader::FShaderPermutationId;
+    using ::AltinaEngine::Shader::FShaderPermutationId;
 } // namespace AltinaEngine::ShaderCompiler

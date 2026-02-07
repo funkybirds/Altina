@@ -1,5 +1,6 @@
 #include "RhiD3D11/RhiD3D11Device.h"
 #include "RhiD3D11/RhiD3D11Pipeline.h"
+#include "RhiD3D11/RhiD3D11Shader.h"
 
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
@@ -215,21 +216,6 @@ namespace AltinaEngine::Rhi {
         }
 #endif
 
-        class FRhiD3D11Shader final : public FRhiShader {
-        public:
-#if AE_PLATFORM_WIN
-            FRhiD3D11Shader(const FRhiShaderDesc& desc, ComPtr<ID3D11DeviceChild> shader)
-                : FRhiShader(desc), mShader(AltinaEngine::Move(shader)) {}
-#else
-            explicit FRhiD3D11Shader(const FRhiShaderDesc& desc) : FRhiShader(desc) {}
-#endif
-
-        private:
-#if AE_PLATFORM_WIN
-            ComPtr<ID3D11DeviceChild> mShader;
-#endif
-        };
-
         class FRhiD3D11PipelineLayout final : public FRhiPipelineLayout {
         public:
             explicit FRhiD3D11PipelineLayout(const FRhiPipelineLayoutDesc& desc)
@@ -284,7 +270,13 @@ namespace AltinaEngine::Rhi {
 
     FRhiD3D11GraphicsPipeline::FRhiD3D11GraphicsPipeline(
         const FRhiGraphicsPipelineDesc& desc, ID3D11Device* device)
-        : FRhiPipeline(desc) {
+        : FRhiPipeline(desc)
+        , mPipelineLayout(desc.mPipelineLayout)
+        , mVertexShader(desc.mVertexShader)
+        , mPixelShader(desc.mPixelShader)
+        , mGeometryShader(desc.mGeometryShader)
+        , mHullShader(desc.mHullShader)
+        , mDomainShader(desc.mDomainShader) {
 #if AE_PLATFORM_WIN
         mState = new FState{};
         if (mState) {
@@ -338,7 +330,9 @@ namespace AltinaEngine::Rhi {
     }
 
     FRhiD3D11ComputePipeline::FRhiD3D11ComputePipeline(const FRhiComputePipelineDesc& desc)
-        : FRhiPipeline(desc) {
+        : FRhiPipeline(desc)
+        , mPipelineLayout(desc.mPipelineLayout)
+        , mComputeShader(desc.mComputeShader) {
 #if AE_PLATFORM_WIN
         if (desc.mComputeShader) {
             AppendReflectionBindings(desc.mComputeShader->GetDesc().mReflection,
@@ -484,7 +478,7 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        return MakeResource<FRhiD3D11Shader>(desc, AltinaEngine::Move(shader));
+        return MakeResource<FRhiD3D11Shader>(desc, shader.Detach());
 #else
         return MakeResource<FRhiD3D11Shader>(desc);
 #endif

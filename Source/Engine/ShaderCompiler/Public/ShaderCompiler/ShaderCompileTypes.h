@@ -12,7 +12,7 @@
 namespace AltinaEngine::ShaderCompiler {
     using Core::Container::FString;
     using Core::Container::TVector;
-    using Shader::EShaderStage;
+    using ::AltinaEngine::Shader::EShaderStage;
 
     enum class EShaderSourceLanguage : u8 {
         Hlsl = 0,

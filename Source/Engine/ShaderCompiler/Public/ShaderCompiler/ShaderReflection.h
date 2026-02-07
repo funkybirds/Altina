@@ -3,8 +3,8 @@
 #include "Shader/ShaderReflection.h"
 
 namespace AltinaEngine::ShaderCompiler {
-    using Shader::EShaderResourceAccess;
-    using Shader::EShaderResourceType;
-    using Shader::FShaderReflection;
-    using Shader::FShaderResourceBinding;
+    using ::AltinaEngine::Shader::EShaderResourceAccess;
+    using ::AltinaEngine::Shader::EShaderResourceType;
+    using ::AltinaEngine::Shader::FShaderReflection;
+    using ::AltinaEngine::Shader::FShaderResourceBinding;
 } // namespace AltinaEngine::ShaderCompiler

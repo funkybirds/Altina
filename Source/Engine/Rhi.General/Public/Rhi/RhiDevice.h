@@ -7,6 +7,7 @@
 #include "Rhi/RhiResourceDeleteQueue.h"
 #include "Container/Vector.h"
 #include "Types/NonCopyable.h"
+#include "Types/Traits.h"
 
 namespace AltinaEngine::Rhi {
     using Core::Container::FStringView;
@@ -67,6 +68,12 @@ namespace AltinaEngine::Rhi {
                 resource->SetDeleteQueue(&mResourceDeleteQueue);
             }
             return TCountRef<TResource>::Adopt(resource);
+        }
+
+        template <typename TResource, typename... Args>
+        auto MakeResource(Args&&... args) -> TCountRef<TResource> {
+            return AdoptResource(
+                new TResource(AltinaEngine::Forward<Args>(args)...));
         }
 
     private:

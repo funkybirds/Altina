@@ -135,11 +135,11 @@ namespace AltinaEngine::Rhi {
 #endif
 
         RegisterQueue(ERhiQueueType::Graphics,
-            AdoptResource(new FRhiD3D11Queue(ERhiQueueType::Graphics)));
+            MakeResource<FRhiD3D11Queue>(ERhiQueueType::Graphics));
         RegisterQueue(ERhiQueueType::Compute,
-            AdoptResource(new FRhiD3D11Queue(ERhiQueueType::Compute)));
+            MakeResource<FRhiD3D11Queue>(ERhiQueueType::Compute));
         RegisterQueue(ERhiQueueType::Copy,
-            AdoptResource(new FRhiD3D11Queue(ERhiQueueType::Copy)));
+            MakeResource<FRhiD3D11Queue>(ERhiQueueType::Copy));
     }
 
     FRhiD3D11Device::~FRhiD3D11Device() {
@@ -172,45 +172,45 @@ namespace AltinaEngine::Rhi {
     }
 
     auto FRhiD3D11Device::CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef {
-        return AdoptResource(new FRhiD3D11Shader(desc));
+        return MakeResource<FRhiD3D11Shader>(desc);
     }
 
     auto FRhiD3D11Device::CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
         -> FRhiPipelineRef {
-        return AdoptResource(new FRhiD3D11GraphicsPipeline(desc));
+        return MakeResource<FRhiD3D11GraphicsPipeline>(desc);
     }
 
     auto FRhiD3D11Device::CreateComputePipeline(const FRhiComputePipelineDesc& desc)
         -> FRhiPipelineRef {
-        return AdoptResource(new FRhiD3D11ComputePipeline(desc));
+        return MakeResource<FRhiD3D11ComputePipeline>(desc);
     }
 
     auto FRhiD3D11Device::CreatePipelineLayout(const FRhiPipelineLayoutDesc& desc)
         -> FRhiPipelineLayoutRef {
-        return AdoptResource(new FRhiD3D11PipelineLayout(desc));
+        return MakeResource<FRhiD3D11PipelineLayout>(desc);
     }
 
     auto FRhiD3D11Device::CreateBindGroupLayout(const FRhiBindGroupLayoutDesc& desc)
         -> FRhiBindGroupLayoutRef {
-        return AdoptResource(new FRhiD3D11BindGroupLayout(desc));
+        return MakeResource<FRhiD3D11BindGroupLayout>(desc);
     }
 
     auto FRhiD3D11Device::CreateBindGroup(const FRhiBindGroupDesc& desc)
         -> FRhiBindGroupRef {
-        return AdoptResource(new FRhiD3D11BindGroup(desc));
+        return MakeResource<FRhiD3D11BindGroup>(desc);
     }
 
     auto FRhiD3D11Device::CreateFence(bool /*signaled*/) -> FRhiFenceRef {
-        return AdoptResource(new FRhiD3D11Fence());
+        return MakeResource<FRhiD3D11Fence>();
     }
 
     auto FRhiD3D11Device::CreateSemaphore() -> FRhiSemaphoreRef {
-        return AdoptResource(new FRhiD3D11Semaphore());
+        return MakeResource<FRhiD3D11Semaphore>();
     }
 
     auto FRhiD3D11Device::CreateCommandPool(const FRhiCommandPoolDesc& desc)
         -> FRhiCommandPoolRef {
-        return AdoptResource(new FRhiD3D11CommandPool(desc));
+        return MakeResource<FRhiD3D11CommandPool>(desc);
     }
 
 } // namespace AltinaEngine::Rhi

@@ -214,9 +214,9 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        return AdoptResource(new FRhiD3D11Buffer(desc, AltinaEngine::Move(buffer)));
+        return MakeResource<FRhiD3D11Buffer>(desc, AltinaEngine::Move(buffer));
 #else
-        return AdoptResource(new FRhiD3D11Buffer(desc));
+        return MakeResource<FRhiD3D11Buffer>(desc);
 #endif
     }
 
@@ -286,7 +286,7 @@ namespace AltinaEngine::Rhi {
 
             ComPtr<ID3D11Resource> resource;
             texture.As(&resource);
-            return AdoptResource(new FRhiD3D11Texture(desc, AltinaEngine::Move(resource)));
+            return MakeResource<FRhiD3D11Texture>(desc, AltinaEngine::Move(resource));
         }
 
         if (desc.mSampleCount == 0U) {
@@ -319,9 +319,9 @@ namespace AltinaEngine::Rhi {
 
         ComPtr<ID3D11Resource> resource;
         texture.As(&resource);
-        return AdoptResource(new FRhiD3D11Texture(desc, AltinaEngine::Move(resource)));
+        return MakeResource<FRhiD3D11Texture>(desc, AltinaEngine::Move(resource));
 #else
-        return AdoptResource(new FRhiD3D11Texture(desc));
+        return MakeResource<FRhiD3D11Texture>(desc);
 #endif
     }
 
@@ -353,9 +353,9 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        return AdoptResource(new FRhiD3D11Sampler(desc, AltinaEngine::Move(sampler)));
+        return MakeResource<FRhiD3D11Sampler>(desc, AltinaEngine::Move(sampler));
 #else
-        return AdoptResource(new FRhiD3D11Sampler(desc));
+        return MakeResource<FRhiD3D11Sampler>(desc);
 #endif
     }
 } // namespace AltinaEngine::Rhi

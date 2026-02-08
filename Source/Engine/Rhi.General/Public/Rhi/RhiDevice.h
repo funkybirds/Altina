@@ -25,6 +25,7 @@ namespace AltinaEngine::Rhi {
 
         [[nodiscard]] auto GetSupportedFeatures() const noexcept -> const FRhiSupportedFeatures&;
         [[nodiscard]] auto GetSupportedLimits() const noexcept -> const FRhiSupportedLimits&;
+        [[nodiscard]] auto GetQueueCapabilities() const noexcept -> const FRhiQueueCapabilities&;
         [[nodiscard]] auto IsFeatureSupported(ERhiFeature feature) const noexcept -> bool;
 
         [[nodiscard]] auto GetQueue(ERhiQueueType type) const noexcept -> FRhiQueueRef;
@@ -46,11 +47,16 @@ namespace AltinaEngine::Rhi {
         virtual auto CreateBindGroup(const FRhiBindGroupDesc& desc)
             -> FRhiBindGroupRef = 0;
 
-        virtual auto CreateFence(bool signaled) -> FRhiFenceRef = 0;
-        virtual auto CreateSemaphore() -> FRhiSemaphoreRef      = 0;
+        virtual auto CreateFence(u64 initialValue) -> FRhiFenceRef = 0;
+        virtual auto CreateSemaphore(bool timeline, u64 initialValue)
+            -> FRhiSemaphoreRef = 0;
 
         virtual auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
             -> FRhiCommandPoolRef = 0;
+        virtual auto CreateCommandList(const FRhiCommandListDesc& desc)
+            -> FRhiCommandListRef = 0;
+        virtual auto CreateCommandContext(const FRhiCommandContextDesc& desc)
+            -> FRhiCommandContextRef = 0;
 
         void ProcessResourceDeleteQueue(u64 completedSerial);
         void FlushResourceDeleteQueue();
@@ -60,6 +66,7 @@ namespace AltinaEngine::Rhi {
 
         void SetSupportedFeatures(const FRhiSupportedFeatures& features) noexcept;
         void SetSupportedLimits(const FRhiSupportedLimits& limits) noexcept;
+        void SetQueueCapabilities(const FRhiQueueCapabilities& caps) noexcept;
         void RegisterQueue(ERhiQueueType type, FRhiQueueRef queue);
 
         template <typename TResource>
@@ -88,6 +95,7 @@ namespace AltinaEngine::Rhi {
         FRhiAdapterDesc      mAdapterDesc;
         FRhiSupportedFeatures mSupportedFeatures;
         FRhiSupportedLimits  mSupportedLimits;
+        FRhiQueueCapabilities mQueueCaps;
         TVector<FRhiQueueEntry> mQueues;
         FRhiResourceDeleteQueue mResourceDeleteQueue;
     };

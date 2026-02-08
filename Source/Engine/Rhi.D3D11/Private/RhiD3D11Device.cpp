@@ -4,6 +4,8 @@
 
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
+#include "Rhi/RhiCommandContext.h"
+#include "Rhi/RhiCommandList.h"
 #include "Rhi/RhiCommandPool.h"
 #include "Rhi/RhiFence.h"
 #include "Rhi/RhiPipeline.h"
@@ -236,18 +238,68 @@ namespace AltinaEngine::Rhi {
 
         class FRhiD3D11Fence final : public FRhiFence {
         public:
-            FRhiD3D11Fence() : FRhiFence() {}
+            explicit FRhiD3D11Fence(u64 initialValue)
+                : FRhiFence(), mValue(initialValue) {}
+
+            [[nodiscard]] auto GetCompletedValue() const noexcept -> u64 override {
+                return mValue;
+            }
+            void SignalCPU(u64 value) override { mValue = value; }
+            void WaitCPU(u64 value) override { mValue = value; }
+            void Reset(u64 value) override { mValue = value; }
+
+        private:
+            u64 mValue = 0ULL;
         };
 
         class FRhiD3D11Semaphore final : public FRhiSemaphore {
         public:
-            FRhiD3D11Semaphore() : FRhiSemaphore() {}
+            FRhiD3D11Semaphore(bool timeline, u64 initialValue)
+                : FRhiSemaphore(), mIsTimeline(timeline), mValue(initialValue) {}
+
+            [[nodiscard]] auto IsTimeline() const noexcept -> bool override {
+                return mIsTimeline;
+            }
+            [[nodiscard]] auto GetCurrentValue() const noexcept -> u64 override {
+                return mValue;
+            }
+
+        private:
+            bool mIsTimeline = false;
+            u64  mValue      = 0ULL;
         };
 
         class FRhiD3D11CommandPool final : public FRhiCommandPool {
         public:
             explicit FRhiD3D11CommandPool(const FRhiCommandPoolDesc& desc)
                 : FRhiCommandPool(desc) {}
+
+            void Reset() override {}
+        };
+
+        class FRhiD3D11CommandList final : public FRhiCommandList {
+        public:
+            explicit FRhiD3D11CommandList(const FRhiCommandListDesc& desc)
+                : FRhiCommandList(desc) {}
+
+            void Reset(FRhiCommandPool* /*pool*/) override {}
+            void Close() override {}
+        };
+
+        class FRhiD3D11CommandContext final : public FRhiCommandContext {
+        public:
+            FRhiD3D11CommandContext(const FRhiCommandContextDesc& desc,
+                FRhiCommandListRef commandList)
+                : FRhiCommandContext(desc), mCommandList(AltinaEngine::Move(commandList)) {}
+
+            void Begin() override {}
+            void End() override {}
+            [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override {
+                return mCommandList.Get();
+            }
+
+        private:
+            FRhiCommandListRef mCommandList;
         };
 
         class FRhiD3D11Queue final : public FRhiQueue {
@@ -255,6 +307,8 @@ namespace AltinaEngine::Rhi {
             explicit FRhiD3D11Queue(ERhiQueueType type) : FRhiQueue(type) {}
 
             void Submit(const FRhiSubmitInfo& /*info*/) override {}
+            void Signal(FRhiFence* /*fence*/, u64 /*value*/) override {}
+            void Wait(FRhiFence* /*fence*/, u64 /*value*/) override {}
             void WaitIdle() override {}
             void Present(const FRhiPresentInfo& /*info*/) override {}
         };
@@ -371,6 +425,14 @@ namespace AltinaEngine::Rhi {
         limits.mMaxSamplers               = D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT;
         limits.mMaxColorAttachments       = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
         SetSupportedLimits(limits);
+
+        FRhiQueueCapabilities queueCaps;
+        queueCaps.mSupportsGraphics = true;
+        queueCaps.mSupportsCompute  = true;
+        queueCaps.mSupportsCopy     = true;
+        queueCaps.mSupportsAsyncCompute = false;
+        queueCaps.mSupportsAsyncCopy    = false;
+        SetQueueCapabilities(queueCaps);
 #else
         (void)device;
         (void)context;
@@ -513,17 +575,32 @@ namespace AltinaEngine::Rhi {
         return MakeResource<FRhiD3D11BindGroup>(desc);
     }
 
-    auto FRhiD3D11Device::CreateFence(bool /*signaled*/) -> FRhiFenceRef {
-        return MakeResource<FRhiD3D11Fence>();
+    auto FRhiD3D11Device::CreateFence(u64 initialValue) -> FRhiFenceRef {
+        return MakeResource<FRhiD3D11Fence>(initialValue);
     }
 
-    auto FRhiD3D11Device::CreateSemaphore() -> FRhiSemaphoreRef {
-        return MakeResource<FRhiD3D11Semaphore>();
+    auto FRhiD3D11Device::CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef {
+        return MakeResource<FRhiD3D11Semaphore>(timeline, initialValue);
     }
 
     auto FRhiD3D11Device::CreateCommandPool(const FRhiCommandPoolDesc& desc)
         -> FRhiCommandPoolRef {
         return MakeResource<FRhiD3D11CommandPool>(desc);
+    }
+
+    auto FRhiD3D11Device::CreateCommandList(const FRhiCommandListDesc& desc)
+        -> FRhiCommandListRef {
+        return MakeResource<FRhiD3D11CommandList>(desc);
+    }
+
+    auto FRhiD3D11Device::CreateCommandContext(const FRhiCommandContextDesc& desc)
+        -> FRhiCommandContextRef {
+        FRhiCommandListDesc listDesc;
+        listDesc.mDebugName = desc.mDebugName;
+        listDesc.mQueueType = desc.mQueueType;
+        listDesc.mListType  = desc.mListType;
+        auto commandList = MakeResource<FRhiD3D11CommandList>(listDesc);
+        return MakeResource<FRhiD3D11CommandContext>(desc, AltinaEngine::Move(commandList));
     }
 
 } // namespace AltinaEngine::Rhi

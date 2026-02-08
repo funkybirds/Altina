@@ -3,10 +3,13 @@
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiCommandContext.h"
+#include "Rhi/RhiCommandList.h"
 #include "Rhi/RhiCommandPool.h"
 #include "Rhi/RhiFence.h"
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiPipelineLayout.h"
+#include "Rhi/RhiQueue.h"
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiSemaphore.h"
 #include "Rhi/RhiShader.h"
@@ -246,8 +249,8 @@ namespace AltinaEngine::Rhi {
 
         class FRhiMockFence final : public FRhiFence {
         public:
-            explicit FRhiMockFence(TShared<FRhiMockCounters> counters)
-                : FRhiFence(), mCounters(AltinaEngine::Move(counters)) {
+            FRhiMockFence(u64 initialValue, TShared<FRhiMockCounters> counters)
+                : FRhiFence(), mValue(initialValue), mCounters(AltinaEngine::Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -259,14 +262,23 @@ namespace AltinaEngine::Rhi {
                 }
             }
 
+            [[nodiscard]] auto GetCompletedValue() const noexcept -> u64 override {
+                return mValue;
+            }
+            void SignalCPU(u64 value) override { mValue = value; }
+            void WaitCPU(u64 value) override { mValue = value; }
+            void Reset(u64 value) override { mValue = value; }
+
         private:
+            u64 mValue = 0ULL;
             TShared<FRhiMockCounters> mCounters;
         };
 
         class FRhiMockSemaphore final : public FRhiSemaphore {
         public:
-            explicit FRhiMockSemaphore(TShared<FRhiMockCounters> counters)
-                : FRhiSemaphore(), mCounters(AltinaEngine::Move(counters)) {
+            FRhiMockSemaphore(bool timeline, u64 initialValue, TShared<FRhiMockCounters> counters)
+                : FRhiSemaphore(), mIsTimeline(timeline), mValue(initialValue),
+                  mCounters(AltinaEngine::Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -278,7 +290,21 @@ namespace AltinaEngine::Rhi {
                 }
             }
 
+            [[nodiscard]] auto IsTimeline() const noexcept -> bool override {
+                return mIsTimeline;
+            }
+            [[nodiscard]] auto GetCurrentValue() const noexcept -> u64 override {
+                return mValue;
+            }
+            void Signal(u64 value) {
+                if (mIsTimeline) {
+                    mValue = value;
+                }
+            }
+
         private:
+            bool mIsTimeline = false;
+            u64  mValue      = 0ULL;
             TShared<FRhiMockCounters> mCounters;
         };
 
@@ -298,8 +324,101 @@ namespace AltinaEngine::Rhi {
                 }
             }
 
+            void Reset() override {}
+
         private:
             TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockCommandList final : public FRhiCommandList {
+        public:
+            FRhiMockCommandList(const FRhiCommandListDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiCommandList(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockCommandList() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+            void Reset(FRhiCommandPool* /*pool*/) override {}
+            void Close() override {}
+
+        private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockCommandContext final : public FRhiCommandContext {
+        public:
+            FRhiMockCommandContext(const FRhiCommandContextDesc& desc,
+                FRhiCommandListRef commandList, TShared<FRhiMockCounters> counters)
+                : FRhiCommandContext(desc),
+                  mCommandList(AltinaEngine::Move(commandList)),
+                  mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+            }
+
+            ~FRhiMockCommandContext() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+            void Begin() override {}
+            void End() override {}
+            [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override {
+                return mCommandList.Get();
+            }
+
+        private:
+            FRhiCommandListRef mCommandList;
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockQueue final : public FRhiQueue {
+        public:
+            explicit FRhiMockQueue(ERhiQueueType type) : FRhiQueue(type) {}
+
+            void Submit(const FRhiSubmitInfo& info) override {
+                if (info.mSignals) {
+                    for (u32 i = 0; i < info.mSignalCount; ++i) {
+                        const auto& signal = info.mSignals[i];
+                        if (signal.mSemaphore == nullptr) {
+                            continue;
+                        }
+                        if (!signal.mSemaphore->IsTimeline()) {
+                            continue;
+                        }
+                        auto* mockSemaphore = static_cast<FRhiMockSemaphore*>(signal.mSemaphore);
+                        mockSemaphore->Signal(signal.mValue);
+                    }
+                }
+
+                if (info.mFence) {
+                    info.mFence->SignalCPU(info.mFenceValue);
+                }
+            }
+
+            void Signal(FRhiFence* fence, u64 value) override {
+                if (fence) {
+                    fence->SignalCPU(value);
+                }
+            }
+
+            void Wait(FRhiFence* fence, u64 value) override {
+                if (fence) {
+                    fence->WaitCPU(value);
+                }
+            }
+
+            void WaitIdle() override {}
+            void Present(const FRhiPresentInfo& /*info*/) override {}
         };
 
         class FRhiMockDevice final : public FRhiDevice {
@@ -310,6 +429,19 @@ namespace AltinaEngine::Rhi {
                 : FRhiDevice(desc, adapterDesc), mCounters(AltinaEngine::Move(counters)) {
                 SetSupportedFeatures(features);
                 SetSupportedLimits(limits);
+                FRhiQueueCapabilities queueCaps;
+                queueCaps.mSupportsGraphics = true;
+                queueCaps.mSupportsCompute  = true;
+                queueCaps.mSupportsCopy     = true;
+                queueCaps.mSupportsAsyncCompute = false;
+                queueCaps.mSupportsAsyncCopy    = false;
+                SetQueueCapabilities(queueCaps);
+                RegisterQueue(ERhiQueueType::Graphics,
+                    MakeResource<FRhiMockQueue>(ERhiQueueType::Graphics));
+                RegisterQueue(ERhiQueueType::Compute,
+                    MakeResource<FRhiMockQueue>(ERhiQueueType::Compute));
+                RegisterQueue(ERhiQueueType::Copy,
+                    MakeResource<FRhiMockQueue>(ERhiQueueType::Copy));
                 if (mCounters) {
                     ++mCounters->mDeviceCreated;
                 }
@@ -356,16 +488,32 @@ namespace AltinaEngine::Rhi {
                 return MakeResource<FRhiMockBindGroup>(desc, mCounters);
             }
 
-            auto CreateFence(bool /*signaled*/) -> FRhiFenceRef override {
-                return MakeResource<FRhiMockFence>(mCounters);
+            auto CreateFence(u64 initialValue) -> FRhiFenceRef override {
+                return MakeResource<FRhiMockFence>(initialValue, mCounters);
             }
-            auto CreateSemaphore() -> FRhiSemaphoreRef override {
-                return MakeResource<FRhiMockSemaphore>(mCounters);
+            auto CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef override {
+                return MakeResource<FRhiMockSemaphore>(timeline, initialValue, mCounters);
             }
 
             auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
                 -> FRhiCommandPoolRef override {
                 return MakeResource<FRhiMockCommandPool>(desc, mCounters);
+            }
+
+            auto CreateCommandList(const FRhiCommandListDesc& desc)
+                -> FRhiCommandListRef override {
+                return MakeResource<FRhiMockCommandList>(desc, mCounters);
+            }
+
+            auto CreateCommandContext(const FRhiCommandContextDesc& desc)
+                -> FRhiCommandContextRef override {
+                FRhiCommandListDesc listDesc;
+                listDesc.mDebugName = desc.mDebugName;
+                listDesc.mQueueType = desc.mQueueType;
+                listDesc.mListType  = desc.mListType;
+                auto commandList = MakeResource<FRhiMockCommandList>(listDesc, mCounters);
+                return MakeResource<FRhiMockCommandContext>(
+                    desc, AltinaEngine::Move(commandList), mCounters);
             }
 
         private:

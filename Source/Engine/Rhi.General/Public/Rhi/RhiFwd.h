@@ -20,6 +20,8 @@ namespace AltinaEngine::Rhi {
     class FRhiFence;
     class FRhiSemaphore;
     class FRhiCommandPool;
+    class FRhiCommandList;
+    class FRhiCommandContext;
     class FRhiSwapchain;
 
     struct FRhiInitDesc;
@@ -27,6 +29,7 @@ namespace AltinaEngine::Rhi {
     struct FRhiDeviceDesc;
     struct FRhiSupportedFeatures;
     struct FRhiSupportedLimits;
+    struct FRhiQueueCapabilities;
     struct FRhiBufferDesc;
     struct FRhiTextureDesc;
     struct FRhiSamplerDesc;
@@ -39,6 +42,10 @@ namespace AltinaEngine::Rhi {
     struct FRhiBindGroupLayoutDesc;
     struct FRhiBindGroupDesc;
     struct FRhiCommandPoolDesc;
+    struct FRhiCommandListDesc;
+    struct FRhiCommandContextDesc;
+    struct FRhiQueueWait;
+    struct FRhiQueueSignal;
     struct FRhiSubmitInfo;
     struct FRhiPresentInfo;
 } // namespace AltinaEngine::Rhi

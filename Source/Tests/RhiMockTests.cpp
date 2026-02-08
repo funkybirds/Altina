@@ -3,6 +3,10 @@
 #include "RhiMock/RhiMockContext.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiFence.h"
+#include "Rhi/RhiQueue.h"
+#include "Rhi/RhiSemaphore.h"
+#include "Rhi/RhiStructs.h"
 
 namespace {
     using AltinaEngine::TChar;
@@ -10,12 +14,16 @@ namespace {
     using AltinaEngine::u64;
     using AltinaEngine::Rhi::ERhiAdapterType;
     using AltinaEngine::Rhi::ERhiGpuPreference;
+    using AltinaEngine::Rhi::ERhiQueueType;
     using AltinaEngine::Rhi::ERhiVendorId;
     using AltinaEngine::Rhi::FRhiAdapterDesc;
     using AltinaEngine::Rhi::FRhiBufferDesc;
     using AltinaEngine::Rhi::FRhiBufferRef;
     using AltinaEngine::Rhi::FRhiInitDesc;
     using AltinaEngine::Rhi::FRhiMockContext;
+    using AltinaEngine::Rhi::FRhiQueueSignal;
+    using AltinaEngine::Rhi::FRhiQueueWait;
+    using AltinaEngine::Rhi::FRhiSubmitInfo;
     using AltinaEngine::Rhi::kRhiInvalidAdapterIndex;
 
     auto MakeAdapterDesc(const TChar* name, ERhiAdapterType type, ERhiVendorId vendor,
@@ -112,4 +120,46 @@ TEST_CASE("RhiMock.ResourceDeleteQueueDelays") {
     REQUIRE_EQ(context.GetResourceDestroyedCount(), 0U);
     device->ProcessResourceDeleteQueue(5U);
     REQUIRE_EQ(context.GetResourceDestroyedCount(), 1U);
+}
+
+TEST_CASE("RhiMock.SubmitPropagatesSyncValues") {
+    FRhiMockContext context;
+    context.AddAdapter(MakeAdapterDesc(
+        TEXT("Mock Discrete"), ERhiAdapterType::Discrete, ERhiVendorId::Nvidia, 2ULL << 30));
+
+    REQUIRE(context.Init(FRhiInitDesc{}));
+    auto device = context.CreateDevice(0);
+    REQUIRE(device);
+
+    auto queue = device->GetQueue(ERhiQueueType::Graphics);
+    REQUIRE(queue);
+
+    auto fence = device->CreateFence(1ULL);
+    auto semaphore = device->CreateSemaphore(true, 2ULL);
+    REQUIRE(fence);
+    REQUIRE(semaphore);
+    REQUIRE(semaphore->IsTimeline());
+    REQUIRE_EQ(fence->GetCompletedValue(), 1ULL);
+    REQUIRE_EQ(semaphore->GetCurrentValue(), 2ULL);
+
+    FRhiQueueWait wait{};
+    wait.mSemaphore = semaphore.Get();
+    wait.mValue     = 2ULL;
+
+    FRhiQueueSignal signal{};
+    signal.mSemaphore = semaphore.Get();
+    signal.mValue     = 5ULL;
+
+    FRhiSubmitInfo submit{};
+    submit.mWaits       = &wait;
+    submit.mWaitCount   = 1U;
+    submit.mSignals     = &signal;
+    submit.mSignalCount = 1U;
+    submit.mFence       = fence.Get();
+    submit.mFenceValue  = 7ULL;
+
+    queue->Submit(submit);
+
+    REQUIRE_EQ(semaphore->GetCurrentValue(), 5ULL);
+    REQUIRE_EQ(fence->GetCompletedValue(), 7ULL);
 }

@@ -35,6 +35,11 @@ namespace AltinaEngine::Rhi {
         Copy
     };
 
+    enum class ERhiCommandListType : u8 {
+        Direct = 0,
+        Bundle
+    };
+
     enum class ERhiVendorId : u32 {
         Unknown   = 0,
         Nvidia    = 0x10DE,

@@ -116,6 +116,14 @@ namespace AltinaEngine::Rhi {
         u32 mMaxComputeWorkgroupInvocations = kRhiLimitUnknown;
     };
 
+    struct FRhiQueueCapabilities {
+        bool mSupportsGraphics     = false;
+        bool mSupportsCompute      = false;
+        bool mSupportsCopy         = false;
+        bool mSupportsAsyncCompute = false;
+        bool mSupportsAsyncCopy    = false;
+    };
+
     struct FRhiDeviceDesc {
         FString mDebugName;
         bool    mEnableDebugLayer     = false;
@@ -237,7 +245,40 @@ namespace AltinaEngine::Rhi {
         ERhiQueueType mQueueType = ERhiQueueType::Graphics;
     };
 
+    struct FRhiCommandListDesc {
+        FString            mDebugName;
+        ERhiQueueType      mQueueType = ERhiQueueType::Graphics;
+        ERhiCommandListType mListType  = ERhiCommandListType::Direct;
+    };
+
+    struct FRhiCommandContextDesc {
+        FString            mDebugName;
+        ERhiQueueType      mQueueType = ERhiQueueType::Graphics;
+        ERhiCommandListType mListType  = ERhiCommandListType::Direct;
+    };
+
+    struct FRhiQueueWait {
+        FRhiSemaphore* mSemaphore = nullptr;
+        u64            mValue     = 0ULL;
+    };
+
+    struct FRhiQueueSignal {
+        FRhiSemaphore* mSemaphore = nullptr;
+        u64            mValue     = 0ULL;
+    };
+
     struct FRhiSubmitInfo {
+        FRhiCommandList* const* mCommandLists = nullptr;
+        u32                      mCommandListCount = 0U;
+
+        const FRhiQueueWait*          mWaits = nullptr;
+        u32                           mWaitCount = 0U;
+
+        const FRhiQueueSignal*        mSignals = nullptr;
+        u32                           mSignalCount = 0U;
+
+        FRhiFence*                    mFence = nullptr;
+        u64                           mFenceValue = 0ULL;
     };
 
     struct FRhiPresentInfo {

@@ -34,11 +34,15 @@ namespace AltinaEngine::Rhi {
             -> FRhiBindGroupLayoutRef override;
         auto CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef override;
 
-        auto CreateFence(bool signaled) -> FRhiFenceRef override;
-        auto CreateSemaphore() -> FRhiSemaphoreRef override;
+        auto CreateFence(u64 initialValue) -> FRhiFenceRef override;
+        auto CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef override;
 
         auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
             -> FRhiCommandPoolRef override;
+        auto CreateCommandList(const FRhiCommandListDesc& desc)
+            -> FRhiCommandListRef override;
+        auto CreateCommandContext(const FRhiCommandContextDesc& desc)
+            -> FRhiCommandContextRef override;
 
     private:
         struct FState;

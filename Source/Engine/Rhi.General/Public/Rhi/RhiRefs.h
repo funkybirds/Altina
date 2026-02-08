@@ -19,4 +19,6 @@ namespace AltinaEngine::Rhi {
     using FRhiFenceRef           = TCountRef<FRhiFence>;
     using FRhiSemaphoreRef       = TCountRef<FRhiSemaphore>;
     using FRhiCommandPoolRef     = TCountRef<FRhiCommandPool>;
+    using FRhiCommandListRef     = TCountRef<FRhiCommandList>;
+    using FRhiCommandContextRef  = TCountRef<FRhiCommandContext>;
 } // namespace AltinaEngine::Rhi

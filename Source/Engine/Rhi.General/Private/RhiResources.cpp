@@ -1,6 +1,8 @@
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiCommandContext.h"
+#include "Rhi/RhiCommandList.h"
 #include "Rhi/RhiCommandPool.h"
 #include "Rhi/RhiFence.h"
 #include "Rhi/RhiPipeline.h"
@@ -73,5 +75,17 @@ namespace AltinaEngine::Rhi {
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiCommandPool::~FRhiCommandPool() = default;
+
+    FRhiCommandList::FRhiCommandList(const FRhiCommandListDesc& desc,
+        FRhiResourceDeleteQueue* deleteQueue) noexcept
+        : FRhiResource(deleteQueue), mDesc(desc) {}
+
+    FRhiCommandList::~FRhiCommandList() = default;
+
+    FRhiCommandContext::FRhiCommandContext(const FRhiCommandContextDesc& desc,
+        FRhiResourceDeleteQueue* deleteQueue) noexcept
+        : FRhiResource(deleteQueue), mDesc(desc) {}
+
+    FRhiCommandContext::~FRhiCommandContext() = default;
 
 } // namespace AltinaEngine::Rhi

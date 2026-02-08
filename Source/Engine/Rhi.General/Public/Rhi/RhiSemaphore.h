@@ -23,6 +23,9 @@ namespace AltinaEngine::Rhi {
             }
         }
 
+        [[nodiscard]] virtual auto IsTimeline() const noexcept -> bool = 0;
+        [[nodiscard]] virtual auto GetCurrentValue() const noexcept -> u64 = 0;
+
     protected:
         Core::Container::FString mDebugName;
     };

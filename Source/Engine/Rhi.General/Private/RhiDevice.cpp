@@ -8,6 +8,7 @@ namespace AltinaEngine::Rhi {
     FRhiDevice::FRhiDevice(const FRhiDeviceDesc& desc, const FRhiAdapterDesc& adapterDesc)
         : mDesc(desc), mAdapterDesc(adapterDesc) {
         NormalizeDebugName();
+        mQueueCaps.mSupportsGraphics = true;
     }
 
     auto FRhiDevice::GetDesc() const noexcept -> const FRhiDeviceDesc& { return mDesc; }
@@ -35,6 +36,10 @@ namespace AltinaEngine::Rhi {
         return mSupportedLimits;
     }
 
+    auto FRhiDevice::GetQueueCapabilities() const noexcept -> const FRhiQueueCapabilities& {
+        return mQueueCaps;
+    }
+
     auto FRhiDevice::IsFeatureSupported(ERhiFeature feature) const noexcept -> bool {
         return mSupportedFeatures.IsSupported(feature);
     }
@@ -55,6 +60,10 @@ namespace AltinaEngine::Rhi {
 
     void FRhiDevice::SetSupportedLimits(const FRhiSupportedLimits& limits) noexcept {
         mSupportedLimits = limits;
+    }
+
+    void FRhiDevice::SetQueueCapabilities(const FRhiQueueCapabilities& caps) noexcept {
+        mQueueCaps = caps;
     }
 
     void FRhiDevice::RegisterQueue(ERhiQueueType type, FRhiQueueRef queue) {

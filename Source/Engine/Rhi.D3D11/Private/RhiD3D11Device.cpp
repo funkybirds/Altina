@@ -1,11 +1,11 @@
 #include "RhiD3D11/RhiD3D11Device.h"
+#include "RhiD3D11/RhiD3D11CommandContext.h"
+#include "RhiD3D11/RhiD3D11CommandList.h"
 #include "RhiD3D11/RhiD3D11Pipeline.h"
 #include "RhiD3D11/RhiD3D11Shader.h"
 
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
-#include "Rhi/RhiCommandContext.h"
-#include "Rhi/RhiCommandList.h"
 #include "Rhi/RhiCommandPool.h"
 #include "Rhi/RhiFence.h"
 #include "Rhi/RhiPipeline.h"
@@ -48,9 +48,136 @@ namespace AltinaEngine::Rhi {
         ComPtr<ID3D11DeviceContext> mImmediateContext;
         D3D_FEATURE_LEVEL           mFeatureLevel = D3D_FEATURE_LEVEL_11_0;
     };
+
+    struct FRhiD3D11CommandList::FState {
+        ComPtr<ID3D11CommandList> mCommandList;
+    };
+
+    struct FRhiD3D11CommandContext::FState {
+        ComPtr<ID3D11Device>        mDevice;
+        ComPtr<ID3D11DeviceContext> mDeferredContext;
+    };
 #else
     struct FRhiD3D11Device::FState {};
+    struct FRhiD3D11CommandList::FState {};
+    struct FRhiD3D11CommandContext::FState {};
 #endif
+
+    FRhiD3D11CommandList::FRhiD3D11CommandList(const FRhiCommandListDesc& desc)
+        : FRhiCommandList(desc) {
+        mState = new FState{};
+    }
+
+    FRhiD3D11CommandList::~FRhiD3D11CommandList() {
+        delete mState;
+        mState = nullptr;
+    }
+
+    auto FRhiD3D11CommandList::GetNativeCommandList() const noexcept -> ID3D11CommandList* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mCommandList.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    void FRhiD3D11CommandList::SetNativeCommandList(ID3D11CommandList* list) {
+#if AE_PLATFORM_WIN
+        if (!mState) {
+            return;
+        }
+        mState->mCommandList.Reset();
+        if (list) {
+            mState->mCommandList.Attach(list);
+        }
+#else
+        (void)list;
+#endif
+    }
+
+    void FRhiD3D11CommandList::Reset(FRhiCommandPool* /*pool*/) {
+#if AE_PLATFORM_WIN
+        if (mState) {
+            mState->mCommandList.Reset();
+        }
+#endif
+    }
+
+    void FRhiD3D11CommandList::Close() {}
+
+    FRhiD3D11CommandContext::FRhiD3D11CommandContext(const FRhiCommandContextDesc& desc,
+        ID3D11Device* device, FRhiCommandListRef commandList)
+        : FRhiCommandContext(desc), mCommandList(AltinaEngine::Move(commandList)) {
+        mState = new FState{};
+#if AE_PLATFORM_WIN
+        if (mState && device) {
+            mState->mDevice = device;
+        }
+#else
+        (void)device;
+#endif
+    }
+
+    FRhiD3D11CommandContext::~FRhiD3D11CommandContext() {
+        delete mState;
+        mState = nullptr;
+    }
+
+    void FRhiD3D11CommandContext::Begin() {
+#if AE_PLATFORM_WIN
+        if (!mState || !mState->mDevice) {
+            return;
+        }
+
+        if (!mState->mDeferredContext) {
+            ComPtr<ID3D11DeviceContext> deferred;
+            if (SUCCEEDED(mState->mDevice->CreateDeferredContext(0, &deferred))) {
+                mState->mDeferredContext = AltinaEngine::Move(deferred);
+            }
+        }
+
+        if (mState->mDeferredContext) {
+            mState->mDeferredContext->ClearState();
+        }
+
+        auto* commandList = static_cast<FRhiD3D11CommandList*>(mCommandList.Get());
+        if (commandList) {
+            commandList->Reset(nullptr);
+        }
+#endif
+    }
+
+    void FRhiD3D11CommandContext::End() {
+#if AE_PLATFORM_WIN
+        if (!mState || !mState->mDeferredContext) {
+            return;
+        }
+
+        ComPtr<ID3D11CommandList> commandList;
+        const HRESULT hr =
+            mState->mDeferredContext->FinishCommandList(TRUE, &commandList);
+        if (FAILED(hr)) {
+            return;
+        }
+
+        auto* rhiCommandList = static_cast<FRhiD3D11CommandList*>(mCommandList.Get());
+        if (rhiCommandList) {
+            rhiCommandList->SetNativeCommandList(commandList.Detach());
+        }
+#endif
+    }
+
+    auto FRhiD3D11CommandContext::GetCommandList() const noexcept -> FRhiCommandList* {
+        return mCommandList.Get();
+    }
+
+    auto FRhiD3D11CommandContext::GetDeferredContext() const noexcept -> ID3D11DeviceContext* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mDeferredContext.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
 
     namespace {
 #if AE_PLATFORM_WIN
@@ -263,6 +390,11 @@ namespace AltinaEngine::Rhi {
             [[nodiscard]] auto GetCurrentValue() const noexcept -> u64 override {
                 return mValue;
             }
+            void Signal(u64 value) {
+                if (mIsTimeline) {
+                    mValue = value;
+                }
+            }
 
         private:
             bool mIsTimeline = false;
@@ -277,40 +409,72 @@ namespace AltinaEngine::Rhi {
             void Reset() override {}
         };
 
-        class FRhiD3D11CommandList final : public FRhiCommandList {
-        public:
-            explicit FRhiD3D11CommandList(const FRhiCommandListDesc& desc)
-                : FRhiCommandList(desc) {}
-
-            void Reset(FRhiCommandPool* /*pool*/) override {}
-            void Close() override {}
-        };
-
-        class FRhiD3D11CommandContext final : public FRhiCommandContext {
-        public:
-            FRhiD3D11CommandContext(const FRhiCommandContextDesc& desc,
-                FRhiCommandListRef commandList)
-                : FRhiCommandContext(desc), mCommandList(AltinaEngine::Move(commandList)) {}
-
-            void Begin() override {}
-            void End() override {}
-            [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override {
-                return mCommandList.Get();
-            }
-
-        private:
-            FRhiCommandListRef mCommandList;
-        };
-
         class FRhiD3D11Queue final : public FRhiQueue {
         public:
-            explicit FRhiD3D11Queue(ERhiQueueType type) : FRhiQueue(type) {}
+            FRhiD3D11Queue(ERhiQueueType type, ID3D11DeviceContext* immediateContext)
+                : FRhiQueue(type) {
+#if AE_PLATFORM_WIN
+                mImmediateContext = immediateContext;
+#else
+                (void)immediateContext;
+#endif
+            }
 
-            void Submit(const FRhiSubmitInfo& /*info*/) override {}
-            void Signal(FRhiFence* /*fence*/, u64 /*value*/) override {}
-            void Wait(FRhiFence* /*fence*/, u64 /*value*/) override {}
+            void Submit(const FRhiSubmitInfo& info) override {
+#if AE_PLATFORM_WIN
+                if (mImmediateContext && info.mCommandLists) {
+                    for (u32 i = 0; i < info.mCommandListCount; ++i) {
+                        auto* rhiList = info.mCommandLists[i];
+                        if (rhiList == nullptr) {
+                            continue;
+                        }
+                        auto* d3dList = static_cast<FRhiD3D11CommandList*>(rhiList);
+                        auto* nativeList =
+                            d3dList ? d3dList->GetNativeCommandList() : nullptr;
+                        if (nativeList) {
+                            mImmediateContext->ExecuteCommandList(nativeList, TRUE);
+                        }
+                    }
+                }
+#endif
+
+                if (info.mSignals) {
+                    for (u32 i = 0; i < info.mSignalCount; ++i) {
+                        const auto& signal = info.mSignals[i];
+                        if (signal.mSemaphore == nullptr) {
+                            continue;
+                        }
+                        if (!signal.mSemaphore->IsTimeline()) {
+                            continue;
+                        }
+                        auto* semaphore = static_cast<FRhiD3D11Semaphore*>(signal.mSemaphore);
+                        semaphore->Signal(signal.mValue);
+                    }
+                }
+
+                if (info.mFence) {
+                    info.mFence->SignalCPU(info.mFenceValue);
+                }
+            }
+            void Signal(FRhiFence* fence, u64 value) override {
+                if (fence) {
+                    fence->SignalCPU(value);
+                }
+            }
+            void Wait(FRhiFence* fence, u64 value) override {
+                if (fence) {
+                    fence->WaitCPU(value);
+                }
+            }
             void WaitIdle() override {}
             void Present(const FRhiPresentInfo& /*info*/) override {}
+
+        private:
+#if AE_PLATFORM_WIN
+            ComPtr<ID3D11DeviceContext> mImmediateContext;
+#else
+            ID3D11DeviceContext* mImmediateContext = nullptr;
+#endif
         };
     } // namespace
 
@@ -439,12 +603,13 @@ namespace AltinaEngine::Rhi {
         (void)featureLevel;
 #endif
 
+        ID3D11DeviceContext* immediateContext = GetImmediateContext();
         RegisterQueue(ERhiQueueType::Graphics,
-            MakeResource<FRhiD3D11Queue>(ERhiQueueType::Graphics));
+            MakeResource<FRhiD3D11Queue>(ERhiQueueType::Graphics, immediateContext));
         RegisterQueue(ERhiQueueType::Compute,
-            MakeResource<FRhiD3D11Queue>(ERhiQueueType::Compute));
+            MakeResource<FRhiD3D11Queue>(ERhiQueueType::Compute, immediateContext));
         RegisterQueue(ERhiQueueType::Copy,
-            MakeResource<FRhiD3D11Queue>(ERhiQueueType::Copy));
+            MakeResource<FRhiD3D11Queue>(ERhiQueueType::Copy, immediateContext));
     }
 
     FRhiD3D11Device::~FRhiD3D11Device() {
@@ -600,7 +765,8 @@ namespace AltinaEngine::Rhi {
         listDesc.mQueueType = desc.mQueueType;
         listDesc.mListType  = desc.mListType;
         auto commandList = MakeResource<FRhiD3D11CommandList>(listDesc);
-        return MakeResource<FRhiD3D11CommandContext>(desc, AltinaEngine::Move(commandList));
+        return MakeResource<FRhiD3D11CommandContext>(
+            desc, GetNativeDevice(), AltinaEngine::Move(commandList));
     }
 
 } // namespace AltinaEngine::Rhi

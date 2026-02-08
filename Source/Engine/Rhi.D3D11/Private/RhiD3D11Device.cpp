@@ -75,7 +75,7 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiD3D11CommandList::GetNativeCommandList() const noexcept -> ID3D11CommandList* {
 #if AE_PLATFORM_WIN
-        return mState ? mState->mCommandList.Get() : nullptr;
+        return (mState != nullptr) ? mState->mCommandList.Get() : nullptr;
 #else
         return nullptr;
 #endif
@@ -83,11 +83,11 @@ namespace AltinaEngine::Rhi {
 
     void FRhiD3D11CommandList::SetNativeCommandList(ID3D11CommandList* list) {
 #if AE_PLATFORM_WIN
-        if (!mState) {
+        if (mState == nullptr) {
             return;
         }
         mState->mCommandList.Reset();
-        if (list) {
+        if (list != nullptr) {
             mState->mCommandList.Attach(list);
         }
 #else
@@ -97,7 +97,7 @@ namespace AltinaEngine::Rhi {
 
     void FRhiD3D11CommandList::Reset(FRhiCommandPool* /*pool*/) {
 #if AE_PLATFORM_WIN
-        if (mState) {
+        if (mState != nullptr) {
             mState->mCommandList.Reset();
         }
 #endif
@@ -105,12 +105,12 @@ namespace AltinaEngine::Rhi {
 
     void FRhiD3D11CommandList::Close() {}
 
-    FRhiD3D11CommandContext::FRhiD3D11CommandContext(const FRhiCommandContextDesc& desc,
-        ID3D11Device* device, FRhiCommandListRef commandList)
+    FRhiD3D11CommandContext::FRhiD3D11CommandContext(
+        const FRhiCommandContextDesc& desc, ID3D11Device* device, FRhiCommandListRef commandList)
         : FRhiCommandContext(desc), mCommandList(AltinaEngine::Move(commandList)) {
         mState = new FState{};
 #if AE_PLATFORM_WIN
-        if (mState && device) {
+        if (mState && (device != nullptr)) {
             mState->mDevice = device;
         }
 #else
@@ -154,8 +154,7 @@ namespace AltinaEngine::Rhi {
         }
 
         ComPtr<ID3D11CommandList> commandList;
-        const HRESULT hr =
-            mState->mDeferredContext->FinishCommandList(TRUE, &commandList);
+        const HRESULT hr = mState->mDeferredContext->FinishCommandList(TRUE, &commandList);
         if (FAILED(hr)) {
             return;
         }
@@ -171,25 +170,24 @@ namespace AltinaEngine::Rhi {
         return mCommandList.Get();
     }
 
-    void FRhiD3D11CommandContext::RHIDrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
-        i32 vertexOffset, u32 firstInstance) {
+    void FRhiD3D11CommandContext::RHIDrawIndexed(
+        u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
 #if AE_PLATFORM_WIN
         ID3D11DeviceContext* context = GetDeferredContext();
         if (!context) {
             return;
         }
 
-        const UINT idxCount = static_cast<UINT>(indexCount);
-        const UINT instCount = static_cast<UINT>(instanceCount);
-        const UINT startIdx = static_cast<UINT>(firstIndex);
-        const INT  baseVertex = static_cast<INT>(vertexOffset);
+        const UINT idxCount      = static_cast<UINT>(indexCount);
+        const UINT instCount     = static_cast<UINT>(instanceCount);
+        const UINT startIdx      = static_cast<UINT>(firstIndex);
+        const INT  baseVertex    = static_cast<INT>(vertexOffset);
         const UINT startInstance = static_cast<UINT>(firstInstance);
 
         if (instCount <= 1U && startInstance == 0U) {
             context->DrawIndexed(idxCount, startIdx, baseVertex);
         } else {
-            context->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVertex,
-                startInstance);
+            context->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVertex, startInstance);
         }
 #else
         (void)indexCount;
@@ -206,8 +204,8 @@ namespace AltinaEngine::Rhi {
         if (!context) {
             return;
         }
-        context->Dispatch(static_cast<UINT>(groupCountX),
-            static_cast<UINT>(groupCountY), static_cast<UINT>(groupCountZ));
+        context->Dispatch(static_cast<UINT>(groupCountX), static_cast<UINT>(groupCountY),
+            static_cast<UINT>(groupCountZ));
 #else
         (void)groupCountX;
         (void)groupCountY;
@@ -300,8 +298,9 @@ namespace AltinaEngine::Rhi {
             return false;
         }
 
-        auto AppendReflectionBindings(const Shader::FShaderReflection& reflection, EShaderStage stage,
-            const FRhiPipelineLayout* layout, TVector<FD3D11BindingMappingEntry>& outBindings) -> void {
+        auto AppendReflectionBindings(const Shader::FShaderReflection& reflection,
+            EShaderStage stage, const FRhiPipelineLayout* layout,
+            TVector<FD3D11BindingMappingEntry>& outBindings) -> void {
             for (const auto& resource : reflection.mResources) {
                 const auto bindingType = ToBindingType(resource);
                 if (!HasLayoutBinding(layout, resource.mSet, resource.mBinding, bindingType)) {
@@ -347,8 +346,7 @@ namespace AltinaEngine::Rhi {
             elements.Reserve(desc.mVertexLayout.mAttributes.Size());
 
             std::vector<std::string> semanticStorage;
-            semanticStorage.reserve(
-                static_cast<size_t>(desc.mVertexLayout.mAttributes.Size()));
+            semanticStorage.reserve(static_cast<size_t>(desc.mVertexLayout.mAttributes.Size()));
 
             for (const auto& attribute : desc.mVertexLayout.mAttributes) {
                 const DXGI_FORMAT format = ToD3D11Format(attribute.mFormat);
@@ -359,29 +357,27 @@ namespace AltinaEngine::Rhi {
                 semanticStorage.push_back(ToAnsiString(attribute.mSemanticName));
 
                 D3D11_INPUT_ELEMENT_DESC element{};
-                element.SemanticName         = semanticStorage.back().c_str();
-                element.SemanticIndex        = attribute.mSemanticIndex;
-                element.Format               = format;
-                element.InputSlot            = attribute.mInputSlot;
-                element.AlignedByteOffset    = attribute.mAlignedByteOffset;
-                element.InputSlotClass       =
-                    attribute.mPerInstance ? D3D11_INPUT_PER_INSTANCE_DATA : D3D11_INPUT_PER_VERTEX_DATA;
-                element.InstanceDataStepRate =
-                    attribute.mPerInstance ? (attribute.mInstanceStepRate == 0U
-                                                  ? 1U
-                                                  : attribute.mInstanceStepRate)
-                                            : 0U;
+                element.SemanticName      = semanticStorage.back().c_str();
+                element.SemanticIndex     = attribute.mSemanticIndex;
+                element.Format            = format;
+                element.InputSlot         = attribute.mInputSlot;
+                element.AlignedByteOffset = attribute.mAlignedByteOffset;
+                element.InputSlotClass    = attribute.mPerInstance ? D3D11_INPUT_PER_INSTANCE_DATA
+                                                                   : D3D11_INPUT_PER_VERTEX_DATA;
+                element.InstanceDataStepRate = attribute.mPerInstance
+                    ? (attribute.mInstanceStepRate == 0U ? 1U : attribute.mInstanceStepRate)
+                    : 0U;
                 elements.PushBack(element);
             }
 
-            const void* data  = shaderDesc.mBytecode.Data();
+            const void*  data = shaderDesc.mBytecode.Data();
             const SIZE_T size = static_cast<SIZE_T>(shaderDesc.mBytecode.Size());
             if (data == nullptr || size == 0U) {
                 return layout;
             }
 
-            const HRESULT hr = device->CreateInputLayout(elements.Data(),
-                static_cast<UINT>(elements.Size()), data, size, &layout);
+            const HRESULT hr = device->CreateInputLayout(
+                elements.Data(), static_cast<UINT>(elements.Size()), data, size, &layout);
             if (FAILED(hr)) {
                 layout.Reset();
             }
@@ -403,21 +399,17 @@ namespace AltinaEngine::Rhi {
 
         class FRhiD3D11BindGroup final : public FRhiBindGroup {
         public:
-            explicit FRhiD3D11BindGroup(const FRhiBindGroupDesc& desc)
-                : FRhiBindGroup(desc) {}
+            explicit FRhiD3D11BindGroup(const FRhiBindGroupDesc& desc) : FRhiBindGroup(desc) {}
         };
 
         class FRhiD3D11Fence final : public FRhiFence {
         public:
-            explicit FRhiD3D11Fence(u64 initialValue)
-                : FRhiFence(), mValue(initialValue) {}
+            explicit FRhiD3D11Fence(u64 initialValue) : FRhiFence(), mValue(initialValue) {}
 
-            [[nodiscard]] auto GetCompletedValue() const noexcept -> u64 override {
-                return mValue;
-            }
-            void SignalCPU(u64 value) override { mValue = value; }
-            void WaitCPU(u64 value) override { mValue = value; }
-            void Reset(u64 value) override { mValue = value; }
+            [[nodiscard]] auto GetCompletedValue() const noexcept -> u64 override { return mValue; }
+            void               SignalCPU(u64 value) override { mValue = value; }
+            void               WaitCPU(u64 value) override { mValue = value; }
+            void               Reset(u64 value) override { mValue = value; }
 
         private:
             u64 mValue = 0ULL;
@@ -428,13 +420,9 @@ namespace AltinaEngine::Rhi {
             FRhiD3D11Semaphore(bool timeline, u64 initialValue)
                 : FRhiSemaphore(), mIsTimeline(timeline), mValue(initialValue) {}
 
-            [[nodiscard]] auto IsTimeline() const noexcept -> bool override {
-                return mIsTimeline;
-            }
-            [[nodiscard]] auto GetCurrentValue() const noexcept -> u64 override {
-                return mValue;
-            }
-            void Signal(u64 value) {
+            [[nodiscard]] auto IsTimeline() const noexcept -> bool override { return mIsTimeline; }
+            [[nodiscard]] auto GetCurrentValue() const noexcept -> u64 override { return mValue; }
+            void               Signal(u64 value) {
                 if (mIsTimeline) {
                     mValue = value;
                 }
@@ -472,9 +460,8 @@ namespace AltinaEngine::Rhi {
                         if (rhiList == nullptr) {
                             continue;
                         }
-                        auto* d3dList = static_cast<FRhiD3D11CommandList*>(rhiList);
-                        auto* nativeList =
-                            d3dList ? d3dList->GetNativeCommandList() : nullptr;
+                        auto* d3dList    = static_cast<FRhiD3D11CommandList*>(rhiList);
+                        auto* nativeList = d3dList ? d3dList->GetNativeCommandList() : nullptr;
                         if (nativeList) {
                             mImmediateContext->ExecuteCommandList(nativeList, TRUE);
                         }
@@ -546,24 +533,24 @@ namespace AltinaEngine::Rhi {
         }
         const FRhiPipelineLayout* layout = desc.mPipelineLayout;
         if (desc.mVertexShader) {
-            AppendReflectionBindings(desc.mVertexShader->GetDesc().mReflection,
-                EShaderStage::Vertex, layout, mBindings);
+            AppendReflectionBindings(
+                desc.mVertexShader->GetDesc().mReflection, EShaderStage::Vertex, layout, mBindings);
         }
         if (desc.mPixelShader) {
-            AppendReflectionBindings(desc.mPixelShader->GetDesc().mReflection,
-                EShaderStage::Pixel, layout, mBindings);
+            AppendReflectionBindings(
+                desc.mPixelShader->GetDesc().mReflection, EShaderStage::Pixel, layout, mBindings);
         }
         if (desc.mGeometryShader) {
             AppendReflectionBindings(desc.mGeometryShader->GetDesc().mReflection,
                 EShaderStage::Geometry, layout, mBindings);
         }
         if (desc.mHullShader) {
-            AppendReflectionBindings(desc.mHullShader->GetDesc().mReflection,
-                EShaderStage::Hull, layout, mBindings);
+            AppendReflectionBindings(
+                desc.mHullShader->GetDesc().mReflection, EShaderStage::Hull, layout, mBindings);
         }
         if (desc.mDomainShader) {
-            AppendReflectionBindings(desc.mDomainShader->GetDesc().mReflection,
-                EShaderStage::Domain, layout, mBindings);
+            AppendReflectionBindings(
+                desc.mDomainShader->GetDesc().mReflection, EShaderStage::Domain, layout, mBindings);
         }
 #else
         (void)desc;
@@ -612,9 +599,8 @@ namespace AltinaEngine::Rhi {
         return mBindings;
     }
 
-    FRhiD3D11Device::FRhiD3D11Device(const FRhiDeviceDesc& desc,
-        const FRhiAdapterDesc& adapterDesc, ID3D11Device* device,
-        ID3D11DeviceContext* context, u32 featureLevel)
+    FRhiD3D11Device::FRhiD3D11Device(const FRhiDeviceDesc& desc, const FRhiAdapterDesc& adapterDesc,
+        ID3D11Device* device, ID3D11DeviceContext* context, u32 featureLevel)
         : FRhiDevice(desc, adapterDesc) {
         mState = new FState{};
 
@@ -626,18 +612,18 @@ namespace AltinaEngine::Rhi {
         }
 
         FRhiSupportedLimits limits;
-        limits.mMaxTextureDimension1D     = D3D11_REQ_TEXTURE1D_U_DIMENSION;
-        limits.mMaxTextureDimension2D     = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
-        limits.mMaxTextureDimension3D     = D3D11_REQ_TEXTURE3D_U_V_OR_W_DIMENSION;
-        limits.mMaxTextureArrayLayers     = D3D11_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION;
-        limits.mMaxSamplers               = D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT;
-        limits.mMaxColorAttachments       = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
+        limits.mMaxTextureDimension1D = D3D11_REQ_TEXTURE1D_U_DIMENSION;
+        limits.mMaxTextureDimension2D = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+        limits.mMaxTextureDimension3D = D3D11_REQ_TEXTURE3D_U_V_OR_W_DIMENSION;
+        limits.mMaxTextureArrayLayers = D3D11_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION;
+        limits.mMaxSamplers           = D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT;
+        limits.mMaxColorAttachments   = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
         SetSupportedLimits(limits);
 
         FRhiQueueCapabilities queueCaps;
-        queueCaps.mSupportsGraphics = true;
-        queueCaps.mSupportsCompute  = true;
-        queueCaps.mSupportsCopy     = true;
+        queueCaps.mSupportsGraphics     = true;
+        queueCaps.mSupportsCompute      = true;
+        queueCaps.mSupportsCopy         = true;
         queueCaps.mSupportsAsyncCompute = false;
         queueCaps.mSupportsAsyncCopy    = false;
         SetQueueCapabilities(queueCaps);
@@ -692,57 +678,63 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        const void* data = desc.mBytecode.Data();
+        const void*  data = desc.mBytecode.Data();
         const SIZE_T size = static_cast<SIZE_T>(desc.mBytecode.Size());
         if (!data || size == 0U) {
             return {};
         }
 
-        HRESULT hr = E_FAIL;
+        HRESULT                   hr = E_FAIL;
         ComPtr<ID3D11DeviceChild> shader;
 
         switch (desc.mStage) {
-        case EShaderStage::Vertex: {
-            ComPtr<ID3D11VertexShader> vertexShader;
-            hr = device->CreateVertexShader(data, size, nullptr, &vertexShader);
-            shader = vertexShader;
-            break;
-        }
-        case EShaderStage::Pixel: {
-            ComPtr<ID3D11PixelShader> pixelShader;
-            hr = device->CreatePixelShader(data, size, nullptr, &pixelShader);
-            shader = pixelShader;
-            break;
-        }
-        case EShaderStage::Compute: {
-            ComPtr<ID3D11ComputeShader> computeShader;
-            hr = device->CreateComputeShader(data, size, nullptr, &computeShader);
-            shader = computeShader;
-            break;
-        }
-        case EShaderStage::Geometry: {
-            ComPtr<ID3D11GeometryShader> geometryShader;
-            hr = device->CreateGeometryShader(data, size, nullptr, &geometryShader);
-            shader = geometryShader;
-            break;
-        }
-        case EShaderStage::Hull: {
-            ComPtr<ID3D11HullShader> hullShader;
-            hr = device->CreateHullShader(data, size, nullptr, &hullShader);
-            shader = hullShader;
-            break;
-        }
-        case EShaderStage::Domain: {
-            ComPtr<ID3D11DomainShader> domainShader;
-            hr = device->CreateDomainShader(data, size, nullptr, &domainShader);
-            shader = domainShader;
-            break;
-        }
-        case EShaderStage::Mesh:
-        case EShaderStage::Amplification:
-        case EShaderStage::Library:
-        default:
-            return {};
+            case EShaderStage::Vertex:
+            {
+                ComPtr<ID3D11VertexShader> vertexShader;
+                hr     = device->CreateVertexShader(data, size, nullptr, &vertexShader);
+                shader = vertexShader;
+                break;
+            }
+            case EShaderStage::Pixel:
+            {
+                ComPtr<ID3D11PixelShader> pixelShader;
+                hr     = device->CreatePixelShader(data, size, nullptr, &pixelShader);
+                shader = pixelShader;
+                break;
+            }
+            case EShaderStage::Compute:
+            {
+                ComPtr<ID3D11ComputeShader> computeShader;
+                hr     = device->CreateComputeShader(data, size, nullptr, &computeShader);
+                shader = computeShader;
+                break;
+            }
+            case EShaderStage::Geometry:
+            {
+                ComPtr<ID3D11GeometryShader> geometryShader;
+                hr     = device->CreateGeometryShader(data, size, nullptr, &geometryShader);
+                shader = geometryShader;
+                break;
+            }
+            case EShaderStage::Hull:
+            {
+                ComPtr<ID3D11HullShader> hullShader;
+                hr     = device->CreateHullShader(data, size, nullptr, &hullShader);
+                shader = hullShader;
+                break;
+            }
+            case EShaderStage::Domain:
+            {
+                ComPtr<ID3D11DomainShader> domainShader;
+                hr     = device->CreateDomainShader(data, size, nullptr, &domainShader);
+                shader = domainShader;
+                break;
+            }
+            case EShaderStage::Mesh:
+            case EShaderStage::Amplification:
+            case EShaderStage::Library:
+            default:
+                return {};
         }
 
         if (FAILED(hr) || shader == nullptr) {
@@ -779,8 +771,7 @@ namespace AltinaEngine::Rhi {
         return MakeResource<FRhiD3D11BindGroupLayout>(desc);
     }
 
-    auto FRhiD3D11Device::CreateBindGroup(const FRhiBindGroupDesc& desc)
-        -> FRhiBindGroupRef {
+    auto FRhiD3D11Device::CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef {
         return MakeResource<FRhiD3D11BindGroup>(desc);
     }
 
@@ -792,13 +783,11 @@ namespace AltinaEngine::Rhi {
         return MakeResource<FRhiD3D11Semaphore>(timeline, initialValue);
     }
 
-    auto FRhiD3D11Device::CreateCommandPool(const FRhiCommandPoolDesc& desc)
-        -> FRhiCommandPoolRef {
+    auto FRhiD3D11Device::CreateCommandPool(const FRhiCommandPoolDesc& desc) -> FRhiCommandPoolRef {
         return MakeResource<FRhiD3D11CommandPool>(desc);
     }
 
-    auto FRhiD3D11Device::CreateCommandList(const FRhiCommandListDesc& desc)
-        -> FRhiCommandListRef {
+    auto FRhiD3D11Device::CreateCommandList(const FRhiCommandListDesc& desc) -> FRhiCommandListRef {
         return MakeResource<FRhiD3D11CommandList>(desc);
     }
 
@@ -808,7 +797,7 @@ namespace AltinaEngine::Rhi {
         listDesc.mDebugName = desc.mDebugName;
         listDesc.mQueueType = desc.mQueueType;
         listDesc.mListType  = desc.mListType;
-        auto commandList = MakeResource<FRhiD3D11CommandList>(listDesc);
+        auto commandList    = MakeResource<FRhiD3D11CommandList>(listDesc);
         return MakeResource<FRhiD3D11CommandContext>(
             desc, GetNativeDevice(), AltinaEngine::Move(commandList));
     }

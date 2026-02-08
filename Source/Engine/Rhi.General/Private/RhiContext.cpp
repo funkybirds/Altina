@@ -74,7 +74,7 @@ namespace AltinaEngine::Rhi {
     }
 
     auto FRhiContext::GetAdapterDesc(u32 index) const noexcept -> const FRhiAdapterDesc* {
-        const usize adapterIndex = static_cast<usize>(index);
+        const auto adapterIndex = static_cast<usize>(index);
         if (adapterIndex >= mAdapters.Size()) {
             return nullptr;
         }
@@ -111,7 +111,7 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        const usize resolvedIndex = static_cast<usize>(selectedIndex);
+        const auto resolvedIndex = static_cast<usize>(selectedIndex);
         if (resolvedIndex >= mAdapters.Size()) {
             return {};
         }

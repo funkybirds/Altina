@@ -30,12 +30,12 @@ namespace AltinaEngine::Rhi {
 
         [[nodiscard]] auto GetQueue(ERhiQueueType type) const noexcept -> FRhiQueueRef;
 
-        virtual auto CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef = 0;
-        virtual auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef = 0;
-        virtual auto CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef = 0;
-        virtual auto CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef = 0;
+        virtual auto       CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef    = 0;
+        virtual auto       CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef = 0;
+        virtual auto       CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef = 0;
+        virtual auto       CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef    = 0;
 
-        virtual auto CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
+        virtual auto       CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
             -> FRhiPipelineRef = 0;
         virtual auto CreateComputePipeline(const FRhiComputePipelineDesc& desc)
             -> FRhiPipelineRef = 0;
@@ -43,18 +43,14 @@ namespace AltinaEngine::Rhi {
             -> FRhiPipelineLayoutRef = 0;
 
         virtual auto CreateBindGroupLayout(const FRhiBindGroupLayoutDesc& desc)
-            -> FRhiBindGroupLayoutRef = 0;
-        virtual auto CreateBindGroup(const FRhiBindGroupDesc& desc)
-            -> FRhiBindGroupRef = 0;
+            -> FRhiBindGroupLayoutRef                                                   = 0;
+        virtual auto CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef = 0;
 
-        virtual auto CreateFence(u64 initialValue) -> FRhiFenceRef = 0;
-        virtual auto CreateSemaphore(bool timeline, u64 initialValue)
-            -> FRhiSemaphoreRef = 0;
+        virtual auto CreateFence(u64 initialValue) -> FRhiFenceRef                        = 0;
+        virtual auto CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef = 0;
 
-        virtual auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
-            -> FRhiCommandPoolRef = 0;
-        virtual auto CreateCommandList(const FRhiCommandListDesc& desc)
-            -> FRhiCommandListRef = 0;
+        virtual auto CreateCommandPool(const FRhiCommandPoolDesc& desc) -> FRhiCommandPoolRef = 0;
+        virtual auto CreateCommandList(const FRhiCommandListDesc& desc) -> FRhiCommandListRef = 0;
         virtual auto CreateCommandContext(const FRhiCommandContextDesc& desc)
             -> FRhiCommandContextRef = 0;
 
@@ -79,8 +75,7 @@ namespace AltinaEngine::Rhi {
 
         template <typename TResource, typename... Args>
         auto MakeResource(Args&&... args) -> TCountRef<TResource> {
-            return AdoptResource(
-                new TResource(AltinaEngine::Forward<Args>(args)...));
+            return AdoptResource(new TResource(AltinaEngine::Forward<Args>(args)...));
         }
 
     private:
@@ -89,13 +84,13 @@ namespace AltinaEngine::Rhi {
             FRhiQueueRef  mQueue = {};
         };
 
-        void NormalizeDebugName();
+        void                    NormalizeDebugName();
 
-        FRhiDeviceDesc       mDesc;
-        FRhiAdapterDesc      mAdapterDesc;
-        FRhiSupportedFeatures mSupportedFeatures;
-        FRhiSupportedLimits  mSupportedLimits;
-        FRhiQueueCapabilities mQueueCaps;
+        FRhiDeviceDesc          mDesc;
+        FRhiAdapterDesc         mAdapterDesc;
+        FRhiSupportedFeatures   mSupportedFeatures;
+        FRhiSupportedLimits     mSupportedLimits;
+        FRhiQueueCapabilities   mQueueCaps;
         TVector<FRhiQueueEntry> mQueues;
         FRhiResourceDeleteQueue mResourceDeleteQueue;
     };

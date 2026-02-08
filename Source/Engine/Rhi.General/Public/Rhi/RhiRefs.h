@@ -6,6 +6,7 @@
 namespace AltinaEngine::Rhi {
     using Core::Container::TCountRef;
 
+    // NOLINTBEGIN(*-identifier-naming)
     using FRhiResourceRef        = TCountRef<FRhiResource>;
     using FRhiQueueRef           = TCountRef<FRhiQueue>;
     using FRhiBufferRef          = TCountRef<FRhiBuffer>;
@@ -21,4 +22,5 @@ namespace AltinaEngine::Rhi {
     using FRhiCommandPoolRef     = TCountRef<FRhiCommandPool>;
     using FRhiCommandListRef     = TCountRef<FRhiCommandList>;
     using FRhiCommandContextRef  = TCountRef<FRhiCommandContext>;
+    // NOLINTEND(*-identifier-naming)
 } // namespace AltinaEngine::Rhi

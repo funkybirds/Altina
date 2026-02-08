@@ -24,12 +24,12 @@ namespace AltinaEngine::Rhi {
         }
 
         [[nodiscard]] virtual auto GetCompletedValue() const noexcept -> u64 = 0;
-        virtual void SignalCPU(u64 value) = 0;
-        virtual void WaitCPU(u64 value) = 0;
-        virtual void Reset(u64 value) = 0;
+        virtual void               SignalCPU(u64 value)                      = 0;
+        virtual void               WaitCPU(u64 value)                        = 0;
+        virtual void               Reset(u64 value)                          = 0;
 
     protected:
-        Core::Container::FString mDebugName;
+        FString mDebugName;
     };
 
 } // namespace AltinaEngine::Rhi

@@ -84,25 +84,25 @@ namespace AltinaEngine::Rhi {
     };
 
     enum class ERhiBufferBindFlags : u32 {
-        None           = 0,
-        Vertex         = 1u << 0,
-        Index          = 1u << 1,
-        Constant       = 1u << 2,
-        ShaderResource = 1u << 3,
+        None            = 0,
+        Vertex          = 1u << 0,
+        Index           = 1u << 1,
+        Constant        = 1u << 2,
+        ShaderResource  = 1u << 3,
         UnorderedAccess = 1u << 4,
-        Indirect       = 1u << 5,
-        CopySrc        = 1u << 6,
-        CopyDst        = 1u << 7
+        Indirect        = 1u << 5,
+        CopySrc         = 1u << 6,
+        CopyDst         = 1u << 7
     };
 
     enum class ERhiTextureBindFlags : u32 {
-        None           = 0,
-        ShaderResource = 1u << 0,
-        RenderTarget   = 1u << 1,
-        DepthStencil   = 1u << 2,
+        None            = 0,
+        ShaderResource  = 1u << 0,
+        RenderTarget    = 1u << 1,
+        DepthStencil    = 1u << 2,
         UnorderedAccess = 1u << 3,
-        CopySrc        = 1u << 4,
-        CopyDst        = 1u << 5
+        CopySrc         = 1u << 4,
+        CopyDst         = 1u << 5
     };
 
     enum class ERhiShaderStageFlags : u32 {
@@ -115,10 +115,10 @@ namespace AltinaEngine::Rhi {
         Domain        = 1u << 5,
         Mesh          = 1u << 6,
         Amplification = 1u << 7,
-        AllGraphics   = (1u << 0) | (1u << 1) | (1u << 3) | (1u << 4) | (1u << 5)
-                       | (1u << 6) | (1u << 7),
-        All           = (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3) | (1u << 4)
-                       | (1u << 5) | (1u << 6) | (1u << 7)
+        AllGraphics =
+            (1u << 0) | (1u << 1) | (1u << 3) | (1u << 4) | (1u << 5) | (1u << 6) | (1u << 7),
+        All = (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3) | (1u << 4) | (1u << 5) | (1u << 6)
+            | (1u << 7)
     };
 
     enum class ERhiBindingType : u8 {
@@ -133,7 +133,8 @@ namespace AltinaEngine::Rhi {
 
     template <typename T>
         requires AltinaEngine::CEnum<T>
-    [[nodiscard]] constexpr auto ToUnderlying(T value) noexcept -> AltinaEngine::TUnderlyingType<T> {
+    [[nodiscard]] constexpr auto ToUnderlying(T value) noexcept
+        -> AltinaEngine::TUnderlyingType<T> {
         return static_cast<AltinaEngine::TUnderlyingType<T>>(value);
     }
 
@@ -152,13 +153,13 @@ namespace AltinaEngine::Rhi {
         return lhs;
     }
 
-    [[nodiscard]] constexpr auto operator|(ERhiBufferBindFlags lhs, ERhiBufferBindFlags rhs) noexcept
-        -> ERhiBufferBindFlags {
+    [[nodiscard]] constexpr auto operator|(
+        ERhiBufferBindFlags lhs, ERhiBufferBindFlags rhs) noexcept -> ERhiBufferBindFlags {
         return static_cast<ERhiBufferBindFlags>(ToUnderlying(lhs) | ToUnderlying(rhs));
     }
 
-    [[nodiscard]] constexpr auto operator&(ERhiBufferBindFlags lhs, ERhiBufferBindFlags rhs) noexcept
-        -> ERhiBufferBindFlags {
+    [[nodiscard]] constexpr auto operator&(
+        ERhiBufferBindFlags lhs, ERhiBufferBindFlags rhs) noexcept -> ERhiBufferBindFlags {
         return static_cast<ERhiBufferBindFlags>(ToUnderlying(lhs) & ToUnderlying(rhs));
     }
 
@@ -168,13 +169,13 @@ namespace AltinaEngine::Rhi {
         return lhs;
     }
 
-    [[nodiscard]] constexpr auto operator|(ERhiTextureBindFlags lhs, ERhiTextureBindFlags rhs) noexcept
-        -> ERhiTextureBindFlags {
+    [[nodiscard]] constexpr auto operator|(
+        ERhiTextureBindFlags lhs, ERhiTextureBindFlags rhs) noexcept -> ERhiTextureBindFlags {
         return static_cast<ERhiTextureBindFlags>(ToUnderlying(lhs) | ToUnderlying(rhs));
     }
 
-    [[nodiscard]] constexpr auto operator&(ERhiTextureBindFlags lhs, ERhiTextureBindFlags rhs) noexcept
-        -> ERhiTextureBindFlags {
+    [[nodiscard]] constexpr auto operator&(
+        ERhiTextureBindFlags lhs, ERhiTextureBindFlags rhs) noexcept -> ERhiTextureBindFlags {
         return static_cast<ERhiTextureBindFlags>(ToUnderlying(lhs) & ToUnderlying(rhs));
     }
 
@@ -184,13 +185,13 @@ namespace AltinaEngine::Rhi {
         return lhs;
     }
 
-    [[nodiscard]] constexpr auto operator|(ERhiShaderStageFlags lhs, ERhiShaderStageFlags rhs) noexcept
-        -> ERhiShaderStageFlags {
+    [[nodiscard]] constexpr auto operator|(
+        ERhiShaderStageFlags lhs, ERhiShaderStageFlags rhs) noexcept -> ERhiShaderStageFlags {
         return static_cast<ERhiShaderStageFlags>(ToUnderlying(lhs) | ToUnderlying(rhs));
     }
 
-    [[nodiscard]] constexpr auto operator&(ERhiShaderStageFlags lhs, ERhiShaderStageFlags rhs) noexcept
-        -> ERhiShaderStageFlags {
+    [[nodiscard]] constexpr auto operator&(
+        ERhiShaderStageFlags lhs, ERhiShaderStageFlags rhs) noexcept -> ERhiShaderStageFlags {
         return static_cast<ERhiShaderStageFlags>(ToUnderlying(lhs) & ToUnderlying(rhs));
     }
 

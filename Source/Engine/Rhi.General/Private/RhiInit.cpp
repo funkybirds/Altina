@@ -25,23 +25,21 @@ namespace AltinaEngine::Rhi {
         return device;
     }
 
-    auto RHIGetDevice() noexcept -> FRhiDevice* {
-        return gRhiDevice.Get();
-    }
+    auto RHIGetDevice() noexcept -> FRhiDevice* { return gRhiDevice.Get(); }
 
     auto RHICreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef {
         FRhiDevice* device = RHIGetDevice();
-        return device ? device->CreateBuffer(desc) : FRhiBufferRef{};
+        return (device != nullptr) ? device->CreateBuffer(desc) : FRhiBufferRef{};
     }
 
     auto RHICreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef {
         FRhiDevice* device = RHIGetDevice();
-        return device ? device->CreateTexture(desc) : FRhiTextureRef{};
+        return (device != nullptr) ? device->CreateTexture(desc) : FRhiTextureRef{};
     }
 
     auto RHICreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef {
         FRhiDevice* device = RHIGetDevice();
-        return device ? device->CreateSampler(desc) : FRhiSamplerRef{};
+        return (device != nullptr) ? device->CreateSampler(desc) : FRhiSamplerRef{};
     }
 
     void RHIExit(FRhiContext& context) noexcept {

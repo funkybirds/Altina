@@ -5,7 +5,7 @@
 namespace AltinaEngine::Rhi {
 
     void FRhiResourceDeleteQueue::Enqueue(FRhiResource* resource, u64 serial) {
-        if (!resource) {
+        if (resource == nullptr) {
             return;
         }
 
@@ -23,7 +23,7 @@ namespace AltinaEngine::Rhi {
         usize writeIndex = 0;
         for (usize index = 0; index < mEntries.Size(); ++index) {
             const auto& entry = mEntries[index];
-            if (entry.mResource && entry.mSerial <= completedSerial) {
+            if ((entry.mResource != nullptr) && entry.mSerial <= completedSerial) {
                 entry.mResource->DestroySelf();
                 continue;
             }
@@ -39,7 +39,7 @@ namespace AltinaEngine::Rhi {
 
     void FRhiResourceDeleteQueue::Flush() {
         for (auto& entry : mEntries) {
-            if (entry.mResource) {
+            if (entry.mResource != nullptr) {
                 entry.mResource->DestroySelf();
             }
         }

@@ -8,36 +8,36 @@ namespace AltinaEngine::Rhi {
 
         auto GetTypeScore(const FRhiAdapterDesc& desc, ERhiGpuPreference preference) -> u64 {
             switch (preference) {
-            case ERhiGpuPreference::HighPerformance:
-                if (desc.IsDiscrete()) {
-                    return 3ULL;
-                }
-                if (desc.IsIntegrated()) {
-                    return 2ULL;
-                }
-                return desc.IsValid() ? 1ULL : 0ULL;
-            case ERhiGpuPreference::LowPower:
-                if (desc.IsIntegrated()) {
-                    return 3ULL;
-                }
-                if (desc.IsDiscrete()) {
-                    return 2ULL;
-                }
-                return desc.IsValid() ? 1ULL : 0ULL;
-            case ERhiGpuPreference::Auto:
-            default:
-                if (desc.IsDiscrete()) {
-                    return 3ULL;
-                }
-                if (desc.IsIntegrated()) {
-                    return 2ULL;
-                }
-                return desc.IsValid() ? 1ULL : 0ULL;
+                case ERhiGpuPreference::HighPerformance:
+                    if (desc.IsDiscrete()) {
+                        return 3ULL;
+                    }
+                    if (desc.IsIntegrated()) {
+                        return 2ULL;
+                    }
+                    return desc.IsValid() ? 1ULL : 0ULL;
+                case ERhiGpuPreference::LowPower:
+                    if (desc.IsIntegrated()) {
+                        return 3ULL;
+                    }
+                    if (desc.IsDiscrete()) {
+                        return 2ULL;
+                    }
+                    return desc.IsValid() ? 1ULL : 0ULL;
+                case ERhiGpuPreference::Auto:
+                default:
+                    if (desc.IsDiscrete()) {
+                        return 3ULL;
+                    }
+                    if (desc.IsIntegrated()) {
+                        return 2ULL;
+                    }
+                    return desc.IsValid() ? 1ULL : 0ULL;
             }
         }
     } // namespace
 
-    FRhiAdapter::FRhiAdapter(FRhiAdapterDesc desc) : mDesc(AltinaEngine::Move(desc)) {}
+    FRhiAdapter::FRhiAdapter(FRhiAdapterDesc desc) : mDesc(Move(desc)) {}
 
     auto FRhiAdapter::GetDesc() const noexcept -> const FRhiAdapterDesc& { return mDesc; }
 

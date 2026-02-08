@@ -9,13 +9,11 @@ namespace AltinaEngine::Rhi {
     FRhiResource::FRhiResource(FRhiResourceDeleteQueue* deleteQueue) noexcept
         : mRefCount(1U), mDeleteQueue(deleteQueue) {}
 
-    void FRhiResource::AddRef() noexcept {
-        mRefCount.FetchAdd(1U, EMemoryOrder::AcquireRelease);
-    }
+    void FRhiResource::AddRef() noexcept { mRefCount.FetchAdd(1U, EMemoryOrder::AcquireRelease); }
 
     void FRhiResource::Release() noexcept {
         if (mRefCount.FetchSub(1U, EMemoryOrder::AcquireRelease) == 1U) {
-            if (mDeleteQueue) {
+            if (mDeleteQueue != nullptr) {
                 mDeleteQueue->Enqueue(this, mRetireSerial);
             } else {
                 DestroySelf();
@@ -35,16 +33,10 @@ namespace AltinaEngine::Rhi {
         return mDeleteQueue;
     }
 
-    void FRhiResource::SetRetireSerial(u64 serial) noexcept {
-        mRetireSerial = serial;
-    }
+    void FRhiResource::SetRetireSerial(u64 serial) noexcept { mRetireSerial = serial; }
 
-    auto FRhiResource::GetRetireSerial() const noexcept -> u64 {
-        return mRetireSerial;
-    }
+    auto FRhiResource::GetRetireSerial() const noexcept -> u64 { return mRetireSerial; }
 
-    void FRhiResource::DestroySelf() noexcept {
-        delete this;
-    }
+    void FRhiResource::DestroySelf() noexcept { delete this; }
 
 } // namespace AltinaEngine::Rhi

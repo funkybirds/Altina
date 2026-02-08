@@ -2,6 +2,7 @@
 #include "RhiD3D11/RhiD3D11CommandContext.h"
 #include "RhiD3D11/RhiD3D11CommandList.h"
 #include "RhiD3D11/RhiD3D11Pipeline.h"
+#include "RhiD3D11/RhiD3D11Resources.h"
 #include "RhiD3D11/RhiD3D11Shader.h"
 
 #include "Rhi/RhiBindGroup.h"
@@ -31,12 +32,14 @@
         #undef CreateSemaphore
     #endif
     #include <d3d11.h>
+    #include <d3d11_1.h>
     #include <wrl/client.h>
 #endif
 
 #include <string>
 #include <vector>
 #include <type_traits>
+#include <limits>
 
 namespace AltinaEngine::Rhi {
     using Core::Container::TVector;
@@ -56,6 +59,13 @@ namespace AltinaEngine::Rhi {
     struct FRhiD3D11CommandContext::FState {
         ComPtr<ID3D11Device>        mDevice;
         ComPtr<ID3D11DeviceContext> mDeferredContext;
+        ComPtr<ID3D11DeviceContext1> mDeferredContext1;
+        FRhiD3D11GraphicsPipeline*  mCurrentGraphicsPipeline = nullptr;
+        FRhiD3D11ComputePipeline*   mCurrentComputePipeline = nullptr;
+        bool                        mUseComputeBindings = false;
+        ID3D11RenderTargetView*     mCurrentRtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
+        UINT                        mCurrentRtvCount = 0U;
+        ID3D11DepthStencilView*     mCurrentDsv = nullptr;
     };
 #else
     struct FRhiD3D11Device::FState {};
@@ -138,6 +148,17 @@ namespace AltinaEngine::Rhi {
 
         if (mState->mDeferredContext) {
             mState->mDeferredContext->ClearState();
+            mState->mDeferredContext1.Reset();
+            mState->mDeferredContext.As(&mState->mDeferredContext1);
+        }
+
+        mState->mCurrentGraphicsPipeline = nullptr;
+        mState->mCurrentComputePipeline  = nullptr;
+        mState->mUseComputeBindings      = false;
+        mState->mCurrentRtvCount         = 0U;
+        mState->mCurrentDsv              = nullptr;
+        for (UINT i = 0; i < D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i) {
+            mState->mCurrentRtvs[i] = nullptr;
         }
 
         auto* commandList = static_cast<FRhiD3D11CommandList*>(mCommandList.Get());
@@ -168,6 +189,441 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiD3D11CommandContext::GetCommandList() const noexcept -> FRhiCommandList* {
         return mCommandList.Get();
+    }
+
+    namespace {
+#if AE_PLATFORM_WIN
+        auto IsComputeStage(EShaderStage stage) noexcept -> bool {
+            return stage == EShaderStage::Compute;
+        }
+
+        void BindConstantBuffer(ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
+            ID3D11Buffer* buffer) {
+            switch (stage) {
+                case EShaderStage::Vertex:
+                    context->VSSetConstantBuffers(slot, 1, &buffer);
+                    break;
+                case EShaderStage::Pixel:
+                    context->PSSetConstantBuffers(slot, 1, &buffer);
+                    break;
+                case EShaderStage::Geometry:
+                    context->GSSetConstantBuffers(slot, 1, &buffer);
+                    break;
+                case EShaderStage::Hull:
+                    context->HSSetConstantBuffers(slot, 1, &buffer);
+                    break;
+                case EShaderStage::Domain:
+                    context->DSSetConstantBuffers(slot, 1, &buffer);
+                    break;
+                case EShaderStage::Compute:
+                    context->CSSetConstantBuffers(slot, 1, &buffer);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        void BindConstantBufferWithOffset(ID3D11DeviceContext1* context, EShaderStage stage,
+            UINT slot, ID3D11Buffer* buffer, UINT firstConstant, UINT numConstants) {
+            switch (stage) {
+                case EShaderStage::Vertex:
+                    context->VSSetConstantBuffers1(slot, 1, &buffer, &firstConstant, &numConstants);
+                    break;
+                case EShaderStage::Pixel:
+                    context->PSSetConstantBuffers1(slot, 1, &buffer, &firstConstant, &numConstants);
+                    break;
+                case EShaderStage::Geometry:
+                    context->GSSetConstantBuffers1(slot, 1, &buffer, &firstConstant, &numConstants);
+                    break;
+                case EShaderStage::Hull:
+                    context->HSSetConstantBuffers1(slot, 1, &buffer, &firstConstant, &numConstants);
+                    break;
+                case EShaderStage::Domain:
+                    context->DSSetConstantBuffers1(slot, 1, &buffer, &firstConstant, &numConstants);
+                    break;
+                case EShaderStage::Compute:
+                    context->CSSetConstantBuffers1(slot, 1, &buffer, &firstConstant, &numConstants);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        void BindShaderResource(ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
+            ID3D11ShaderResourceView* view) {
+            switch (stage) {
+                case EShaderStage::Vertex:
+                    context->VSSetShaderResources(slot, 1, &view);
+                    break;
+                case EShaderStage::Pixel:
+                    context->PSSetShaderResources(slot, 1, &view);
+                    break;
+                case EShaderStage::Geometry:
+                    context->GSSetShaderResources(slot, 1, &view);
+                    break;
+                case EShaderStage::Hull:
+                    context->HSSetShaderResources(slot, 1, &view);
+                    break;
+                case EShaderStage::Domain:
+                    context->DSSetShaderResources(slot, 1, &view);
+                    break;
+                case EShaderStage::Compute:
+                    context->CSSetShaderResources(slot, 1, &view);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        void BindSampler(ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
+            ID3D11SamplerState* sampler) {
+            switch (stage) {
+                case EShaderStage::Vertex:
+                    context->VSSetSamplers(slot, 1, &sampler);
+                    break;
+                case EShaderStage::Pixel:
+                    context->PSSetSamplers(slot, 1, &sampler);
+                    break;
+                case EShaderStage::Geometry:
+                    context->GSSetSamplers(slot, 1, &sampler);
+                    break;
+                case EShaderStage::Hull:
+                    context->HSSetSamplers(slot, 1, &sampler);
+                    break;
+                case EShaderStage::Domain:
+                    context->DSSetSamplers(slot, 1, &sampler);
+                    break;
+                case EShaderStage::Compute:
+                    context->CSSetSamplers(slot, 1, &sampler);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        void BindUnorderedAccess(ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
+            ID3D11UnorderedAccessView* view) {
+            if (!IsComputeStage(stage)) {
+                return;
+            }
+            context->CSSetUnorderedAccessViews(slot, 1, &view, nullptr);
+        }
+
+        void BindGraphicsUnorderedAccess(ID3D11DeviceContext* context,
+            ID3D11RenderTargetView* const* rtvs, UINT rtvCount, ID3D11DepthStencilView* dsv,
+            UINT slot, ID3D11UnorderedAccessView* view) {
+            if (context == nullptr) {
+                return;
+            }
+            if (slot >= D3D11_PS_CS_UAV_REGISTER_COUNT) {
+                return;
+            }
+            if (slot < rtvCount) {
+                return;
+            }
+            ID3D11UnorderedAccessView* uavs[1] = { view };
+            context->OMSetRenderTargetsAndUnorderedAccessViews(
+                rtvCount, (rtvCount > 0U) ? rtvs : nullptr, dsv, slot, 1, uavs, nullptr);
+        }
+#endif
+    } // namespace
+
+    void FRhiD3D11CommandContext::RHISetGraphicsPipeline(FRhiPipeline* pipeline) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context || !mState) {
+            return;
+        }
+
+        FRhiD3D11GraphicsPipeline* graphicsPipeline = nullptr;
+        if (pipeline != nullptr && pipeline->IsGraphics()) {
+            graphicsPipeline = static_cast<FRhiD3D11GraphicsPipeline*>(pipeline);
+        }
+
+        mState->mCurrentGraphicsPipeline = graphicsPipeline;
+        mState->mUseComputeBindings      = false;
+
+        ID3D11InputLayout*  inputLayout = nullptr;
+        ID3D11VertexShader* vertexShader = nullptr;
+        ID3D11PixelShader*  pixelShader  = nullptr;
+        ID3D11GeometryShader* geometryShader = nullptr;
+        ID3D11HullShader*   hullShader   = nullptr;
+        ID3D11DomainShader* domainShader = nullptr;
+
+        if (graphicsPipeline != nullptr) {
+            inputLayout = graphicsPipeline->GetInputLayout();
+            const auto& desc = pipeline->GetGraphicsDesc();
+            auto* vs = static_cast<FRhiD3D11Shader*>(desc.mVertexShader);
+            auto* ps = static_cast<FRhiD3D11Shader*>(desc.mPixelShader);
+            auto* gs = static_cast<FRhiD3D11Shader*>(desc.mGeometryShader);
+            auto* hs = static_cast<FRhiD3D11Shader*>(desc.mHullShader);
+            auto* ds = static_cast<FRhiD3D11Shader*>(desc.mDomainShader);
+
+            vertexShader   = vs ? vs->GetVertexShader() : nullptr;
+            pixelShader    = ps ? ps->GetPixelShader() : nullptr;
+            geometryShader = gs ? gs->GetGeometryShader() : nullptr;
+            hullShader     = hs ? hs->GetHullShader() : nullptr;
+            domainShader   = ds ? ds->GetDomainShader() : nullptr;
+        }
+
+        context->IASetInputLayout(inputLayout);
+        context->VSSetShader(vertexShader, nullptr, 0);
+        context->PSSetShader(pixelShader, nullptr, 0);
+        context->GSSetShader(geometryShader, nullptr, 0);
+        context->HSSetShader(hullShader, nullptr, 0);
+        context->DSSetShader(domainShader, nullptr, 0);
+#else
+        (void)pipeline;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHISetComputePipeline(FRhiPipeline* pipeline) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context || !mState) {
+            return;
+        }
+
+        FRhiD3D11ComputePipeline* computePipeline = nullptr;
+        if (pipeline != nullptr && !pipeline->IsGraphics()) {
+            computePipeline = static_cast<FRhiD3D11ComputePipeline*>(pipeline);
+        }
+
+        mState->mCurrentComputePipeline = computePipeline;
+        mState->mUseComputeBindings     = true;
+
+        ID3D11ComputeShader* computeShader = nullptr;
+        if (computePipeline != nullptr) {
+            const auto& desc = pipeline->GetComputeDesc();
+            auto* cs = static_cast<FRhiD3D11Shader*>(desc.mComputeShader);
+            computeShader = cs ? cs->GetComputeShader() : nullptr;
+        }
+        context->CSSetShader(computeShader, nullptr, 0);
+#else
+        (void)pipeline;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHISetRenderTargets(u32 colorTargetCount,
+        FRhiTexture* const* colorTargets, FRhiTexture* depthTarget) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context || !mState) {
+            return;
+        }
+
+        const UINT maxTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
+        const UINT rtvCount   = (colorTargetCount > maxTargets)
+            ? maxTargets
+            : static_cast<UINT>(colorTargetCount);
+
+        ID3D11RenderTargetView* rtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
+        for (UINT i = 0; i < rtvCount; ++i) {
+            auto* texture = colorTargets ? static_cast<FRhiD3D11Texture*>(colorTargets[i]) : nullptr;
+            rtvs[i] = texture ? texture->GetRenderTargetView() : nullptr;
+        }
+
+        ID3D11DepthStencilView* dsv = nullptr;
+        if (depthTarget != nullptr) {
+            auto* depthTexture = static_cast<FRhiD3D11Texture*>(depthTarget);
+            dsv = depthTexture ? depthTexture->GetDepthStencilView() : nullptr;
+        }
+
+        context->OMSetRenderTargets(rtvCount, rtvCount ? rtvs : nullptr, dsv);
+
+        mState->mCurrentRtvCount = rtvCount;
+        mState->mCurrentDsv      = dsv;
+        for (UINT i = 0; i < maxTargets; ++i) {
+            mState->mCurrentRtvs[i] = (i < rtvCount) ? rtvs[i] : nullptr;
+        }
+#else
+        (void)colorTargetCount;
+        (void)colorTargets;
+        (void)depthTarget;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHISetBindGroup(u32 setIndex, FRhiBindGroup* group,
+        const u32* dynamicOffsets, u32 dynamicOffsetCount) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context || !mState || group == nullptr) {
+            return;
+        }
+
+        const auto& groupDesc = group->GetDesc();
+        if (groupDesc.mEntries.IsEmpty()) {
+            return;
+        }
+
+        const FRhiBindGroupLayout* groupLayout  = groupDesc.mLayout;
+        const auto*                layoutEntries =
+            groupLayout ? &groupLayout->GetDesc().mEntries : nullptr;
+
+        const FRhiD3D11GraphicsPipeline* graphicsPipeline = mState->mCurrentGraphicsPipeline;
+        const FRhiD3D11ComputePipeline* computePipeline   = mState->mCurrentComputePipeline;
+
+        auto getDynamicOffsetBytes = [&](const FRhiBindGroupEntry& entry,
+                                         bool& hasDynamicOffset) -> u64 {
+            hasDynamicOffset = false;
+            if (!groupLayout || layoutEntries == nullptr || dynamicOffsets == nullptr
+                || dynamicOffsetCount == 0U) {
+                return 0ULL;
+            }
+
+            u32 dynIndex = 0U;
+            for (const auto& layoutEntry : *layoutEntries) {
+                if (!layoutEntry.mHasDynamicOffset) {
+                    continue;
+                }
+                if (layoutEntry.mBinding == entry.mBinding && layoutEntry.mType == entry.mType) {
+                    hasDynamicOffset = true;
+                    if (dynIndex < dynamicOffsetCount) {
+                        return static_cast<u64>(dynamicOffsets[dynIndex]);
+                    }
+                    return 0ULL;
+                }
+                ++dynIndex;
+            }
+            return 0ULL;
+        };
+
+        auto applyMappings = [&](const TVector<FD3D11BindingMappingEntry>& mappings) {
+            for (const auto& entry : groupDesc.mEntries) {
+                for (const auto& mapping : mappings) {
+                    if (mapping.mSet != setIndex || mapping.mBinding != entry.mBinding) {
+                        continue;
+                    }
+                    if (mapping.mType != entry.mType) {
+                        continue;
+                    }
+
+                    const UINT slot = static_cast<UINT>(mapping.mRegister + entry.mArrayIndex);
+
+                    switch (mapping.mType) {
+                        case ERhiBindingType::ConstantBuffer:
+                        {
+                            auto* buffer = static_cast<FRhiD3D11Buffer*>(entry.mBuffer);
+                            ID3D11Buffer* nativeBuffer =
+                                buffer ? buffer->GetNativeBuffer() : nullptr;
+                            ID3D11DeviceContext1* context1 = mState->mDeferredContext1.Get();
+                            bool                 hasDynamicOffset = false;
+                            const u64            dynamicOffsetBytes =
+                                getDynamicOffsetBytes(entry, hasDynamicOffset);
+
+                            const bool wantsRange =
+                                hasDynamicOffset || entry.mOffset != 0ULL || entry.mSize != 0ULL;
+
+                            if (context1 && wantsRange && buffer != nullptr) {
+                                const u64 bufferSizeBytes = buffer->GetDesc().mSizeBytes;
+                                u64       offsetBytes = entry.mOffset + dynamicOffsetBytes;
+                                u64       sizeBytes   = entry.mSize;
+
+                                if (sizeBytes == 0ULL) {
+                                    sizeBytes = (offsetBytes <= bufferSizeBytes)
+                                        ? (bufferSizeBytes - offsetBytes)
+                                        : 0ULL;
+                                }
+
+                                const bool validRange =
+                                    (offsetBytes <= bufferSizeBytes)
+                                    && (sizeBytes != 0ULL)
+                                    && (sizeBytes <= (bufferSizeBytes - offsetBytes))
+                                    && (offsetBytes % 16ULL == 0ULL)
+                                    && (sizeBytes % 16ULL == 0ULL);
+
+                                if (validRange) {
+                                    const u64 firstConstant64 = offsetBytes / 16ULL;
+                                    const u64 numConstants64  = sizeBytes / 16ULL;
+                                    const u64 maxUint =
+                                        static_cast<u64>(std::numeric_limits<UINT>::max());
+                                    if (firstConstant64 <= maxUint && numConstants64 <= maxUint) {
+                                        const UINT firstConstant = static_cast<UINT>(firstConstant64);
+                                        const UINT numConstants  = static_cast<UINT>(numConstants64);
+                                        BindConstantBufferWithOffset(
+                                            context1, mapping.mStage, slot, nativeBuffer,
+                                            firstConstant, numConstants);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            BindConstantBuffer(context, mapping.mStage, slot, nativeBuffer);
+                            break;
+                        }
+                        case ERhiBindingType::SampledTexture:
+                        {
+                            auto* texture = static_cast<FRhiD3D11Texture*>(entry.mTexture);
+                            ID3D11ShaderResourceView* view =
+                                texture ? texture->GetShaderResourceView() : nullptr;
+                            BindShaderResource(context, mapping.mStage, slot, view);
+                            break;
+                        }
+                        case ERhiBindingType::SampledBuffer:
+                        {
+                            auto* buffer = static_cast<FRhiD3D11Buffer*>(entry.mBuffer);
+                            ID3D11ShaderResourceView* view =
+                                buffer ? buffer->GetShaderResourceView() : nullptr;
+                            BindShaderResource(context, mapping.mStage, slot, view);
+                            break;
+                        }
+                        case ERhiBindingType::StorageTexture:
+                        {
+                            auto* texture = static_cast<FRhiD3D11Texture*>(entry.mTexture);
+                            ID3D11UnorderedAccessView* view =
+                                texture ? texture->GetUnorderedAccessView() : nullptr;
+                            if (IsComputeStage(mapping.mStage)) {
+                                BindUnorderedAccess(context, mapping.mStage, slot, view);
+                            } else if (mapping.mStage == EShaderStage::Pixel) {
+                                BindGraphicsUnorderedAccess(context, mState->mCurrentRtvs,
+                                    mState->mCurrentRtvCount, mState->mCurrentDsv, slot, view);
+                            }
+                            break;
+                        }
+                        case ERhiBindingType::StorageBuffer:
+                        {
+                            auto* buffer = static_cast<FRhiD3D11Buffer*>(entry.mBuffer);
+                            ID3D11UnorderedAccessView* view =
+                                buffer ? buffer->GetUnorderedAccessView() : nullptr;
+                            if (IsComputeStage(mapping.mStage)) {
+                                BindUnorderedAccess(context, mapping.mStage, slot, view);
+                            } else if (mapping.mStage == EShaderStage::Pixel) {
+                                BindGraphicsUnorderedAccess(context, mState->mCurrentRtvs,
+                                    mState->mCurrentRtvCount, mState->mCurrentDsv, slot, view);
+                            }
+                            break;
+                        }
+                        case ERhiBindingType::Sampler:
+                        {
+                            auto* sampler = static_cast<FRhiD3D11Sampler*>(entry.mSampler);
+                            ID3D11SamplerState* nativeSampler =
+                                sampler ? sampler->GetNativeSampler() : nullptr;
+                            BindSampler(context, mapping.mStage, slot, nativeSampler);
+                            break;
+                        }
+                        case ERhiBindingType::AccelerationStructure:
+                        default:
+                            break;
+                    }
+                }
+            }
+        };
+
+        if (mState->mUseComputeBindings) {
+            if (computePipeline) {
+                applyMappings(computePipeline->GetBindingMappings());
+            }
+        } else {
+            if (graphicsPipeline) {
+                applyMappings(graphicsPipeline->GetBindingMappings());
+            }
+        }
+#else
+        (void)setIndex;
+        (void)group;
+        (void)dynamicOffsets;
+        (void)dynamicOffsetCount;
+#endif
     }
 
     void FRhiD3D11CommandContext::RHIDrawIndexed(

@@ -9,13 +9,18 @@
 #include "RhiD3D11/RhiD3D11CommandContext.h"
 #include "RhiD3D11/RhiD3D11CommandList.h"
 #include "RhiD3D11/RhiD3D11Device.h"
+#include "RhiD3D11/RhiD3D11Resources.h"
 #include "RhiD3D11/RhiD3D11Shader.h"
 #include "Rhi/Command/RhiCmdBuiltins.h"
 #include "Rhi/Command/RhiCmdContextAdapter.h"
 #include "Rhi/Command/RhiCmdExecutor.h"
 #include "Rhi/Command/RhiCmdList.h"
 #include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiBindGroup.h"
+#include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiDevice.h"
+#include "Rhi/RhiPipeline.h"
+#include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiShader.h"
@@ -103,6 +108,14 @@ VSOut VSMain(VSIn input) {
 void CSMain(uint3 tid : SV_DispatchThreadID) {
     Output[0] = 123u;
 })";
+
+    constexpr const char* kGraphicsUavPsShader = R"(RWTexture2D<float4> gOut : register(u1);
+
+float4 PSMain() : SV_Target0 {
+    gOut[uint2(0, 0)] = float4(1, 0, 0, 1);
+    return float4(0, 0, 0, 1);
+}
+)";
 } // namespace
 
 TEST_CASE("RhiD3D11.DeviceCreation") {
@@ -395,6 +408,180 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
     immediateContext->Unmap(staging.Get(), 0);
 
     REQUIRE_EQ(value, 123U);
+#else
+    // Non-Windows platforms do not support D3D11.
+#endif
+}
+
+TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
+#if AE_PLATFORM_WIN
+    using AltinaEngine::Rhi::ERhiBindingType;
+    using AltinaEngine::Rhi::ERhiQueueType;
+    using AltinaEngine::Rhi::ERhiShaderStageFlags;
+    using AltinaEngine::Rhi::FRhiBindGroupDesc;
+    using AltinaEngine::Rhi::FRhiBindGroupEntry;
+    using AltinaEngine::Rhi::FRhiBindGroupLayoutDesc;
+    using AltinaEngine::Rhi::FRhiBindGroupLayoutEntry;
+    using AltinaEngine::Rhi::FRhiCommandContextDesc;
+    using AltinaEngine::Rhi::FRhiD3D11Context;
+    using AltinaEngine::Rhi::FRhiD3D11Texture;
+    using AltinaEngine::Rhi::FRhiD3D11Device;
+    using AltinaEngine::Rhi::FRhiGraphicsPipelineDesc;
+    using AltinaEngine::Rhi::FRhiInitDesc;
+    using AltinaEngine::Rhi::FRhiPipelineLayoutDesc;
+    using AltinaEngine::Rhi::FRhiShaderDesc;
+    using AltinaEngine::Rhi::FRhiTexture;
+    using AltinaEngine::Rhi::FRhiTextureDesc;
+    using AltinaEngine::Rhi::kRhiInvalidAdapterIndex;
+    using AltinaEngine::Shader::EShaderResourceAccess;
+    using AltinaEngine::Shader::EShaderResourceType;
+    using AltinaEngine::Shader::EShaderStage;
+    using AltinaEngine::Shader::FShaderResourceBinding;
+    using Microsoft::WRL::ComPtr;
+
+    FRhiD3D11Context context;
+    FRhiInitDesc     initDesc;
+    initDesc.mEnableDebugLayer = false;
+
+    REQUIRE(context.Init(initDesc));
+
+    const auto adapters = context.EnumerateAdapters();
+    if (adapters.IsEmpty()) {
+        return;
+    }
+
+    const auto device = context.CreateDevice(kRhiInvalidAdapterIndex);
+    REQUIRE(device);
+
+    auto* d3dDevice = static_cast<FRhiD3D11Device*>(device.Get());
+    REQUIRE(d3dDevice);
+    ID3D11Device* nativeDevice = d3dDevice->GetNativeDevice();
+    if (!nativeDevice) {
+        return;
+    }
+
+    AltinaEngine::Shader::FShaderBytecode vsBytecode;
+    AltinaEngine::Shader::FShaderBytecode psBytecode;
+    std::string compileErrors;
+    if (!CompileD3D11ShaderDXBC(kMinimalVsShader, "VSMain", "vs_5_0", vsBytecode,
+            compileErrors)) {
+        if (!compileErrors.empty()) {
+            std::cerr << "[SKIP] D3D11 D3DCompile failed:\n" << compileErrors << "\n";
+        }
+        return;
+    }
+    if (!CompileD3D11ShaderDXBC(kGraphicsUavPsShader, "PSMain", "ps_5_0", psBytecode,
+            compileErrors)) {
+        if (!compileErrors.empty()) {
+            std::cerr << "[SKIP] D3D11 D3DCompile failed:\n" << compileErrors << "\n";
+        }
+        return;
+    }
+
+    FRhiShaderDesc vsDesc;
+    vsDesc.mStage    = EShaderStage::Vertex;
+    vsDesc.mBytecode = AltinaEngine::Move(vsBytecode);
+
+    FRhiShaderDesc psDesc;
+    psDesc.mStage    = EShaderStage::Pixel;
+    psDesc.mBytecode = AltinaEngine::Move(psBytecode);
+
+    FShaderResourceBinding uavBinding;
+    uavBinding.mType     = EShaderResourceType::StorageTexture;
+    uavBinding.mAccess   = EShaderResourceAccess::ReadWrite;
+    uavBinding.mSet      = 0U;
+    uavBinding.mBinding  = 1U;
+    uavBinding.mRegister = 1U;
+    uavBinding.mSpace    = 0U;
+    psDesc.mReflection.mResources.PushBack(uavBinding);
+
+    const auto vs = device->CreateShader(vsDesc);
+    const auto ps = device->CreateShader(psDesc);
+    REQUIRE(vs);
+    REQUIRE(ps);
+
+    FRhiBindGroupLayoutDesc layoutDesc;
+    layoutDesc.mSetIndex = 0U;
+    FRhiBindGroupLayoutEntry layoutEntry;
+    layoutEntry.mBinding    = 1U;
+    layoutEntry.mType       = ERhiBindingType::StorageTexture;
+    layoutEntry.mVisibility = ERhiShaderStageFlags::Pixel;
+    layoutDesc.mEntries.PushBack(layoutEntry);
+
+    const auto bindGroupLayout = device->CreateBindGroupLayout(layoutDesc);
+    REQUIRE(bindGroupLayout);
+
+    FRhiPipelineLayoutDesc pipelineLayoutDesc;
+    pipelineLayoutDesc.mBindGroupLayouts.PushBack(bindGroupLayout.Get());
+    const auto pipelineLayout = device->CreatePipelineLayout(pipelineLayoutDesc);
+    REQUIRE(pipelineLayout);
+
+    FRhiGraphicsPipelineDesc pipelineDesc;
+    pipelineDesc.mPipelineLayout = pipelineLayout.Get();
+    pipelineDesc.mVertexShader   = vs.Get();
+    pipelineDesc.mPixelShader    = ps.Get();
+    const auto pipeline = device->CreateGraphicsPipeline(pipelineDesc);
+    REQUIRE(pipeline);
+
+    FRhiTextureDesc rtvDesc;
+    rtvDesc.mWidth     = 4U;
+    rtvDesc.mHeight    = 4U;
+    rtvDesc.mBindFlags = AltinaEngine::Rhi::ERhiTextureBindFlags::RenderTarget;
+    const auto colorTarget = device->CreateTexture(rtvDesc);
+    REQUIRE(colorTarget);
+
+    FRhiTextureDesc uavDesc;
+    uavDesc.mWidth     = 4U;
+    uavDesc.mHeight    = 4U;
+    uavDesc.mBindFlags = AltinaEngine::Rhi::ERhiTextureBindFlags::UnorderedAccess;
+    const auto uavTexture = device->CreateTexture(uavDesc);
+    REQUIRE(uavTexture);
+
+    FRhiBindGroupDesc bindGroupDesc;
+    bindGroupDesc.mLayout = bindGroupLayout.Get();
+    FRhiBindGroupEntry bindEntry;
+    bindEntry.mBinding = 1U;
+    bindEntry.mType    = ERhiBindingType::StorageTexture;
+    bindEntry.mTexture = uavTexture.Get();
+    bindGroupDesc.mEntries.PushBack(bindEntry);
+    const auto bindGroup = device->CreateBindGroup(bindGroupDesc);
+    REQUIRE(bindGroup);
+
+    FRhiCommandContextDesc ctxDesc;
+    ctxDesc.mQueueType = ERhiQueueType::Graphics;
+    const auto cmdContext = device->CreateCommandContext(ctxDesc);
+    REQUIRE(cmdContext);
+
+    auto* d3dContext = static_cast<FRhiD3D11CommandContext*>(cmdContext.Get());
+    REQUIRE(d3dContext);
+    d3dContext->Begin();
+
+    FRhiTexture* colorTargets[] = { colorTarget.Get() };
+    d3dContext->RHISetRenderTargets(1U, colorTargets, nullptr);
+    d3dContext->RHISetGraphicsPipeline(pipeline.Get());
+    d3dContext->RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
+
+    ID3D11DeviceContext* deferredContext = d3dContext->GetDeferredContext();
+    if (!deferredContext) {
+        return;
+    }
+
+    ComPtr<ID3D11RenderTargetView> rtv;
+    ComPtr<ID3D11DepthStencilView> dsv;
+    ComPtr<ID3D11UnorderedAccessView> uav;
+
+    deferredContext->OMGetRenderTargetsAndUnorderedAccessViews(
+        1U, rtv.GetAddressOf(), dsv.GetAddressOf(), 1U, 1U, uav.GetAddressOf());
+
+    auto* expectedRtv =
+        static_cast<FRhiD3D11Texture*>(colorTarget.Get())->GetRenderTargetView();
+    auto* expectedUav =
+        static_cast<FRhiD3D11Texture*>(uavTexture.Get())->GetUnorderedAccessView();
+
+    REQUIRE(rtv.Get() == expectedRtv);
+    REQUIRE(uav.Get() == expectedUav);
+
+    d3dContext->End();
 #else
     // Non-Windows platforms do not support D3D11.
 #endif

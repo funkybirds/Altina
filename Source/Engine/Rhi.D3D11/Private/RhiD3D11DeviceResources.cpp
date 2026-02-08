@@ -1,4 +1,5 @@
 #include "RhiD3D11/RhiD3D11Device.h"
+#include "RhiD3D11/RhiD3D11Resources.h"
 
 #include "Rhi/RhiBuffer.h"
 #include "Rhi/RhiSampler.h"
@@ -29,7 +30,208 @@
 namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
     using Microsoft::WRL::ComPtr;
+
+    struct FRhiD3D11Buffer::FState {
+        ComPtr<ID3D11Buffer>              mBuffer;
+        ComPtr<ID3D11ShaderResourceView>  mSrv;
+        ComPtr<ID3D11UnorderedAccessView> mUav;
+    };
+
+    struct FRhiD3D11Texture::FState {
+        ComPtr<ID3D11Resource>            mResource;
+        ComPtr<ID3D11RenderTargetView>    mRtv;
+        ComPtr<ID3D11DepthStencilView>    mDsv;
+        ComPtr<ID3D11ShaderResourceView>  mSrv;
+        ComPtr<ID3D11UnorderedAccessView> mUav;
+    };
+
+    struct FRhiD3D11Sampler::FState {
+        ComPtr<ID3D11SamplerState> mSampler;
+    };
+#else
+    struct FRhiD3D11Buffer::FState {};
+    struct FRhiD3D11Texture::FState {};
+    struct FRhiD3D11Sampler::FState {};
 #endif
+
+    using Core::Container::MakeUnique;
+
+    FRhiD3D11Buffer::FRhiD3D11Buffer(const FRhiBufferDesc& desc, ID3D11Buffer* buffer,
+        ID3D11ShaderResourceView* shaderResourceView,
+        ID3D11UnorderedAccessView* unorderedAccessView)
+        : FRhiBuffer(desc) {
+#if AE_PLATFORM_WIN
+        mState = MakeUnique<FState>();
+        if (mState) {
+            if (buffer) {
+                mState->mBuffer.Attach(buffer);
+            }
+            if (shaderResourceView) {
+                mState->mSrv.Attach(shaderResourceView);
+            }
+            if (unorderedAccessView) {
+                mState->mUav.Attach(unorderedAccessView);
+            }
+        }
+#else
+        (void)buffer;
+        (void)shaderResourceView;
+        (void)unorderedAccessView;
+#endif
+    }
+
+    FRhiD3D11Buffer::FRhiD3D11Buffer(const FRhiBufferDesc& desc) : FRhiBuffer(desc) {
+#if AE_PLATFORM_WIN
+        mState = MakeUnique<FState>();
+#endif
+    }
+
+    FRhiD3D11Buffer::~FRhiD3D11Buffer() {
+#if AE_PLATFORM_WIN
+        mState.reset();
+#endif
+    }
+
+    auto FRhiD3D11Buffer::GetNativeBuffer() const noexcept -> ID3D11Buffer* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mBuffer.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11Buffer::GetShaderResourceView() const noexcept -> ID3D11ShaderResourceView* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mSrv.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11Buffer::GetUnorderedAccessView() const noexcept -> ID3D11UnorderedAccessView* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mUav.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    FRhiD3D11Texture::FRhiD3D11Texture(const FRhiTextureDesc& desc, ID3D11Resource* resource,
+        ID3D11RenderTargetView* renderTargetView, ID3D11DepthStencilView* depthStencilView,
+        ID3D11ShaderResourceView* shaderResourceView,
+        ID3D11UnorderedAccessView* unorderedAccessView)
+        : FRhiTexture(desc) {
+#if AE_PLATFORM_WIN
+        mState = MakeUnique<FState>();
+        if (mState) {
+            if (resource) {
+                mState->mResource.Attach(resource);
+            }
+            if (renderTargetView) {
+                mState->mRtv.Attach(renderTargetView);
+            }
+            if (depthStencilView) {
+                mState->mDsv.Attach(depthStencilView);
+            }
+            if (shaderResourceView) {
+                mState->mSrv.Attach(shaderResourceView);
+            }
+            if (unorderedAccessView) {
+                mState->mUav.Attach(unorderedAccessView);
+            }
+        }
+#else
+        (void)resource;
+        (void)renderTargetView;
+        (void)depthStencilView;
+        (void)shaderResourceView;
+        (void)unorderedAccessView;
+#endif
+    }
+
+    FRhiD3D11Texture::FRhiD3D11Texture(const FRhiTextureDesc& desc) : FRhiTexture(desc) {
+#if AE_PLATFORM_WIN
+        mState = MakeUnique<FState>();
+#endif
+    }
+
+    FRhiD3D11Texture::~FRhiD3D11Texture() {
+#if AE_PLATFORM_WIN
+        mState.reset();
+#endif
+    }
+
+    auto FRhiD3D11Texture::GetNativeResource() const noexcept -> ID3D11Resource* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mResource.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11Texture::GetRenderTargetView() const noexcept -> ID3D11RenderTargetView* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mRtv.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11Texture::GetDepthStencilView() const noexcept -> ID3D11DepthStencilView* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mDsv.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11Texture::GetShaderResourceView() const noexcept -> ID3D11ShaderResourceView* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mSrv.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11Texture::GetUnorderedAccessView() const noexcept -> ID3D11UnorderedAccessView* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mUav.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    FRhiD3D11Sampler::FRhiD3D11Sampler(const FRhiSamplerDesc& desc, ID3D11SamplerState* sampler)
+        : FRhiSampler(desc) {
+#if AE_PLATFORM_WIN
+        mState = MakeUnique<FState>();
+        if (mState && sampler) {
+            mState->mSampler.Attach(sampler);
+        }
+#else
+        (void)sampler;
+#endif
+    }
+
+    FRhiD3D11Sampler::FRhiD3D11Sampler(const FRhiSamplerDesc& desc) : FRhiSampler(desc) {
+#if AE_PLATFORM_WIN
+        mState = MakeUnique<FState>();
+#endif
+    }
+
+    FRhiD3D11Sampler::~FRhiD3D11Sampler() {
+#if AE_PLATFORM_WIN
+        mState.reset();
+#endif
+    }
+
+    auto FRhiD3D11Sampler::GetNativeSampler() const noexcept -> ID3D11SamplerState* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mSampler.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
 
     namespace {
 #if AE_PLATFORM_WIN
@@ -119,49 +321,246 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        class FRhiD3D11Buffer final : public FRhiBuffer {
-        public:
-            FRhiD3D11Buffer(const FRhiBufferDesc& desc, ComPtr<ID3D11Buffer> buffer)
-                : FRhiBuffer(desc), mBuffer(AltinaEngine::Move(buffer)) {}
+        auto IsDepthStencilFormat(ERhiFormat format) noexcept -> bool {
+            switch (format) {
+                case ERhiFormat::D24UnormS8Uint:
+                case ERhiFormat::D32Float:
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
-        private:
-            ComPtr<ID3D11Buffer> mBuffer;
-        };
+        auto CreateTextureRtv(ID3D11Device* device, ID3D11Resource* resource,
+            const FRhiTextureDesc& desc) -> ComPtr<ID3D11RenderTargetView> {
+            ComPtr<ID3D11RenderTargetView> rtv;
+            if (device == nullptr || resource == nullptr) {
+                return rtv;
+            }
+            if (IsDepthStencilFormat(desc.mFormat)) {
+                return rtv;
+            }
 
-        class FRhiD3D11Texture final : public FRhiTexture {
-        public:
-            FRhiD3D11Texture(const FRhiTextureDesc& desc, ComPtr<ID3D11Resource> resource)
-                : FRhiTexture(desc), mResource(AltinaEngine::Move(resource)) {}
+            const DXGI_FORMAT format = ToD3D11Format(desc.mFormat);
+            if (format == DXGI_FORMAT_UNKNOWN) {
+                return rtv;
+            }
 
-        private:
-            ComPtr<ID3D11Resource> mResource;
-        };
-#else
-        class FRhiD3D11Buffer final : public FRhiBuffer {
-        public:
-            explicit FRhiD3D11Buffer(const FRhiBufferDesc& desc) : FRhiBuffer(desc) {}
-        };
+            D3D11_RENDER_TARGET_VIEW_DESC viewDesc = {};
+            viewDesc.Format                        = format;
 
-        class FRhiD3D11Texture final : public FRhiTexture {
-        public:
-            explicit FRhiD3D11Texture(const FRhiTextureDesc& desc) : FRhiTexture(desc) {}
-        };
+            if (desc.mDepth > 1U) {
+                viewDesc.ViewDimension        = D3D11_RTV_DIMENSION_TEXTURE3D;
+                viewDesc.Texture3D.MipSlice   = 0U;
+                viewDesc.Texture3D.FirstWSlice = 0U;
+                viewDesc.Texture3D.WSize       = desc.mDepth;
+            } else if (desc.mSampleCount > 1U) {
+                if (desc.mArrayLayers > 1U) {
+                    viewDesc.ViewDimension                    = D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY;
+                    viewDesc.Texture2DMSArray.FirstArraySlice = 0U;
+                    viewDesc.Texture2DMSArray.ArraySize       = desc.mArrayLayers;
+                } else {
+                    viewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMS;
+                }
+            } else if (desc.mArrayLayers > 1U) {
+                viewDesc.ViewDimension                  = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
+                viewDesc.Texture2DArray.MipSlice        = 0U;
+                viewDesc.Texture2DArray.FirstArraySlice = 0U;
+                viewDesc.Texture2DArray.ArraySize       = desc.mArrayLayers;
+            } else {
+                viewDesc.ViewDimension      = D3D11_RTV_DIMENSION_TEXTURE2D;
+                viewDesc.Texture2D.MipSlice = 0U;
+            }
+
+            const HRESULT hr = device->CreateRenderTargetView(resource, &viewDesc, &rtv);
+            if (FAILED(hr)) {
+                rtv.Reset();
+            }
+            return rtv;
+        }
+
+        auto CreateTextureDsv(ID3D11Device* device, ID3D11Resource* resource,
+            const FRhiTextureDesc& desc) -> ComPtr<ID3D11DepthStencilView> {
+            ComPtr<ID3D11DepthStencilView> dsv;
+            if (device == nullptr || resource == nullptr) {
+                return dsv;
+            }
+            if (!IsDepthStencilFormat(desc.mFormat)) {
+                return dsv;
+            }
+            if (desc.mDepth > 1U) {
+                return dsv;
+            }
+
+            const DXGI_FORMAT format = ToD3D11Format(desc.mFormat);
+            if (format == DXGI_FORMAT_UNKNOWN) {
+                return dsv;
+            }
+
+            D3D11_DEPTH_STENCIL_VIEW_DESC viewDesc = {};
+            viewDesc.Format                         = format;
+
+            if (desc.mSampleCount > 1U) {
+                if (desc.mArrayLayers > 1U) {
+                    viewDesc.ViewDimension                    = D3D11_DSV_DIMENSION_TEXTURE2DMSARRAY;
+                    viewDesc.Texture2DMSArray.FirstArraySlice = 0U;
+                    viewDesc.Texture2DMSArray.ArraySize       = desc.mArrayLayers;
+                } else {
+                    viewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
+                }
+            } else if (desc.mArrayLayers > 1U) {
+                viewDesc.ViewDimension                  = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+                viewDesc.Texture2DArray.MipSlice        = 0U;
+                viewDesc.Texture2DArray.FirstArraySlice = 0U;
+                viewDesc.Texture2DArray.ArraySize       = desc.mArrayLayers;
+            } else {
+                viewDesc.ViewDimension      = D3D11_DSV_DIMENSION_TEXTURE2D;
+                viewDesc.Texture2D.MipSlice = 0U;
+            }
+
+            const HRESULT hr = device->CreateDepthStencilView(resource, &viewDesc, &dsv);
+            if (FAILED(hr)) {
+                dsv.Reset();
+            }
+            return dsv;
+        }
+
+        auto CreateBufferSrv(ID3D11Device* device, ID3D11Buffer* buffer,
+            const FRhiBufferDesc& desc) -> ComPtr<ID3D11ShaderResourceView> {
+            ComPtr<ID3D11ShaderResourceView> srv;
+            if (device == nullptr || buffer == nullptr) {
+                return srv;
+            }
+            if ((desc.mSizeBytes == 0ULL) || (desc.mSizeBytes % 4ULL != 0ULL)) {
+                return srv;
+            }
+            const UINT elementCount = static_cast<UINT>(desc.mSizeBytes / 4ULL);
+            if (elementCount == 0U) {
+                return srv;
+            }
+            D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
+            viewDesc.ViewDimension                   = D3D11_SRV_DIMENSION_BUFFEREX;
+            viewDesc.Format                          = DXGI_FORMAT_R32_TYPELESS;
+            viewDesc.BufferEx.FirstElement           = 0U;
+            viewDesc.BufferEx.NumElements            = elementCount;
+            viewDesc.BufferEx.Flags                  = D3D11_BUFFEREX_SRV_FLAG_RAW;
+            const HRESULT hr = device->CreateShaderResourceView(buffer, &viewDesc, &srv);
+            if (FAILED(hr)) {
+                srv.Reset();
+            }
+            return srv;
+        }
+
+        auto CreateBufferUav(ID3D11Device* device, ID3D11Buffer* buffer,
+            const FRhiBufferDesc& desc) -> ComPtr<ID3D11UnorderedAccessView> {
+            ComPtr<ID3D11UnorderedAccessView> uav;
+            if (device == nullptr || buffer == nullptr) {
+                return uav;
+            }
+            if ((desc.mSizeBytes == 0ULL) || (desc.mSizeBytes % 4ULL != 0ULL)) {
+                return uav;
+            }
+            const UINT elementCount = static_cast<UINT>(desc.mSizeBytes / 4ULL);
+            if (elementCount == 0U) {
+                return uav;
+            }
+            D3D11_UNORDERED_ACCESS_VIEW_DESC viewDesc = {};
+            viewDesc.ViewDimension                    = D3D11_UAV_DIMENSION_BUFFER;
+            viewDesc.Format                           = DXGI_FORMAT_R32_TYPELESS;
+            viewDesc.Buffer.FirstElement              = 0U;
+            viewDesc.Buffer.NumElements               = elementCount;
+            viewDesc.Buffer.Flags                     = D3D11_BUFFER_UAV_FLAG_RAW;
+            const HRESULT hr = device->CreateUnorderedAccessView(buffer, &viewDesc, &uav);
+            if (FAILED(hr)) {
+                uav.Reset();
+            }
+            return uav;
+        }
+
+        auto CreateTextureSrv(ID3D11Device* device, ID3D11Resource* resource,
+            const FRhiTextureDesc& desc) -> ComPtr<ID3D11ShaderResourceView> {
+            ComPtr<ID3D11ShaderResourceView> srv;
+            if (device == nullptr || resource == nullptr) {
+                return srv;
+            }
+            const DXGI_FORMAT format = ToD3D11Format(desc.mFormat);
+            if (format == DXGI_FORMAT_UNKNOWN) {
+                return srv;
+            }
+
+            D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
+            viewDesc.Format                          = format;
+
+            if (desc.mDepth > 1U) {
+                viewDesc.ViewDimension             = D3D11_SRV_DIMENSION_TEXTURE3D;
+                viewDesc.Texture3D.MostDetailedMip = 0U;
+                viewDesc.Texture3D.MipLevels       = desc.mMipLevels;
+            } else if (desc.mSampleCount > 1U) {
+                if (desc.mArrayLayers > 1U) {
+                    viewDesc.ViewDimension                   = D3D11_SRV_DIMENSION_TEXTURE2DMSARRAY;
+                    viewDesc.Texture2DMSArray.FirstArraySlice = 0U;
+                    viewDesc.Texture2DMSArray.ArraySize       = desc.mArrayLayers;
+                } else {
+                    viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
+                }
+            } else if (desc.mArrayLayers > 1U) {
+                viewDesc.ViewDimension                  = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+                viewDesc.Texture2DArray.MostDetailedMip = 0U;
+                viewDesc.Texture2DArray.MipLevels       = desc.mMipLevels;
+                viewDesc.Texture2DArray.FirstArraySlice = 0U;
+                viewDesc.Texture2DArray.ArraySize       = desc.mArrayLayers;
+            } else {
+                viewDesc.ViewDimension             = D3D11_SRV_DIMENSION_TEXTURE2D;
+                viewDesc.Texture2D.MostDetailedMip = 0U;
+                viewDesc.Texture2D.MipLevels       = desc.mMipLevels;
+            }
+
+            const HRESULT hr = device->CreateShaderResourceView(resource, &viewDesc, &srv);
+            if (FAILED(hr)) {
+                srv.Reset();
+            }
+            return srv;
+        }
+
+        auto CreateTextureUav(ID3D11Device* device, ID3D11Resource* resource,
+            const FRhiTextureDesc& desc) -> ComPtr<ID3D11UnorderedAccessView> {
+            ComPtr<ID3D11UnorderedAccessView> uav;
+            if (device == nullptr || resource == nullptr) {
+                return uav;
+            }
+            if (desc.mSampleCount > 1U) {
+                return uav;
+            }
+            const DXGI_FORMAT format = ToD3D11Format(desc.mFormat);
+            if (format == DXGI_FORMAT_UNKNOWN) {
+                return uav;
+            }
+
+            D3D11_UNORDERED_ACCESS_VIEW_DESC viewDesc = {};
+            viewDesc.Format                           = format;
+
+            if (desc.mDepth > 1U) {
+                viewDesc.ViewDimension      = D3D11_UAV_DIMENSION_TEXTURE3D;
+                viewDesc.Texture3D.MipSlice = 0U;
+                viewDesc.Texture3D.FirstWSlice = 0U;
+                viewDesc.Texture3D.WSize       = desc.mDepth;
+            } else if (desc.mArrayLayers > 1U) {
+                viewDesc.ViewDimension               = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
+                viewDesc.Texture2DArray.MipSlice     = 0U;
+                viewDesc.Texture2DArray.FirstArraySlice = 0U;
+                viewDesc.Texture2DArray.ArraySize       = desc.mArrayLayers;
+            } else {
+                viewDesc.ViewDimension      = D3D11_UAV_DIMENSION_TEXTURE2D;
+                viewDesc.Texture2D.MipSlice = 0U;
+            }
+
+            const HRESULT hr = device->CreateUnorderedAccessView(resource, &viewDesc, &uav);
+            if (FAILED(hr)) {
+                uav.Reset();
+            }
+            return uav;
+        }
 #endif
-
-        class FRhiD3D11Sampler final : public FRhiSampler {
-        public:
-#if AE_PLATFORM_WIN
-            FRhiD3D11Sampler(const FRhiSamplerDesc& desc, ComPtr<ID3D11SamplerState> sampler)
-                : FRhiSampler(desc), mSampler(AltinaEngine::Move(sampler)) {}
-#else
-            explicit FRhiD3D11Sampler(const FRhiSamplerDesc& desc) : FRhiSampler(desc) {}
-#endif
-
-        private:
-#if AE_PLATFORM_WIN
-            ComPtr<ID3D11SamplerState> mSampler;
-#endif
-        };
     } // namespace
 
     auto FRhiD3D11Device::CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef {
@@ -182,6 +581,11 @@ namespace AltinaEngine::Rhi {
 
         if (HasAnyFlags(desc.mBindFlags, ERhiBufferBindFlags::Indirect)) {
             miscFlags |= D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS;
+        }
+        const bool wantsSrv = HasAnyFlags(desc.mBindFlags, ERhiBufferBindFlags::ShaderResource);
+        const bool wantsUav = HasAnyFlags(desc.mBindFlags, ERhiBufferBindFlags::UnorderedAccess);
+        if (wantsSrv || wantsUav) {
+            miscFlags |= D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
         }
 
         if (usage == D3D11_USAGE_IMMUTABLE && cpuAccess != 0U) {
@@ -213,7 +617,17 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        return MakeResource<FRhiD3D11Buffer>(desc, AltinaEngine::Move(buffer));
+        ComPtr<ID3D11ShaderResourceView> srv;
+        ComPtr<ID3D11UnorderedAccessView> uav;
+        if (wantsSrv) {
+            srv = CreateBufferSrv(device, buffer.Get(), desc);
+        }
+        if (wantsUav) {
+            uav = CreateBufferUav(device, buffer.Get(), desc);
+        }
+
+        return MakeResource<FRhiD3D11Buffer>(
+            desc, buffer.Detach(), srv.Detach(), uav.Detach());
 #else
         return MakeResource<FRhiD3D11Buffer>(desc);
 #endif
@@ -284,7 +698,24 @@ namespace AltinaEngine::Rhi {
 
             ComPtr<ID3D11Resource> resource;
             texture.As(&resource);
-            return MakeResource<FRhiD3D11Texture>(desc, AltinaEngine::Move(resource));
+            ComPtr<ID3D11ShaderResourceView> srv;
+            ComPtr<ID3D11UnorderedAccessView> uav;
+            ComPtr<ID3D11RenderTargetView> rtv;
+            ComPtr<ID3D11DepthStencilView> dsv;
+            if (HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::ShaderResource)) {
+                srv = CreateTextureSrv(device, resource.Get(), desc);
+            }
+            if (HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::UnorderedAccess)) {
+                uav = CreateTextureUav(device, resource.Get(), desc);
+            }
+            if (HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::RenderTarget)) {
+                rtv = CreateTextureRtv(device, resource.Get(), desc);
+            }
+            if (HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::DepthStencil)) {
+                dsv = CreateTextureDsv(device, resource.Get(), desc);
+            }
+            return MakeResource<FRhiD3D11Texture>(desc, resource.Detach(), rtv.Detach(),
+                dsv.Detach(), srv.Detach(), uav.Detach());
         }
 
         if (desc.mSampleCount == 0U) {
@@ -317,7 +748,24 @@ namespace AltinaEngine::Rhi {
 
         ComPtr<ID3D11Resource> resource;
         texture.As(&resource);
-        return MakeResource<FRhiD3D11Texture>(desc, AltinaEngine::Move(resource));
+        ComPtr<ID3D11ShaderResourceView> srv;
+        ComPtr<ID3D11UnorderedAccessView> uav;
+        ComPtr<ID3D11RenderTargetView> rtv;
+        ComPtr<ID3D11DepthStencilView> dsv;
+        if (HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::ShaderResource)) {
+            srv = CreateTextureSrv(device, resource.Get(), desc);
+        }
+        if (HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::UnorderedAccess)) {
+            uav = CreateTextureUav(device, resource.Get(), desc);
+        }
+        if (HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::RenderTarget)) {
+            rtv = CreateTextureRtv(device, resource.Get(), desc);
+        }
+        if (HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::DepthStencil)) {
+            dsv = CreateTextureDsv(device, resource.Get(), desc);
+        }
+        return MakeResource<FRhiD3D11Texture>(desc, resource.Detach(), rtv.Detach(),
+            dsv.Detach(), srv.Detach(), uav.Detach());
 #else
         return MakeResource<FRhiD3D11Texture>(desc);
 #endif
@@ -351,7 +799,7 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        return MakeResource<FRhiD3D11Sampler>(desc, AltinaEngine::Move(sampler));
+        return MakeResource<FRhiD3D11Sampler>(desc, sampler.Detach());
 #else
         return MakeResource<FRhiD3D11Sampler>(desc);
 #endif

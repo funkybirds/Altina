@@ -20,6 +20,12 @@ namespace AltinaEngine::Rhi {
         void End() override;
         [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override;
 
+        void RHISetGraphicsPipeline(FRhiPipeline* pipeline) override;
+        void RHISetComputePipeline(FRhiPipeline* pipeline) override;
+        void RHISetRenderTargets(u32 colorTargetCount, FRhiTexture* const* colorTargets,
+            FRhiTexture* depthTarget) override;
+        void RHISetBindGroup(u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets,
+            u32 dynamicOffsetCount) override;
         void RHIDrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
             i32 vertexOffset, u32 firstInstance) override;
         void RHIDispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) override;

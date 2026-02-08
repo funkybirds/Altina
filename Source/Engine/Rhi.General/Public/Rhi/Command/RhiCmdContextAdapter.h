@@ -20,6 +20,24 @@ namespace AltinaEngine::Rhi {
         void Begin() override { mContext->Begin(); }
         void End() override { mContext->End(); }
 
+        void RHISetGraphicsPipeline(FRhiPipeline* pipeline) override {
+            mOps->RHISetGraphicsPipeline(pipeline);
+        }
+
+        void RHISetComputePipeline(FRhiPipeline* pipeline) override {
+            mOps->RHISetComputePipeline(pipeline);
+        }
+
+        void RHISetRenderTargets(u32 colorTargetCount, FRhiTexture* const* colorTargets,
+            FRhiTexture* depthTarget) override {
+            mOps->RHISetRenderTargets(colorTargetCount, colorTargets, depthTarget);
+        }
+
+        void RHISetBindGroup(u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets,
+            u32 dynamicOffsetCount) override {
+            mOps->RHISetBindGroup(setIndex, group, dynamicOffsets, dynamicOffsetCount);
+        }
+
         void RHIDrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
             i32 vertexOffset, u32 firstInstance) override {
             mOps->RHIDrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset,

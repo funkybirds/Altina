@@ -308,9 +308,9 @@ namespace AltinaEngine::Rhi {
 
 #if AE_PLATFORM_WIN
         const auto* d3dAdapter = AltinaEngine::CheckedCast<const FRhiD3D11Adapter*>(adapter.Get());
-        IDXGIAdapter1*       nativeAdapter = (d3dAdapter != nullptr) ? d3dAdapter->GetAdapter() : nullptr;
+        IDXGIAdapter1* nativeAdapter = (d3dAdapter != nullptr) ? d3dAdapter->GetAdapter() : nullptr;
 
-        ComPtr<ID3D11Device> device;
+        ComPtr<ID3D11Device>        device;
         ComPtr<ID3D11DeviceContext> context;
         D3D_FEATURE_LEVEL           featureLevel = D3D_FEATURE_LEVEL_11_0;
 

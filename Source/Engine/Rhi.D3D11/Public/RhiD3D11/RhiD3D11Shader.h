@@ -2,6 +2,7 @@
 
 #include "RhiD3D11API.h"
 #include "Rhi/RhiShader.h"
+#include "Container/SmartPtr.h"
 
 struct ID3D11DeviceChild;
 struct ID3D11VertexShader;

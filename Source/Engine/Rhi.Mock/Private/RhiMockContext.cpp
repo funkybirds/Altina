@@ -3,6 +3,7 @@
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiBuffer.h"
+#include "Rhi/Command/RhiCmdContextOps.h"
 #include "Rhi/RhiCommandContext.h"
 #include "Rhi/RhiCommandList.h"
 #include "Rhi/RhiCommandPool.h"
@@ -352,7 +353,8 @@ namespace AltinaEngine::Rhi {
             TShared<FRhiMockCounters> mCounters;
         };
 
-        class FRhiMockCommandContext final : public FRhiCommandContext {
+        class FRhiMockCommandContext final : public FRhiCommandContext,
+                                             public IRhiCmdContextOps {
         public:
             FRhiMockCommandContext(const FRhiCommandContextDesc& desc,
                 FRhiCommandListRef commandList, TShared<FRhiMockCounters> counters)
@@ -375,6 +377,10 @@ namespace AltinaEngine::Rhi {
             [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override {
                 return mCommandList.Get();
             }
+
+            void RHIDrawIndexed(u32 /*indexCount*/, u32 /*instanceCount*/, u32 /*firstIndex*/,
+                i32 /*vertexOffset*/, u32 /*firstInstance*/) override {}
+            void RHIDispatch(u32 /*groupCountX*/, u32 /*groupCountY*/, u32 /*groupCountZ*/) override {}
 
         private:
             FRhiCommandListRef mCommandList;

@@ -22,6 +22,14 @@ namespace AltinaEngine::Rhi {
     class FRhiCommandPool;
     class FRhiCommandList;
     class FRhiCommandContext;
+    class FRhiCmd;
+    class FRhiCmdList;
+    class FRhiCmdContext;
+    class FRhiCmdContextAdapter;
+    class FRhiCmdExecutor;
+    class IRhiCmdContextOps;
+    class FRhiCmdDrawIndexed;
+    class FRhiCmdDispatch;
     class FRhiSwapchain;
 
     struct FRhiInitDesc;

@@ -171,6 +171,50 @@ namespace AltinaEngine::Rhi {
         return mCommandList.Get();
     }
 
+    void FRhiD3D11CommandContext::RHIDrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
+        i32 vertexOffset, u32 firstInstance) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context) {
+            return;
+        }
+
+        const UINT idxCount = static_cast<UINT>(indexCount);
+        const UINT instCount = static_cast<UINT>(instanceCount);
+        const UINT startIdx = static_cast<UINT>(firstIndex);
+        const INT  baseVertex = static_cast<INT>(vertexOffset);
+        const UINT startInstance = static_cast<UINT>(firstInstance);
+
+        if (instCount <= 1U && startInstance == 0U) {
+            context->DrawIndexed(idxCount, startIdx, baseVertex);
+        } else {
+            context->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVertex,
+                startInstance);
+        }
+#else
+        (void)indexCount;
+        (void)instanceCount;
+        (void)firstIndex;
+        (void)vertexOffset;
+        (void)firstInstance;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHIDispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context) {
+            return;
+        }
+        context->Dispatch(static_cast<UINT>(groupCountX),
+            static_cast<UINT>(groupCountY), static_cast<UINT>(groupCountZ));
+#else
+        (void)groupCountX;
+        (void)groupCountY;
+        (void)groupCountZ;
+#endif
+    }
+
     auto FRhiD3D11CommandContext::GetDeferredContext() const noexcept -> ID3D11DeviceContext* {
 #if AE_PLATFORM_WIN
         return mState ? mState->mDeferredContext.Get() : nullptr;

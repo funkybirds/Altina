@@ -15,6 +15,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiCommandContext() override;
 
+        FRhiCommandContext(const FRhiCommandContext&) = delete;
+        FRhiCommandContext(FRhiCommandContext&&) = delete;
+        auto operator=(const FRhiCommandContext&) -> FRhiCommandContext& = delete;
+        auto operator=(FRhiCommandContext&&) -> FRhiCommandContext& = delete;
+
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiCommandContextDesc& { return mDesc; }
         [[nodiscard]] auto GetQueueType() const noexcept -> ERhiQueueType {
             return mDesc.mQueueType;
@@ -36,7 +41,7 @@ namespace AltinaEngine::Rhi {
         virtual void End() = 0;
         [[nodiscard]] virtual auto GetCommandList() const noexcept -> FRhiCommandList* = 0;
 
-    protected:
+    private:
         FRhiCommandContextDesc mDesc;
     };
 

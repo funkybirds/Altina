@@ -1,5 +1,6 @@
 #include "RhiD3D11/RhiD3D11Shader.h"
 
+#include "Container/SmartPtr.h"
 #include "Types/Traits.h"
 
 #if AE_PLATFORM_WIN
@@ -18,6 +19,7 @@
 #endif
 
 namespace AltinaEngine::Rhi {
+    using Core::Container::MakeUnique;
 #if AE_PLATFORM_WIN
     using Microsoft::WRL::ComPtr;
 
@@ -31,7 +33,7 @@ namespace AltinaEngine::Rhi {
     FRhiD3D11Shader::FRhiD3D11Shader(const FRhiShaderDesc& desc, ID3D11DeviceChild* shader)
         : FRhiShader(desc) {
 #if AE_PLATFORM_WIN
-        mState = new FState{};
+        mState = MakeUnique<FState>();
         if (mState && shader) {
             mState->mShader.Attach(shader);
         }
@@ -42,14 +44,13 @@ namespace AltinaEngine::Rhi {
 
     FRhiD3D11Shader::FRhiD3D11Shader(const FRhiShaderDesc& desc) : FRhiShader(desc) {
 #if AE_PLATFORM_WIN
-        mState = new FState{};
+        mState = MakeUnique<FState>();
 #endif
     }
 
     FRhiD3D11Shader::~FRhiD3D11Shader() {
 #if AE_PLATFORM_WIN
-        delete mState;
-        mState = nullptr;
+        mState.reset();
 #endif
     }
 

@@ -17,6 +17,11 @@ namespace AltinaEngine::Rhi {
         FRhiContext()           = default;
         ~FRhiContext() override = default;
 
+        FRhiContext(const FRhiContext&) = delete;
+        FRhiContext(FRhiContext&&) = delete;
+        auto operator=(const FRhiContext&) -> FRhiContext& = delete;
+        auto operator=(FRhiContext&&) -> FRhiContext& = delete;
+
         auto               Init(const FRhiInitDesc& desc) -> bool;
         void               Shutdown();
 

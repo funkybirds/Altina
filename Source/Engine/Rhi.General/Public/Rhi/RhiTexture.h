@@ -14,6 +14,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiTexture() override;
 
+        FRhiTexture(const FRhiTexture&) = delete;
+        FRhiTexture(FRhiTexture&&) = delete;
+        auto operator=(const FRhiTexture&) -> FRhiTexture& = delete;
+        auto operator=(FRhiTexture&&) -> FRhiTexture& = delete;
+
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiTextureDesc& { return mDesc; }
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {
             return mDesc.mDebugName.ToView();
@@ -25,7 +30,7 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-    protected:
+    private:
         FRhiTextureDesc mDesc;
     };
 

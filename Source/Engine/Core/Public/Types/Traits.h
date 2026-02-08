@@ -134,6 +134,12 @@ namespace AltinaEngine {
         requires TTypeIsEnum<T>::Value
     using TUnderlyingType = Detail::CompilerTraits::TUnderlyingTypeImpl<T>;
 
+    template <typename T>
+        requires CEnum<T>
+    [[nodiscard]] constexpr auto ToUnderlying(T value) noexcept -> TUnderlyingType<T> {
+        return static_cast<TUnderlyingType<T>>(value);
+    }
+
     // Basic Types
     namespace Detail::BasicTypes {
         template <typename> struct TTypeIsIntegral : TFalseType {};

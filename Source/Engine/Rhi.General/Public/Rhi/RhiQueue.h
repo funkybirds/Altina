@@ -15,6 +15,11 @@ namespace AltinaEngine::Rhi {
         FRhiQueue(ERhiQueueType type, FRhiResourceDeleteQueue* deleteQueue = nullptr);
         ~FRhiQueue() override = default;
 
+        FRhiQueue(const FRhiQueue&) = delete;
+        FRhiQueue(FRhiQueue&&) = delete;
+        auto operator=(const FRhiQueue&) -> FRhiQueue& = delete;
+        auto operator=(FRhiQueue&&) -> FRhiQueue& = delete;
+
         [[nodiscard]] auto GetType() const noexcept -> ERhiQueueType;
 
         virtual void Submit(const FRhiSubmitInfo& info) = 0;

@@ -9,6 +9,11 @@ namespace AltinaEngine::Rhi {
 
     class AE_RHI_GENERAL_API FRhiResource : public FNonCopyableClass {
     public:
+        FRhiResource(const FRhiResource&) = delete;
+        FRhiResource(FRhiResource&&) = delete;
+        auto operator=(const FRhiResource&) -> FRhiResource& = delete;
+        auto operator=(FRhiResource&&) -> FRhiResource& = delete;
+
         void AddRef() noexcept;
         void Release() noexcept;
 
@@ -20,9 +25,10 @@ namespace AltinaEngine::Rhi {
         void               SetRetireSerial(u64 serial) noexcept;
         [[nodiscard]] auto GetRetireSerial() const noexcept -> u64;
 
+        ~FRhiResource() override = default;
+
     protected:
         explicit FRhiResource(FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
-        ~FRhiResource() override = default;
 
     private:
         void DestroySelf() noexcept;

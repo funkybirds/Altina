@@ -14,6 +14,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiPipelineLayout() override;
 
+        FRhiPipelineLayout(const FRhiPipelineLayout&) = delete;
+        FRhiPipelineLayout(FRhiPipelineLayout&&) = delete;
+        auto operator=(const FRhiPipelineLayout&) -> FRhiPipelineLayout& = delete;
+        auto operator=(FRhiPipelineLayout&&) -> FRhiPipelineLayout& = delete;
+
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiPipelineLayoutDesc& {
             return mDesc;
         }
@@ -27,7 +32,7 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-    protected:
+    private:
         FRhiPipelineLayoutDesc mDesc;
     };
 

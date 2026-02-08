@@ -13,6 +13,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiSemaphore() override;
 
+        FRhiSemaphore(const FRhiSemaphore&)                                  = delete;
+        FRhiSemaphore(FRhiSemaphore&&)                                       = delete;
+        auto               operator=(const FRhiSemaphore&) -> FRhiSemaphore& = delete;
+        auto               operator=(FRhiSemaphore&&) -> FRhiSemaphore&      = delete;
+
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {
             return mDebugName.ToView();
         }
@@ -23,11 +28,11 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        [[nodiscard]] virtual auto IsTimeline() const noexcept -> bool = 0;
+        [[nodiscard]] virtual auto IsTimeline() const noexcept -> bool     = 0;
         [[nodiscard]] virtual auto GetCurrentValue() const noexcept -> u64 = 0;
 
-    protected:
-        Core::Container::FString mDebugName;
+    private:
+        FString mDebugName;
     };
 
 } // namespace AltinaEngine::Rhi

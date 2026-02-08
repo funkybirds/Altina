@@ -14,6 +14,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiBuffer() override;
 
+        FRhiBuffer(const FRhiBuffer&) = delete;
+        FRhiBuffer(FRhiBuffer&&) = delete;
+        auto operator=(const FRhiBuffer&) -> FRhiBuffer& = delete;
+        auto operator=(FRhiBuffer&&) -> FRhiBuffer& = delete;
+
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiBufferDesc& { return mDesc; }
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {
             return mDesc.mDebugName.ToView();
@@ -25,7 +30,7 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-    protected:
+    private:
         FRhiBufferDesc mDesc;
     };
 

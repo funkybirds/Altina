@@ -24,6 +24,11 @@ namespace AltinaEngine::Rhi {
         FRhiD3D11GraphicsPipeline(const FRhiGraphicsPipelineDesc& desc, ID3D11Device* device);
         ~FRhiD3D11GraphicsPipeline() override;
 
+        FRhiD3D11GraphicsPipeline(const FRhiD3D11GraphicsPipeline&) = delete;
+        FRhiD3D11GraphicsPipeline(FRhiD3D11GraphicsPipeline&&) = delete;
+        auto operator=(const FRhiD3D11GraphicsPipeline&) -> FRhiD3D11GraphicsPipeline& = delete;
+        auto operator=(FRhiD3D11GraphicsPipeline&&) -> FRhiD3D11GraphicsPipeline& = delete;
+
         [[nodiscard]] auto GetInputLayout() const noexcept -> ID3D11InputLayout*;
         [[nodiscard]] auto GetBindingMappings() const noexcept
             -> const TVector<FD3D11BindingMappingEntry>&;
@@ -44,6 +49,11 @@ namespace AltinaEngine::Rhi {
     public:
         explicit FRhiD3D11ComputePipeline(const FRhiComputePipelineDesc& desc);
         ~FRhiD3D11ComputePipeline() override;
+
+        FRhiD3D11ComputePipeline(const FRhiD3D11ComputePipeline&) = delete;
+        FRhiD3D11ComputePipeline(FRhiD3D11ComputePipeline&&) = delete;
+        auto operator=(const FRhiD3D11ComputePipeline&) -> FRhiD3D11ComputePipeline& = delete;
+        auto operator=(FRhiD3D11ComputePipeline&&) -> FRhiD3D11ComputePipeline& = delete;
 
         [[nodiscard]] auto GetBindingMappings() const noexcept
             -> const TVector<FD3D11BindingMappingEntry>&;

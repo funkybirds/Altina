@@ -25,7 +25,7 @@ namespace AltinaEngine::Rhi {
             -> TShared<FRhiDevice> override;
 
     private:
-        FRhiD3D11ContextState* mState = nullptr;
+        Core::Container::TOwner<FRhiD3D11ContextState> mState;
     };
 
 } // namespace AltinaEngine::Rhi

@@ -14,6 +14,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiBindGroupLayout() override;
 
+        FRhiBindGroupLayout(const FRhiBindGroupLayout&) = delete;
+        FRhiBindGroupLayout(FRhiBindGroupLayout&&) = delete;
+        auto operator=(const FRhiBindGroupLayout&) -> FRhiBindGroupLayout& = delete;
+        auto operator=(FRhiBindGroupLayout&&) -> FRhiBindGroupLayout& = delete;
+
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiBindGroupLayoutDesc& {
             return mDesc;
         }
@@ -27,7 +32,7 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-    protected:
+    private:
         FRhiBindGroupLayoutDesc mDesc;
     };
 

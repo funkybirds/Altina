@@ -25,7 +25,7 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-    protected:
+    private:
         FRhiBindGroupDesc mDesc;
     };
 

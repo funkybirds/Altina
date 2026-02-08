@@ -14,6 +14,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiSampler() override;
 
+        FRhiSampler(const FRhiSampler&) = delete;
+        FRhiSampler(FRhiSampler&&) = delete;
+        auto operator=(const FRhiSampler&) -> FRhiSampler& = delete;
+        auto operator=(FRhiSampler&&) -> FRhiSampler& = delete;
+
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiSamplerDesc& { return mDesc; }
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {
             return mDesc.mDebugName.ToView();
@@ -25,7 +30,7 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-    protected:
+    private:
         FRhiSamplerDesc mDesc;
     };
 

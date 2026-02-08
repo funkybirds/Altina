@@ -60,14 +60,14 @@ namespace AltinaEngine::Rhi {
 
     enum class ERhiFormat : u16 {
         Unknown = 0,
-        R8G8B8A8_UNORM,
-        R8G8B8A8_UNORM_SRGB,
-        B8G8R8A8_UNORM,
-        B8G8R8A8_UNORM_SRGB,
-        R16G16B16A16_FLOAT,
-        R32_FLOAT,
-        D24_UNORM_S8_UINT,
-        D32_FLOAT
+        R8G8B8A8Unorm,
+        R8G8B8A8UnormSrgb,
+        B8G8R8A8Unorm,
+        B8G8R8A8UnormSrgb,
+        R16G16B16A16Float,
+        R32Float,
+        D24UnormS8Uint,
+        D32Float
     };
 
     enum class ERhiResourceUsage : u8 {
@@ -83,7 +83,7 @@ namespace AltinaEngine::Rhi {
         Write = 1u << 1
     };
 
-    enum class ERhiBufferBindFlags : u32 {
+    enum class ERhiBufferBindFlags : u8 {
         None            = 0,
         Vertex          = 1u << 0,
         Index           = 1u << 1,
@@ -95,7 +95,7 @@ namespace AltinaEngine::Rhi {
         CopyDst         = 1u << 7
     };
 
-    enum class ERhiTextureBindFlags : u32 {
+    enum class ERhiTextureBindFlags : u8 {
         None            = 0,
         ShaderResource  = 1u << 0,
         RenderTarget    = 1u << 1,
@@ -105,7 +105,7 @@ namespace AltinaEngine::Rhi {
         CopyDst         = 1u << 5
     };
 
-    enum class ERhiShaderStageFlags : u32 {
+    enum class ERhiShaderStageFlags : u8 {
         None          = 0,
         Vertex        = 1u << 0,
         Pixel         = 1u << 1,
@@ -130,13 +130,6 @@ namespace AltinaEngine::Rhi {
         Sampler,
         AccelerationStructure
     };
-
-    template <typename T>
-        requires AltinaEngine::CEnum<T>
-    [[nodiscard]] constexpr auto ToUnderlying(T value) noexcept
-        -> AltinaEngine::TUnderlyingType<T> {
-        return static_cast<AltinaEngine::TUnderlyingType<T>>(value);
-    }
 
     [[nodiscard]] constexpr auto operator|(ERhiCpuAccess lhs, ERhiCpuAccess rhs) noexcept
         -> ERhiCpuAccess {

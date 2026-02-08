@@ -14,6 +14,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiShader() override;
 
+        FRhiShader(const FRhiShader&) = delete;
+        FRhiShader(FRhiShader&&) = delete;
+        auto operator=(const FRhiShader&) -> FRhiShader& = delete;
+        auto operator=(FRhiShader&&) -> FRhiShader& = delete;
+
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiShaderDesc& { return mDesc; }
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {
             return mDesc.mDebugName.ToView();
@@ -25,7 +30,7 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-    protected:
+    private:
         FRhiShaderDesc mDesc;
     };
 

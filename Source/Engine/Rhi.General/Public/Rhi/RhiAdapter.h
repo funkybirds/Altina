@@ -12,6 +12,11 @@ namespace AltinaEngine::Rhi {
         explicit FRhiAdapter(FRhiAdapterDesc desc);
         ~FRhiAdapter() override = default;
 
+        FRhiAdapter(const FRhiAdapter&) = delete;
+        FRhiAdapter(FRhiAdapter&&) = delete;
+        auto operator=(const FRhiAdapter&) -> FRhiAdapter& = delete;
+        auto operator=(FRhiAdapter&&) -> FRhiAdapter& = delete;
+
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiAdapterDesc&;
         [[nodiscard]] auto GetName() const noexcept -> FStringView;
 
@@ -22,7 +27,7 @@ namespace AltinaEngine::Rhi {
 
         [[nodiscard]] auto GetPreferenceScore(ERhiGpuPreference preference) const noexcept -> u64;
 
-    protected:
+    private:
         FRhiAdapterDesc mDesc;
     };
 

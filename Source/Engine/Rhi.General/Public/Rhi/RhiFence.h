@@ -13,6 +13,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiFence() override;
 
+        FRhiFence(const FRhiFence&) = delete;
+        FRhiFence(FRhiFence&&) = delete;
+        auto operator=(const FRhiFence&) -> FRhiFence& = delete;
+        auto operator=(FRhiFence&&) -> FRhiFence& = delete;
+
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {
             return mDebugName.ToView();
         }
@@ -28,7 +33,7 @@ namespace AltinaEngine::Rhi {
         virtual void               WaitCPU(u64 value)                        = 0;
         virtual void               Reset(u64 value)                          = 0;
 
-    protected:
+    private:
         FString mDebugName;
     };
 

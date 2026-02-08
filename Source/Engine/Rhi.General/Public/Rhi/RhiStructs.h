@@ -147,7 +147,7 @@ namespace AltinaEngine::Rhi {
         u32     mMipLevels = 1U;
         u32     mArrayLayers = 1U;
         u32     mSampleCount = 1U;
-        ERhiFormat          mFormat    = ERhiFormat::R8G8B8A8_UNORM;
+        ERhiFormat          mFormat    = ERhiFormat::R8G8B8A8Unorm;
         ERhiResourceUsage   mUsage     = ERhiResourceUsage::Default;
         ERhiTextureBindFlags mBindFlags = ERhiTextureBindFlags::ShaderResource;
         ERhiCpuAccess       mCpuAccess = ERhiCpuAccess::None;
@@ -167,7 +167,7 @@ namespace AltinaEngine::Rhi {
     struct FRhiVertexAttributeDesc {
         FString   mSemanticName;
         u32       mSemanticIndex    = 0U;
-        ERhiFormat mFormat          = ERhiFormat::R32_FLOAT;
+        ERhiFormat mFormat          = ERhiFormat::R32Float;
         u32       mInputSlot        = 0U;
         u32       mAlignedByteOffset = 0U;
         bool      mPerInstance      = false;

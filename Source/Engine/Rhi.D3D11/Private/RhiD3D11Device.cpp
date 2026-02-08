@@ -228,21 +228,21 @@ namespace AltinaEngine::Rhi {
 
         auto ToD3D11Format(ERhiFormat format) noexcept -> DXGI_FORMAT {
             switch (format) {
-                case ERhiFormat::R8G8B8A8_UNORM:
+                case ERhiFormat::R8G8B8A8Unorm:
                     return DXGI_FORMAT_R8G8B8A8_UNORM;
-                case ERhiFormat::R8G8B8A8_UNORM_SRGB:
+                case ERhiFormat::R8G8B8A8UnormSrgb:
                     return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-                case ERhiFormat::B8G8R8A8_UNORM:
+                case ERhiFormat::B8G8R8A8Unorm:
                     return DXGI_FORMAT_B8G8R8A8_UNORM;
-                case ERhiFormat::B8G8R8A8_UNORM_SRGB:
+                case ERhiFormat::B8G8R8A8UnormSrgb:
                     return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-                case ERhiFormat::R16G16B16A16_FLOAT:
+                case ERhiFormat::R16G16B16A16Float:
                     return DXGI_FORMAT_R16G16B16A16_FLOAT;
-                case ERhiFormat::R32_FLOAT:
+                case ERhiFormat::R32Float:
                     return DXGI_FORMAT_R32_FLOAT;
-                case ERhiFormat::D24_UNORM_S8_UINT:
+                case ERhiFormat::D24UnormS8Uint:
                     return DXGI_FORMAT_D24_UNORM_S8_UINT;
-                case ERhiFormat::D32_FLOAT:
+                case ERhiFormat::D32Float:
                     return DXGI_FORMAT_D32_FLOAT;
                 case ERhiFormat::Unknown:
                 default:

@@ -27,7 +27,7 @@ namespace AltinaEngine::Rhi {
 
         virtual void Reset() = 0;
 
-    protected:
+    private:
         FRhiCommandPoolDesc mDesc;
     };
 

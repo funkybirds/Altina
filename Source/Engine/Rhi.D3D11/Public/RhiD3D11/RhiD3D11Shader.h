@@ -18,6 +18,11 @@ namespace AltinaEngine::Rhi {
         explicit FRhiD3D11Shader(const FRhiShaderDesc& desc);
         ~FRhiD3D11Shader() override;
 
+        FRhiD3D11Shader(const FRhiD3D11Shader&) = delete;
+        FRhiD3D11Shader(FRhiD3D11Shader&&) = delete;
+        auto operator=(const FRhiD3D11Shader&) -> FRhiD3D11Shader& = delete;
+        auto operator=(FRhiD3D11Shader&&) -> FRhiD3D11Shader& = delete;
+
         [[nodiscard]] auto GetNativeShader() const noexcept -> ID3D11DeviceChild*;
         [[nodiscard]] auto GetVertexShader() const noexcept -> ID3D11VertexShader*;
         [[nodiscard]] auto GetPixelShader() const noexcept -> ID3D11PixelShader*;
@@ -28,7 +33,7 @@ namespace AltinaEngine::Rhi {
 
     private:
         struct FState;
-        FState* mState = nullptr;
+        Core::Container::TOwner<FState> mState;
     };
 
 } // namespace AltinaEngine::Rhi

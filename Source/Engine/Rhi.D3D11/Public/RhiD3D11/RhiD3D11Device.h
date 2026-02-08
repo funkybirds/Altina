@@ -14,6 +14,11 @@ namespace AltinaEngine::Rhi {
             ID3D11Device* device, ID3D11DeviceContext* context, u32 featureLevel);
         ~FRhiD3D11Device() override;
 
+        FRhiD3D11Device(const FRhiD3D11Device&) = delete;
+        FRhiD3D11Device(FRhiD3D11Device&&) = delete;
+        auto operator=(const FRhiD3D11Device&) -> FRhiD3D11Device& = delete;
+        auto operator=(FRhiD3D11Device&&) -> FRhiD3D11Device& = delete;
+
         [[nodiscard]] auto GetNativeDevice() const noexcept -> ID3D11Device*;
         [[nodiscard]] auto GetImmediateContext() const noexcept -> ID3D11DeviceContext*;
         [[nodiscard]] auto GetFeatureLevel() const noexcept -> u32;

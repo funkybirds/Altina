@@ -17,6 +17,11 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiPipeline() override;
 
+        FRhiPipeline(const FRhiPipeline&) = delete;
+        FRhiPipeline(FRhiPipeline&&) = delete;
+        auto operator=(const FRhiPipeline&) -> FRhiPipeline& = delete;
+        auto operator=(FRhiPipeline&&) -> FRhiPipeline& = delete;
+
         [[nodiscard]] auto IsGraphics() const noexcept -> bool { return mIsGraphics; }
         [[nodiscard]] auto GetGraphicsDesc() const noexcept -> const FRhiGraphicsPipelineDesc& {
             return mGraphicsDesc;
@@ -30,7 +35,7 @@ namespace AltinaEngine::Rhi {
                                : mComputeDesc.mDebugName.ToView();
         }
 
-    protected:
+    private:
         FRhiGraphicsPipelineDesc mGraphicsDesc;
         FRhiComputePipelineDesc  mComputeDesc;
         bool                     mIsGraphics = true;

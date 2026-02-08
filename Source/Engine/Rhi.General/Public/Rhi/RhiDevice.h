@@ -18,6 +18,11 @@ namespace AltinaEngine::Rhi {
     public:
         ~FRhiDevice() override = default;
 
+        FRhiDevice(const FRhiDevice&) = delete;
+        FRhiDevice(FRhiDevice&&) = delete;
+        auto operator=(const FRhiDevice&) -> FRhiDevice& = delete;
+        auto operator=(FRhiDevice&&) -> FRhiDevice& = delete;
+
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiDeviceDesc&;
         [[nodiscard]] auto GetAdapterDesc() const noexcept -> const FRhiAdapterDesc&;
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView;

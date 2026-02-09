@@ -40,6 +40,7 @@ namespace AltinaEngine::Application {
 
         [[nodiscard]] virtual auto GetSize() const noexcept -> FWindowExtent        = 0;
         [[nodiscard]] virtual auto GetProperties() const -> FPlatformWindowProperty = 0;
+        [[nodiscard]] virtual auto GetNativeHandle() const noexcept -> void*        = 0;
     };
 
 } // namespace AltinaEngine::Application

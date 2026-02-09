@@ -21,7 +21,9 @@ namespace AltinaEngine::Launch {
         }
 
 #if AE_PLATFORM_WIN
-        mApplication.Reset(new Application::FWindowsApplication(mStartupParameters));
+        mApplication =
+            Core::Container::MakeUniqueAs<Application::FApplication,
+                Application::FWindowsApplication>(mStartupParameters);
 #else
         LogError(TEXT("FEngineLoop PreInit failed: no platform application available."));
         return false;
@@ -53,9 +55,9 @@ namespace AltinaEngine::Launch {
         }
 
 #if AE_PLATFORM_WIN
-        mRhiContext.Reset(new Rhi::FRhiD3D11Context());
+        mRhiContext = Core::Container::MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiD3D11Context>();
 #else
-        mRhiContext.reset(new Rhi::FRhiMockContext());
+        mRhiContext = Core::Container::MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiMockContext>();
 #endif
 
         if (!mRhiContext) {
@@ -75,6 +77,27 @@ namespace AltinaEngine::Launch {
             return false;
         }
 
+        auto* window = mApplication->GetMainWindow();
+        if (!window) {
+            LogError(TEXT("FEngineLoop Init failed: main window is missing."));
+            return false;
+        }
+
+        const auto extent = window->GetSize();
+        Rhi::FRhiViewportDesc viewportDesc{};
+        viewportDesc.mDebugName.Assign(TEXT("MainViewport"));
+        viewportDesc.mWidth        = extent.mWidth;
+        viewportDesc.mHeight       = extent.mHeight;
+        viewportDesc.mNativeHandle = window->GetNativeHandle();
+        mMainViewport = Rhi::RHICreateViewport(viewportDesc);
+        if (!mMainViewport) {
+            LogError(TEXT("FEngineLoop Init failed: viewport creation failed."));
+            return false;
+        }
+
+        mViewportWidth  = extent.mWidth;
+        mViewportHeight = extent.mHeight;
+
         return true;
     }
 
@@ -89,11 +112,48 @@ namespace AltinaEngine::Launch {
                 mIsRunning = false;
             }
         }
+
+        if (!mIsRunning || !mRhiDevice) {
+            return;
+        }
+
+        mRhiDevice->BeginFrame(++mFrameIndex);
+
+        if (mMainViewport && mApplication) {
+            auto* window = mApplication->GetMainWindow();
+            if (window) {
+                const auto extent = window->GetSize();
+                if (extent.mWidth > 0U && extent.mHeight > 0U) {
+                    if (extent.mWidth != mViewportWidth || extent.mHeight != mViewportHeight) {
+                        mMainViewport->Resize(extent.mWidth, extent.mHeight);
+                        mViewportWidth  = extent.mWidth;
+                        mViewportHeight = extent.mHeight;
+                    }
+
+                    const auto queue = mRhiDevice->GetQueue(Rhi::ERhiQueueType::Graphics);
+                    if (queue) {
+                        Rhi::FRhiPresentInfo presentInfo{};
+                        presentInfo.mViewport     = mMainViewport.Get();
+                        presentInfo.mSyncInterval = 1U;
+                        queue->Present(presentInfo);
+                    }
+                }
+            }
+        }
+
+        mRhiDevice->EndFrame();
     }
 
     void FEngineLoop::Exit() {
         mIsRunning = false;
 
+        if (mMainViewport) {
+            mMainViewport->SetDeleteQueue(nullptr);
+            mMainViewport.Reset();
+        }
+        if (mRhiDevice) {
+            mRhiDevice->FlushResourceDeleteQueue();
+        }
         mRhiDevice.Reset();
         if (mRhiContext) {
             Rhi::RHIExit(*mRhiContext);

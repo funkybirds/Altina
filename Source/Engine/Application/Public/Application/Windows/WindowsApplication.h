@@ -42,6 +42,7 @@ namespace AltinaEngine::Application {
 
         [[nodiscard]] auto GetSize() const noexcept -> FWindowExtent override;
         [[nodiscard]] auto GetProperties() const -> FPlatformWindowProperty override;
+        [[nodiscard]] auto GetNativeHandle() const noexcept -> void* override;
         [[nodiscard]] auto GetWindowHandle() const noexcept -> void*;
 
     private:

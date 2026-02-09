@@ -16,6 +16,7 @@
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiTexture.h"
+#include "Rhi/RhiViewport.h"
 #include "Container/SmartPtr.h"
 #include "Types/Traits.h"
 #include <type_traits>
@@ -108,6 +109,51 @@ namespace AltinaEngine::Rhi {
             }
 
         private:
+            TShared<FRhiMockCounters> mCounters;
+        };
+
+        class FRhiMockViewport final : public FRhiViewport {
+        public:
+            FRhiMockViewport(const FRhiViewportDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiViewport(desc), mCounters(AltinaEngine::Move(counters)) {
+                if (mCounters) {
+                    ++mCounters->mResourceCreated;
+                }
+                CreateBackBuffer();
+            }
+
+            ~FRhiMockViewport() override {
+                if (mCounters) {
+                    ++mCounters->mResourceDestroyed;
+                }
+            }
+
+            void Resize(u32 width, u32 height) override {
+                UpdateExtent(width, height);
+                CreateBackBuffer();
+            }
+
+            [[nodiscard]] auto GetBackBuffer() const noexcept -> FRhiTexture* override {
+                return mBackBuffer.Get();
+            }
+
+            void Present(const FRhiPresentInfo& /*info*/) override {}
+
+        private:
+            void CreateBackBuffer() {
+                FRhiTextureDesc texDesc{};
+                texDesc.mWidth     = GetDesc().mWidth;
+                texDesc.mHeight    = GetDesc().mHeight;
+                texDesc.mFormat    = GetDesc().mFormat;
+                texDesc.mBindFlags = ERhiTextureBindFlags::RenderTarget;
+                if (!GetDesc().mDebugName.IsEmptyString()) {
+                    texDesc.mDebugName = GetDesc().mDebugName;
+                    texDesc.mDebugName.Append(TEXT(" BackBuffer"));
+                }
+                mBackBuffer = FRhiTextureRef::Adopt(new FRhiMockTexture(texDesc, mCounters));
+            }
+
+            FRhiTextureRef mBackBuffer;
             TShared<FRhiMockCounters> mCounters;
         };
 
@@ -430,7 +476,11 @@ namespace AltinaEngine::Rhi {
             }
 
             void WaitIdle() override {}
-            void Present(const FRhiPresentInfo& /*info*/) override {}
+            void Present(const FRhiPresentInfo& info) override {
+                if (info.mViewport) {
+                    info.mViewport->Present(info);
+                }
+            }
         };
 
         class FRhiMockDevice final : public FRhiDevice {
@@ -470,6 +520,9 @@ namespace AltinaEngine::Rhi {
             }
             auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef override {
                 return MakeResource<FRhiMockTexture>(desc, mCounters);
+            }
+            auto CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef override {
+                return MakeResource<FRhiMockViewport>(desc, mCounters);
             }
             auto CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef override {
                 return MakeResource<FRhiMockSampler>(desc, mCounters);

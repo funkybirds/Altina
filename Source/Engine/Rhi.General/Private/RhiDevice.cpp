@@ -54,6 +54,10 @@ namespace AltinaEngine::Rhi {
         return {};
     }
 
+    void FRhiDevice::BeginFrame(u64 /*frameIndex*/) {}
+
+    void FRhiDevice::EndFrame() {}
+
     void FRhiDevice::SetSupportedFeatures(const FRhiSupportedFeatures& features) noexcept {
         mSupportedFeatures = features;
     }

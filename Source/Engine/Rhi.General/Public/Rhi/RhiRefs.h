@@ -11,6 +11,7 @@ namespace AltinaEngine::Rhi {
     using FRhiQueueRef           = TCountRef<FRhiQueue>;
     using FRhiBufferRef          = TCountRef<FRhiBuffer>;
     using FRhiTextureRef         = TCountRef<FRhiTexture>;
+    using FRhiViewportRef        = TCountRef<FRhiViewport>;
     using FRhiSamplerRef         = TCountRef<FRhiSampler>;
     using FRhiShaderRef          = TCountRef<FRhiShader>;
     using FRhiPipelineRef        = TCountRef<FRhiPipeline>;

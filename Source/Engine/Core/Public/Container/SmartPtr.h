@@ -152,6 +152,64 @@ namespace AltinaEngine::Core::Container {
         }
     }
 
+    template <typename T> class TPolymorphicDeleter {
+    public:
+        using TDestroyFn = void (*)(T*);
+
+        constexpr TPolymorphicDeleter() noexcept = default;
+        explicit constexpr TPolymorphicDeleter(TDestroyFn fn) noexcept : mDestroy(fn) {}
+
+        void operator()(T* ptr) const noexcept {
+            if (ptr && mDestroy) {
+                mDestroy(ptr);
+            }
+        }
+
+    private:
+        TDestroyFn mDestroy = nullptr;
+    };
+
+    template <typename TBase, typename TDerived>
+        requires AltinaEngine::CClassBaseOf<TBase, TDerived>
+    inline void DestroyPolymorphic(TBase* basePtr) noexcept {
+        if (!basePtr) {
+            return;
+        }
+
+        auto* derivedPtr = static_cast<TDerived*>(basePtr);
+        if constexpr (kSmartPtrUseManagedAllocator) {
+            TAllocator<TDerived> allocator;
+            TAllocatorTraits<TAllocator<TDerived>>::Destroy(allocator, derivedPtr);
+            TAllocatorTraits<TAllocator<TDerived>>::Deallocate(allocator, derivedPtr, 1);
+        } else {
+            delete derivedPtr; // NOLINT
+        }
+    }
+
+    template <typename TBase, typename TDerived, typename... Args>
+        requires AltinaEngine::CClassBaseOf<TBase, TDerived>
+    auto MakeUniqueAs(Args&&... args) -> TOwner<TBase, TPolymorphicDeleter<TBase>> {
+        TDerived* ptr = nullptr;
+        if constexpr (kSmartPtrUseManagedAllocator) {
+            TAllocator<TDerived> allocator;
+            ptr = TAllocatorTraits<TAllocator<TDerived>>::Allocate(allocator, 1);
+            if (ptr != nullptr) {
+                try {
+                    TAllocatorTraits<TAllocator<TDerived>>::Construct(
+                        allocator, ptr, AltinaEngine::Forward<Args>(args)...);
+                } catch (...) {
+                    TAllocatorTraits<TAllocator<TDerived>>::Deallocate(allocator, ptr, 1);
+                    throw;
+                }
+            }
+        } else {
+            ptr = new TDerived(AltinaEngine::Forward<Args>(args)...); // NOLINT
+        }
+
+        return TOwner<TBase, TPolymorphicDeleter<TBase>>(
+            ptr, TPolymorphicDeleter<TBase>(&DestroyPolymorphic<TBase, TDerived>));
+    }
+
     template <typename T, typename Alloc> struct TAllocatorDeleter {
         Alloc mAllocator;
 

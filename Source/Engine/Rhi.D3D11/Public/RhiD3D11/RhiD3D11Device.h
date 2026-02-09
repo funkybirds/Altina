@@ -29,6 +29,7 @@ namespace AltinaEngine::Rhi {
 
         auto CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef override;
         auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef override;
+        auto CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef override;
         auto CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef override;
         auto CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef override;
 
@@ -52,6 +53,9 @@ namespace AltinaEngine::Rhi {
             -> FRhiCommandListRef override;
         auto CreateCommandContext(const FRhiCommandContextDesc& desc)
             -> FRhiCommandContextRef override;
+
+        void BeginFrame(u64 frameIndex) override;
+        void EndFrame() override;
 
     private:
         struct FState;

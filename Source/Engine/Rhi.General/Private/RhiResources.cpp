@@ -11,6 +11,7 @@
 #include "Rhi/RhiSemaphore.h"
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiTexture.h"
+#include "Rhi/RhiViewport.h"
 
 namespace AltinaEngine::Rhi {
 
@@ -31,6 +32,11 @@ namespace AltinaEngine::Rhi {
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiTexture::~FRhiTexture() = default;
+
+    FRhiViewport::FRhiViewport(const FRhiViewportDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
+        : FRhiResource(deleteQueue), mDesc(desc) {}
+
+    FRhiViewport::~FRhiViewport() = default;
 
     FRhiSampler::FRhiSampler(const FRhiSamplerDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}

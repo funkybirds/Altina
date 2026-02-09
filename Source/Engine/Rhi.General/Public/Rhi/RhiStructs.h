@@ -153,6 +153,16 @@ namespace AltinaEngine::Rhi {
         ERhiCpuAccess       mCpuAccess = ERhiCpuAccess::None;
     };
 
+    struct FRhiViewportDesc {
+        FString   mDebugName;
+        u32       mWidth       = 0U;
+        u32       mHeight      = 0U;
+        ERhiFormat mFormat     = ERhiFormat::B8G8R8A8Unorm;
+        u32       mBufferCount = 2U;
+        bool      mAllowTearing = false;
+        void*     mNativeHandle = nullptr;
+    };
+
     struct FRhiSamplerDesc {
         FString mDebugName;
     };
@@ -282,6 +292,9 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiPresentInfo {
+        FRhiViewport* mViewport = nullptr;
+        u32           mSyncInterval = 1U;
+        u32           mFlags = 0U;
     };
 
 } // namespace AltinaEngine::Rhi

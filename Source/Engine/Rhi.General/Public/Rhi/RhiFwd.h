@@ -11,6 +11,7 @@ namespace AltinaEngine::Rhi {
     class FRhiQueue;
     class FRhiBuffer;
     class FRhiTexture;
+    class FRhiViewport;
     class FRhiSampler;
     class FRhiShader;
     class FRhiPipeline;
@@ -40,6 +41,7 @@ namespace AltinaEngine::Rhi {
     struct FRhiQueueCapabilities;
     struct FRhiBufferDesc;
     struct FRhiTextureDesc;
+    struct FRhiViewportDesc;
     struct FRhiSamplerDesc;
     struct FRhiShaderDesc;
     struct FRhiVertexAttributeDesc;

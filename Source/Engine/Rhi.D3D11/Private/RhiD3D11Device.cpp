@@ -6,6 +6,7 @@
 #include "RhiD3D11/RhiD3D11Shader.h"
 #include "RhiD3D11/RhiD3D11StagingBufferManager.h"
 #include "RhiD3D11/RhiD3D11UploadBufferManager.h"
+#include "RhiD3D11/RhiD3D11Viewport.h"
 
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
@@ -16,6 +17,7 @@
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiSemaphore.h"
 #include "Rhi/RhiShader.h"
+#include "Rhi/RhiViewport.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
 
@@ -54,6 +56,11 @@ namespace AltinaEngine::Rhi {
         D3D_FEATURE_LEVEL           mFeatureLevel = D3D_FEATURE_LEVEL_11_0;
         FD3D11UploadBufferManager   mUploadManager;
         FD3D11StagingBufferManager  mStagingManager;
+        u64                         mFrameIndex = 0ULL;
+        u64                         mCompletedSerial = 0ULL;
+        u32                         mFrameQueryIndex = 0U;
+        TVector<ComPtr<ID3D11Query>> mFrameQueries;
+        TVector<u64>                mFrameQuerySerials;
     };
 
     struct FRhiD3D11CommandList::FState {
@@ -957,8 +964,18 @@ namespace AltinaEngine::Rhi {
                     fence->WaitCPU(value);
                 }
             }
-            void WaitIdle() override {}
-            void Present(const FRhiPresentInfo& /*info*/) override {}
+            void WaitIdle() override {
+#if AE_PLATFORM_WIN
+                if (mImmediateContext) {
+                    mImmediateContext->Flush();
+                }
+#endif
+            }
+            void Present(const FRhiPresentInfo& info) override {
+                if (info.mViewport) {
+                    info.mViewport->Present(info);
+                }
+            }
 
         private:
 #if AE_PLATFORM_WIN
@@ -1093,6 +1110,34 @@ namespace AltinaEngine::Rhi {
             uploadDesc.mAllowConstantBufferSuballocation = false;
             mState->mUploadManager.Init(this, uploadDesc);
             mState->mStagingManager.Init(this);
+
+            if (mState->mDevice && mState->mImmediateContext) {
+                constexpr u32 kQueryCount = 3U;
+                mState->mFrameQueries.Resize(kQueryCount);
+                mState->mFrameQuerySerials.Resize(kQueryCount);
+                for (u32 i = 0U; i < kQueryCount; ++i) {
+                    mState->mFrameQuerySerials[i] = 0ULL;
+                }
+
+                D3D11_QUERY_DESC queryDesc{};
+                queryDesc.Query = D3D11_QUERY_EVENT;
+                queryDesc.MiscFlags = 0U;
+
+                bool queryOk = true;
+                for (u32 i = 0U; i < kQueryCount; ++i) {
+                    ComPtr<ID3D11Query> query;
+                    if (FAILED(mState->mDevice->CreateQuery(&queryDesc, &query))) {
+                        queryOk = false;
+                        break;
+                    }
+                    mState->mFrameQueries[i] = AltinaEngine::Move(query);
+                }
+
+                if (!queryOk) {
+                    mState->mFrameQueries.Clear();
+                    mState->mFrameQuerySerials.Clear();
+                }
+            }
         }
 #else
         (void)device;
@@ -1151,6 +1196,21 @@ namespace AltinaEngine::Rhi {
         return mState ? &mState->mStagingManager : nullptr;
 #else
         return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11Device::CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef {
+#if AE_PLATFORM_WIN
+        auto viewport = MakeResource<FRhiD3D11Viewport>(
+            desc, GetNativeDevice(), GetImmediateContext());
+        if (viewport && !viewport->IsValid()) {
+            viewport->SetDeleteQueue(nullptr);
+            viewport.Reset();
+        }
+        return viewport;
+#else
+        (void)desc;
+        return {};
 #endif
     }
 
@@ -1283,6 +1343,58 @@ namespace AltinaEngine::Rhi {
         auto commandList    = MakeResource<FRhiD3D11CommandList>(listDesc);
         return MakeResource<FRhiD3D11CommandContext>(
             desc, GetNativeDevice(), AltinaEngine::Move(commandList));
+    }
+
+    void FRhiD3D11Device::BeginFrame(u64 frameIndex) {
+#if AE_PLATFORM_WIN
+        if (!mState) {
+            return;
+        }
+
+        mState->mFrameIndex = frameIndex;
+        mState->mUploadManager.BeginFrame(frameIndex);
+        mState->mStagingManager.Reset();
+
+        if (mState->mImmediateContext && !mState->mFrameQueries.IsEmpty()) {
+            for (usize i = 0; i < mState->mFrameQueries.Size(); ++i) {
+                auto& query = mState->mFrameQueries[i];
+                if (!query) {
+                    continue;
+                }
+                const HRESULT hr = mState->mImmediateContext->GetData(query.Get(), nullptr, 0, 0);
+                if (hr == S_OK) {
+                    const u64 serial = mState->mFrameQuerySerials[i];
+                    if (serial > mState->mCompletedSerial) {
+                        mState->mCompletedSerial = serial;
+                    }
+                }
+            }
+        }
+        ProcessResourceDeleteQueue(mState->mCompletedSerial);
+#else
+        (void)frameIndex;
+#endif
+    }
+
+    void FRhiD3D11Device::EndFrame() {
+#if AE_PLATFORM_WIN
+        if (!mState) {
+            return;
+        }
+
+        mState->mUploadManager.EndFrame();
+
+        if (mState->mImmediateContext && !mState->mFrameQueries.IsEmpty()) {
+            const u32 queryCount = static_cast<u32>(mState->mFrameQueries.Size());
+            const u32 index = (queryCount > 0U) ? (mState->mFrameQueryIndex % queryCount) : 0U;
+            auto& query = mState->mFrameQueries[index];
+            if (query) {
+                mState->mFrameQuerySerials[index] = mState->mFrameIndex;
+                mState->mImmediateContext->End(query.Get());
+            }
+            mState->mFrameQueryIndex = index + 1U;
+        }
+#endif
     }
 
 } // namespace AltinaEngine::Rhi

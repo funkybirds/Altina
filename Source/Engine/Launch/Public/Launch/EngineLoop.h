@@ -6,6 +6,8 @@
 #include "Application/Application.h"
 #include "Rhi/RhiContext.h"
 #include "Rhi/RhiDevice.h"
+#include "Rhi/RhiRefs.h"
+#include "Rhi/RhiViewport.h"
 
 namespace AltinaEngine::Launch {
     class AE_LAUNCH_API FEngineLoop final {
@@ -19,9 +21,17 @@ namespace AltinaEngine::Launch {
         void Exit();
 
     private:
-        Core::Container::TOwner<Application::FApplication> mApplication;
-        Core::Container::TOwner<Rhi::FRhiContext>          mRhiContext;
+        Core::Container::TOwner<Application::FApplication,
+            Core::Container::TPolymorphicDeleter<Application::FApplication>>
+            mApplication;
+        Core::Container::TOwner<Rhi::FRhiContext,
+            Core::Container::TPolymorphicDeleter<Rhi::FRhiContext>>
+            mRhiContext;
         Core::Container::TShared<Rhi::FRhiDevice>          mRhiDevice;
+        Rhi::FRhiViewportRef                               mMainViewport;
+        u32                                               mViewportWidth = 0U;
+        u32                                               mViewportHeight = 0U;
+        u64                                               mFrameIndex = 0ULL;
         FStartupParameters mStartupParameters{};
         bool               mIsRunning = false;
     };

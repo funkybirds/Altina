@@ -37,6 +37,7 @@ namespace AltinaEngine::Rhi {
 
         virtual auto       CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef    = 0;
         virtual auto       CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef = 0;
+        virtual auto       CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef = 0;
         virtual auto       CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef = 0;
         virtual auto       CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef    = 0;
 
@@ -58,6 +59,9 @@ namespace AltinaEngine::Rhi {
         virtual auto CreateCommandList(const FRhiCommandListDesc& desc) -> FRhiCommandListRef = 0;
         virtual auto CreateCommandContext(const FRhiCommandContextDesc& desc)
             -> FRhiCommandContextRef = 0;
+
+        virtual void BeginFrame(u64 frameIndex);
+        virtual void EndFrame();
 
         void ProcessResourceDeleteQueue(u64 completedSerial);
         void FlushResourceDeleteQueue();

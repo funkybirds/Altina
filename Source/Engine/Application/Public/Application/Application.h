@@ -6,7 +6,9 @@
 
 namespace AltinaEngine::Application {
     using Core::Container::TOwner;
-    using FWindowOwner = TOwner<FPlatformWindow>; // NOLINT(*-identifier-naming)
+    using Core::Container::TPolymorphicDeleter;
+    using FWindowOwner =
+        TOwner<FPlatformWindow, TPolymorphicDeleter<FPlatformWindow>>; // NOLINT(*-identifier-naming)
 
     class AE_APPLICATION_API FApplication {
     public:
@@ -21,10 +23,10 @@ namespace AltinaEngine::Application {
 
         void               SetWindowProperties(const FPlatformWindowProperty& InProperties);
         [[nodiscard]] auto GetWindowProperties() const noexcept -> const FPlatformWindowProperty&;
+        [[nodiscard]] auto GetMainWindow() noexcept -> FPlatformWindow*;
 
     protected:
         [[nodiscard]] auto GetStartupParameters() const noexcept -> const FStartupParameters&;
-        [[nodiscard]] auto GetMainWindow() noexcept -> FPlatformWindow*;
         void               RequestShutdown() noexcept;
 
         virtual auto       CreatePlatformWindow() -> FWindowOwner = 0;

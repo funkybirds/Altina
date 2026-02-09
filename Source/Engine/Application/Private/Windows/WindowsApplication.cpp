@@ -10,6 +10,7 @@
 namespace AltinaEngine::Application {
     using AltinaEngine::Core::Container::FString;
     using AltinaEngine::Core::Container::MakeUnique;
+    using AltinaEngine::Core::Container::MakeUniqueAs;
 
     namespace {
         constexpr const TChar* kWindowClassName = TEXT("AltinaEngineWindowClass");
@@ -158,6 +159,10 @@ namespace AltinaEngine::Application {
         return mProperties;
     }
 
+    auto FWindowsPlatformWindow::GetNativeHandle() const noexcept -> void* {
+        return mWindowHandle;
+    }
+
     auto FWindowsPlatformWindow::GetWindowHandle() const noexcept -> void* { return mWindowHandle; }
 
     LRESULT CALLBACK FWindowsPlatformWindow::WindowProc(
@@ -239,8 +244,7 @@ namespace AltinaEngine::Application {
         : FApplication(InStartupParameters) {}
 
     auto FWindowsApplication::CreatePlatformWindow() -> FWindowOwner {
-        auto window = MakeUnique<FWindowsPlatformWindow>();
-        return FWindowOwner(window.Release());
+        return MakeUniqueAs<FPlatformWindow, FWindowsPlatformWindow>();
     }
 
     void FWindowsApplication::PumpPlatformMessages() {

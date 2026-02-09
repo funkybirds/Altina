@@ -3,6 +3,7 @@
 #include "Rhi/RhiBuffer.h"
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiTexture.h"
+#include "Rhi/RhiViewport.h"
 
 namespace AltinaEngine::Rhi {
     namespace {
@@ -35,6 +36,11 @@ namespace AltinaEngine::Rhi {
     auto RHICreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef {
         FRhiDevice* device = RHIGetDevice();
         return (device != nullptr) ? device->CreateTexture(desc) : FRhiTextureRef{};
+    }
+
+    auto RHICreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef {
+        FRhiDevice* device = RHIGetDevice();
+        return (device != nullptr) ? device->CreateViewport(desc) : FRhiViewportRef{};
     }
 
     auto RHICreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef {

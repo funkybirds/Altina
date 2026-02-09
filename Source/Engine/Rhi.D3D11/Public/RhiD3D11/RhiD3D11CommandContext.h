@@ -29,6 +29,8 @@ namespace AltinaEngine::Rhi {
         void RHISetScissor(const FRhiScissorRect& scissor) override;
         void RHISetRenderTargets(u32 colorTargetCount, FRhiTexture* const* colorTargets,
             FRhiTexture* depthTarget) override;
+        void RHIBeginRenderPass(const FRhiRenderPassDesc& desc) override;
+        void RHIEndRenderPass() override;
         void RHIClearColor(FRhiTexture* colorTarget, const FRhiClearColor& color) override;
         void RHISetBindGroup(u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets,
             u32 dynamicOffsetCount) override;

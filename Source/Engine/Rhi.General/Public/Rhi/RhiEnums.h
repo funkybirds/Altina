@@ -83,6 +83,25 @@ namespace AltinaEngine::Rhi {
         D32Float
     };
 
+    enum class ERhiResourceViewType : u8 {
+        Unknown = 0,
+        ShaderResource,
+        UnorderedAccess,
+        RenderTarget,
+        DepthStencil
+    };
+
+    enum class ERhiLoadOp : u8 {
+        Load = 0,
+        Clear,
+        DontCare
+    };
+
+    enum class ERhiStoreOp : u8 {
+        Store = 0,
+        DontCare
+    };
+
     enum class ERhiResourceUsage : u8 {
         Default = 0,
         Immutable,

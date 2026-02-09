@@ -1,5 +1,6 @@
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiQueue.h"
+#include "Rhi/RhiResourceView.h"
 
 #include "Types/Traits.h"
 
@@ -52,6 +53,38 @@ namespace AltinaEngine::Rhi {
         }
 
         return {};
+    }
+
+    auto FRhiDevice::CreateShaderResourceView(const FRhiShaderResourceViewDesc& desc)
+        -> FRhiShaderResourceViewRef {
+        if (desc.mTexture == nullptr && desc.mBuffer == nullptr) {
+            return {};
+        }
+        return MakeResource<FRhiShaderResourceView>(desc);
+    }
+
+    auto FRhiDevice::CreateUnorderedAccessView(const FRhiUnorderedAccessViewDesc& desc)
+        -> FRhiUnorderedAccessViewRef {
+        if (desc.mTexture == nullptr && desc.mBuffer == nullptr) {
+            return {};
+        }
+        return MakeResource<FRhiUnorderedAccessView>(desc);
+    }
+
+    auto FRhiDevice::CreateRenderTargetView(const FRhiRenderTargetViewDesc& desc)
+        -> FRhiRenderTargetViewRef {
+        if (desc.mTexture == nullptr) {
+            return {};
+        }
+        return MakeResource<FRhiRenderTargetView>(desc);
+    }
+
+    auto FRhiDevice::CreateDepthStencilView(const FRhiDepthStencilViewDesc& desc)
+        -> FRhiDepthStencilViewRef {
+        if (desc.mTexture == nullptr) {
+            return {};
+        }
+        return MakeResource<FRhiDepthStencilView>(desc);
     }
 
     void FRhiDevice::BeginFrame(u64 /*frameIndex*/) {}

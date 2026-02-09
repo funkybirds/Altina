@@ -18,6 +18,11 @@ namespace AltinaEngine::Rhi {
     using FRhiPipelineLayoutRef  = TCountRef<FRhiPipelineLayout>;
     using FRhiBindGroupLayoutRef = TCountRef<FRhiBindGroupLayout>;
     using FRhiBindGroupRef       = TCountRef<FRhiBindGroup>;
+    using FRhiResourceViewRef    = TCountRef<FRhiResourceView>;
+    using FRhiShaderResourceViewRef = TCountRef<FRhiShaderResourceView>;
+    using FRhiUnorderedAccessViewRef = TCountRef<FRhiUnorderedAccessView>;
+    using FRhiRenderTargetViewRef = TCountRef<FRhiRenderTargetView>;
+    using FRhiDepthStencilViewRef = TCountRef<FRhiDepthStencilView>;
     using FRhiFenceRef           = TCountRef<FRhiFence>;
     using FRhiSemaphoreRef       = TCountRef<FRhiSemaphore>;
     using FRhiCommandPoolRef     = TCountRef<FRhiCommandPool>;

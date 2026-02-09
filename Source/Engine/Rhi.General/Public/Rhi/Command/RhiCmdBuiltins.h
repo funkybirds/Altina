@@ -131,6 +131,23 @@ namespace AltinaEngine::Rhi {
         FRhiTexture* mDepthTarget = nullptr;
     };
 
+    class FRhiCmdBeginRenderPass final : public FRhiCmd {
+    public:
+        explicit FRhiCmdBeginRenderPass(const FRhiRenderPassDesc& desc) : mDesc(desc) {}
+
+        void Execute(FRhiCmdContext& context) override { context.RHIBeginRenderPass(mDesc); }
+
+    private:
+        FRhiRenderPassDesc mDesc{};
+    };
+
+    class FRhiCmdEndRenderPass final : public FRhiCmd {
+    public:
+        FRhiCmdEndRenderPass() = default;
+
+        void Execute(FRhiCmdContext& context) override { context.RHIEndRenderPass(); }
+    };
+
     class FRhiCmdSetBindGroup final : public FRhiCmd {
     public:
         FRhiCmdSetBindGroup(u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets,

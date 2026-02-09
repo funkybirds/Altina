@@ -7,6 +7,7 @@
 #include "Rhi/RhiFence.h"
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiPipelineLayout.h"
+#include "Rhi/RhiResourceView.h"
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiSemaphore.h"
 #include "Rhi/RhiShader.h"
@@ -74,6 +75,58 @@ namespace AltinaEngine::Rhi {
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiBindGroup::~FRhiBindGroup() = default;
+
+    FRhiResourceView::FRhiResourceView(ERhiResourceViewType type,
+        FRhiResourceDeleteQueue* deleteQueue) noexcept
+        : FRhiResource(deleteQueue), mViewType(type) {}
+
+    FRhiResourceView::~FRhiResourceView() = default;
+
+    FRhiShaderResourceView::FRhiShaderResourceView(const FRhiShaderResourceViewDesc& desc,
+        FRhiResourceDeleteQueue* deleteQueue) noexcept
+        : FRhiResourceView(ERhiResourceViewType::ShaderResource, deleteQueue), mDesc(desc) {
+        if (mDesc.mTexture) {
+            mTexture.Reset(mDesc.mTexture);
+        }
+        if (mDesc.mBuffer) {
+            mBuffer.Reset(mDesc.mBuffer);
+        }
+    }
+
+    FRhiShaderResourceView::~FRhiShaderResourceView() = default;
+
+    FRhiUnorderedAccessView::FRhiUnorderedAccessView(const FRhiUnorderedAccessViewDesc& desc,
+        FRhiResourceDeleteQueue* deleteQueue) noexcept
+        : FRhiResourceView(ERhiResourceViewType::UnorderedAccess, deleteQueue), mDesc(desc) {
+        if (mDesc.mTexture) {
+            mTexture.Reset(mDesc.mTexture);
+        }
+        if (mDesc.mBuffer) {
+            mBuffer.Reset(mDesc.mBuffer);
+        }
+    }
+
+    FRhiUnorderedAccessView::~FRhiUnorderedAccessView() = default;
+
+    FRhiRenderTargetView::FRhiRenderTargetView(const FRhiRenderTargetViewDesc& desc,
+        FRhiResourceDeleteQueue* deleteQueue) noexcept
+        : FRhiResourceView(ERhiResourceViewType::RenderTarget, deleteQueue), mDesc(desc) {
+        if (mDesc.mTexture) {
+            mTexture.Reset(mDesc.mTexture);
+        }
+    }
+
+    FRhiRenderTargetView::~FRhiRenderTargetView() = default;
+
+    FRhiDepthStencilView::FRhiDepthStencilView(const FRhiDepthStencilViewDesc& desc,
+        FRhiResourceDeleteQueue* deleteQueue) noexcept
+        : FRhiResourceView(ERhiResourceViewType::DepthStencil, deleteQueue), mDesc(desc) {
+        if (mDesc.mTexture) {
+            mTexture.Reset(mDesc.mTexture);
+        }
+    }
+
+    FRhiDepthStencilView::~FRhiDepthStencilView() = default;
 
     FRhiFence::FRhiFence(FRhiResourceDeleteQueue* deleteQueue) noexcept : FRhiResource(deleteQueue) {}
 

@@ -18,6 +18,11 @@ namespace AltinaEngine::Rhi {
     class FRhiPipelineLayout;
     class FRhiBindGroupLayout;
     class FRhiBindGroup;
+    class FRhiResourceView;
+    class FRhiShaderResourceView;
+    class FRhiUnorderedAccessView;
+    class FRhiRenderTargetView;
+    class FRhiDepthStencilView;
     class FRhiFence;
     class FRhiSemaphore;
     class FRhiCommandPool;
@@ -50,18 +55,25 @@ namespace AltinaEngine::Rhi {
     struct FRhiQueueCapabilities;
     struct FRhiBufferDesc;
     struct FRhiTextureDesc;
+    struct FRhiTextureViewRange;
+    struct FRhiBufferViewRange;
     struct FRhiViewportDesc;
     struct FRhiVertexBufferView;
     struct FRhiIndexBufferView;
     struct FRhiViewportRect;
     struct FRhiScissorRect;
     struct FRhiClearColor;
+    struct FRhiClearDepthStencil;
     struct FRhiSamplerDesc;
     struct FRhiShaderDesc;
     struct FRhiVertexAttributeDesc;
     struct FRhiVertexLayoutDesc;
     struct FRhiGraphicsPipelineDesc;
     struct FRhiComputePipelineDesc;
+    struct FRhiShaderResourceViewDesc;
+    struct FRhiUnorderedAccessViewDesc;
+    struct FRhiRenderTargetViewDesc;
+    struct FRhiDepthStencilViewDesc;
     struct FRhiPipelineLayoutDesc;
     struct FRhiBindGroupLayoutDesc;
     struct FRhiBindGroupDesc;
@@ -72,4 +84,7 @@ namespace AltinaEngine::Rhi {
     struct FRhiQueueSignal;
     struct FRhiSubmitInfo;
     struct FRhiPresentInfo;
+    struct FRhiRenderPassColorAttachment;
+    struct FRhiRenderPassDepthStencilAttachment;
+    struct FRhiRenderPassDesc;
 } // namespace AltinaEngine::Rhi

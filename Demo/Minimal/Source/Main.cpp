@@ -9,6 +9,7 @@
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiQueue.h"
+#include "Rhi/RhiResourceView.h"
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiStructs.h"
 #include "Rhi/RhiViewport.h"
@@ -131,10 +132,20 @@ float4 PSMain(VSOut input) : SV_Target0 {
 
             mCmdList.Reset();
 
-            Rhi::FRhiTexture* colorTargets[] = { backBuffer };
-            mCmdList.Emplace<Rhi::FRhiCmdSetRenderTargets>(1U, colorTargets, nullptr);
-            mCmdList.Emplace<Rhi::FRhiCmdClearColor>(
-                backBuffer, Rhi::FRhiClearColor{ 0.08f, 0.08f, 0.12f, 1.0f });
+            Rhi::FRhiRenderTargetViewDesc rtvDesc{};
+            rtvDesc.mTexture = backBuffer;
+            auto backBufferRtv = device.CreateRenderTargetView(rtvDesc);
+
+            Rhi::FRhiRenderPassColorAttachment colorAttachment{};
+            colorAttachment.mView = backBufferRtv.Get();
+            colorAttachment.mLoadOp = Rhi::ERhiLoadOp::Clear;
+            colorAttachment.mStoreOp = Rhi::ERhiStoreOp::Store;
+            colorAttachment.mClearColor = Rhi::FRhiClearColor{ 0.08f, 0.08f, 0.12f, 1.0f };
+
+            Rhi::FRhiRenderPassDesc passDesc{};
+            passDesc.mColorAttachmentCount = 1U;
+            passDesc.mColorAttachments = &colorAttachment;
+            mCmdList.Emplace<Rhi::FRhiCmdBeginRenderPass>(passDesc);
             mCmdList.Emplace<Rhi::FRhiCmdSetPrimitiveTopology>(
                 Rhi::ERhiPrimitiveTopology::TriangleList);
             mCmdList.Emplace<Rhi::FRhiCmdSetViewport>(Rhi::FRhiViewportRect{
@@ -143,6 +154,7 @@ float4 PSMain(VSOut input) : SV_Target0 {
             mCmdList.Emplace<Rhi::FRhiCmdSetIndexBuffer>(
                 Rhi::FRhiIndexBufferView{ mIndexBuffer.Get(), Rhi::ERhiIndexType::Uint16, 0U });
             mCmdList.Emplace<Rhi::FRhiCmdDrawIndexed>(3U, 1U, 0U, 0, 0U);
+            mCmdList.Emplace<Rhi::FRhiCmdEndRenderPass>();
 
             Rhi::FRhiCmdExecutor::Execute(mCmdList, adapter);
             adapter.End();

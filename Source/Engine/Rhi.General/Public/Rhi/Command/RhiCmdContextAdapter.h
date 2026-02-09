@@ -53,6 +53,12 @@ namespace AltinaEngine::Rhi {
             mOps->RHISetRenderTargets(colorTargetCount, colorTargets, depthTarget);
         }
 
+        void RHIBeginRenderPass(const FRhiRenderPassDesc& desc) override {
+            mOps->RHIBeginRenderPass(desc);
+        }
+
+        void RHIEndRenderPass() override { mOps->RHIEndRenderPass(); }
+
         void RHIClearColor(FRhiTexture* colorTarget, const FRhiClearColor& color) override {
             mOps->RHIClearColor(colorTarget, color);
         }

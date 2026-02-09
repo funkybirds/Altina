@@ -153,6 +153,54 @@ namespace AltinaEngine::Rhi {
         ERhiCpuAccess       mCpuAccess = ERhiCpuAccess::None;
     };
 
+    struct FRhiTextureViewRange {
+        u32 mBaseMip        = 0U;
+        u32 mMipCount       = 0U;
+        u32 mBaseArrayLayer = 0U;
+        u32 mLayerCount     = 0U;
+        u32 mBaseDepthSlice = 0U;
+        u32 mDepthSliceCount = 0U;
+    };
+
+    struct FRhiBufferViewRange {
+        u64 mOffsetBytes = 0ULL;
+        u64 mSizeBytes   = 0ULL;
+    };
+
+    struct FRhiShaderResourceViewDesc {
+        FString             mDebugName;
+        FRhiTexture*        mTexture = nullptr;
+        FRhiBuffer*         mBuffer  = nullptr;
+        ERhiFormat          mFormat  = ERhiFormat::Unknown;
+        FRhiTextureViewRange mTextureRange;
+        FRhiBufferViewRange  mBufferRange;
+    };
+
+    struct FRhiUnorderedAccessViewDesc {
+        FString             mDebugName;
+        FRhiTexture*        mTexture = nullptr;
+        FRhiBuffer*         mBuffer  = nullptr;
+        ERhiFormat          mFormat  = ERhiFormat::Unknown;
+        FRhiTextureViewRange mTextureRange;
+        FRhiBufferViewRange  mBufferRange;
+    };
+
+    struct FRhiRenderTargetViewDesc {
+        FString              mDebugName;
+        FRhiTexture*         mTexture = nullptr;
+        ERhiFormat           mFormat  = ERhiFormat::Unknown;
+        FRhiTextureViewRange mRange;
+    };
+
+    struct FRhiDepthStencilViewDesc {
+        FString              mDebugName;
+        FRhiTexture*         mTexture = nullptr;
+        ERhiFormat           mFormat  = ERhiFormat::Unknown;
+        FRhiTextureViewRange mRange;
+        bool                 mReadOnlyDepth   = false;
+        bool                 mReadOnlyStencil = false;
+    };
+
     struct FRhiViewportDesc {
         FString   mDebugName;
         u32       mWidth       = 0U;
@@ -196,6 +244,11 @@ namespace AltinaEngine::Rhi {
         f32 mG = 0.0f;
         f32 mB = 0.0f;
         f32 mA = 1.0f;
+    };
+
+    struct FRhiClearDepthStencil {
+        f32 mDepth   = 1.0f;
+        u32 mStencil = 0U;
     };
 
     struct FRhiSamplerDesc {
@@ -330,6 +383,31 @@ namespace AltinaEngine::Rhi {
         FRhiViewport* mViewport = nullptr;
         u32           mSyncInterval = 1U;
         u32           mFlags = 0U;
+    };
+
+    struct FRhiRenderPassColorAttachment {
+        FRhiRenderTargetView* mView = nullptr;
+        ERhiLoadOp            mLoadOp  = ERhiLoadOp::Clear;
+        ERhiStoreOp           mStoreOp = ERhiStoreOp::Store;
+        FRhiClearColor        mClearColor;
+    };
+
+    struct FRhiRenderPassDepthStencilAttachment {
+        FRhiDepthStencilView* mView = nullptr;
+        ERhiLoadOp            mDepthLoadOp   = ERhiLoadOp::Clear;
+        ERhiStoreOp           mDepthStoreOp  = ERhiStoreOp::Store;
+        ERhiLoadOp            mStencilLoadOp = ERhiLoadOp::Clear;
+        ERhiStoreOp           mStencilStoreOp = ERhiStoreOp::Store;
+        FRhiClearDepthStencil mClearDepthStencil;
+        bool                  mReadOnlyDepth   = false;
+        bool                  mReadOnlyStencil = false;
+    };
+
+    struct FRhiRenderPassDesc {
+        FString                               mDebugName;
+        u32                                   mColorAttachmentCount = 0U;
+        const FRhiRenderPassColorAttachment*  mColorAttachments      = nullptr;
+        const FRhiRenderPassDepthStencilAttachment* mDepthStencilAttachment = nullptr;
     };
 
 } // namespace AltinaEngine::Rhi

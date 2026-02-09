@@ -37,6 +37,14 @@ namespace AltinaEngine::Rhi {
 
         virtual auto       CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef    = 0;
         virtual auto       CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef = 0;
+        virtual auto CreateShaderResourceView(const FRhiShaderResourceViewDesc& desc)
+            -> FRhiShaderResourceViewRef;
+        virtual auto CreateUnorderedAccessView(const FRhiUnorderedAccessViewDesc& desc)
+            -> FRhiUnorderedAccessViewRef;
+        virtual auto CreateRenderTargetView(const FRhiRenderTargetViewDesc& desc)
+            -> FRhiRenderTargetViewRef;
+        virtual auto CreateDepthStencilView(const FRhiDepthStencilViewDesc& desc)
+            -> FRhiDepthStencilViewRef;
         virtual auto       CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef = 0;
         virtual auto       CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef = 0;
         virtual auto       CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef    = 0;

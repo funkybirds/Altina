@@ -15,6 +15,7 @@
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiQueue.h"
+#include "Rhi/RhiResourceView.h"
 #include "Rhi/RhiSemaphore.h"
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiViewport.h"
@@ -358,6 +359,24 @@ namespace AltinaEngine::Rhi {
             return (type == ERhiIndexType::Uint16) ? DXGI_FORMAT_R16_UINT
                                                    : DXGI_FORMAT_R32_UINT;
         }
+
+        auto GetRenderTargetViewHandle(FRhiRenderTargetView* view) noexcept
+            -> ID3D11RenderTargetView* {
+            if (!view) {
+                return nullptr;
+            }
+            auto* texture = static_cast<FRhiD3D11Texture*>(view->GetTexture());
+            return texture ? texture->GetRenderTargetView() : nullptr;
+        }
+
+        auto GetDepthStencilViewHandle(FRhiDepthStencilView* view) noexcept
+            -> ID3D11DepthStencilView* {
+            if (!view) {
+                return nullptr;
+            }
+            auto* texture = static_cast<FRhiD3D11Texture*>(view->GetTexture());
+            return texture ? texture->GetDepthStencilView() : nullptr;
+        }
 #endif
     } // namespace
 
@@ -575,6 +594,85 @@ namespace AltinaEngine::Rhi {
         (void)colorTargetCount;
         (void)colorTargets;
         (void)depthTarget;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHIBeginRenderPass(const FRhiRenderPassDesc& desc) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context || !mState) {
+            return;
+        }
+
+        const UINT maxTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
+        const UINT rtvCount =
+            (desc.mColorAttachments && desc.mColorAttachmentCount > 0U)
+                ? ((desc.mColorAttachmentCount > maxTargets) ? maxTargets
+                                                             : static_cast<UINT>(desc.mColorAttachmentCount))
+                : 0U;
+
+        ID3D11RenderTargetView* rtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
+        if (desc.mColorAttachments) {
+            for (UINT i = 0; i < rtvCount; ++i) {
+                rtvs[i] = GetRenderTargetViewHandle(desc.mColorAttachments[i].mView);
+            }
+        }
+
+        ID3D11DepthStencilView* dsv = nullptr;
+        if (desc.mDepthStencilAttachment) {
+            dsv = GetDepthStencilViewHandle(desc.mDepthStencilAttachment->mView);
+        }
+
+        context->OMSetRenderTargets(rtvCount, rtvCount ? rtvs : nullptr, dsv);
+
+        mState->mCurrentRtvCount = rtvCount;
+        mState->mCurrentDsv      = dsv;
+        for (UINT i = 0; i < maxTargets; ++i) {
+            mState->mCurrentRtvs[i] = (i < rtvCount) ? rtvs[i] : nullptr;
+        }
+
+        if (desc.mColorAttachments) {
+            for (UINT i = 0; i < rtvCount; ++i) {
+                const auto& attachment = desc.mColorAttachments[i];
+                if (attachment.mLoadOp != ERhiLoadOp::Clear) {
+                    continue;
+                }
+                if (!rtvs[i]) {
+                    continue;
+                }
+                const float clearColor[4] = {
+                    attachment.mClearColor.mR,
+                    attachment.mClearColor.mG,
+                    attachment.mClearColor.mB,
+                    attachment.mClearColor.mA
+                };
+                context->ClearRenderTargetView(rtvs[i], clearColor);
+            }
+        }
+
+        if (desc.mDepthStencilAttachment && dsv) {
+            const auto& ds = *desc.mDepthStencilAttachment;
+            UINT clearFlags = 0U;
+            if (ds.mDepthLoadOp == ERhiLoadOp::Clear && !ds.mReadOnlyDepth) {
+                clearFlags |= D3D11_CLEAR_DEPTH;
+            }
+            if (ds.mStencilLoadOp == ERhiLoadOp::Clear && !ds.mReadOnlyStencil) {
+                clearFlags |= D3D11_CLEAR_STENCIL;
+            }
+            if (clearFlags != 0U) {
+                context->ClearDepthStencilView(
+                    dsv, clearFlags, ds.mClearDepthStencil.mDepth,
+                    static_cast<UINT8>(ds.mClearDepthStencil.mStencil));
+            }
+        }
+#else
+        (void)desc;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHIEndRenderPass() {
+#if AE_PLATFORM_WIN
+        (void)mState;
 #endif
     }
 

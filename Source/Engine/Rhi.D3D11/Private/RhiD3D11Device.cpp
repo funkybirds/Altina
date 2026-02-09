@@ -676,6 +676,18 @@ namespace AltinaEngine::Rhi {
 #endif
     }
 
+    void FRhiD3D11CommandContext::RHIBeginTransition(const FRhiTransitionCreateInfo& info) {
+#if AE_PLATFORM_WIN
+        (void)info;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHIEndTransition(const FRhiTransitionCreateInfo& info) {
+#if AE_PLATFORM_WIN
+        (void)info;
+#endif
+    }
+
     void FRhiD3D11CommandContext::RHIClearColor(
         FRhiTexture* colorTarget, const FRhiClearColor& color) {
 #if AE_PLATFORM_WIN

@@ -435,6 +435,8 @@ namespace AltinaEngine::Rhi {
                 FRhiTexture* const* /*colorTargets*/, FRhiTexture* /*depthTarget*/) override {}
             void RHIBeginRenderPass(const FRhiRenderPassDesc& /*desc*/) override {}
             void RHIEndRenderPass() override {}
+            void RHIBeginTransition(const FRhiTransitionCreateInfo& /*info*/) override {}
+            void RHIEndTransition(const FRhiTransitionCreateInfo& /*info*/) override {}
             void RHIClearColor(FRhiTexture* /*colorTarget*/,
                 const FRhiClearColor& /*color*/) override {}
             void RHISetBindGroup(u32 /*setIndex*/, FRhiBindGroup* /*group*/,

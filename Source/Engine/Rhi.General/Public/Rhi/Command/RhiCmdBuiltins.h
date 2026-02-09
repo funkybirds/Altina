@@ -148,6 +148,26 @@ namespace AltinaEngine::Rhi {
         void Execute(FRhiCmdContext& context) override { context.RHIEndRenderPass(); }
     };
 
+    class FRhiCmdBeginTransition final : public FRhiCmd {
+    public:
+        explicit FRhiCmdBeginTransition(const FRhiTransitionCreateInfo& info) : mInfo(info) {}
+
+        void Execute(FRhiCmdContext& context) override { context.RHIBeginTransition(mInfo); }
+
+    private:
+        FRhiTransitionCreateInfo mInfo{};
+    };
+
+    class FRhiCmdEndTransition final : public FRhiCmd {
+    public:
+        explicit FRhiCmdEndTransition(const FRhiTransitionCreateInfo& info) : mInfo(info) {}
+
+        void Execute(FRhiCmdContext& context) override { context.RHIEndTransition(mInfo); }
+
+    private:
+        FRhiTransitionCreateInfo mInfo{};
+    };
+
     class FRhiCmdSetBindGroup final : public FRhiCmd {
     public:
         FRhiCmdSetBindGroup(u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets,

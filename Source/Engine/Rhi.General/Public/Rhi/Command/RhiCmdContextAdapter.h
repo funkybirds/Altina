@@ -59,6 +59,14 @@ namespace AltinaEngine::Rhi {
 
         void RHIEndRenderPass() override { mOps->RHIEndRenderPass(); }
 
+        void RHIBeginTransition(const FRhiTransitionCreateInfo& info) override {
+            mOps->RHIBeginTransition(info);
+        }
+
+        void RHIEndTransition(const FRhiTransitionCreateInfo& info) override {
+            mOps->RHIEndTransition(info);
+        }
+
         void RHIClearColor(FRhiTexture* colorTarget, const FRhiClearColor& color) override {
             mOps->RHIClearColor(colorTarget, color);
         }

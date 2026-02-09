@@ -385,6 +385,22 @@ namespace AltinaEngine::Rhi {
         u32           mFlags = 0U;
     };
 
+    struct FRhiTransitionInfo {
+        FRhiResource*        mResource = nullptr;
+        ERhiResourceState    mBefore   = ERhiResourceState::Unknown;
+        ERhiResourceState    mAfter    = ERhiResourceState::Unknown;
+        FRhiTextureViewRange mTextureRange;
+        FRhiBufferViewRange  mBufferRange;
+    };
+
+    struct FRhiTransitionCreateInfo {
+        const FRhiTransitionInfo* mTransitions = nullptr;
+        u32                       mTransitionCount = 0U;
+        ERhiQueueType             mSrcQueue = ERhiQueueType::Graphics;
+        ERhiQueueType             mDstQueue = ERhiQueueType::Graphics;
+        u32                       mFlags = 0U;
+    };
+
     struct FRhiRenderPassColorAttachment {
         FRhiRenderTargetView* mView = nullptr;
         ERhiLoadOp            mLoadOp  = ERhiLoadOp::Clear;

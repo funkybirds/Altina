@@ -109,6 +109,19 @@ namespace AltinaEngine::Rhi {
         Staging
     };
 
+    enum class ERhiResourceState : u8 {
+        Unknown = 0,
+        Common,
+        RenderTarget,
+        DepthWrite,
+        DepthRead,
+        ShaderResource,
+        UnorderedAccess,
+        CopySrc,
+        CopyDst,
+        Present
+    };
+
     enum class ERhiCpuAccess : u8 {
         None  = 0,
         Read  = 1u << 0,

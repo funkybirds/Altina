@@ -16,6 +16,14 @@ target_link_libraries(${TargetName}
         AltinaEngine::Launch
 )
 
+if(WIN32)
+    target_link_libraries(${TargetName}
+        PRIVATE
+            AltinaEngine::Rhi::D3D11
+            d3dcompiler
+    )
+endif()
+
 target_compile_features(${TargetName}
     PRIVATE
         cxx_std_23

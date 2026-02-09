@@ -3,6 +3,7 @@
 #include "Base/LaunchAPI.h"
 #include "CoreMinimal.h"
 #include "Container/SmartPtr.h"
+#include "Container/Function.h"
 #include "Application/Application.h"
 #include "Rhi/RhiContext.h"
 #include "Rhi/RhiDevice.h"
@@ -12,6 +13,9 @@
 namespace AltinaEngine::Launch {
     class AE_LAUNCH_API FEngineLoop final {
     public:
+        using FRenderCallback =
+            Core::Container::TFunction<void(Rhi::FRhiDevice&, Rhi::FRhiViewport&, u32, u32)>;
+
         FEngineLoop() = default;
         explicit FEngineLoop(const FStartupParameters& InStartupParameters);
 
@@ -19,6 +23,7 @@ namespace AltinaEngine::Launch {
         auto Init() -> bool;
         void Tick(float InDeltaTime);
         void Exit();
+        void SetRenderCallback(FRenderCallback callback);
 
     private:
         Core::Container::TOwner<Application::FApplication,
@@ -32,6 +37,7 @@ namespace AltinaEngine::Launch {
         u32                                               mViewportWidth = 0U;
         u32                                               mViewportHeight = 0U;
         u64                                               mFrameIndex = 0ULL;
+        FRenderCallback                                   mRenderCallback;
         FStartupParameters mStartupParameters{};
         bool               mIsRunning = false;
     };

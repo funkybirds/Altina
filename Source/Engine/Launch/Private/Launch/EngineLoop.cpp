@@ -21,9 +21,8 @@ namespace AltinaEngine::Launch {
         }
 
 #if AE_PLATFORM_WIN
-        mApplication =
-            Core::Container::MakeUniqueAs<Application::FApplication,
-                Application::FWindowsApplication>(mStartupParameters);
+        mApplication = Core::Container::MakeUniqueAs<Application::FApplication,
+            Application::FWindowsApplication>(mStartupParameters);
 #else
         LogError(TEXT("FEngineLoop PreInit failed: no platform application available."));
         return false;
@@ -83,13 +82,13 @@ namespace AltinaEngine::Launch {
             return false;
         }
 
-        const auto extent = window->GetSize();
+        const auto            extent = window->GetSize();
         Rhi::FRhiViewportDesc viewportDesc{};
         viewportDesc.mDebugName.Assign(TEXT("MainViewport"));
         viewportDesc.mWidth        = extent.mWidth;
         viewportDesc.mHeight       = extent.mHeight;
         viewportDesc.mNativeHandle = window->GetNativeHandle();
-        mMainViewport = Rhi::RHICreateViewport(viewportDesc);
+        mMainViewport              = Rhi::RHICreateViewport(viewportDesc);
         if (!mMainViewport) {
             LogError(TEXT("FEngineLoop Init failed: viewport creation failed."));
             return false;
@@ -121,13 +120,18 @@ namespace AltinaEngine::Launch {
 
         if (mMainViewport && mApplication) {
             auto* window = mApplication->GetMainWindow();
-            if (window) {
+            if (window != nullptr) {
                 const auto extent = window->GetSize();
                 if (extent.mWidth > 0U && extent.mHeight > 0U) {
                     if (extent.mWidth != mViewportWidth || extent.mHeight != mViewportHeight) {
                         mMainViewport->Resize(extent.mWidth, extent.mHeight);
                         mViewportWidth  = extent.mWidth;
                         mViewportHeight = extent.mHeight;
+                    }
+
+                    if (mRenderCallback && mMainViewport && mRhiDevice) {
+                        mRenderCallback(
+                            *mRhiDevice, *mMainViewport, mViewportWidth, mViewportHeight);
                     }
 
                     const auto queue = mRhiDevice->GetQueue(Rhi::ERhiQueueType::Graphics);
@@ -164,5 +168,9 @@ namespace AltinaEngine::Launch {
             mApplication->Shutdown();
             mApplication.Reset();
         }
+    }
+
+    void FEngineLoop::SetRenderCallback(FRenderCallback callback) {
+        mRenderCallback = AltinaEngine::Move(callback);
     }
 } // namespace AltinaEngine::Launch

@@ -349,6 +349,137 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             return true;
         }
 
+        auto GetNumberAsU32(const FJsonValue* value, u32& out) -> bool {
+            double number = 0.0;
+            if (!GetNumberValue(value, number) || number < 0.0) {
+                return false;
+            }
+            out = static_cast<u32>(number);
+            return true;
+        }
+
+        auto GetLayoutOffsetBytes(const FJsonValue* value, u32& out) -> bool {
+            if (GetNumberAsU32(value, out)) {
+                return true;
+            }
+            if (value == nullptr || value->mType != EJsonType::Object) {
+                return false;
+            }
+            if (GetNumberAsU32(FindObjectValue(*value, "uniform"), out)) {
+                return true;
+            }
+            if (GetNumberAsU32(FindObjectValue(*value, "constantBuffer"), out)) {
+                return true;
+            }
+            if (GetNumberAsU32(FindObjectValue(*value, "byteOffset"), out)) {
+                return true;
+            }
+            if (GetNumberAsU32(FindObjectValue(*value, "offset"), out)) {
+                return true;
+            }
+            return false;
+        }
+
+        auto GetLayoutSizeBytes(const FJsonValue* layout, u32& out) -> bool {
+            if (layout == nullptr || layout->mType != EJsonType::Object) {
+                return false;
+            }
+            if (GetNumberAsU32(FindObjectValue(*layout, "size"), out)) {
+                return true;
+            }
+            if (GetNumberAsU32(FindObjectValue(*layout, "uniformSize"), out)) {
+                return true;
+            }
+            const auto* sizeObj = FindObjectValue(*layout, "size");
+            if (sizeObj != nullptr && sizeObj->mType == EJsonType::Object) {
+                if (GetNumberAsU32(FindObjectValue(*sizeObj, "uniform"), out)) {
+                    return true;
+                }
+                if (GetNumberAsU32(FindObjectValue(*sizeObj, "constantBuffer"), out)) {
+                    return true;
+                }
+                if (GetNumberAsU32(FindObjectValue(*sizeObj, "byteSize"), out)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        auto NativeToFString(const FNativeString& value) -> FString;
+
+        auto ParseSlangTypeLayoutFields(const FJsonValue* layout, const FString& prefix,
+            u32 baseOffset, FShaderConstantBuffer& outCb) -> void {
+            if (layout == nullptr || layout->mType != EJsonType::Object) {
+                return;
+            }
+            const auto* fields = FindObjectValue(*layout, "fields");
+            if (fields == nullptr || fields->mType != EJsonType::Array) {
+                return;
+            }
+
+            for (const auto* field : fields->mArray) {
+                if (field == nullptr || field->mType != EJsonType::Object) {
+                    continue;
+                }
+
+                FNativeString name;
+                if (!GetStringValue(FindObjectValue(*field, "name"), name)) {
+                    continue;
+                }
+
+                u32 offsetBytes = 0U;
+                const auto* offsetValue = FindObjectValue(*field, "offset");
+                if (!GetLayoutOffsetBytes(offsetValue, offsetBytes)) {
+                    GetNumberAsU32(FindObjectValue(*field, "uniformOffset"), offsetBytes);
+                }
+
+                const auto* fieldTypeLayout = FindObjectValue(*field, "typeLayout");
+                u32         sizeBytes = 0U;
+                if (!GetLayoutSizeBytes(fieldTypeLayout, sizeBytes)) {
+                    GetNumberAsU32(FindObjectValue(*field, "size"), sizeBytes);
+                }
+
+                const auto* fieldType = FindObjectValue(*field, "type");
+                FNativeString kind;
+                if (fieldType != nullptr && fieldType->mType == EJsonType::Object) {
+                    GetStringValue(FindObjectValue(*fieldType, "kind"), kind);
+                }
+
+                u32 elementCount = 0U;
+                GetNumberAsU32(FindObjectValue(*field, "elementCount"), elementCount);
+                if (elementCount == 0U && fieldType != nullptr && fieldType->mType == EJsonType::Object) {
+                    GetNumberAsU32(FindObjectValue(*fieldType, "elementCount"), elementCount);
+                }
+
+                const u32 elementStride =
+                    (elementCount > 0U && sizeBytes > 0U) ? (sizeBytes / elementCount) : 0U;
+
+                FString fullName = prefix;
+                if (!fullName.IsEmptyString()) {
+                    fullName.Append(TEXT("."));
+                }
+                const FString nameText = NativeToFString(name);
+                if (!nameText.IsEmptyString()) {
+                    fullName.Append(nameText.GetData(), nameText.Length());
+                }
+
+                FShaderConstantBufferMember member{};
+                member.mName          = fullName;
+                member.mOffset        = baseOffset + offsetBytes;
+                member.mSize          = sizeBytes;
+                member.mElementCount  = elementCount;
+                member.mElementStride = elementStride;
+                outCb.mMembers.PushBack(member);
+
+                const std::string kindStr(kind.GetData(), kind.Length());
+                const bool isArray = (kindStr == "array");
+                if (!isArray && kindStr == "struct") {
+                    ParseSlangTypeLayoutFields(fieldTypeLayout, fullName,
+                        baseOffset + offsetBytes, outCb);
+                }
+            }
+        }
+
         auto NativeToFString(const FNativeString& value) -> FString {
             FString out;
             if (value.IsEmptyString()) {
@@ -421,10 +552,13 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 return false;
             }
 
+            outReflection.mResources.Clear();
+            outReflection.mConstantBuffers.Clear();
+
             const auto* params = FindObjectValue(root, "parameters");
             if (params != nullptr && params->mType == EJsonType::Array) {
-                outReflection.mResources.Clear();
                 outReflection.mResources.Reserve(params->mArray.Size());
+                outReflection.mConstantBuffers.Reserve(params->mArray.Size());
 
                 for (const auto* param : params->mArray) {
                     if (param == nullptr || param->mType != EJsonType::Object) {
@@ -468,6 +602,33 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     binding.mSpace    = bindingSet;
                     binding.mType     = MapResourceKind(kind, baseShape, access, binding.mAccess);
                     outReflection.mResources.PushBack(binding);
+
+                    const std::string kindStr(kind.GetData(), kind.Length());
+                    if (kindStr == "constantBuffer") {
+                        FShaderConstantBuffer cbInfo{};
+                        cbInfo.mName      = binding.mName;
+                        cbInfo.mBinding   = binding.mBinding;
+                        cbInfo.mSet       = binding.mSet;
+                        cbInfo.mRegister  = binding.mRegister;
+                        cbInfo.mSpace     = binding.mSpace;
+
+                        const auto* typeLayout = FindObjectValue(*param, "typeLayout");
+                        const auto* layout = typeLayout;
+                        if (typeLayout != nullptr && typeLayout->mType == EJsonType::Object) {
+                            const auto* elementLayout =
+                                FindObjectValue(*typeLayout, "elementTypeLayout");
+                            if (elementLayout != nullptr && elementLayout->mType == EJsonType::Object) {
+                                layout = elementLayout;
+                            }
+                        }
+
+                        if (layout != nullptr && layout->mType == EJsonType::Object) {
+                            GetLayoutSizeBytes(layout, cbInfo.mSizeBytes);
+                            ParseSlangTypeLayoutFields(layout, FString{}, 0U, cbInfo);
+                        }
+
+                        outReflection.mConstantBuffers.PushBack(cbInfo);
+                    }
                 }
             }
 

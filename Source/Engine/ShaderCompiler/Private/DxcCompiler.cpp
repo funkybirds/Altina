@@ -6,6 +6,7 @@
 #include "Platform/PlatformFileSystem.h"
 #include "Platform/PlatformProcess.h"
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -39,6 +40,7 @@
 
 namespace AltinaEngine::ShaderCompiler::Detail {
     using Core::Container::FString;
+    using Core::Container::TVector;
     using Core::Platform::ReadFileBytes;
     using Core::Platform::RemoveFileIfExists;
     using Core::Platform::RunProcess;
@@ -174,6 +176,131 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             return out;
         }
 
+        auto NameEqualsAscii(const FString& name, const char* ascii) -> bool {
+            if (ascii == nullptr) {
+                return name.IsEmptyString();
+            }
+            const size_t asciiLen = std::strlen(ascii);
+            if (asciiLen != static_cast<size_t>(name.Length())) {
+                return false;
+            }
+            const auto* data = name.GetData();
+            for (size_t i = 0; i < asciiLen; ++i) {
+                const auto ch = static_cast<unsigned char>(ascii[i]);
+                if (data[i] != static_cast<TChar>(ch)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        struct FStructMemberInfo {
+            std::string                   mName;
+            ID3D12ShaderReflectionType*   mType = nullptr;
+            D3D12_SHADER_TYPE_DESC        mDesc{};
+            u32                           mOffset = 0U;
+        };
+
+        auto AppendCBufferMember(FShaderConstantBuffer& outCb, const std::string& name,
+            u32 offsetBytes, u32 sizeBytes, u32 elementCount, u32 elementStride) -> void {
+            FShaderConstantBufferMember member{};
+            member.mName          = ConvertNameToString(name.c_str());
+            member.mOffset        = offsetBytes;
+            member.mSize          = sizeBytes;
+            member.mElementCount  = elementCount;
+            member.mElementStride = elementStride;
+            outCb.mMembers.PushBack(member);
+        }
+
+        auto AppendStructMembers(ID3D12ShaderReflectionType* type, const std::string& prefix,
+            u32 baseOffset, u32 parentSize, FShaderConstantBuffer& outCb) -> void {
+            if (type == nullptr || parentSize == 0U) {
+                return;
+            }
+
+            D3D12_SHADER_TYPE_DESC typeDesc{};
+            if (FAILED(type->GetDesc(&typeDesc)) || typeDesc.Members == 0) {
+                return;
+            }
+
+            TVector<FStructMemberInfo> members;
+            members.Reserve(typeDesc.Members);
+
+            for (UINT i = 0; i < typeDesc.Members; ++i) {
+                const char* memberName = type->GetMemberTypeName(i);
+                auto*       memberType = type->GetMemberTypeByIndex(i);
+                if (memberName == nullptr || memberType == nullptr) {
+                    continue;
+                }
+
+                D3D12_SHADER_TYPE_DESC memberDesc{};
+                if (FAILED(memberType->GetDesc(&memberDesc))) {
+                    continue;
+                }
+
+                FStructMemberInfo info{};
+                info.mName   = memberName;
+                info.mType   = memberType;
+                info.mDesc   = memberDesc;
+                info.mOffset = static_cast<u32>(memberDesc.Offset);
+                members.PushBack(info);
+            }
+
+            if (members.IsEmpty()) {
+                return;
+            }
+
+            std::sort(members.begin(), members.end(),
+                [](const auto& lhs, const auto& rhs) { return lhs.mOffset < rhs.mOffset; });
+
+            for (usize i = 0; i < members.Size(); ++i) {
+                const auto& entry = members[i];
+                u32         sizeBytes = 0U;
+                if (entry.mOffset < parentSize) {
+                    if (i + 1 < members.Size()) {
+                        const u32 nextOffset = members[i + 1].mOffset;
+                        sizeBytes = (nextOffset > entry.mOffset)
+                            ? (nextOffset - entry.mOffset)
+                            : 0U;
+                    } else {
+                        sizeBytes = parentSize - entry.mOffset;
+                    }
+                }
+
+                const std::string fullName = prefix + "." + entry.mName;
+                const u32 elementCount = static_cast<u32>(entry.mDesc.Elements);
+                const u32 elementStride =
+                    (elementCount > 0U && sizeBytes > 0U) ? (sizeBytes / elementCount) : 0U;
+                AppendCBufferMember(outCb, fullName, baseOffset + entry.mOffset, sizeBytes,
+                    elementCount, elementStride);
+
+                const bool isStruct = entry.mDesc.Class == D3D_SVC_STRUCT;
+                if (isStruct && entry.mDesc.Elements == 0 && entry.mDesc.Members > 0
+                    && sizeBytes > 0U) {
+                    AppendStructMembers(entry.mType, fullName,
+                        baseOffset + entry.mOffset, sizeBytes, outCb);
+                }
+            }
+        }
+
+        auto FindConstantBufferBinding(const FShaderReflection& reflection, const char* name,
+            u32& outSet, u32& outBinding, u32& outRegister, u32& outSpace) -> bool {
+            for (const auto& resource : reflection.mResources) {
+                if (resource.mType != EShaderResourceType::ConstantBuffer) {
+                    continue;
+                }
+                if (!NameEqualsAscii(resource.mName, name)) {
+                    continue;
+                }
+                outSet      = resource.mSet;
+                outBinding  = resource.mBinding;
+                outRegister = resource.mRegister;
+                outSpace    = resource.mSpace;
+                return true;
+            }
+            return false;
+        }
+
         auto MapResourceType(const D3D12_SHADER_INPUT_BIND_DESC& desc,
             EShaderResourceAccess&                               outAccess) -> EShaderResourceType {
             outAccess = EShaderResourceAccess::ReadOnly;
@@ -280,6 +407,77 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 binding.mSet      = bindDesc.Space;
                 binding.mType     = MapResourceType(bindDesc, binding.mAccess);
                 outReflection.mResources.PushBack(binding);
+            }
+
+            outReflection.mConstantBuffers.Clear();
+            outReflection.mConstantBuffers.Reserve(desc.ConstantBuffers);
+
+            for (UINT i = 0; i < desc.ConstantBuffers; ++i) {
+                ID3D12ShaderReflectionConstantBuffer* cb = reflector->GetConstantBufferByIndex(i);
+                if (cb == nullptr) {
+                    continue;
+                }
+
+                D3D12_SHADER_BUFFER_DESC cbDesc{};
+                if (FAILED(cb->GetDesc(&cbDesc))) {
+                    continue;
+                }
+                if (cbDesc.Type != D3D_CT_CBUFFER && cbDesc.Type != D3D_CT_TBUFFER) {
+                    continue;
+                }
+
+                FShaderConstantBuffer cbInfo{};
+                cbInfo.mName      = ConvertNameToString(cbDesc.Name);
+                cbInfo.mSizeBytes = cbDesc.Size;
+
+                u32 bindingSet = 0U;
+                u32 bindingIndex = 0U;
+                u32 bindingRegister = 0U;
+                u32 bindingSpace = 0U;
+                if (FindConstantBufferBinding(outReflection, cbDesc.Name,
+                        bindingSet, bindingIndex, bindingRegister, bindingSpace)) {
+                    cbInfo.mSet      = bindingSet;
+                    cbInfo.mBinding  = bindingIndex;
+                    cbInfo.mRegister = bindingRegister;
+                    cbInfo.mSpace    = bindingSpace;
+                }
+
+                cbInfo.mMembers.Reserve(cbDesc.Variables);
+                for (UINT v = 0; v < cbDesc.Variables; ++v) {
+                    ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(v);
+                    if (var == nullptr) {
+                        continue;
+                    }
+                    D3D12_SHADER_VARIABLE_DESC varDesc{};
+                    if (FAILED(var->GetDesc(&varDesc))) {
+                        continue;
+                    }
+                    ID3D12ShaderReflectionType* varType = var->GetType();
+                    D3D12_SHADER_TYPE_DESC      typeDesc{};
+                    if (varType) {
+                        varType->GetDesc(&typeDesc);
+                    }
+
+                    const u32 elementCount = static_cast<u32>(typeDesc.Elements);
+                    const u32 elementStride =
+                        (elementCount > 0U && varDesc.Size > 0U)
+                        ? (static_cast<u32>(varDesc.Size) / elementCount)
+                        : 0U;
+
+                    AppendCBufferMember(cbInfo, std::string(varDesc.Name),
+                        static_cast<u32>(varDesc.StartOffset),
+                        static_cast<u32>(varDesc.Size), elementCount, elementStride);
+
+                    const bool isStruct = varType != nullptr && typeDesc.Class == D3D_SVC_STRUCT;
+                    if (isStruct && typeDesc.Elements == 0 && typeDesc.Members > 0
+                        && varDesc.Size > 0U) {
+                        AppendStructMembers(varType, std::string(varDesc.Name),
+                            static_cast<u32>(varDesc.StartOffset),
+                            static_cast<u32>(varDesc.Size), cbInfo);
+                    }
+                }
+
+                outReflection.mConstantBuffers.PushBack(cbInfo);
             }
 
             UINT tgx = 1;

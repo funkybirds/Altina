@@ -22,6 +22,24 @@ namespace AltinaEngine::Shader {
         ReadWrite
     };
 
+    struct FShaderConstantBufferMember {
+        FString mName;
+        u32     mOffset = 0U;
+        u32     mSize   = 0U;
+        u32     mElementCount  = 0U;
+        u32     mElementStride = 0U;
+    };
+
+    struct FShaderConstantBuffer {
+        FString                         mName;
+        u32                             mSizeBytes = 0U;
+        u32                             mSet      = 0U;
+        u32                             mBinding  = 0U;
+        u32                             mRegister = 0U;
+        u32                             mSpace    = 0U;
+        TVector<FShaderConstantBufferMember> mMembers;
+    };
+
     struct FShaderResourceBinding {
         FString               mName;
         EShaderResourceType   mType      = EShaderResourceType::Texture;
@@ -34,6 +52,7 @@ namespace AltinaEngine::Shader {
 
     struct FShaderReflection {
         TVector<FShaderResourceBinding> mResources;
+        TVector<FShaderConstantBuffer>  mConstantBuffers;
         u32                             mPushConstantBytes = 0U;
         u32                             mThreadGroupSizeX  = 1U;
         u32                             mThreadGroupSizeY  = 1U;

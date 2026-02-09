@@ -6,6 +6,7 @@
 
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "TestHarness.h"
+#include "Shader/ShaderPropertyBag.h"
 #include "RhiMock/RhiMockContext.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiBindGroupLayout.h"
@@ -237,6 +238,29 @@ AE_PER_DRAW_UAV(RWTexture2D<float4>, gOut);
 void CSMain(uint3 id : SV_DispatchThreadID) {
     float4 tex = gTex.SampleLevel(gSamp, float2(0.0, 0.0), 0);
     gOut[id.xy] = tex + mTint + mWorld._11;
+}
+)";
+
+    constexpr const char* kCBufferMemberShaderHlsl = R"(#include "Shader/Bindings/ShaderBindings.hlsli"
+
+struct FInner {
+    float3 A;
+    float  B;
+    float4 C;
+};
+
+AE_PER_MATERIAL_CBUFFER(PerMaterial) {
+    float4 BaseColor;
+    FInner Inner;
+    float2 UVScale;
+    float2 UVBias;
+};
+
+RWStructuredBuffer<uint> gOut : register(u0);
+
+[numthreads(1, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID) {
+    gOut[0] = asuint(BaseColor.x + Inner.B + UVScale.x + UVBias.y + (float)id.x);
 }
 )";
 } // namespace
@@ -488,4 +512,130 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX11") {
     REQUIRE(tex->mBinding == 32U);
     REQUIRE(samp->mBinding == 8U);
     REQUIRE(out->mBinding == 4U);
+}
+
+TEST_CASE("ShaderCompiler.DXC.ConstantBufferMembers") {
+    const auto shaderPath = WriteTempShaderFile("DXC-CBufferMembers", kCBufferMemberShaderHlsl);
+
+    FShaderCompileRequest request;
+    request.mSource.mPath       = ToFString(shaderPath);
+    request.mSource.mEntryPoint = FString(TEXT("CSMain"));
+    request.mSource.mStage      = EShaderStage::Compute;
+    request.mSource.mLanguage   = EShaderSourceLanguage::Hlsl;
+    request.mOptions.mTargetBackend = ERhiBackend::DirectX12;
+    AddShaderIncludeDir(request);
+
+    const auto result = GetShaderCompiler().Compile(request);
+
+    std::error_code ec;
+    std::filesystem::remove(shaderPath, ec);
+
+    if (!result.mSucceeded && IsCompilerUnavailable(result)) {
+        std::cout << "[ SKIP ] DXC-CBufferMembers compiler unavailable\n";
+        return;
+    }
+
+    if (!result.mSucceeded) {
+        std::cerr << "[FAIL] DXC-CBufferMembers compile diagnostics:\n"
+                  << ToAsciiString(result.mDiagnostics) << "\n";
+    }
+
+    REQUIRE(result.mSucceeded);
+    REQUIRE(!result.mReflection.mConstantBuffers.IsEmpty());
+
+    auto FindCBuffer = [&](const char* name)
+        -> const AltinaEngine::Shader::FShaderConstantBuffer* {
+        for (const auto& cb : result.mReflection.mConstantBuffers) {
+            if (ToAsciiString(cb.mName) == name) {
+                return &cb;
+            }
+        }
+        return nullptr;
+    };
+
+    auto FindMember = [&](const AltinaEngine::Shader::FShaderConstantBuffer& cb, const char* name)
+        -> const AltinaEngine::Shader::FShaderConstantBufferMember* {
+        for (const auto& member : cb.mMembers) {
+            if (ToAsciiString(member.mName) == name) {
+                return &member;
+            }
+        }
+        return nullptr;
+    };
+
+    const auto* cb = FindCBuffer("PerMaterial");
+    REQUIRE(cb != nullptr);
+    if (cb == nullptr) {
+        return;
+    }
+
+    REQUIRE(cb->mSet == 2U);
+    REQUIRE(cb->mBinding == 0U);
+    REQUIRE(cb->mSizeBytes >= 64U);
+
+    const auto* baseColorMember = FindMember(*cb, "BaseColor");
+    const auto* innerMember     = FindMember(*cb, "Inner");
+    const auto* innerAMember    = FindMember(*cb, "Inner.A");
+    const auto* innerBMember    = FindMember(*cb, "Inner.B");
+    const auto* innerCMember    = FindMember(*cb, "Inner.C");
+    const auto* uvScaleMember   = FindMember(*cb, "UVScale");
+    const auto* uvBiasMember    = FindMember(*cb, "UVBias");
+
+    REQUIRE(baseColorMember != nullptr);
+    REQUIRE(innerMember != nullptr);
+    REQUIRE(innerAMember != nullptr);
+    REQUIRE(innerBMember != nullptr);
+    REQUIRE(innerCMember != nullptr);
+    REQUIRE(uvScaleMember != nullptr);
+    REQUIRE(uvBiasMember != nullptr);
+    if (!baseColorMember || !innerMember || !innerAMember || !innerBMember || !innerCMember
+        || !uvScaleMember || !uvBiasMember) {
+        return;
+    }
+
+    REQUIRE(baseColorMember->mOffset == 0U);
+    REQUIRE(baseColorMember->mSize == 16U);
+
+    REQUIRE(innerMember->mOffset == 16U);
+    REQUIRE(innerMember->mSize == 32U);
+
+    REQUIRE(innerAMember->mOffset == 16U);
+    REQUIRE(innerAMember->mSize == 12U);
+
+    REQUIRE(innerBMember->mOffset == 28U);
+    REQUIRE(innerBMember->mSize == 4U);
+
+    REQUIRE(innerCMember->mOffset == 32U);
+    REQUIRE(innerCMember->mSize == 16U);
+
+    REQUIRE(uvScaleMember->mOffset == 48U);
+    REQUIRE(uvScaleMember->mSize == 8U);
+
+    REQUIRE(uvBiasMember->mOffset == 56U);
+    REQUIRE(uvBiasMember->mSize == 8U);
+
+    AltinaEngine::Shader::FShaderPropertyBag bag(*cb);
+    const float baseColorValue[4] = { 1.0f, 2.0f, 3.0f, 4.0f };
+    const float innerBValue = 5.0f;
+    const float uvBiasValue[2] = { 6.0f, 7.0f };
+
+    REQUIRE(bag.SetRaw(TEXT("BaseColor"), baseColorValue, sizeof(baseColorValue)));
+    REQUIRE(bag.Set(TEXT("Inner.B"), innerBValue));
+    REQUIRE(bag.SetRaw(TEXT("UVBias"), uvBiasValue, sizeof(uvBiasValue)));
+
+    float baseColorRead[4] = {};
+    float innerBRead = 0.0f;
+    float uvBiasRead[2] = {};
+
+    std::memcpy(baseColorRead, bag.GetData() + baseColorMember->mOffset, sizeof(baseColorRead));
+    std::memcpy(&innerBRead, bag.GetData() + innerBMember->mOffset, sizeof(innerBRead));
+    std::memcpy(uvBiasRead, bag.GetData() + uvBiasMember->mOffset, sizeof(uvBiasRead));
+
+    REQUIRE_EQ(baseColorRead[0], baseColorValue[0]);
+    REQUIRE_EQ(baseColorRead[1], baseColorValue[1]);
+    REQUIRE_EQ(baseColorRead[2], baseColorValue[2]);
+    REQUIRE_EQ(baseColorRead[3], baseColorValue[3]);
+    REQUIRE_EQ(innerBRead, innerBValue);
+    REQUIRE_EQ(uvBiasRead[0], uvBiasValue[0]);
+    REQUIRE_EQ(uvBiasRead[1], uvBiasValue[1]);
 }

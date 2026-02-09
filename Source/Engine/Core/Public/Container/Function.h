@@ -104,7 +104,7 @@ namespace AltinaEngine::Core::Container {
         static constexpr usize kSmallAlign = alignof(void*);
 
         struct StorageT {
-            alignas(kSmallAlign) unsigned char data[kSmallSize];
+            alignas(kSmallAlign) unsigned char mData[kSmallSize];
         };
 
         struct VTable {

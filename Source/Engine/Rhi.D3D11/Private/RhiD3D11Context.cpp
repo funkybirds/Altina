@@ -218,7 +218,7 @@ namespace AltinaEngine::Rhi {
 
     FRhiD3D11Context::~FRhiD3D11Context() {
         Shutdown();
-        mState.reset();
+        mState.Reset();
     }
 
     auto FRhiD3D11Context::InitializeBackend(const FRhiInitDesc& desc) -> bool {

@@ -117,7 +117,7 @@ namespace AltinaEngine {
 
     namespace Detail::ClassPtr {
         template <class T> auto TestClassPtr(int T::*) -> TBoolConstant<!TTypeIsUnion<T>::Value>;
-        template <class> auto   TestClassPtr(...) -> TBoolConstant<false>;
+        template <class> auto   TestClassPtr(...) -> TBoolConstant<false>; // NOLINT
     } // namespace Detail::ClassPtr
 
     template <typename T>
@@ -199,14 +199,14 @@ namespace AltinaEngine {
 
     namespace Detail::Construction {
         template <typename T, typename... Args>
-        auto TestConstructParen(int) -> decltype(T(Declval<Args>()...), TTrueType{});
+        auto TestConstructParen(int) -> decltype(T(Declval<Args>()...), TTrueType{}); // NOLINT
 
-        template <typename T, typename... Args> TFalseType TestConstructParen(...);
+        template <typename T, typename... Args> TFalseType TestConstructParen(...); // NOLINT
 
         template <typename T, typename... Args>
-        auto TestConstructBrace(int) -> decltype(T{ Declval<Args>()... }, TTrueType{});
+        auto TestConstructBrace(int) -> decltype(T{ Declval<Args>()... }, TTrueType{}); // NOLINT
 
-        template <typename T, typename... Args> TFalseType TestConstructBrace(...);
+        template <typename T, typename... Args> TFalseType TestConstructBrace(...); // NOLINT
     } // namespace Detail::Construction
 
     template <typename T, typename... Args>
@@ -279,12 +279,12 @@ namespace AltinaEngine {
 
     // Inheritance / Polymorphism
     namespace Detail::Inheritance {
-        template <typename B> auto TestPtrConv(const volatile B*) -> TTrueType;
-        template <typename> auto   TestPtrConv(const volatile void*) -> TFalseType;
+        template <typename B> auto TestPtrConv(const volatile B*) -> TTrueType;     // NOLINT
+        template <typename> auto   TestPtrConv(const volatile void*) -> TFalseType; // NOLINT
 
         template <typename B, typename D>
-        auto TestIsBaseOf(int) -> decltype(TestPtrConv<B>(static_cast<D*>(nullptr)));
-        template <typename, typename> auto TestIsBaseOf(...) -> TTrueType;
+        auto TestIsBaseOf(int) -> decltype(TestPtrConv<B>(static_cast<D*>(nullptr))); // NOLINT
+        template <typename, typename> auto TestIsBaseOf(...) -> TTrueType;            // NOLINT
     } // namespace Detail::Inheritance
 
     template <typename TBase, typename TDerived>

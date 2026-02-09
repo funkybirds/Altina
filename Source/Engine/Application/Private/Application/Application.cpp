@@ -68,7 +68,7 @@ namespace AltinaEngine::Application {
 
         if (mMainWindow) {
             mMainWindow->Hide();
-            mMainWindow.reset();
+            mMainWindow.Reset();
         }
 
         mIsRunning = false;
@@ -92,7 +92,7 @@ namespace AltinaEngine::Application {
         return mStartupParameters;
     }
 
-    auto FApplication::GetMainWindow() noexcept -> FPlatformWindow* { return mMainWindow.get(); }
+    auto FApplication::GetMainWindow() noexcept -> FPlatformWindow* { return mMainWindow.Get(); }
 
     void FApplication::RequestShutdown() noexcept { mIsRunning = false; }
 

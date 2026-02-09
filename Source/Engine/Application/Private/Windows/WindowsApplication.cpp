@@ -240,7 +240,7 @@ namespace AltinaEngine::Application {
 
     auto FWindowsApplication::CreatePlatformWindow() -> FWindowOwner {
         auto window = MakeUnique<FWindowsPlatformWindow>();
-        return FWindowOwner(window.release());
+        return FWindowOwner(window.Release());
     }
 
     void FWindowsApplication::PumpPlatformMessages() {

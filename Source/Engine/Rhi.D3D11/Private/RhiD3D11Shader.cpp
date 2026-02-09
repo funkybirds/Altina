@@ -34,7 +34,7 @@ namespace AltinaEngine::Rhi {
         : FRhiShader(desc) {
 #if AE_PLATFORM_WIN
         mState = MakeUnique<FState>();
-        if (mState && shader) {
+        if (mState && (shader != nullptr)) {
             mState->mShader.Attach(shader);
         }
 #else
@@ -50,7 +50,7 @@ namespace AltinaEngine::Rhi {
 
     FRhiD3D11Shader::~FRhiD3D11Shader() {
 #if AE_PLATFORM_WIN
-        mState.reset();
+        mState.Reset();
 #endif
     }
 

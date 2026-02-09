@@ -147,7 +147,7 @@ namespace AltinaEngine::Core::TypeMeta {
 
         static auto InvokeDtor(void* p) {
             if constexpr (kDestructible)
-                delete static_cast<T*>(p);
+                delete static_cast<T*>(p); // NOLINT
         }
         static auto InvokeCopyCtor(void* p) -> void* {
             if constexpr (kCopyConstructible)
@@ -224,12 +224,12 @@ namespace AltinaEngine::Core::TypeMeta {
         }
         [[nodiscard]] auto CallDefaultConstructor() const -> void* { return mDefaultConstructor(); }
         void               CallSerializeRule(void* obj, void* serializer) const {
-            if (mSerializeRule) {
+            if (mSerializeRule != nullptr) {
                 mSerializeRule(obj, serializer);
             }
         }
         void CallDeserializeRule(void* obj, void* deserializer) const {
-            if (mDeserializeRule) {
+            if (mDeserializeRule != nullptr) {
                 mDeserializeRule(obj, deserializer);
             }
         }

@@ -11,7 +11,7 @@ TEST_CASE("TOwner release and reset") {
     REQUIRE(Owner);
     REQUIRE_EQ(*Owner, 42);
 
-    int* RawPtr = Owner.release();
+    int* RawPtr = Owner.Release();
     REQUIRE(!Owner);
     REQUIRE(RawPtr != nullptr);
 
@@ -19,7 +19,7 @@ TEST_CASE("TOwner release and reset") {
     REQUIRE(Rewrapped);
     REQUIRE_EQ(*Rewrapped, 42);
 
-    Rewrapped.reset();
+    Rewrapped.Reset();
     REQUIRE(!Rewrapped);
 }
 
@@ -32,7 +32,7 @@ TEST_CASE("TOwner move and swap semantics") {
     REQUIRE(Moved);
     REQUIRE_EQ(*Moved, 5);
 
-    Second.swap(Moved);
+    Second.Swap(Moved);
     REQUIRE_EQ(*Second, 5);
     REQUIRE_EQ(*Moved, 9);
 

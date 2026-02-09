@@ -21,7 +21,7 @@ namespace AltinaEngine::Launch {
         }
 
 #if AE_PLATFORM_WIN
-        mApplication.reset(new Application::FWindowsApplication(mStartupParameters));
+        mApplication.Reset(new Application::FWindowsApplication(mStartupParameters));
 #else
         LogError(TEXT("FEngineLoop PreInit failed: no platform application available."));
         return false;
@@ -53,7 +53,7 @@ namespace AltinaEngine::Launch {
         }
 
 #if AE_PLATFORM_WIN
-        mRhiContext.reset(new Rhi::FRhiD3D11Context());
+        mRhiContext.Reset(new Rhi::FRhiD3D11Context());
 #else
         mRhiContext.reset(new Rhi::FRhiMockContext());
 #endif
@@ -97,12 +97,12 @@ namespace AltinaEngine::Launch {
         mRhiDevice.Reset();
         if (mRhiContext) {
             Rhi::RHIExit(*mRhiContext);
-            mRhiContext.reset();
+            mRhiContext.Reset();
         }
 
         if (mApplication) {
             mApplication->Shutdown();
-            mApplication.reset();
+            mApplication.Reset();
         }
     }
 } // namespace AltinaEngine::Launch

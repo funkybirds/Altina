@@ -8,7 +8,9 @@ namespace AltinaEngine {
     using TTrueType  = TBoolConstant<true>;
     using TFalseType = TBoolConstant<false>;
 
+    // NOLINTBEGIN
     template <typename T> auto Declval() noexcept -> T&& {
         static_assert(false, "Declval can only be used in unevaluated contexts");
     }
+    // NOLINTEND
 } // namespace AltinaEngine

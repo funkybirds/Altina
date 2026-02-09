@@ -40,6 +40,19 @@ namespace AltinaEngine::Rhi {
         Bundle
     };
 
+    enum class ERhiPrimitiveTopology : u8 {
+        PointList = 0,
+        LineList,
+        LineStrip,
+        TriangleList,
+        TriangleStrip
+    };
+
+    enum class ERhiIndexType : u8 {
+        Uint16 = 0,
+        Uint32
+    };
+
     enum class ERhiVendorId : u32 {
         Unknown   = 0,
         Nvidia    = 0x10DE,

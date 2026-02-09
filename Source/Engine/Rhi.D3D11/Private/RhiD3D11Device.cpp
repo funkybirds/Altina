@@ -336,6 +336,28 @@ namespace AltinaEngine::Rhi {
             context->OMSetRenderTargetsAndUnorderedAccessViews(
                 rtvCount, (rtvCount > 0U) ? rtvs : nullptr, dsv, slot, 1, uavs, nullptr);
         }
+
+        auto ToD3D11PrimitiveTopology(ERhiPrimitiveTopology topology) noexcept
+            -> D3D11_PRIMITIVE_TOPOLOGY {
+            switch (topology) {
+                case ERhiPrimitiveTopology::PointList:
+                    return D3D11_PRIMITIVE_TOPOLOGY_POINTLIST;
+                case ERhiPrimitiveTopology::LineList:
+                    return D3D11_PRIMITIVE_TOPOLOGY_LINELIST;
+                case ERhiPrimitiveTopology::LineStrip:
+                    return D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP;
+                case ERhiPrimitiveTopology::TriangleStrip:
+                    return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+                case ERhiPrimitiveTopology::TriangleList:
+                default:
+                    return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+            }
+        }
+
+        auto ToD3D11IndexFormat(ERhiIndexType type) noexcept -> DXGI_FORMAT {
+            return (type == ERhiIndexType::Uint16) ? DXGI_FORMAT_R16_UINT
+                                                   : DXGI_FORMAT_R32_UINT;
+        }
 #endif
     } // namespace
 
@@ -415,6 +437,108 @@ namespace AltinaEngine::Rhi {
 #endif
     }
 
+    void FRhiD3D11CommandContext::RHISetPrimitiveTopology(ERhiPrimitiveTopology topology) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context) {
+            return;
+        }
+
+        context->IASetPrimitiveTopology(ToD3D11PrimitiveTopology(topology));
+#else
+        (void)topology;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context) {
+            return;
+        }
+
+        ID3D11Buffer* buffer = nullptr;
+        if (view.mBuffer) {
+            auto* d3dBuffer = static_cast<FRhiD3D11Buffer*>(view.mBuffer);
+            buffer = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
+        }
+
+        const UINT stride = static_cast<UINT>(view.mStrideBytes);
+        const UINT offset = static_cast<UINT>(view.mOffsetBytes);
+        context->IASetVertexBuffers(static_cast<UINT>(slot), 1, &buffer, &stride, &offset);
+#else
+        (void)slot;
+        (void)view;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHISetIndexBuffer(const FRhiIndexBufferView& view) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context) {
+            return;
+        }
+
+        ID3D11Buffer* buffer = nullptr;
+        if (view.mBuffer) {
+            auto* d3dBuffer = static_cast<FRhiD3D11Buffer*>(view.mBuffer);
+            buffer = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
+        }
+
+        const DXGI_FORMAT format = buffer ? ToD3D11IndexFormat(view.mIndexType)
+                                          : DXGI_FORMAT_UNKNOWN;
+        context->IASetIndexBuffer(buffer, format, static_cast<UINT>(view.mOffsetBytes));
+#else
+        (void)view;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHISetViewport(const FRhiViewportRect& viewport) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context) {
+            return;
+        }
+
+        if (viewport.mWidth <= 0.0f || viewport.mHeight <= 0.0f) {
+            return;
+        }
+
+        D3D11_VIEWPORT vp{};
+        vp.TopLeftX = viewport.mX;
+        vp.TopLeftY = viewport.mY;
+        vp.Width    = viewport.mWidth;
+        vp.Height   = viewport.mHeight;
+        vp.MinDepth = viewport.mMinDepth;
+        vp.MaxDepth = viewport.mMaxDepth;
+        context->RSSetViewports(1, &vp);
+#else
+        (void)viewport;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHISetScissor(const FRhiScissorRect& scissor) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context) {
+            return;
+        }
+
+        if (scissor.mWidth == 0U || scissor.mHeight == 0U) {
+            return;
+        }
+
+        D3D11_RECT rect{};
+        rect.left   = scissor.mX;
+        rect.top    = scissor.mY;
+        rect.right  = scissor.mX + static_cast<LONG>(scissor.mWidth);
+        rect.bottom = scissor.mY + static_cast<LONG>(scissor.mHeight);
+        context->RSSetScissorRects(1, &rect);
+#else
+        (void)scissor;
+#endif
+    }
+
     void FRhiD3D11CommandContext::RHISetRenderTargets(u32 colorTargetCount,
         FRhiTexture* const* colorTargets, FRhiTexture* depthTarget) {
 #if AE_PLATFORM_WIN
@@ -451,6 +575,28 @@ namespace AltinaEngine::Rhi {
         (void)colorTargetCount;
         (void)colorTargets;
         (void)depthTarget;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHIClearColor(
+        FRhiTexture* colorTarget, const FRhiClearColor& color) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context || colorTarget == nullptr) {
+            return;
+        }
+
+        auto* texture = static_cast<FRhiD3D11Texture*>(colorTarget);
+        ID3D11RenderTargetView* rtv = texture ? texture->GetRenderTargetView() : nullptr;
+        if (!rtv) {
+            return;
+        }
+
+        const float clearColor[4] = { color.mR, color.mG, color.mB, color.mA };
+        context->ClearRenderTargetView(rtv, clearColor);
+#else
+        (void)colorTarget;
+        (void)color;
 #endif
     }
 
@@ -634,6 +780,27 @@ namespace AltinaEngine::Rhi {
         (void)group;
         (void)dynamicOffsets;
         (void)dynamicOffsetCount;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHIDraw(
+        u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context || vertexCount == 0U || instanceCount == 0U) {
+            return;
+        }
+
+        if (instanceCount == 1U) {
+            context->Draw(vertexCount, firstVertex);
+        } else {
+            context->DrawInstanced(vertexCount, instanceCount, firstVertex, firstInstance);
+        }
+#else
+        (void)vertexCount;
+        (void)instanceCount;
+        (void)firstVertex;
+        (void)firstInstance;
 #endif
     }
 

@@ -28,14 +28,43 @@ namespace AltinaEngine::Rhi {
             mOps->RHISetComputePipeline(pipeline);
         }
 
+        void RHISetPrimitiveTopology(ERhiPrimitiveTopology topology) override {
+            mOps->RHISetPrimitiveTopology(topology);
+        }
+
+        void RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) override {
+            mOps->RHISetVertexBuffer(slot, view);
+        }
+
+        void RHISetIndexBuffer(const FRhiIndexBufferView& view) override {
+            mOps->RHISetIndexBuffer(view);
+        }
+
+        void RHISetViewport(const FRhiViewportRect& viewport) override {
+            mOps->RHISetViewport(viewport);
+        }
+
+        void RHISetScissor(const FRhiScissorRect& scissor) override {
+            mOps->RHISetScissor(scissor);
+        }
+
         void RHISetRenderTargets(u32 colorTargetCount, FRhiTexture* const* colorTargets,
             FRhiTexture* depthTarget) override {
             mOps->RHISetRenderTargets(colorTargetCount, colorTargets, depthTarget);
         }
 
+        void RHIClearColor(FRhiTexture* colorTarget, const FRhiClearColor& color) override {
+            mOps->RHIClearColor(colorTarget, color);
+        }
+
         void RHISetBindGroup(u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets,
             u32 dynamicOffsetCount) override {
             mOps->RHISetBindGroup(setIndex, group, dynamicOffsets, dynamicOffsetCount);
+        }
+
+        void RHIDraw(u32 vertexCount, u32 instanceCount, u32 firstVertex,
+            u32 firstInstance) override {
+            mOps->RHIDraw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
 
         void RHIDrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,

@@ -30,6 +30,15 @@ namespace AltinaEngine::Rhi {
     class FRhiCmdExecutor;
     class IRhiCmdContextOps;
     class FRhiCmdDrawIndexed;
+    class FRhiCmdSetIndexBuffer;
+    class FRhiCmdSetVertexBuffer;
+    class FRhiCmdSetPrimitiveTopology;
+    class FRhiCmdSetViewport;
+    class FRhiCmdSetScissor;
+    class FRhiCmdClearColor;
+    class FRhiCmdDraw;
+    class FRhiCmdSetRenderTargets;
+    class FRhiCmdSetBindGroup;
     class FRhiCmdDispatch;
     class FRhiSwapchain;
 
@@ -42,6 +51,11 @@ namespace AltinaEngine::Rhi {
     struct FRhiBufferDesc;
     struct FRhiTextureDesc;
     struct FRhiViewportDesc;
+    struct FRhiVertexBufferView;
+    struct FRhiIndexBufferView;
+    struct FRhiViewportRect;
+    struct FRhiScissorRect;
+    struct FRhiClearColor;
     struct FRhiSamplerDesc;
     struct FRhiShaderDesc;
     struct FRhiVertexAttributeDesc;

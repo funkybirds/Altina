@@ -163,6 +163,41 @@ namespace AltinaEngine::Rhi {
         void*     mNativeHandle = nullptr;
     };
 
+    struct FRhiVertexBufferView {
+        FRhiBuffer* mBuffer      = nullptr;
+        u32         mStrideBytes = 0U;
+        u32         mOffsetBytes = 0U;
+    };
+
+    struct FRhiIndexBufferView {
+        FRhiBuffer*  mBuffer      = nullptr;
+        ERhiIndexType mIndexType  = ERhiIndexType::Uint32;
+        u32          mOffsetBytes = 0U;
+    };
+
+    struct FRhiViewportRect {
+        f32 mX        = 0.0f;
+        f32 mY        = 0.0f;
+        f32 mWidth    = 0.0f;
+        f32 mHeight   = 0.0f;
+        f32 mMinDepth = 0.0f;
+        f32 mMaxDepth = 1.0f;
+    };
+
+    struct FRhiScissorRect {
+        i32 mX      = 0;
+        i32 mY      = 0;
+        u32 mWidth  = 0U;
+        u32 mHeight = 0U;
+    };
+
+    struct FRhiClearColor {
+        f32 mR = 0.0f;
+        f32 mG = 0.0f;
+        f32 mB = 0.0f;
+        f32 mA = 1.0f;
+    };
+
     struct FRhiSamplerDesc {
         FString mDebugName;
     };

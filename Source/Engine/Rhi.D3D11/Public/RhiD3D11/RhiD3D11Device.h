@@ -7,6 +7,8 @@ struct ID3D11Device;
 struct ID3D11DeviceContext;
 
 namespace AltinaEngine::Rhi {
+    class FD3D11UploadBufferManager;
+    class FD3D11StagingBufferManager;
 
     class AE_RHI_D3D11_API FRhiD3D11Device final : public FRhiDevice {
     public:
@@ -22,6 +24,8 @@ namespace AltinaEngine::Rhi {
         [[nodiscard]] auto GetNativeDevice() const noexcept -> ID3D11Device*;
         [[nodiscard]] auto GetImmediateContext() const noexcept -> ID3D11DeviceContext*;
         [[nodiscard]] auto GetFeatureLevel() const noexcept -> u32;
+        [[nodiscard]] auto GetUploadBufferManager() noexcept -> FD3D11UploadBufferManager*;
+        [[nodiscard]] auto GetStagingBufferManager() noexcept -> FD3D11StagingBufferManager*;
 
         auto CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef override;
         auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef override;

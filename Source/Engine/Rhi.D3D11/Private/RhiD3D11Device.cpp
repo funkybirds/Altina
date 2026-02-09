@@ -4,6 +4,8 @@
 #include "RhiD3D11/RhiD3D11Pipeline.h"
 #include "RhiD3D11/RhiD3D11Resources.h"
 #include "RhiD3D11/RhiD3D11Shader.h"
+#include "RhiD3D11/RhiD3D11StagingBufferManager.h"
+#include "RhiD3D11/RhiD3D11UploadBufferManager.h"
 
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
@@ -50,6 +52,8 @@ namespace AltinaEngine::Rhi {
         ComPtr<ID3D11Device>        mDevice;
         ComPtr<ID3D11DeviceContext> mImmediateContext;
         D3D_FEATURE_LEVEL           mFeatureLevel = D3D_FEATURE_LEVEL_11_0;
+        FD3D11UploadBufferManager   mUploadManager;
+        FD3D11StagingBufferManager  mStagingManager;
     };
 
     struct FRhiD3D11CommandList::FState {
@@ -1083,6 +1087,13 @@ namespace AltinaEngine::Rhi {
         queueCaps.mSupportsAsyncCompute = false;
         queueCaps.mSupportsAsyncCopy    = false;
         SetQueueCapabilities(queueCaps);
+
+        if (mState) {
+            FD3D11UploadBufferManagerDesc uploadDesc{};
+            uploadDesc.mAllowConstantBufferSuballocation = false;
+            mState->mUploadManager.Init(this, uploadDesc);
+            mState->mStagingManager.Init(this);
+        }
 #else
         (void)device;
         (void)context;
@@ -1124,6 +1135,22 @@ namespace AltinaEngine::Rhi {
         return mState ? static_cast<u32>(mState->mFeatureLevel) : 0U;
 #else
         return 0U;
+#endif
+    }
+
+    auto FRhiD3D11Device::GetUploadBufferManager() noexcept -> FD3D11UploadBufferManager* {
+#if AE_PLATFORM_WIN
+        return mState ? &mState->mUploadManager : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11Device::GetStagingBufferManager() noexcept -> FD3D11StagingBufferManager* {
+#if AE_PLATFORM_WIN
+        return mState ? &mState->mStagingManager : nullptr;
+#else
+        return nullptr;
 #endif
     }
 

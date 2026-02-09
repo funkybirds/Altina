@@ -9,6 +9,16 @@ namespace AltinaEngine::Rhi {
 
     class AE_RHI_GENERAL_API FRhiBuffer : public FRhiResource {
     public:
+        struct FLockResult {
+            void*              mData   = nullptr;
+            u64                mOffset = 0ULL;
+            u64                mSize   = 0ULL;
+            ERhiBufferLockMode mMode   = ERhiBufferLockMode::Read;
+            void*              mHandle = nullptr;
+
+            [[nodiscard]] auto IsValid() const noexcept -> bool { return mData != nullptr; }
+        };
+
         explicit FRhiBuffer(const FRhiBufferDesc& desc,
             FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
 
@@ -29,6 +39,9 @@ namespace AltinaEngine::Rhi {
                 mDesc.mDebugName.Append(name.Data(), name.Length());
             }
         }
+
+        virtual auto Lock(u64 offset, u64 size, ERhiBufferLockMode mode) -> FLockResult;
+        virtual void Unlock(FLockResult& lock);
 
     private:
         FRhiBufferDesc mDesc;

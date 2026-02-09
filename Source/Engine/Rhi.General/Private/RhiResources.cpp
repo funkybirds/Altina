@@ -19,6 +19,14 @@ namespace AltinaEngine::Rhi {
 
     FRhiBuffer::~FRhiBuffer() = default;
 
+    auto FRhiBuffer::Lock(u64 /*offset*/, u64 /*size*/, ERhiBufferLockMode /*mode*/) -> FLockResult {
+        return {};
+    }
+
+    void FRhiBuffer::Unlock(FLockResult& lock) {
+        lock = {};
+    }
+
     FRhiTexture::FRhiTexture(const FRhiTextureDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 

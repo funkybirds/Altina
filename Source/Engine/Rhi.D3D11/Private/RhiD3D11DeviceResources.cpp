@@ -1,7 +1,10 @@
 #include "RhiD3D11/RhiD3D11Device.h"
 #include "RhiD3D11/RhiD3D11Resources.h"
+#include "RhiD3D11/RhiD3D11StagingBufferManager.h"
+#include "RhiD3D11/RhiD3D11UploadBufferManager.h"
 
 #include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiInit.h"
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiTexture.h"
 #include "Types/Aliases.h"
@@ -56,6 +59,29 @@ namespace AltinaEngine::Rhi {
 
     using Core::Container::MakeUnique;
 
+#if AE_PLATFORM_WIN
+    enum class ED3D11BufferLockPath : u8 {
+        None,
+        DirectMap,
+        Upload,
+        Staging
+    };
+
+    namespace {
+        [[nodiscard]] auto ToD3D11Map(ERhiBufferLockMode mode) noexcept -> D3D11_MAP;
+        [[nodiscard]] auto BuildBufferBox(u64 offset, u64 size, D3D11_BOX& box) noexcept -> bool;
+    } // namespace
+
+    struct FD3D11BufferLockState {
+        ED3D11BufferLockPath      mPath = ED3D11BufferLockPath::None;
+        FRhiD3D11Device*          mDevice = nullptr;
+        ID3D11DeviceContext*      mContext = nullptr;
+        ID3D11Buffer*             mNativeBuffer = nullptr;
+        FD3D11UploadAllocation    mUpload;
+        FD3D11StagingAllocation   mStaging;
+    };
+#endif
+
     FRhiD3D11Buffer::FRhiD3D11Buffer(const FRhiBufferDesc& desc, ID3D11Buffer* buffer,
         ID3D11ShaderResourceView*  shaderResourceView,
         ID3D11UnorderedAccessView* unorderedAccessView)
@@ -90,6 +116,237 @@ namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
         mState.Reset();
 #endif
+    }
+
+    auto FRhiD3D11Buffer::Lock(u64 offset, u64 size, ERhiBufferLockMode mode) -> FLockResult {
+        FLockResult lock{};
+        lock.mOffset = offset;
+        lock.mMode   = mode;
+
+#if AE_PLATFORM_WIN
+        const auto& desc = GetDesc();
+        if (desc.mSizeBytes == 0ULL) {
+            return lock;
+        }
+
+        if (size == 0ULL) {
+            if (offset >= desc.mSizeBytes) {
+                return lock;
+            }
+            size = desc.mSizeBytes - offset;
+        }
+
+        if (offset > desc.mSizeBytes || size > (desc.mSizeBytes - offset)) {
+            return lock;
+        }
+
+        lock.mSize = size;
+
+        auto* device = static_cast<FRhiD3D11Device*>(RHIGetDevice());
+        if (device == nullptr) {
+            return {};
+        }
+
+        ID3D11DeviceContext* context = device->GetImmediateContext();
+        ID3D11Buffer*        nativeBuffer = GetNativeBuffer();
+        if (context == nullptr || nativeBuffer == nullptr) {
+            return {};
+        }
+
+        const bool cpuRead  = HasAnyFlags(desc.mCpuAccess, ERhiCpuAccess::Read);
+        const bool cpuWrite = HasAnyFlags(desc.mCpuAccess, ERhiCpuAccess::Write);
+        const bool isDynamic = desc.mUsage == ERhiResourceUsage::Dynamic;
+        const bool isStaging = desc.mUsage == ERhiResourceUsage::Staging;
+
+        if (isStaging) {
+            const bool wantsRead = (mode == ERhiBufferLockMode::Read)
+                || (mode == ERhiBufferLockMode::ReadWrite);
+            const bool wantsWrite = (mode == ERhiBufferLockMode::Write)
+                || (mode == ERhiBufferLockMode::WriteDiscard)
+                || (mode == ERhiBufferLockMode::WriteNoOverwrite)
+                || (mode == ERhiBufferLockMode::ReadWrite);
+            if ((wantsRead && !cpuRead) || (wantsWrite && !cpuWrite)) {
+                return {};
+            }
+
+            D3D11_MAPPED_SUBRESOURCE mapped = {};
+            const HRESULT hr = context->Map(nativeBuffer, 0U, ToD3D11Map(mode), 0U, &mapped);
+            if (FAILED(hr) || mapped.pData == nullptr) {
+                return {};
+            }
+
+            lock.mData = static_cast<u8*>(mapped.pData) + offset;
+
+            auto* state = new FD3D11BufferLockState{};
+            state->mPath = ED3D11BufferLockPath::DirectMap;
+            state->mDevice = device;
+            state->mContext = context;
+            state->mNativeBuffer = nativeBuffer;
+            lock.mHandle = state;
+            return lock;
+        }
+
+        const bool wantsRead = (mode == ERhiBufferLockMode::Read)
+            || (mode == ERhiBufferLockMode::ReadWrite);
+        const bool wantsWrite = (mode == ERhiBufferLockMode::Write)
+            || (mode == ERhiBufferLockMode::WriteDiscard)
+            || (mode == ERhiBufferLockMode::WriteNoOverwrite)
+            || (mode == ERhiBufferLockMode::ReadWrite);
+
+        if (isDynamic && cpuWrite && wantsWrite && !wantsRead) {
+            const D3D11_MAP mapMode =
+                (mode == ERhiBufferLockMode::WriteDiscard) ? D3D11_MAP_WRITE_DISCARD
+                                                           : D3D11_MAP_WRITE_NO_OVERWRITE;
+            D3D11_MAPPED_SUBRESOURCE mapped = {};
+            const HRESULT hr = context->Map(nativeBuffer, 0U, mapMode, 0U, &mapped);
+            if (FAILED(hr) || mapped.pData == nullptr) {
+                return {};
+            }
+            lock.mData = static_cast<u8*>(mapped.pData) + offset;
+
+            auto* state = new FD3D11BufferLockState{};
+            state->mPath = ED3D11BufferLockPath::DirectMap;
+            state->mDevice = device;
+            state->mContext = context;
+            state->mNativeBuffer = nativeBuffer;
+            lock.mHandle = state;
+            return lock;
+        }
+
+        if (wantsRead) {
+            auto* stagingManager = device->GetStagingBufferManager();
+            if (stagingManager == nullptr) {
+                return {};
+            }
+            const ERhiCpuAccess access =
+                wantsWrite ? (ERhiCpuAccess::Read | ERhiCpuAccess::Write) : ERhiCpuAccess::Read;
+            auto staging = stagingManager->Acquire(size, access);
+            if (!staging.IsValid()) {
+                return {};
+            }
+
+            auto* stagingBuffer = static_cast<FRhiD3D11Buffer*>(staging.mBuffer);
+            ID3D11Buffer* stagingNative = stagingBuffer ? stagingBuffer->GetNativeBuffer() : nullptr;
+            if (stagingNative == nullptr) {
+                stagingManager->Release(staging);
+                return {};
+            }
+
+            D3D11_BOX box = {};
+            if (!BuildBufferBox(offset, size, box)) {
+                stagingManager->Release(staging);
+                return {};
+            }
+            context->CopySubresourceRegion(stagingNative, 0U, 0U, 0U, 0U, nativeBuffer, 0U, &box);
+
+            void* mappedData = stagingManager->Map(
+                staging, wantsWrite ? ED3D11StagingMapMode::ReadWrite
+                                    : ED3D11StagingMapMode::Read);
+            if (mappedData == nullptr) {
+                stagingManager->Release(staging);
+                return {};
+            }
+
+            lock.mData = mappedData;
+
+            auto* state = new FD3D11BufferLockState{};
+            state->mPath = ED3D11BufferLockPath::Staging;
+            state->mDevice = device;
+            state->mContext = context;
+            state->mNativeBuffer = nativeBuffer;
+            state->mStaging = staging;
+            lock.mHandle = state;
+            return lock;
+        }
+
+        if (wantsWrite) {
+            auto* uploadManager = device->GetUploadBufferManager();
+            if (uploadManager == nullptr) {
+                return {};
+            }
+            auto upload = uploadManager->Allocate(size, 16ULL, 0ULL);
+            if (!upload.IsValid()) {
+                return {};
+            }
+            void* writePtr = uploadManager->GetWritePointer(upload, 0ULL);
+            if (writePtr == nullptr) {
+                return {};
+            }
+            lock.mData = writePtr;
+
+            auto* state = new FD3D11BufferLockState{};
+            state->mPath = ED3D11BufferLockPath::Upload;
+            state->mDevice = device;
+            state->mContext = context;
+            state->mNativeBuffer = nativeBuffer;
+            state->mUpload = upload;
+            lock.mHandle = state;
+            return lock;
+        }
+#else
+        (void)offset;
+        (void)size;
+        (void)mode;
+#endif
+
+        return lock;
+    }
+
+    void FRhiD3D11Buffer::Unlock(FLockResult& lock) {
+#if AE_PLATFORM_WIN
+        auto* state = static_cast<FD3D11BufferLockState*>(lock.mHandle);
+        if (state == nullptr) {
+            lock = {};
+            return;
+        }
+
+        switch (state->mPath) {
+            case ED3D11BufferLockPath::DirectMap:
+            {
+                if (state->mContext && state->mNativeBuffer) {
+                    state->mContext->Unmap(state->mNativeBuffer, 0U);
+                }
+                break;
+            }
+            case ED3D11BufferLockPath::Upload:
+            {
+                if (state->mContext && state->mNativeBuffer && lock.mData && lock.mSize > 0ULL) {
+                    D3D11_BOX box = {};
+                    if (BuildBufferBox(lock.mOffset, lock.mSize, box)) {
+                        state->mContext->UpdateSubresource(
+                            state->mNativeBuffer, 0U, &box, lock.mData, 0U, 0U);
+                    }
+                }
+                break;
+            }
+            case ED3D11BufferLockPath::Staging:
+            {
+                auto* stagingManager = state->mDevice ? state->mDevice->GetStagingBufferManager()
+                                                      : nullptr;
+                if (stagingManager && state->mNativeBuffer) {
+                    if (lock.mMode == ERhiBufferLockMode::ReadWrite
+                        && lock.mData && lock.mSize > 0ULL) {
+                        D3D11_BOX box = {};
+                        if (BuildBufferBox(lock.mOffset, lock.mSize, box)) {
+                            state->mContext->UpdateSubresource(
+                                state->mNativeBuffer, 0U, &box, lock.mData, 0U, 0U);
+                        }
+                    }
+                    stagingManager->Unmap(state->mStaging);
+                    stagingManager->Release(state->mStaging);
+                }
+                break;
+            }
+            case ED3D11BufferLockPath::None:
+            default:
+                break;
+        }
+
+        delete state;
+#else
+        (void)lock;
+#endif
+        lock = {};
     }
 
     auto FRhiD3D11Buffer::GetNativeBuffer() const noexcept -> ID3D11Buffer* {
@@ -235,6 +492,37 @@ namespace AltinaEngine::Rhi {
 
     namespace {
 #if AE_PLATFORM_WIN
+        [[nodiscard]] auto ToD3D11Map(ERhiBufferLockMode mode) noexcept -> D3D11_MAP {
+            switch (mode) {
+                case ERhiBufferLockMode::WriteDiscard:
+                    return D3D11_MAP_WRITE_DISCARD;
+                case ERhiBufferLockMode::WriteNoOverwrite:
+                    return D3D11_MAP_WRITE_NO_OVERWRITE;
+                case ERhiBufferLockMode::Write:
+                    return D3D11_MAP_WRITE_NO_OVERWRITE;
+                case ERhiBufferLockMode::ReadWrite:
+                    return D3D11_MAP_READ_WRITE;
+                case ERhiBufferLockMode::Read:
+                default:
+                    return D3D11_MAP_READ;
+            }
+        }
+
+        [[nodiscard]] auto BuildBufferBox(u64 offset, u64 size, D3D11_BOX& box) noexcept -> bool {
+            const u64 end = offset + size;
+            const u64 maxUint = static_cast<u64>(std::numeric_limits<UINT>::max());
+            if (offset > maxUint || end > maxUint) {
+                return false;
+            }
+            box.left   = static_cast<UINT>(offset);
+            box.right  = static_cast<UINT>(end);
+            box.top    = 0U;
+            box.bottom = 1U;
+            box.front  = 0U;
+            box.back   = 1U;
+            return true;
+        }
+
         auto ToD3D11Usage(ERhiResourceUsage usage) noexcept -> D3D11_USAGE {
             switch (usage) {
                 case ERhiResourceUsage::Immutable:

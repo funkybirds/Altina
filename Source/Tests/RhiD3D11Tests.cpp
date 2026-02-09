@@ -19,6 +19,7 @@
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiDevice.h"
+#include "Rhi/RhiInit.h"
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiQueue.h"
@@ -26,6 +27,7 @@
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiStructs.h"
 #include "Rhi/RhiTexture.h"
+#include "RhiD3D11/RhiD3D11UploadBufferManager.h"
 #include "Types/Traits.h"
 
 #if AE_PLATFORM_WIN
@@ -107,6 +109,13 @@ VSOut VSMain(VSIn input) {
 [numthreads(1, 1, 1)]
 void CSMain(uint3 tid : SV_DispatchThreadID) {
     Output[0] = 123u;
+})";
+
+    constexpr const char* kRawBufferCsShader = R"(RWByteAddressBuffer Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void CSMain(uint3 tid : SV_DispatchThreadID) {
+    Output.Store(0, 123u);
 })";
 
     constexpr const char* kGraphicsUavPsShader = R"(RWTexture2D<float4> gOut : register(u1);
@@ -582,6 +591,118 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
     REQUIRE(uav.Get() == expectedUav);
 
     d3dContext->End();
+#else
+    // Non-Windows platforms do not support D3D11.
+#endif
+}
+
+TEST_CASE("RhiD3D11.BufferLockCpuGpu") {
+#if AE_PLATFORM_WIN
+    using AltinaEngine::Rhi::ERhiBufferBindFlags;
+    using AltinaEngine::Rhi::ERhiBufferLockMode;
+    using AltinaEngine::Rhi::ERhiResourceUsage;
+    using AltinaEngine::Rhi::FRhiBufferDesc;
+    using AltinaEngine::Rhi::FRhiD3D11Buffer;
+    using AltinaEngine::Rhi::FRhiD3D11Context;
+    using AltinaEngine::Rhi::FRhiD3D11Device;
+    using AltinaEngine::Rhi::FRhiDeviceDesc;
+    using AltinaEngine::Rhi::FRhiInitDesc;
+    using AltinaEngine::Rhi::RHIExit;
+    using AltinaEngine::Rhi::RHIInit;
+    using AltinaEngine::Rhi::kRhiInvalidAdapterIndex;
+    using Microsoft::WRL::ComPtr;
+
+    FRhiD3D11Context context;
+    FRhiInitDesc     initDesc;
+    initDesc.mEnableDebugLayer = false;
+
+    const auto device = RHIInit(context, initDesc, FRhiDeviceDesc{}, kRhiInvalidAdapterIndex);
+    if (!device) {
+        return;
+    }
+
+    auto* d3dDevice = static_cast<FRhiD3D11Device*>(device.Get());
+    REQUIRE(d3dDevice);
+
+    bool frameBegun = false;
+    auto cleanup = [&]() {
+        if (frameBegun) {
+            d3dDevice->GetUploadBufferManager()->EndFrame();
+        }
+        RHIExit(context);
+    };
+
+    ID3D11Device* nativeDevice = d3dDevice->GetNativeDevice();
+    ID3D11DeviceContext* immediateContext = d3dDevice->GetImmediateContext();
+    if (!nativeDevice || !immediateContext) {
+        cleanup();
+        return;
+    }
+
+    FRhiBufferDesc bufferDesc;
+    bufferDesc.mSizeBytes = sizeof(u32);
+    bufferDesc.mUsage = ERhiResourceUsage::Default;
+    bufferDesc.mBindFlags = ERhiBufferBindFlags::UnorderedAccess;
+    const auto buffer = device->CreateBuffer(bufferDesc);
+    REQUIRE(buffer);
+
+    const u32 cpuValue = 42U;
+    auto* uploadManager = d3dDevice->GetUploadBufferManager();
+    if (!uploadManager) {
+        cleanup();
+        return;
+    }
+    uploadManager->BeginFrame(0ULL);
+    frameBegun = true;
+    auto writeLock = buffer->Lock(0ULL, sizeof(u32), ERhiBufferLockMode::WriteDiscard);
+    REQUIRE(writeLock.IsValid());
+    std::memcpy(writeLock.mData, &cpuValue, sizeof(u32));
+    buffer->Unlock(writeLock);
+
+    auto readLock = buffer->Lock(0ULL, sizeof(u32), ERhiBufferLockMode::Read);
+    REQUIRE(readLock.IsValid());
+    const u32 readValue = *static_cast<const u32*>(readLock.mData);
+    buffer->Unlock(readLock);
+    REQUIRE_EQ(readValue, cpuValue);
+
+    AltinaEngine::Shader::FShaderBytecode bytecode;
+    std::string compileErrors;
+    if (!CompileD3D11ShaderDXBC(kRawBufferCsShader, "CSMain", "cs_5_0", bytecode,
+            compileErrors)) {
+        cleanup();
+        return;
+    }
+
+    ComPtr<ID3D11ComputeShader> computeShader;
+    if (FAILED(nativeDevice->CreateComputeShader(
+            bytecode.mData.Data(), bytecode.mData.Size(), nullptr, &computeShader))) {
+        cleanup();
+        return;
+    }
+
+    auto* d3dBuffer = static_cast<FRhiD3D11Buffer*>(buffer.Get());
+    ID3D11UnorderedAccessView* uav =
+        d3dBuffer ? d3dBuffer->GetUnorderedAccessView() : nullptr;
+    if (!uav) {
+        cleanup();
+        return;
+    }
+
+    immediateContext->CSSetShader(computeShader.Get(), nullptr, 0);
+    ID3D11UnorderedAccessView* uavs[] = { uav };
+    immediateContext->CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
+    immediateContext->Dispatch(1U, 1U, 1U);
+    ID3D11UnorderedAccessView* nullUavs[] = { nullptr };
+    immediateContext->CSSetUnorderedAccessViews(0, 1, nullUavs, nullptr);
+    immediateContext->Flush();
+
+    auto gpuReadLock = buffer->Lock(0ULL, sizeof(u32), ERhiBufferLockMode::Read);
+    REQUIRE(gpuReadLock.IsValid());
+    const u32 gpuValue = *static_cast<const u32*>(gpuReadLock.mData);
+    buffer->Unlock(gpuReadLock);
+    REQUIRE_EQ(gpuValue, 123U);
+
+    cleanup();
 #else
     // Non-Windows platforms do not support D3D11.
 #endif

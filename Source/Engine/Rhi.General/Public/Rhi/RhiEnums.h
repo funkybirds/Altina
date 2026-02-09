@@ -83,6 +83,14 @@ namespace AltinaEngine::Rhi {
         Write = 1u << 1
     };
 
+    enum class ERhiBufferLockMode : u8 {
+        Read,
+        Write,
+        ReadWrite,
+        WriteDiscard,
+        WriteNoOverwrite
+    };
+
     enum class ERhiBufferBindFlags : u8 {
         None            = 0,
         Vertex          = 1u << 0,

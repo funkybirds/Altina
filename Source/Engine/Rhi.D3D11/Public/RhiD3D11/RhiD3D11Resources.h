@@ -28,6 +28,9 @@ namespace AltinaEngine::Rhi {
         auto operator=(const FRhiD3D11Buffer&) -> FRhiD3D11Buffer& = delete;
         auto operator=(FRhiD3D11Buffer&&) -> FRhiD3D11Buffer& = delete;
 
+        auto Lock(u64 offset, u64 size, ERhiBufferLockMode mode) -> FLockResult override;
+        void Unlock(FLockResult& lock) override;
+
         [[nodiscard]] auto GetNativeBuffer() const noexcept -> ID3D11Buffer*;
         [[nodiscard]] auto GetShaderResourceView() const noexcept -> ID3D11ShaderResourceView*;
         [[nodiscard]] auto GetUnorderedAccessView() const noexcept -> ID3D11UnorderedAccessView*;

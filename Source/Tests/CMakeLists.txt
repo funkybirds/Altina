@@ -8,6 +8,7 @@ file(GLOB_RECURSE ALTINA_TEST_SOURCES
 add_executable(AltinaEngineTests ${ALTINA_TEST_SOURCES})
 target_link_libraries(AltinaEngineTests PRIVATE
     AltinaEngine::Core
+    AltinaEngine::RenderCore
     AltinaEngine::Rhi::Mock
     AltinaEngine::Rhi::D3D11
     AltinaEngine::ShaderCompiler

@@ -9,6 +9,7 @@ runtime asset loading and editor/tooling import pipelines while keeping dependen
 - Reproducible import/cook pipeline driven by metadata.
 - Minimal, explicit dependencies between engine modules.
 - Scalable to async loading and streaming.
+- Deterministic, cache-friendly build artifacts for CI and local iteration.
 
 ## Non-Goals (for now)
 - Full editor UI for asset authoring.
@@ -24,6 +25,8 @@ runtime asset loading and editor/tooling import pipelines while keeping dependen
 - **Asset Registry**: Database mapping asset identity to paths, types, dependencies, and versions.
 - **Asset Handle**: Runtime reference (UUID + type) used by code.
 - **Virtual Path**: User-facing path (`Engine/Textures/Wood_Albedo`) independent of filesystem.
+- **Redirector**: Lightweight asset mapping from an old UUID/VirtualPath to a new one.
+- **Cook Key**: Hash identifying the deterministic input set for an asset cook.
 
 ---
 
@@ -68,6 +71,23 @@ Each asset has a stable UUID and a virtual path. Metadata is stored next to sour
 Notes:
 - The UUID is the authoritative key; VirtualPath is a convenience lookup.
 - Dependencies are explicit (materials list textures, meshes list materials, etc.).
+- UUIDs are stable across renames/moves; VirtualPath can change without re-import unless data depends on it.
+
+### 3.0 VirtualPath Rules
+- Always use forward slashes and ASCII: `Domain/Category/Name`.
+- Case-insensitive compare at runtime; normalize to lower-case on disk.
+- Reserved top-level prefixes: `Engine/`, `Demo/<Name>/`, `Tools/`.
+- No file extensions in VirtualPath.
+
+### 3.0.1 Renames, Moves, and Redirectors
+- Renames/moves update VirtualPath in `.meta` but keep UUID unchanged.
+- If UUID must change (e.g., duplicate UUID detected), emit a Redirector asset:
+  - `OldUuid -> NewUuid`, `OldVirtualPath -> NewVirtualPath`.
+  - Redirectors ship in registry for at least one release cycle.
+- Runtime lookup:
+  1) VirtualPath -> UUID
+  2) Resolve Redirector (if present)
+  3) Load final target UUID
 
 ### 3.1 Source Dependencies vs Runtime Dependencies
 We distinguish dependencies needed for import/cook from runtime load:
@@ -101,6 +121,23 @@ Example `.meta` (sketch):
 
 ---
 
+## 3.3 Metadata File Conventions
+- `.meta` format: JSON for Phase 0-2; consider TOML/YAML later if tooling benefits.
+- Store authoring hints under `ImportSettings` (non-runtime).
+- Avoid absolute paths. Use repo-root-relative `SourcePath`.
+- Add `CookKey` and `LastCooked` stamps to support incremental builds.
+
+Example extensions (sketch):
+```json
+{
+  "ImportSettings": { "SRGB": true, "MipGen": "Default" },
+  "CookKey": "sha256:0c7f...e9",
+  "LastCooked": "2026-02-10T12:00:00Z"
+}
+```
+
+--- 
+
 ## 4. Runtime Architecture (Engine/Asset)
 Create `Source/Engine/Asset/` module with the following runtime-only responsibilities:
 
@@ -133,7 +170,33 @@ Responsibilities:
 - `bool CanLoad(EAssetType type)`
 - `TSharedPtr<IAsset> Load(const FAssetDesc&, IAssetStream&)`
 
+### 4.5 Loading Phases (Async-Ready)
+Split loading into phases to support async and GPU finalization:
+1) IO: read cooked bytes (background thread).
+2) Decode: CPU-only parse/transform (background thread).
+3) Finalize: GPU resource creation (main thread).
+
+Expose optional hooks:
+- `Preload()` for IO scheduling.
+- `Finalize()` for render-thread integration.
+
+### 4.6 Error Handling & Fallback
+- Missing asset: return null + error log with VirtualPath + UUID.
+- Loader mismatch: return null + typed error code.
+- Optional fallback asset per type (e.g., checkerboard texture).
+
 ---
+
+## 4.7 Asset Type Minimum Fields (v1)
+Define a minimal `FAssetDesc` surface for each asset type:
+- Texture2D: `Width`, `Height`, `Format`, `MipCount`, `SRGB`.
+- Mesh: `VertexFormat`, `IndexFormat`, `Bounds`, `SubMeshes`.
+- Material: `ShadingModel`, `TextureBindings` (UUIDs).
+- Audio: `Codec`, `Channels`, `SampleRate`, `Duration`.
+
+Keep the runtime `FAssetDesc` small; large authoring data stays in tooling.
+
+--- 
 
 ## 5. Tooling Pipeline (Tools/AssetPipeline)
 The import/cook pipeline lives in tooling:
@@ -150,7 +213,42 @@ The import/cook pipeline lives in tooling:
 - Emit or update `AssetRegistry.bin` (or JSON for early stage).
   - Emit RuntimeDependencies for each sub-asset (Mesh -> Material -> Texture, etc.).
 
----
+### 5.3 Deterministic Builds & Cook Keys
+- Compute `CookKey = hash(source bytes + import settings + importer version + platform config)`.
+- Skip cook if `CookKey` unchanged and cooked output exists.
+- Deterministic ordering for dependencies and registry output.
+
+### 5.4 Output Layout (Dev)
+```
+<BuildRoot>/Cooked/<Platform>/
+  Registry/AssetRegistry.json
+  Assets/<Uuid>.bin
+  Bundles/<BundleName>.pak
+<BuildRoot>/Imported/
+  <Uuid>.<importer>.bin
+<BuildRoot>/Cache/
+  CookKeys.json
+```
+
+### 5.5 CLI Surface (Draft)
+Provide a thin CLI for automated workflows:
+- `AssetTool import --root <RepoRoot> --platform Win64`
+- `AssetTool cook --platform Win64 --demo Minimal`
+- `AssetTool validate --registry <path>`
+- `AssetTool clean --cache`
+
+### 5.6 Configuration Files
+`Assets/AssetPipeline.json` (or `config/AssetPipeline.json`):
+```json
+{
+  "Platforms": ["Win64", "Linux"],
+  "DefaultTextureFormat": "BC7",
+  "AudioCodec": "OggVorbis",
+  "CookedOutputRoot": "build/Cooked"
+}
+```
+
+--- 
 
 ## 6. IO & Packaging
 Runtime reads only cooked assets using `IFileSystem` abstraction:
@@ -161,7 +259,11 @@ Bundling strategy (future):
 - Chunk by virtual path prefix (`Engine/*`, `Demo/Minimal/*`).
 - Support per-platform bundles.
 
----
+### 6.1 Bundle Index
+Store an index table mapping UUID -> offset/size in bundle.
+Optional per-bundle compression/encryption metadata.
+
+--- 
 
 ## 7. Versioning & Compatibility
 Each asset format includes:
@@ -173,15 +275,56 @@ When versions change:
 - Require re-import/re-cook.
 - Keep compatibility paths if necessary.
 
----
+### 7.1 Registry Schema (v1)
+Draft JSON schema (runtime-facing):
+```json
+{
+  "SchemaVersion": 1,
+  "Assets": [
+    {
+      "Uuid": "a9c1b3c0-6d6e-4e16-9f4d-2d0a4f2d9a0b",
+      "Type": "Texture2D",
+      "VirtualPath": "Engine/Textures/Wood_Albedo",
+      "CookedPath": "Assets/a9c1b3c0.bin",
+      "Dependencies": [],
+      "Desc": { "Width": 1024, "Height": 1024, "Format": "BC7", "MipCount": 10, "SRGB": true }
+    }
+  ],
+  "Redirectors": [
+    {
+      "OldUuid": "11111111-1111-1111-1111-111111111111",
+      "NewUuid": "a9c1b3c0-6d6e-4e16-9f4d-2d0a4f2d9a0b",
+      "OldVirtualPath": "Engine/Textures/Wood_Albedo_Old"
+    }
+  ]
+}
+```
+
+--- 
 
 ## 8. Diagnostics
 Add logging and validation:
 - Missing asset warnings show VirtualPath + UUID.
 - Dependency cycles detected during registry build.
 - Cook validation emits a summary report.
+- Registry validation checks UUID uniqueness and VirtualPath collisions.
+- Bundle validation checks offsets and sizes.
 
 ---
+
+## 9. Dependency Rules
+- Hard dependency: required for load (e.g., Mesh -> Material).
+- Soft dependency: optional/late load (e.g., LODs, thumbnails).
+- Runtime dependency graph must be acyclic; tool enforces this.
+
+---
+
+## 10. Security & Integrity (Optional)
+- Optional checksum per cooked asset (SHA-256).
+- Bundle signing for shipping builds.
+- Strip editor-only metadata from shipped registry.
+
+--- 
 
 ## Implementation Plan (TODO)
 
@@ -194,11 +337,14 @@ Add logging and validation:
 - [ ] Define `FAssetHandle`, `EAssetType`, `FAssetDesc`.
 - [ ] Implement `AssetRegistry` (JSON reader for bootstrap).
 - [ ] Implement `AssetManager` with simple cache + sync load.
+- [ ] Implement Redirector resolution.
 
 ### Phase 2: Tooling MVP
 - [ ] Add `Tools/AssetPipeline` skeleton (import + cook commands).
 - [ ] Implement `.meta` generation for textures and meshes.
 - [ ] Emit `AssetRegistry.json` for runtime load.
+- [ ] Add `CookKey` + incremental cook cache.
+- [ ] Add registry validation CLI.
 
 ### Phase 3: Asset Types
 - [ ] Texture2D loader (DDS/BCn or engine format).
@@ -215,10 +361,12 @@ Add logging and validation:
 - [ ] Asset bundle/pak format with index table.
 - [ ] Bundle per demo and per platform.
 - [ ] Registry moved to binary format.
+- [ ] Optional checksum/signing for bundles.
 
----
+--- 
 
 ## Open Questions
 - Preferred cooked texture format on Windows (DDS/BCn vs custom)?
 - Do we need a shared global asset cache across demos?
 - Should registry be JSON long-term or migrate to binary/SQLite?
+- Should VirtualPath lookups be case-sensitive or normalized to lower-case only?

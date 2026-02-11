@@ -89,3 +89,14 @@ ae_add_test_target(AltinaEngineTestsShaderCompiler
         AltinaEngine::ShaderCompiler
         AltinaEngine::Rhi::Mock
 )
+
+file(GLOB_RECURSE AE_TEST_IMAGING_SOURCES
+    CONFIGURE_DEPENDS
+    ${AE_TESTS_ROOT}/Imaging/*.cpp
+)
+
+ae_add_test_target(AltinaEngineTestsImaging
+    FOLDER "Imaging"
+    SOURCES ${AE_TEST_IMAGING_SOURCES}
+    LIBS AltinaEngine::Imaging
+)

@@ -179,6 +179,10 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
+        if (width == 0U || height == 0U) {
+            return;
+        }
+
         const u32 newWidth  = ClampExtent(width);
         const u32 newHeight = ClampExtent(height);
 
@@ -190,6 +194,7 @@ namespace AltinaEngine::Rhi {
 
         if (mState->mImmediateContext) {
             mState->mImmediateContext->OMSetRenderTargets(0, nullptr, nullptr);
+            mState->mImmediateContext->ClearState();
             mState->mImmediateContext->Flush();
         }
 
@@ -197,12 +202,27 @@ namespace AltinaEngine::Rhi {
         const bool allowTearing = mState->mAllowTearing && mState->mTearingSupported;
         const UINT flags = allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0U;
 
-        const HRESULT hr =
+        HRESULT hr =
             mState->mSwapChain->ResizeBuffers(mState->mBufferCount, newWidth, newHeight, format,
                 flags);
         if (FAILED(hr)) {
             LogError(TEXT("RHI(D3D11): ResizeBuffers failed (hr=0x{:08X})."),
                 static_cast<u32>(hr));
+
+            if (hr == DXGI_ERROR_INVALID_CALL) {
+                mState->mSwapChain.Reset();
+                mState->mWidth  = newWidth;
+                mState->mHeight = newHeight;
+                if (!CreateSwapChain()) {
+                    LogError(TEXT("RHI(D3D11): Recreate swapchain failed after ResizeBuffers."));
+                    return;
+                }
+
+                UpdateExtent(newWidth, newHeight);
+                CreateBackBuffer();
+                return;
+            }
+
             return;
         }
 

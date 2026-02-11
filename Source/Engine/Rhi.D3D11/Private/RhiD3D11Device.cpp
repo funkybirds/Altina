@@ -187,7 +187,7 @@ namespace AltinaEngine::Rhi {
         }
 
         ComPtr<ID3D11CommandList> commandList;
-        const HRESULT hr = mState->mDeferredContext->FinishCommandList(TRUE, &commandList);
+        const HRESULT hr = mState->mDeferredContext->FinishCommandList(FALSE, &commandList);
         if (FAILED(hr)) {
             return;
         }
@@ -196,6 +196,8 @@ namespace AltinaEngine::Rhi {
         if (rhiCommandList) {
             rhiCommandList->SetNativeCommandList(commandList.Detach());
         }
+
+        mState->mDeferredContext->ClearState();
 #endif
     }
 

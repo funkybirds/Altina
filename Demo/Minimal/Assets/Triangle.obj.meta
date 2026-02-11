@@ -1,0 +1,9 @@
+{
+  "Uuid": "e8f3e312-b6f6-4161-9c32-3c3bb726526e",
+  "Type": "Mesh",
+  "VirtualPath": "demo/minimal/triangle",
+  "SourcePath": "Demo/Minimal/Assets/Triangle.obj",
+  "Importer": "MeshImporter",
+  "ImporterVersion": 1,
+  "Dependencies": []
+}

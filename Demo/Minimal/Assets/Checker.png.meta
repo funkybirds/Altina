@@ -1,0 +1,9 @@
+{
+  "Uuid": "cd3be45e-9aa5-4e33-bf83-f96136b1f50d",
+  "Type": "Texture2D",
+  "VirtualPath": "demo/minimal/checker",
+  "SourcePath": "Demo/Minimal/Assets/Checker.png",
+  "Importer": "TextureImporter",
+  "ImporterVersion": 1,
+  "Dependencies": []
+}

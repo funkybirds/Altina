@@ -5,6 +5,9 @@
 #include "Container/SmartPtr.h"
 #include "Container/Function.h"
 #include "Application/Application.h"
+#include "Asset/AssetManager.h"
+#include "Asset/AssetRegistry.h"
+#include "Asset/Texture2DLoader.h"
 #include "Rhi/RhiContext.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiRefs.h"
@@ -40,5 +43,9 @@ namespace AltinaEngine::Launch {
         FRenderCallback                                   mRenderCallback;
         FStartupParameters mStartupParameters{};
         bool               mIsRunning = false;
+        bool               mAssetReady = false;
+        Asset::FAssetRegistry mAssetRegistry;
+        Asset::FAssetManager  mAssetManager;
+        Asset::FTexture2DLoader mTexture2DLoader;
     };
 } // namespace AltinaEngine::Launch

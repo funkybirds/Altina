@@ -82,3 +82,7 @@ Demo/*/Binaries/
 # PowerShell temp/persist files
 *.ps1xml
 
+# Allow mesh assets (OBJ) under asset folders
+!Assets/**/*.obj
+!Demo/*/Assets/**/*.obj
+

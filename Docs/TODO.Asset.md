@@ -329,22 +329,22 @@ Add logging and validation:
 ## Implementation Plan (TODO)
 
 ### Phase 0: Structure & Stubs
-- [ ] Add `Source/Engine/Asset/` module (Public/Private).
-- [ ] Add `AE_ASSET_API` export macro in `AssetAPI.h`.
-- [ ] Wire CMake target `AltinaEngineAsset` and link to `AltinaEngineCore`.
+- [x] Add `Source/Engine/Asset/` module (Public/Private).
+- [x] Add `AE_ASSET_API` export macro in `AssetAPI.h`.
+- [x] Wire CMake target `AltinaEngineAsset` and link to `AltinaEngineCore`.
 
 ### Phase 1: Runtime Core
-- [ ] Define `FAssetHandle`, `EAssetType`, `FAssetDesc`.
-- [ ] Implement `AssetRegistry` (JSON reader for bootstrap).
-- [ ] Implement `AssetManager` with simple cache + sync load.
-- [ ] Implement Redirector resolution.
+- [x] Define `FAssetHandle`, `EAssetType`, `FAssetDesc`.
+- [x] Implement `AssetRegistry` (JSON reader for bootstrap).
+- [x] Implement `AssetManager` with simple cache + sync load.
+- [x] Implement Redirector resolution.
 
 ### Phase 2: Tooling MVP
-- [ ] Add `Tools/AssetPipeline` skeleton (import + cook commands).
-- [ ] Implement `.meta` generation for textures and meshes.
-- [ ] Emit `AssetRegistry.json` for runtime load.
-- [ ] Add `CookKey` + incremental cook cache.
-- [ ] Add registry validation CLI.
+- [x] Add `Tools/AssetPipeline` skeleton (import + cook commands).
+- [x] Implement `.meta` generation for textures and meshes.
+- [x] Emit `AssetRegistry.json` for runtime load.
+- [x] Add `CookKey` + incremental cook cache.
+- [x] Add registry validation CLI.
 
 ### Phase 3: Asset Types
 - [ ] Texture2D loader (DDS/BCn or engine format).

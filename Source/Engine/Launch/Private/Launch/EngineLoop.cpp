@@ -53,6 +53,12 @@ namespace AltinaEngine::Launch {
             return true;
         }
 
+        if (!mAssetReady) {
+            mAssetManager.SetRegistry(&mAssetRegistry);
+            mAssetManager.RegisterLoader(&mTexture2DLoader);
+            mAssetReady = true;
+        }
+
 #if AE_PLATFORM_WIN
         mRhiContext = Core::Container::MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiD3D11Context>();
 #else
@@ -150,6 +156,13 @@ namespace AltinaEngine::Launch {
 
     void FEngineLoop::Exit() {
         mIsRunning = false;
+
+        if (mAssetReady) {
+            mAssetManager.ClearCache();
+            mAssetManager.UnregisterLoader(&mTexture2DLoader);
+            mAssetManager.SetRegistry(nullptr);
+            mAssetReady = false;
+        }
 
         if (mMainViewport) {
             mMainViewport->SetDeleteQueue(nullptr);

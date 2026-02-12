@@ -27,6 +27,53 @@ namespace AltinaEngine::Asset {
             return true;
         }
 
+        auto HasCompleteTextureDesc(const FTexture2DDesc& desc) noexcept -> bool {
+            return desc.Width > 0U && desc.Height > 0U && desc.MipCount > 0U && desc.Format > 0U;
+        }
+
+        auto MatchesRegistryDesc(const FTexture2DBlobDesc& blobDesc, const FTexture2DDesc& desc,
+            bool srgb) noexcept -> bool {
+            if (!HasCompleteTextureDesc(desc)) {
+                return true;
+            }
+
+            return desc.Width == blobDesc.Width && desc.Height == blobDesc.Height
+                && desc.MipCount == blobDesc.MipCount && desc.Format == blobDesc.Format
+                && desc.SRGB == srgb;
+        }
+
+        auto ComputeTightlyPackedSize(const FTexture2DBlobDesc& blobDesc, u32 bytesPerPixel,
+            u64& outSize) noexcept -> bool {
+            if (bytesPerPixel == 0U) {
+                return false;
+            }
+
+            u32 width  = blobDesc.Width;
+            u32 height = blobDesc.Height;
+            if (width == 0U || height == 0U || blobDesc.MipCount == 0U) {
+                return false;
+            }
+
+            u64 total = 0;
+            for (u32 mip = 0; mip < blobDesc.MipCount; ++mip) {
+                const u64 rowPitch = static_cast<u64>(width) * bytesPerPixel;
+                const u64 mipSize  = rowPitch * static_cast<u64>(height);
+                if (rowPitch == 0U || mipSize / rowPitch != height) {
+                    return false;
+                }
+                if (total > std::numeric_limits<u64>::max() - mipSize) {
+                    return false;
+                }
+                total += mipSize;
+
+                width  = (width > 1U) ? (width >> 1U) : 1U;
+                height = (height > 1U) ? (height >> 1U) : 1U;
+            }
+
+            outSize = total;
+            return true;
+        }
+
         auto ReadHeader(IAssetStream& stream, FAssetBlobHeader& outHeader) -> bool {
             if (!ReadExact(stream, &outHeader, sizeof(FAssetBlobHeader))) {
                 return false;
@@ -83,8 +130,6 @@ namespace AltinaEngine::Asset {
     }
 
     auto FTexture2DLoader::Load(const FAssetDesc& desc, IAssetStream& stream) -> TShared<IAsset> {
-        (void)desc;
-
         FAssetBlobHeader header{};
         if (!ReadHeader(stream, header)) {
             return {};
@@ -96,21 +141,30 @@ namespace AltinaEngine::Asset {
         }
 
         const u32 bytesPerPixel = GetTextureBytesPerPixel(blobDesc.Format);
-        if (bytesPerPixel == 0 || blobDesc.Width == 0 || blobDesc.Height == 0) {
+        if (bytesPerPixel == 0 || blobDesc.Width == 0 || blobDesc.Height == 0
+            || blobDesc.MipCount == 0) {
             return {};
         }
 
         const u64 minRowPitch = static_cast<u64>(blobDesc.Width) * bytesPerPixel;
-        if (blobDesc.RowPitch < minRowPitch) {
+        if (blobDesc.RowPitch != minRowPitch) {
             return {};
         }
 
-        const u64 expectedSize = static_cast<u64>(blobDesc.RowPitch) * blobDesc.Height;
+        u64 expectedSize = 0;
+        if (!ComputeTightlyPackedSize(blobDesc, bytesPerPixel, expectedSize)) {
+            return {};
+        }
         if (expectedSize > static_cast<u64>(std::numeric_limits<usize>::max())) {
             return {};
         }
 
-        if (header.DataSize < expectedSize) {
+        if (header.DataSize != expectedSize) {
+            return {};
+        }
+
+        const bool srgb = HasAssetBlobFlag(header.Flags, EAssetBlobFlags::SRGB);
+        if (!MatchesRegistryDesc(blobDesc, desc.Texture, srgb)) {
             return {};
         }
 
@@ -125,7 +179,7 @@ namespace AltinaEngine::Asset {
         textureDesc.Height   = blobDesc.Height;
         textureDesc.MipCount = blobDesc.MipCount;
         textureDesc.Format   = blobDesc.Format;
-        textureDesc.SRGB     = HasAssetBlobFlag(header.Flags, EAssetBlobFlags::SRGB);
+        textureDesc.SRGB     = srgb;
 
         return MakeSharedAsset<FTexture2DAsset>(textureDesc, AltinaEngine::Move(pixels));
     }

@@ -1,0 +1,9 @@
+﻿{
+  "Uuid": "910816bf-0f36-4a1f-8f5c-a88b9fc01374",
+  "Type": "Audio",
+  "VirtualPath": "demo/minimal/beep",
+  "SourcePath": "Demo/Minimal/Assets/Beep.wav",
+  "Importer": "AudioImporter",
+  "ImporterVersion": 1,
+  "Dependencies": []
+}

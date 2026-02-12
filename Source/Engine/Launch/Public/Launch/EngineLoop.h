@@ -7,6 +7,8 @@
 #include "Application/Application.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
+#include "Asset/AudioLoader.h"
+#include "Asset/MeshLoader.h"
 #include "Asset/Texture2DLoader.h"
 #include "Rhi/RhiContext.h"
 #include "Rhi/RhiDevice.h"
@@ -46,6 +48,8 @@ namespace AltinaEngine::Launch {
         bool               mAssetReady = false;
         Asset::FAssetRegistry mAssetRegistry;
         Asset::FAssetManager  mAssetManager;
+        Asset::FAudioLoader    mAudioLoader;
+        Asset::FMeshLoader     mMeshLoader;
         Asset::FTexture2DLoader mTexture2DLoader;
     };
 } // namespace AltinaEngine::Launch

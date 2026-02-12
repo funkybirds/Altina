@@ -347,10 +347,128 @@ Add logging and validation:
 - [x] Add registry validation CLI.
 
 ### Phase 3: Asset Types
-- [ ] Texture2D loader (DDS/BCn or engine format).
-- [ ] Mesh loader (engine format).
+- [x] Texture2D loader (DDS/BCn or engine format).
+- [x] Mesh loader (engine format).
 - [ ] Material loader (references textures).
-- [ ] Audio loader (streaming-friendly format).
+- [x] Audio loader (streaming-friendly format).
+
+#### Mesh Loader (Engine Format) Draft
+Goals:
+- Fast runtime load with strict validation.
+- Simple, stable binary layout with offsets and sizes.
+- Directly consumable by Render/RHI (vertex layout + index type).
+
+Binary layout (v1):
+- `FAssetBlobHeader` + `FMeshBlobDesc`
+- `FMeshVertexAttributeDesc[]`
+- `FMeshSubMeshDesc[]`
+- `VertexBuffer`
+- `IndexBuffer`
+
+All offsets in `FMeshBlobDesc` are **byte offsets from the blob start**
+(immediately after `FMeshBlobDesc`), so the loader can bounds-check against
+`header.DataSize`.
+
+```cpp
+struct FMeshBlobDesc {
+  u32 VertexCount;
+  u32 IndexCount;
+  u32 VertexStride;
+  u32 IndexType;        // ERhiIndexType (u16/u32)
+  u32 AttributeCount;
+  u32 SubMeshCount;
+
+  u32 AttributesOffset; // bytes from blob start
+  u32 SubMeshesOffset;  // bytes from blob start
+  u32 VertexDataOffset; // bytes from blob start
+  u32 IndexDataOffset;  // bytes from blob start
+
+  u32 VertexDataSize;   // bytes
+  u32 IndexDataSize;    // bytes
+
+  f32 BoundsMin[3];     // optional in v1
+  f32 BoundsMax[3];
+
+  u32 Flags;            // e.g. Interleaved=1, HasBounds=2
+};
+
+struct FMeshVertexAttributeDesc {
+  u32 Semantic;         // Position/Normal/Tangent/UV/Color (enum or hash)
+  u32 SemanticIndex;    // UV0/UV1 etc.
+  u32 Format;           // ERhiFormat
+  u32 InputSlot;        // v1: 0 (single stream)
+  u32 AlignedOffset;    // byte offset in vertex
+  u32 PerInstance;      // 0/1
+  u32 InstanceStepRate;
+};
+
+struct FMeshSubMeshDesc {
+  u32 IndexStart;
+  u32 IndexCount;
+  i32 BaseVertex;
+  u32 MaterialSlot;
+};
+```
+
+Loader validation rules:
+- `VertexCount > 0`, `IndexCount > 0`, `VertexStride > 0`.
+- `VertexDataSize == VertexCount * VertexStride`.
+- `IndexDataSize == IndexCount * (IndexType == u16 ? 2 : 4)`.
+- `Offsets + Sizes` must be within `header.DataSize`.
+- `AttributeCount` / `SubMeshCount` arrays fully readable.
+
+Importer/cook (v1) rules:
+- Single interleaved vertex stream.
+- Triangles only.
+- Index type u16 or u32.
+- No LODs; no compression.
+
+##### LOD Extension (Classic)
+The current layout can be extended for classic LODs by adding a LOD table and per‑LOD
+data ranges. This keeps validation simple and avoids conflating different LODs into
+one giant submesh list.
+
+Add to `FMeshBlobDesc`:
+```cpp
+u32 LodCount;
+u32 LodTableOffset; // bytes from blob start
+```
+
+Per‑LOD table entry:
+```cpp
+struct FMeshLodDesc {
+  u32 VertexCount;
+  u32 IndexCount;
+  u32 VertexDataOffset;
+  u32 IndexDataOffset;
+  u32 VertexDataSize;
+  u32 IndexDataSize;
+
+  u32 SubMeshOffset;
+  u32 SubMeshCount;
+
+  f32 ScreenSize;   // or PixelCoverage threshold
+  f32 BoundsMin[3]; // optional
+  f32 BoundsMax[3];
+};
+```
+
+Loader validation additions:
+- `LodTableOffset` + `LodCount * sizeof(FMeshLodDesc)` within `header.DataSize`.
+- For each LOD: VB/IB ranges within bounds; size matches counts; submesh table in range.
+
+Registry (runtime desc) additions (optional but recommended):
+- `FMeshDesc` add `LodCount` and global `Bounds`.
+
+##### Nanite / Cluster‑Based LOD
+The classic blob layout is **not sufficient** for Nanite‑style data. It needs
+cluster/meshlet tables, hierarchical culling metadata, and streaming page
+indices. Recommended direction:
+- Introduce a new asset type or blob version (e.g., `NaniteMesh`) rather than
+  overloading the classic mesh loader.
+- Add chunked/streamable IO support (loader reads only required ranges instead of
+  loading the entire blob).
+- Store per‑cluster bounds + error metrics + parent/child hierarchy in the cooked blob.
 
 ### Phase 4: Async Loading + Hot Reload
 - [ ] Async load queue + IO thread.

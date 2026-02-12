@@ -100,3 +100,14 @@ ae_add_test_target(AltinaEngineTestsImaging
     SOURCES ${AE_TEST_IMAGING_SOURCES}
     LIBS AltinaEngine::Imaging
 )
+
+file(GLOB_RECURSE AE_TEST_ASSET_SOURCES
+    CONFIGURE_DEPENDS
+    ${AE_TESTS_ROOT}/Asset/*.cpp
+)
+
+ae_add_test_target(AltinaEngineTestsAsset
+    FOLDER "Asset"
+    SOURCES ${AE_TEST_ASSET_SOURCES}
+    LIBS AltinaEngine::Asset
+)

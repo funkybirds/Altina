@@ -37,6 +37,94 @@ namespace AltinaEngine::Asset {
         u32 RowPitch = 0;
     };
 
+    struct AE_ASSET_API FMeshBlobDesc {
+        u32 VertexCount     = 0;
+        u32 IndexCount      = 0;
+        u32 VertexStride    = 0;
+        u32 IndexType       = 0;
+        u32 AttributeCount  = 0;
+        u32 SubMeshCount    = 0;
+        u32 AttributesOffset = 0;
+        u32 SubMeshesOffset  = 0;
+        u32 VertexDataOffset = 0;
+        u32 IndexDataOffset  = 0;
+        u32 VertexDataSize   = 0;
+        u32 IndexDataSize    = 0;
+        f32 BoundsMin[3]     = { 0.0f, 0.0f, 0.0f };
+        f32 BoundsMax[3]     = { 0.0f, 0.0f, 0.0f };
+        u32 Flags            = 0;
+    };
+
+    struct AE_ASSET_API FMeshVertexAttributeDesc {
+        u32 Semantic         = 0;
+        u32 SemanticIndex    = 0;
+        u32 Format           = 0;
+        u32 InputSlot        = 0;
+        u32 AlignedOffset    = 0;
+        u32 PerInstance      = 0;
+        u32 InstanceStepRate = 0;
+    };
+
+    struct AE_ASSET_API FMeshSubMeshDesc {
+        u32 IndexStart   = 0;
+        u32 IndexCount   = 0;
+        i32 BaseVertex   = 0;
+        u32 MaterialSlot = 0;
+    };
+
+    struct AE_ASSET_API FAudioBlobDesc {
+        u32 Codec            = 0;
+        u32 SampleFormat     = 0;
+        u32 Channels         = 0;
+        u32 SampleRate       = 0;
+        u32 FrameCount       = 0;
+        u32 ChunkCount       = 0;
+        u32 FramesPerChunk   = 0;
+        u32 ChunkTableOffset = 0;
+        u32 DataOffset       = 0;
+        u32 DataSize         = 0;
+    };
+
+    struct AE_ASSET_API FAudioChunkDesc {
+        u32 Offset = 0;
+        u32 Size   = 0;
+    };
+
+    constexpr u32 kMeshSemanticPosition = 0;
+    constexpr u32 kMeshSemanticNormal   = 1;
+    constexpr u32 kMeshSemanticTangent  = 2;
+    constexpr u32 kMeshSemanticTexCoord = 3;
+    constexpr u32 kMeshSemanticColor    = 4;
+
+    constexpr u32 kMeshVertexMaskPosition = 1u << 0;
+    constexpr u32 kMeshVertexMaskNormal   = 1u << 1;
+    constexpr u32 kMeshVertexMaskTexCoord0 = 1u << 2;
+
+    constexpr u32 kMeshVertexFormatUnknown        = 0;
+    constexpr u32 kMeshVertexFormatR32Float       = 1;
+    constexpr u32 kMeshVertexFormatR32G32Float    = 2;
+    constexpr u32 kMeshVertexFormatR32G32B32Float = 3;
+    constexpr u32 kMeshVertexFormatR32G32B32A32Float = 4;
+
+    constexpr u32 kAudioCodecUnknown   = 0;
+    constexpr u32 kAudioCodecPcm       = 1;
+    constexpr u32 kAudioCodecOggVorbis = 2;
+
+    constexpr u32 kAudioSampleFormatUnknown = 0;
+    constexpr u32 kAudioSampleFormatPcm16   = 1;
+    constexpr u32 kAudioSampleFormatPcm32f  = 2;
+
+    [[nodiscard]] constexpr auto GetAudioBytesPerSample(u32 format) noexcept -> u32 {
+        switch (format) {
+            case kAudioSampleFormatPcm16:
+                return 2;
+            case kAudioSampleFormatPcm32f:
+                return 4;
+            default:
+                return 0;
+        }
+    }
+
     constexpr u32 kTextureFormatUnknown = 0;
     constexpr u32 kTextureFormatR8      = 1;
     constexpr u32 kTextureFormatRGB8    = 2;
@@ -49,6 +137,20 @@ namespace AltinaEngine::Asset {
             case kTextureFormatRGB8:
                 return 3;
             case kTextureFormatRGBA8:
+                return 4;
+            default:
+                return 0;
+        }
+    }
+
+    constexpr u32 kMeshIndexTypeUint16 = 0;
+    constexpr u32 kMeshIndexTypeUint32 = 1;
+
+    [[nodiscard]] constexpr auto GetMeshIndexStride(u32 indexType) noexcept -> u32 {
+        switch (indexType) {
+            case kMeshIndexTypeUint16:
+                return 2;
+            case kMeshIndexTypeUint32:
                 return 4;
             default:
                 return 0;

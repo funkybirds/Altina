@@ -14,10 +14,15 @@
 #include "Rhi/RhiStructs.h"
 #include "Rhi/RhiViewport.h"
 #include "RhiD3D11/RhiD3D11CommandContext.h"
+#include "ShaderCompiler/ShaderCompiler.h"
 #include "Types/Aliases.h"
 
+#include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -47,35 +52,272 @@ struct Neko {
 
 namespace {
 #if AE_PLATFORM_WIN
-    using Microsoft::WRL::ComPtr;
+    namespace ShaderCompileHelpers {
+        using Microsoft::WRL::ComPtr;
 
-    auto CompileD3D11Shader(const char* source, const char* entryPoint, const char* targetProfile,
-        Shader::FShaderBytecode& outBytecode, std::string& outErrors) -> bool {
-        if (!source || !entryPoint || !targetProfile) {
+        auto ToFString(const std::filesystem::path& path) -> Container::FString {
+            Container::FString out;
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+            const auto wide = path.wstring();
+            if (!wide.empty()) {
+                out.Append(wide.c_str(), wide.size());
+            }
+#else
+            const auto narrow = path.string();
+            if (!narrow.empty()) {
+                out.Append(narrow.c_str(), narrow.size());
+            }
+#endif
+            return out;
+        }
+
+        auto ToFStringAscii(const char* text) -> Container::FString {
+            Container::FString out;
+            if (text == nullptr) {
+                return out;
+            }
+            const size_t length = std::strlen(text);
+            out.Reserve(length);
+            for (size_t i = 0; i < length; ++i) {
+                out.Append(static_cast<TChar>(text[i]));
+            }
+            return out;
+        }
+
+        auto ToAsciiString(const Container::FString& text) -> std::string {
+            std::string out;
+            const auto* data = text.GetData();
+            const auto  size = text.Length();
+            out.reserve(static_cast<size_t>(size));
+            for (usize i = 0; i < size; ++i) {
+                const auto ch = data[i];
+                out.push_back((ch <= 0x7f) ? static_cast<char>(ch) : '?');
+            }
+            return out;
+        }
+
+        auto IsCompilerUnavailable(const Container::FString& diagnostics) -> bool {
+            const auto diag = ToAsciiString(diagnostics);
+            if (diag.find("disabled") != std::string::npos) {
+                return true;
+            }
+            if (diag.find("Failed to launch compiler process.") != std::string::npos) {
+                return true;
+            }
+            if (diag.find("Process execution not supported") != std::string::npos) {
+                return true;
+            }
             return false;
         }
 
-        ComPtr<ID3DBlob> bytecode;
-        ComPtr<ID3DBlob> errors;
-        const UINT       flags = D3DCOMPILE_ENABLE_STRICTNESS;
-        const HRESULT    hr    = D3DCompile(source, std::strlen(source), nullptr, nullptr, nullptr,
-                  entryPoint, targetProfile, flags, 0, &bytecode, &errors);
-
-        outErrors.clear();
-        if (errors) {
-            const auto* data = static_cast<const char*>(errors->GetBufferPointer());
-            outErrors.assign(data, data + errors->GetBufferSize());
+        auto GetEnvPath(const char* name, std::filesystem::path& outPath) -> bool {
+            if (name == nullptr) {
+                return false;
+            }
+            const char* value = std::getenv(name);
+            if (value == nullptr || value[0] == '\0') {
+                return false;
+            }
+            outPath = std::filesystem::path(value);
+            return true;
         }
 
-        if (FAILED(hr) || !bytecode) {
+        auto TryResolveDxcPath(std::filesystem::path& outPath) -> bool {
+            std::filesystem::path envPath;
+            if (GetEnvPath("AE_DXC_PATH", envPath) || GetEnvPath("DXC_PATH", envPath)) {
+                if (std::filesystem::exists(envPath)) {
+                    outPath = envPath;
+                    return true;
+                }
+            }
+
+            if (GetEnvPath("VULKAN_SDK", envPath)) {
+                auto candidate = envPath / "Bin" / "dxc.exe";
+                if (std::filesystem::exists(candidate)) {
+                    outPath = candidate;
+                    return true;
+                }
+            }
+
+            if (GetEnvPath("ProgramFiles(x86)", envPath) || GetEnvPath("ProgramFiles", envPath)) {
+                auto kitsRoot = envPath / "Windows Kits" / "10" / "bin";
+                std::error_code ec;
+                if (std::filesystem::exists(kitsRoot, ec)) {
+                    std::filesystem::path bestPath;
+                    for (const auto& entry : std::filesystem::directory_iterator(kitsRoot, ec)) {
+                        if (ec || !entry.is_directory()) {
+                            continue;
+                        }
+                        auto candidate = entry.path() / "x64" / "dxc.exe";
+                        if (std::filesystem::exists(candidate)) {
+                            if (bestPath.empty() || candidate.string() > bestPath.string()) {
+                                bestPath = candidate;
+                            }
+                        }
+                    }
+                    if (!bestPath.empty()) {
+                        outPath = bestPath;
+                        return true;
+                    }
+                }
+            }
+
             return false;
         }
 
-        const SIZE_T size = bytecode->GetBufferSize();
-        outBytecode.mData.Resize(static_cast<usize>(size));
-        std::memcpy(outBytecode.mData.Data(), bytecode->GetBufferPointer(), size);
-        return true;
-    }
+        auto TryResolveSlangcPath(std::filesystem::path& outPath) -> bool {
+            std::filesystem::path envPath;
+            if (GetEnvPath("AE_SLANGC_PATH", envPath) || GetEnvPath("SLANGC_PATH", envPath)) {
+                if (std::filesystem::exists(envPath)) {
+                    outPath = envPath;
+                    return true;
+                }
+            }
+
+            if (GetEnvPath("VULKAN_SDK", envPath)) {
+                auto candidate = envPath / "Bin" / "slangc.exe";
+                if (std::filesystem::exists(candidate)) {
+                    outPath = candidate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        auto CompileD3D11ShaderFxc(const char* source, const char* entryPoint,
+            const char* targetProfile, Shader::FShaderBytecode& outBytecode,
+            std::string& outErrors) -> bool {
+            if (!source || !entryPoint || !targetProfile) {
+                return false;
+            }
+
+            ComPtr<ID3DBlob> bytecode;
+            ComPtr<ID3DBlob> errors;
+            const UINT       flags = D3DCOMPILE_ENABLE_STRICTNESS;
+            const HRESULT    hr    = D3DCompile(source, std::strlen(source), nullptr, nullptr,
+                      nullptr, entryPoint, targetProfile, flags, 0, &bytecode, &errors);
+
+            outErrors.clear();
+            if (errors) {
+                const auto* data = static_cast<const char*>(errors->GetBufferPointer());
+                outErrors.assign(data, data + errors->GetBufferSize());
+            }
+
+            if (FAILED(hr) || !bytecode) {
+                return false;
+            }
+
+            const SIZE_T size = bytecode->GetBufferSize();
+            outBytecode.mData.Resize(static_cast<usize>(size));
+            std::memcpy(outBytecode.mData.Data(), bytecode->GetBufferPointer(), size);
+            return true;
+        }
+
+        auto WriteTempShaderFile(const char* prefix, const char* content, std::string& outErrors)
+            -> std::filesystem::path {
+            if (content == nullptr) {
+                outErrors = "Shader source is null.";
+                return {};
+            }
+
+            static std::atomic<unsigned int> counter{ 0 };
+            std::error_code                  ec;
+            auto                             dir = std::filesystem::temp_directory_path(ec);
+            if (ec) {
+                dir = std::filesystem::current_path();
+            }
+
+            dir /= "AltinaEngine";
+            dir /= "Demo";
+            dir /= "Minimal";
+            std::filesystem::create_directories(dir, ec);
+            if (ec) {
+                outErrors = "Failed to create shader temp directory.";
+                return {};
+            }
+
+            const auto id = counter.fetch_add(1, std::memory_order_relaxed);
+            std::filesystem::path path =
+                dir / (std::string(prefix) + "_" + std::to_string(id) + ".hlsl");
+
+            std::ofstream file(path, std::ios::binary | std::ios::trunc);
+            if (!file) {
+                outErrors = "Failed to open temp shader file for writing.";
+                return {};
+            }
+
+            file.write(content, static_cast<std::streamsize>(std::strlen(content)));
+            if (!file) {
+                outErrors = "Failed to write temp shader file.";
+                return {};
+            }
+
+            file.close();
+            return path;
+        }
+
+        auto CompileD3D11ShaderWithShaderCompiler(const char* source, const char* entryPoint,
+            Shader::EShaderStage stage, ShaderCompiler::EShaderSourceLanguage sourceLanguage,
+            Shader::FShaderBytecode& outBytecode, Shader::FShaderReflection& outReflection,
+            std::string& outErrors, const char* targetProfile = nullptr) -> bool {
+            if (!source || !entryPoint) {
+                return false;
+            }
+
+            outErrors.clear();
+            const auto shaderPath = WriteTempShaderFile("TriangleShader", source, outErrors);
+            if (shaderPath.empty()) {
+                return false;
+            }
+
+            ShaderCompiler::FShaderCompileRequest request;
+            request.mSource.mPath       = ToFString(shaderPath);
+            request.mSource.mEntryPoint = ToFStringAscii(entryPoint);
+            request.mSource.mStage      = stage;
+            request.mSource.mLanguage   = sourceLanguage;
+            request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
+            if (targetProfile != nullptr && targetProfile[0] != '\0') {
+                request.mOptions.mTargetProfile = ToFStringAscii(targetProfile);
+            }
+
+            auto result = ShaderCompiler::GetShaderCompiler().Compile(request);
+            if ((!result.mSucceeded || result.mBytecode.IsEmpty())
+                && IsCompilerUnavailable(result.mDiagnostics)) {
+                std::filesystem::path compilerPath;
+                const bool resolved =
+                    (sourceLanguage == ShaderCompiler::EShaderSourceLanguage::Slang)
+                    ? TryResolveSlangcPath(compilerPath)
+                    : TryResolveDxcPath(compilerPath);
+                if (resolved) {
+                    request.mOptions.mCompilerPathOverride = ToFString(compilerPath);
+                    result = ShaderCompiler::GetShaderCompiler().Compile(request);
+                }
+            }
+
+            std::error_code ec;
+            std::filesystem::remove(shaderPath, ec);
+
+            outErrors = ToAsciiString(result.mDiagnostics);
+            if (!result.mSucceeded || result.mBytecode.IsEmpty()) {
+                return false;
+            }
+
+            outBytecode.mData = AltinaEngine::Move(result.mBytecode);
+            outReflection = AltinaEngine::Move(result.mReflection);
+            return true;
+        }
+
+        auto CreateShaderFromBytecode(Rhi::FRhiDevice& device, Shader::EShaderStage stage,
+            Shader::FShaderBytecode&& bytecode, Shader::FShaderReflection&& reflection)
+            -> Rhi::FRhiShaderRef {
+            Rhi::FRhiShaderDesc desc{};
+            desc.mStage      = stage;
+            desc.mBytecode   = AltinaEngine::Move(bytecode);
+            desc.mReflection = AltinaEngine::Move(reflection);
+            return device.CreateShader(desc);
+        }
+    } // namespace ShaderCompileHelpers
 #endif
 
     constexpr const char* kTriangleShaderHlsl = R"(struct VSOut {
@@ -191,35 +433,75 @@ float4 PSMain(VSOut input) : SV_Target0 {
     private:
         bool Initialize(Rhi::FRhiDevice& device) {
 #if AE_PLATFORM_WIN
-            Shader::FShaderBytecode vsBytecode;
-            Shader::FShaderBytecode psBytecode;
-            std::string             errors;
+            auto BuildShader = [&](const char* entryPoint, Shader::EShaderStage stage,
+                const char* targetProfile, const char* label, Rhi::FRhiShaderRef& outShader)
+                -> bool {
+                Shader::FShaderBytecode   bytecode;
+                Shader::FShaderReflection reflection;
+                std::string               errors;
 
-            if (!CompileD3D11Shader(kTriangleShaderHlsl, "VSMain", "vs_5_0", vsBytecode, errors)) {
-                if (!errors.empty()) {
-                    std::cerr << "[Triangle] VS compile failed:\n" << errors << "\n";
+                if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(
+                        kTriangleShaderHlsl, entryPoint, stage,
+                        ShaderCompiler::EShaderSourceLanguage::Hlsl, bytecode, reflection, errors,
+                        targetProfile)) {
+                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(
+                        device, stage, AltinaEngine::Move(bytecode), AltinaEngine::Move(reflection));
+                    if (outShader) {
+                        return true;
+                    }
+                    std::cerr << "[Triangle] " << label
+                              << " create failed for DXC output; trying Slang.\n";
+                } else if (!errors.empty()) {
+                    std::cerr << "[Triangle] " << label << " DXC compile failed:\n"
+                              << errors << "\n";
                 }
+
+                errors.clear();
+                if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(
+                        kTriangleShaderHlsl, entryPoint, stage,
+                        ShaderCompiler::EShaderSourceLanguage::Slang, bytecode, reflection, errors,
+                        targetProfile)) {
+                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(
+                        device, stage, AltinaEngine::Move(bytecode), AltinaEngine::Move(reflection));
+                    if (outShader) {
+                        return true;
+                    }
+                    std::cerr << "[Triangle] " << label
+                              << " create failed for Slang output; trying D3DCompile.\n";
+                } else if (!errors.empty()) {
+                    std::cerr << "[Triangle] " << label << " Slang compile failed:\n"
+                              << errors << "\n";
+                }
+
+                errors.clear();
+                Shader::FShaderBytecode fxcBytecode;
+                if (ShaderCompileHelpers::CompileD3D11ShaderFxc(
+                        kTriangleShaderHlsl, entryPoint, targetProfile, fxcBytecode, errors)) {
+                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(
+                        device, stage, AltinaEngine::Move(fxcBytecode), {});
+                    if (outShader) {
+                        std::cerr << "[Triangle] " << label
+                                  << " created via D3DCompile fallback.\n";
+                        return true;
+                    }
+                    std::cerr << "[Triangle] " << label
+                              << " create failed after D3DCompile.\n";
+                }
+
+                if (!errors.empty()) {
+                    std::cerr << "[Triangle] " << label << " D3DCompile failed:\n"
+                              << errors << "\n";
+                }
+                return false;
+            };
+
+            if (!BuildShader("VSMain", Shader::EShaderStage::Vertex, "vs_5_0", "VS",
+                    mVertexShader)) {
                 return false;
             }
 
-            if (!CompileD3D11Shader(kTriangleShaderHlsl, "PSMain", "ps_5_0", psBytecode, errors)) {
-                if (!errors.empty()) {
-                    std::cerr << "[Triangle] PS compile failed:\n" << errors << "\n";
-                }
-                return false;
-            }
-
-            Rhi::FRhiShaderDesc vsDesc{};
-            vsDesc.mStage    = Shader::EShaderStage::Vertex;
-            vsDesc.mBytecode = AltinaEngine::Move(vsBytecode);
-
-            Rhi::FRhiShaderDesc psDesc{};
-            psDesc.mStage    = Shader::EShaderStage::Pixel;
-            psDesc.mBytecode = AltinaEngine::Move(psBytecode);
-
-            mVertexShader = device.CreateShader(vsDesc);
-            mPixelShader  = device.CreateShader(psDesc);
-            if (!mVertexShader || !mPixelShader) {
+            if (!BuildShader("PSMain", Shader::EShaderStage::Pixel, "ps_5_0", "PS",
+                    mPixelShader)) {
                 return false;
             }
 

@@ -14,6 +14,7 @@ target_sources(${TargetName}
 target_link_libraries(${TargetName}
     PRIVATE
         AltinaEngine::Launch
+        AltinaEngine::ShaderCompiler
 )
 
 if(WIN32)

@@ -90,6 +90,35 @@ namespace AltinaEngine::Asset {
         u32 Size   = 0;
     };
 
+    struct AE_ASSET_API FMaterialBlobDesc {
+        u32 ShadingModel  = 0;
+        u32 BlendMode     = 0;
+        u32 Flags         = 0;
+        f32 AlphaCutoff   = 0.0f;
+        u32 ScalarCount   = 0;
+        u32 VectorCount   = 0;
+        u32 TextureCount  = 0;
+        u32 ScalarsOffset = 0;
+        u32 VectorsOffset = 0;
+        u32 TexturesOffset = 0;
+    };
+
+    struct AE_ASSET_API FMaterialScalarParam {
+        u32 NameHash = 0;
+        f32 Value    = 0.0f;
+    };
+
+    struct AE_ASSET_API FMaterialVectorParam {
+        u32 NameHash = 0;
+        f32 Value[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    };
+
+    struct AE_ASSET_API FMaterialTextureParam {
+        u32         NameHash = 0;
+        FAssetHandle Texture;
+        u32         SamplerFlags = 0;
+    };
+
     constexpr u32 kMeshSemanticPosition = 0;
     constexpr u32 kMeshSemanticNormal   = 1;
     constexpr u32 kMeshSemanticTangent  = 2;

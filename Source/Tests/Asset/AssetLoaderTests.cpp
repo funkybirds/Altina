@@ -2,12 +2,16 @@
 #include <system_error>
 #include <cstring>
 #include <cmath>
+#include <fstream>
 
 #include "Asset/AssetBinary.h"
+#include "Asset/AssetBundle.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
 #include "Asset/AudioAsset.h"
 #include "Asset/AudioLoader.h"
+#include "Asset/MaterialAsset.h"
+#include "Asset/MaterialLoader.h"
 #include "Asset/MeshAsset.h"
 #include "Asset/MeshLoader.h"
 #include "Asset/Texture2DAsset.h"
@@ -24,8 +28,11 @@ namespace {
     using AltinaEngine::Asset::FAssetHandle;
     using AltinaEngine::Asset::FAssetManager;
     using AltinaEngine::Asset::FAssetRegistry;
+    using AltinaEngine::Asset::FAssetBundleReader;
     using AltinaEngine::Asset::FAudioAsset;
     using AltinaEngine::Asset::FAudioLoader;
+    using AltinaEngine::Asset::FMaterialAsset;
+    using AltinaEngine::Asset::FMaterialLoader;
     using AltinaEngine::Asset::FMeshAsset;
     using AltinaEngine::Asset::FMeshLoader;
     using AltinaEngine::Asset::FTexture2DAsset;
@@ -227,6 +234,183 @@ TEST_CASE("Asset.Mesh.EngineFormat.Load") {
 
     manager.UnregisterLoader(&loader);
     manager.SetRegistry(nullptr);
+}
+
+TEST_CASE("Asset.Material.EngineFormat.Load") {
+    AltinaEngine::FUuid::FBytes uuidBytes{};
+    uuidBytes[0] = 0x11;
+    uuidBytes[1] = 0x22;
+    uuidBytes[2] = 0x33;
+    uuidBytes[3] = 0x44;
+    uuidBytes[15] = 0x55;
+    AltinaEngine::FUuid textureUuid(uuidBytes);
+
+    FAssetHandle textureHandle{};
+    textureHandle.Uuid = textureUuid;
+    textureHandle.Type = AltinaEngine::Asset::EAssetType::Texture2D;
+
+    AltinaEngine::Asset::FMaterialBlobDesc blobDesc{};
+    blobDesc.ShadingModel  = 1;
+    blobDesc.BlendMode     = 2;
+    blobDesc.Flags         = 0x4;
+    blobDesc.AlphaCutoff   = 0.5f;
+    blobDesc.ScalarCount   = 2;
+    blobDesc.VectorCount   = 1;
+    blobDesc.TextureCount  = 1;
+
+    const u32 scalarBytes = blobDesc.ScalarCount
+        * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialScalarParam));
+    const u32 vectorBytes = blobDesc.VectorCount
+        * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialVectorParam));
+    const u32 textureBytes = blobDesc.TextureCount
+        * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialTextureParam));
+
+    blobDesc.ScalarsOffset  = 0;
+    blobDesc.VectorsOffset  = scalarBytes;
+    blobDesc.TexturesOffset = scalarBytes + vectorBytes;
+
+    AltinaEngine::Asset::FAssetBlobHeader header{};
+    header.Type     = static_cast<u8>(AltinaEngine::Asset::EAssetType::Material);
+    header.DescSize = static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialBlobDesc));
+    header.DataSize = scalarBytes + vectorBytes + textureBytes;
+
+    TVector<u8> cooked;
+    cooked.Resize(sizeof(header) + sizeof(blobDesc) + header.DataSize);
+
+    u8* writePtr = cooked.Data();
+    std::memcpy(writePtr, &header, sizeof(header));
+    writePtr += sizeof(header);
+    std::memcpy(writePtr, &blobDesc, sizeof(blobDesc));
+    writePtr += sizeof(blobDesc);
+
+    AltinaEngine::Asset::FMaterialScalarParam scalars[2]{};
+    scalars[0].NameHash = 0x1111U;
+    scalars[0].Value    = 0.25f;
+    scalars[1].NameHash = 0x2222U;
+    scalars[1].Value    = 0.75f;
+
+    AltinaEngine::Asset::FMaterialVectorParam vectors[1]{};
+    vectors[0].NameHash = 0x3333U;
+    vectors[0].Value[0] = 0.1f;
+    vectors[0].Value[1] = 0.2f;
+    vectors[0].Value[2] = 0.3f;
+    vectors[0].Value[3] = 0.4f;
+
+    AltinaEngine::Asset::FMaterialTextureParam textures[1]{};
+    textures[0].NameHash = 0x4444U;
+    textures[0].Texture  = textureHandle;
+    textures[0].SamplerFlags = 0x1U;
+
+    std::memcpy(writePtr + blobDesc.ScalarsOffset, scalars, sizeof(scalars));
+    std::memcpy(writePtr + blobDesc.VectorsOffset, vectors, sizeof(vectors));
+    std::memcpy(writePtr + blobDesc.TexturesOffset, textures, sizeof(textures));
+
+    FTestAssetStream stream(cooked);
+    FMaterialLoader loader;
+
+    FAssetDesc desc{};
+    desc.Material.ShadingModel = blobDesc.ShadingModel;
+    desc.Material.TextureBindings.PushBack(textureHandle);
+
+    auto asset = loader.Load(desc, stream);
+    REQUIRE(asset);
+
+    auto* material = static_cast<FMaterialAsset*>(asset.Get());
+    REQUIRE(material != nullptr);
+
+    const auto& runtime = material->GetDesc();
+    REQUIRE_EQ(runtime.ShadingModel, blobDesc.ShadingModel);
+    REQUIRE_EQ(runtime.BlendMode, blobDesc.BlendMode);
+    REQUIRE_EQ(runtime.Flags, blobDesc.Flags);
+    REQUIRE_EQ(runtime.AlphaCutoff, blobDesc.AlphaCutoff);
+
+    REQUIRE_EQ(material->GetScalars().Size(), static_cast<usize>(blobDesc.ScalarCount));
+    REQUIRE_EQ(material->GetVectors().Size(), static_cast<usize>(blobDesc.VectorCount));
+    REQUIRE_EQ(material->GetTextures().Size(), static_cast<usize>(blobDesc.TextureCount));
+
+    REQUIRE_EQ(material->GetScalars()[0].NameHash, scalars[0].NameHash);
+    REQUIRE_EQ(material->GetScalars()[1].NameHash, scalars[1].NameHash);
+    REQUIRE_EQ(material->GetVectors()[0].NameHash, vectors[0].NameHash);
+    REQUIRE_EQ(material->GetTextures()[0].Texture, textureHandle);
+}
+
+TEST_CASE("Asset.Bundle.RoundTrip") {
+    AltinaEngine::FUuid::FBytes uuidBytes{};
+    uuidBytes[0] = 0xAA;
+    uuidBytes[1] = 0xBB;
+    uuidBytes[2] = 0xCC;
+    uuidBytes[3] = 0xDD;
+    uuidBytes[15] = 0xEE;
+    AltinaEngine::FUuid assetUuid(uuidBytes);
+
+    TVector<u8> payload;
+    payload.Resize(12);
+    for (usize i = 0; i < payload.Size(); ++i) {
+        payload[i] = static_cast<u8>(i + 1U);
+    }
+
+    const auto bundlePath = std::filesystem::current_path() / "BundleRoundTrip.pak";
+    {
+        std::ofstream file(bundlePath, std::ios::binary);
+        REQUIRE(file.good());
+
+        AltinaEngine::Asset::FBundleHeader header{};
+        header.Magic   = AltinaEngine::Asset::kBundleMagic;
+        header.Version = AltinaEngine::Asset::kBundleVersion;
+
+        file.write(reinterpret_cast<const char*>(&header),
+            static_cast<std::streamsize>(sizeof(header)));
+
+        AltinaEngine::Asset::FBundleIndexEntry entry{};
+        const auto& bytes = assetUuid.GetBytes();
+        for (usize index = 0; index < AltinaEngine::FUuid::kByteCount; ++index) {
+            entry.Uuid[index] = bytes[index];
+        }
+        entry.Type        = static_cast<u32>(AltinaEngine::Asset::EAssetType::Texture2D);
+        entry.Compression = static_cast<u32>(AltinaEngine::Asset::EBundleCompression::None);
+        entry.Offset      = sizeof(header);
+        entry.Size        = static_cast<u64>(payload.Size());
+        entry.RawSize     = static_cast<u64>(payload.Size());
+        entry.ChunkCount  = 0;
+        entry.ChunkTableOffset = 0;
+
+        file.write(reinterpret_cast<const char*>(payload.Data()),
+            static_cast<std::streamsize>(payload.Size()));
+
+        const u64 indexOffset = entry.Offset + entry.Size;
+        AltinaEngine::Asset::FBundleIndexHeader indexHeader{};
+        indexHeader.EntryCount = 1;
+        indexHeader.StringTableSize = 0;
+
+        file.write(reinterpret_cast<const char*>(&indexHeader),
+            static_cast<std::streamsize>(sizeof(indexHeader)));
+        file.write(reinterpret_cast<const char*>(&entry),
+            static_cast<std::streamsize>(sizeof(entry)));
+
+        header.IndexOffset = indexOffset;
+        header.IndexSize   = sizeof(indexHeader) + sizeof(entry);
+        header.BundleSize  = header.IndexOffset + header.IndexSize;
+
+        file.seekp(0, std::ios::beg);
+        file.write(reinterpret_cast<const char*>(&header),
+            static_cast<std::streamsize>(sizeof(header)));
+    }
+
+    FAssetBundleReader reader;
+    REQUIRE(reader.Open(ToFString(bundlePath)));
+
+    AltinaEngine::Asset::FBundleIndexEntry readEntry{};
+    REQUIRE(reader.GetEntry(assetUuid, readEntry));
+    REQUIRE_EQ(readEntry.Size, static_cast<u64>(payload.Size()));
+
+    TVector<u8> outBytes;
+    REQUIRE(reader.ReadEntry(readEntry, outBytes));
+    REQUIRE_EQ(outBytes.Size(), payload.Size());
+    REQUIRE(std::memcmp(outBytes.Data(), payload.Data(), static_cast<size_t>(payload.Size())) == 0);
+
+    reader.Close();
+    std::error_code ec;
+    std::filesystem::remove(bundlePath, ec);
 }
 
 TEST_CASE("Asset.Audio.EngineFormat.Load") {

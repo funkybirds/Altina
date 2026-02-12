@@ -349,7 +349,7 @@ Add logging and validation:
 ### Phase 3: Asset Types
 - [x] Texture2D loader (DDS/BCn or engine format).
 - [x] Mesh loader (engine format).
-- [ ] Material loader (references textures).
+- [x] Material loader (references textures).
 - [x] Audio loader (streaming-friendly format).
 
 #### Mesh Loader (Engine Format) Draft
@@ -470,16 +470,154 @@ indices. Recommended direction:
   loading the entire blob).
 - Store per‑cluster bounds + error metrics + parent/child hierarchy in the cooked blob.
 
+#### Material Loader (Engine Format) Draft
+Goals:
+- Small, stable binary that the runtime can load quickly.
+- Explicit dependencies on Texture2D assets.
+- Minimal parameter system (scalars, vectors, textures) suitable for Phase 3.
+
+Binary layout (v1):
+- `FAssetBlobHeader` + `FMaterialBlobDesc`
+- `FMaterialScalarParam[]`
+- `FMaterialVectorParam[]`
+- `FMaterialTextureParam[]`
+
+All offsets in `FMaterialBlobDesc` are **byte offsets from the blob start**
+(immediately after `FMaterialBlobDesc`), so the loader can bounds-check against
+`header.DataSize`.
+
+```cpp
+struct FMaterialBlobDesc {
+  u32 ShadingModel;     // e.g. PBR, Unlit
+  u32 BlendMode;        // Opaque/Masked/Translucent
+  u32 Flags;            // TwoSided, HasNormalMap, etc.
+  f32 AlphaCutoff;      // for masked
+  u32 ScalarCount;
+  u32 VectorCount;
+  u32 TextureCount;
+  u32 ScalarsOffset;    // bytes from blob start
+  u32 VectorsOffset;    // bytes from blob start
+  u32 TexturesOffset;   // bytes from blob start
+};
+
+struct FMaterialScalarParam {
+  u32 NameHash;         // stable hash of parameter name
+  f32 Value;
+};
+
+struct FMaterialVectorParam {
+  u32 NameHash;
+  f32 Value[4];
+};
+
+struct FMaterialTextureParam {
+  u32 NameHash;
+  FAssetHandle Texture; // UUID + type (Texture2D)
+  u32 SamplerFlags;     // wrap/filter bits
+};
+```
+
+Loader validation rules:
+- `ScalarCount/VectorCount/TextureCount` arrays fully readable.
+- Offsets + sizes stay within `header.DataSize`.
+- All texture handles are `EAssetType::Texture2D`.
+
+Registry (runtime desc) fields (v1):
+- `ShadingModel`, `BlendMode`, `Flags`.
+- `TextureBindings` (list of texture asset handles for dependencies).
+
+Custom material compatibility (Phase 3+):
+- Allow `ShadingModel = Custom` while keeping the same parameter tables.
+- Reserve optional fields in `FMaterialBlobDesc` for custom shader linkage and payload:
+
+```cpp
+// Optional v1 extensions (keep zero for standard materials).
+u32 ShaderId;          // hash or registry id for a custom shader/pipeline
+u32 CustomDataOffset;  // bytes from blob start
+u32 CustomDataSize;    // bytes
+```
+
+Loader behavior:
+- If `CustomDataSize > 0`, validate the range but do not parse it in Phase 3.
+- Runtime can pass `ShaderId` and raw custom payload to the render backend.
+
+Cooker behavior:
+- For `Custom` materials, emit `ShaderId` + opaque payload (e.g., serialized graph or
+  custom parameter block) and list any extra dependencies explicitly.
+
 ### Phase 4: Async Loading + Hot Reload
 - [ ] Async load queue + IO thread.
 - [ ] Main-thread finalize phase for GPU resources.
 - [ ] Editor/dev hot reload based on `.meta` timestamp.
 
 ### Phase 5: Packaging
-- [ ] Asset bundle/pak format with index table.
-- [ ] Bundle per demo and per platform.
+- [x] Asset bundle/pak format with index table.
+- [x] Bundle per demo and per platform.
 - [ ] Registry moved to binary format.
 - [ ] Optional checksum/signing for bundles.
+
+#### Asset Bundle (Pak) Design Draft
+Goals:
+- Reduce file count and improve IO locality.
+- Random access by UUID (no full scan).
+- Compatible with existing cooked asset blobs.
+- Extensible for compression/encryption/streaming.
+
+High-level layout (v1):
+- `FBundleHeader`
+- Optional chunk table(s)
+- Asset payloads (concatenated cooked blobs)
+- `FBundleIndex` (at the end, offset in header)
+
+Lookup flow:
+1) Registry provides `Uuid` + asset type + bundle hint (optional).
+2) Bundle reader finds `Uuid` entry in index.
+3) Read payload range; decompress if needed.
+4) Feed bytes to the existing asset loader.
+
+Minimal v1 scope:
+- Single bundle file per demo/platform.
+- No encryption.
+- Optional compression per asset entry.
+
+```cpp
+struct FBundleHeader {
+  u32 Magic;        // "AEB1"
+  u16 Version;      // 1
+  u16 Flags;        // HasCompression, HasEncryption, HasChunkTable...
+  u64 IndexOffset;  // byte offset to bundle index
+  u64 IndexSize;    // bytes
+  u64 BundleSize;   // total file size
+  u64 HashOffset;   // optional: bundle hash table
+};
+
+struct FBundleIndexHeader {
+  u32 EntryCount;
+  u32 StringTableSize; // optional debug strings
+};
+
+struct FBundleIndexEntry {
+  FUuid Uuid;
+  u32   Type;
+  u32   Compression; // None / LZ4 / Zstd
+  u64   Offset;      // payload offset
+  u64   Size;        // compressed size
+  u64   RawSize;     // decompressed size
+  u32   ChunkCount;  // 0 if not chunked
+  u32   ChunkTableOffset; // relative to index start
+};
+
+struct FBundleChunkDesc {
+  u64 Offset;
+  u64 Size;     // compressed
+  u64 RawSize;  // decompressed
+};
+```
+
+Bundling strategy (draft):
+- Prefix groups: `Engine/*` → Engine.pak, `Demo/Minimal/*` → DemoMinimal.pak.
+- Large assets can be chunked for streaming (audio, nanite meshes).
+- Hotfix pak can be layered with higher priority.
 
 --- 
 

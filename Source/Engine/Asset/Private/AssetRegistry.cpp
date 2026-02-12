@@ -211,6 +211,9 @@ namespace AltinaEngine::Asset {
                     break;
                 case EAssetType::Material:
                     ReadU32Field(descObject, "ShadingModel", desc.Material.ShadingModel);
+                    ReadU32Field(descObject, "BlendMode", desc.Material.BlendMode);
+                    ReadU32Field(descObject, "Flags", desc.Material.Flags);
+                    ReadFloatField(descObject, "AlphaCutoff", desc.Material.AlphaCutoff);
                     ReadTextureBindings(descObject, desc.Material.TextureBindings);
                     break;
                 case EAssetType::Audio:

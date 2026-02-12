@@ -1,5 +1,6 @@
 ﻿
 #include "Asset/AssetBinary.h"
+#include "Asset/AssetBundle.h"
 #include "Asset/AssetTypes.h"
 #include "Container/Span.h"
 #include "Container/Vector.h"
@@ -1863,6 +1864,96 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             return BuildMeshBlob(mesh, outCooked, outDesc);
         }
+
+        struct FBundledAsset {
+            FUuid               Uuid;
+            std::string         UuidText;
+            Asset::EAssetType   Type = Asset::EAssetType::Unknown;
+            std::string         CookedPath;
+            std::vector<u8>     Data;
+        };
+
+        void WriteBundleUuid(Asset::FBundleIndexEntry& entry, const FUuid& uuid) {
+            const auto& bytes = uuid.GetBytes();
+            for (usize index = 0; index < FUuid::kByteCount; ++index) {
+                entry.Uuid[index] = bytes[index];
+            }
+        }
+
+        auto LoadRegistryAssets(const std::filesystem::path& registryPath,
+            const std::filesystem::path& cookedRoot, std::vector<FBundledAsset>& outAssets) -> bool {
+            outAssets.clear();
+
+            std::string text;
+            if (!ReadFileText(registryPath, text)) {
+                return false;
+            }
+
+            FNativeString native;
+            native.Append(text.c_str(), text.size());
+            const FNativeStringView view(native.GetData(), native.Length());
+
+            FJsonDocument document;
+            if (!document.Parse(view)) {
+                return false;
+            }
+
+            const FJsonValue* root = document.GetRoot();
+            if (root == nullptr || root->Type != EJsonType::Object) {
+                return false;
+            }
+
+            const FJsonValue* assetsValue = FindObjectValueInsensitive(*root, "Assets");
+            if (assetsValue == nullptr || assetsValue->Type != EJsonType::Array) {
+                return false;
+            }
+
+            for (const auto* assetValue : assetsValue->Array) {
+                if (assetValue == nullptr || assetValue->Type != EJsonType::Object) {
+                    continue;
+                }
+
+                FNativeString uuidText;
+                FNativeString typeText;
+                FNativeString cookedText;
+
+                if (!GetStringValue(FindObjectValueInsensitive(*assetValue, "Uuid"), uuidText)) {
+                    continue;
+                }
+                if (!GetStringValue(FindObjectValueInsensitive(*assetValue, "Type"), typeText)) {
+                    continue;
+                }
+                if (!GetStringValue(FindObjectValueInsensitive(*assetValue, "CookedPath"),
+                        cookedText)) {
+                    continue;
+                }
+
+                FUuid uuid;
+                if (!FUuid::TryParse(
+                        FNativeStringView(uuidText.GetData(), uuidText.Length()), uuid)) {
+                    continue;
+                }
+
+                FBundledAsset asset{};
+                asset.Uuid = uuid;
+                asset.UuidText = ToStdString(uuidText);
+                asset.Type = ParseAssetType(ToStdString(typeText));
+                if (asset.Type == Asset::EAssetType::Unknown) {
+                    continue;
+                }
+                asset.CookedPath = ToStdString(cookedText);
+
+                const std::filesystem::path sourcePath = cookedRoot / asset.CookedPath;
+                if (!ReadFileBytes(sourcePath, asset.Data)) {
+                    std::cerr << "Failed to read cooked asset: " << sourcePath.string() << "\n";
+                    continue;
+                }
+
+                outAssets.push_back(AltinaEngine::Move(asset));
+            }
+
+            return !outAssets.empty();
+        }
         auto LoadMeta(const std::filesystem::path& metaPath, FUuid& outUuid,
             Asset::EAssetType& outType, std::string& outVirtualPath) -> bool {
             std::string text;
@@ -2071,6 +2162,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::cout << "  import   --root <repoRoot> [--demo <DemoName>]\n";
             std::cout << "  cook     --root <repoRoot> --platform <Platform> [--demo <DemoName>]";
             std::cout << " [--build-root <BuildRoot>]\n";
+            std::cout << "  bundle   --root <repoRoot> --platform <Platform> [--demo <DemoName>]";
+            std::cout << " [--build-root <BuildRoot>]\n";
             std::cout << "  validate --registry <PathToAssetRegistry.json>\n";
             std::cout << "  clean    --root <repoRoot> [--build-root <BuildRoot>] --cache\n";
         }
@@ -2250,7 +2343,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         }
                         break;
                     case Asset::EAssetType::Material:
-                        stream << "\"ShadingModel\": 0, \"TextureBindings\": []";
+                        stream << "\"ShadingModel\": 0, \"BlendMode\": 0, \"Flags\": 0, "
+                               << "\"AlphaCutoff\": 0, \"TextureBindings\": []";
                         break;
                     case Asset::EAssetType::Audio:
                         if (entry.HasAudioDesc) {
@@ -2441,6 +2535,110 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::cout << "Registry: " << registryPath.string() << "\n";
             return 0;
         }
+
+        auto BundleAssets(const FCommandLine& command) -> int {
+            const std::string platform = command.Options.contains("platform")
+                ? command.Options.at("platform")
+                : std::string("Win64");
+            const std::string demoFilter = command.Options.contains("demo")
+                ? command.Options.at("demo")
+                : std::string();
+
+            FToolPaths paths = BuildPaths(command, platform);
+            const std::filesystem::path registryPath =
+                paths.CookedRoot / "Registry" / "AssetRegistry.json";
+
+            std::vector<FBundledAsset> assets;
+            if (!LoadRegistryAssets(registryPath, paths.CookedRoot, assets)) {
+                std::cerr << "Failed to load registry assets: " << registryPath.string() << "\n";
+                return 1;
+            }
+
+            std::sort(assets.begin(), assets.end(),
+                [](const FBundledAsset& left, const FBundledAsset& right) {
+                    return left.UuidText < right.UuidText;
+                });
+
+            const std::string bundleName = demoFilter.empty() ? std::string("All") : demoFilter;
+            const std::filesystem::path bundlePath =
+                paths.CookedRoot / "Bundles" / (bundleName + ".pak");
+
+            std::error_code ec;
+            std::filesystem::create_directories(bundlePath.parent_path(), ec);
+
+            std::ofstream file(bundlePath, std::ios::binary);
+            if (!file) {
+                std::cerr << "Failed to open bundle for writing: " << bundlePath.string() << "\n";
+                return 1;
+            }
+
+            Asset::FBundleHeader header{};
+            header.Magic   = Asset::kBundleMagic;
+            header.Version = Asset::kBundleVersion;
+
+            file.write(reinterpret_cast<const char*>(&header),
+                static_cast<std::streamsize>(sizeof(header)));
+
+            u64 offset = sizeof(header);
+            std::vector<Asset::FBundleIndexEntry> entries;
+            entries.reserve(assets.size());
+
+            for (const auto& asset : assets) {
+                if (asset.Data.empty()) {
+                    std::cerr << "Skipping empty asset: " << asset.CookedPath << "\n";
+                    continue;
+                }
+
+                Asset::FBundleIndexEntry entry{};
+                WriteBundleUuid(entry, asset.Uuid);
+                entry.Type        = static_cast<u32>(asset.Type);
+                entry.Compression = static_cast<u32>(Asset::EBundleCompression::None);
+                entry.Offset      = offset;
+                entry.Size        = static_cast<u64>(asset.Data.size());
+                entry.RawSize     = static_cast<u64>(asset.Data.size());
+                entry.ChunkCount  = 0;
+                entry.ChunkTableOffset = 0;
+
+                file.write(reinterpret_cast<const char*>(asset.Data.data()),
+                    static_cast<std::streamsize>(asset.Data.size()));
+                offset += entry.Size;
+                entries.push_back(entry);
+            }
+
+            const u64 indexOffset = offset;
+            Asset::FBundleIndexHeader indexHeader{};
+            indexHeader.EntryCount = static_cast<u32>(entries.size());
+            indexHeader.StringTableSize = 0;
+
+            file.write(reinterpret_cast<const char*>(&indexHeader),
+                static_cast<std::streamsize>(sizeof(indexHeader)));
+
+            if (!entries.empty()) {
+                file.write(reinterpret_cast<const char*>(entries.data()),
+                    static_cast<std::streamsize>(entries.size() * sizeof(Asset::FBundleIndexEntry)));
+            }
+
+            const u64 indexSize = sizeof(indexHeader)
+                + static_cast<u64>(entries.size()) * sizeof(Asset::FBundleIndexEntry);
+            const u64 bundleSize = indexOffset + indexSize;
+
+            header.IndexOffset = indexOffset;
+            header.IndexSize   = indexSize;
+            header.BundleSize  = bundleSize;
+
+            file.seekp(0, std::ios::beg);
+            file.write(reinterpret_cast<const char*>(&header),
+                static_cast<std::streamsize>(sizeof(header)));
+
+            if (!file.good()) {
+                std::cerr << "Failed to write bundle: " << bundlePath.string() << "\n";
+                return 1;
+            }
+
+            std::cout << "Bundle: " << bundlePath.string() << "\n";
+            std::cout << "Bundle assets: " << entries.size() << "\n";
+            return 0;
+        }
         auto ValidateRegistry(const std::filesystem::path& registryPath) -> int {
             std::string text;
             if (!ReadFileText(registryPath, text)) {
@@ -2572,6 +2770,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
         if (cmdLower == "cook") {
             return CookAssets(command);
+        }
+        if (cmdLower == "bundle") {
+            return BundleAssets(command);
         }
         if (cmdLower == "validate") {
             auto registryIt = command.Options.find("registry");

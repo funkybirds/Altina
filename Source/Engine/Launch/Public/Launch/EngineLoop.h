@@ -8,6 +8,7 @@
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
 #include "Asset/AudioLoader.h"
+#include "Asset/MaterialLoader.h"
 #include "Asset/MeshLoader.h"
 #include "Asset/Texture2DLoader.h"
 #include "Rhi/RhiContext.h"
@@ -49,6 +50,7 @@ namespace AltinaEngine::Launch {
         Asset::FAssetRegistry mAssetRegistry;
         Asset::FAssetManager  mAssetManager;
         Asset::FAudioLoader    mAudioLoader;
+        Asset::FMaterialLoader mMaterialLoader;
         Asset::FMeshLoader     mMeshLoader;
         Asset::FTexture2DLoader mTexture2DLoader;
     };

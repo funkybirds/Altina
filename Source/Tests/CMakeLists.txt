@@ -111,3 +111,27 @@ ae_add_test_target(AltinaEngineTestsAsset
     SOURCES ${AE_TEST_ASSET_SOURCES}
     LIBS AltinaEngine::Asset
 )
+
+if(TARGET AltinaEngineAssetTool)
+    if(WIN32)
+        set(AE_ASSET_COOK_PLATFORM "Win64")
+    else()
+        set(AE_ASSET_COOK_PLATFORM "Linux")
+    endif()
+
+    add_test(NAME AltinaEngineAssetCook
+        COMMAND $<TARGET_FILE:AltinaEngineAssetTool> cook
+            --root ${CMAKE_SOURCE_DIR}
+            --platform ${AE_ASSET_COOK_PLATFORM}
+            --demo Minimal
+    )
+
+    set_tests_properties(AltinaEngineAssetCook PROPERTIES
+        FIXTURES_SETUP AssetCook
+    )
+    set_tests_properties(AltinaEngineTestsAsset PROPERTIES
+        FIXTURES_REQUIRED AssetCook
+    )
+
+    add_dependencies(AltinaEngineTestsAsset AltinaEngineAssetTool)
+endif()

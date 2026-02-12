@@ -60,6 +60,9 @@ namespace AltinaEngine::Asset {
 
     struct AE_ASSET_API FMaterialDesc {
         u32                   ShadingModel = 0;
+        u32                   BlendMode    = 0;
+        u32                   Flags        = 0;
+        f32                   AlphaCutoff  = 0.0f;
         TVector<FAssetHandle> TextureBindings;
     };
 

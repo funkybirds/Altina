@@ -41,7 +41,6 @@ AltinaEngine/
 - `Private/` hosts implementation headers and all `.cpp` files. Subfolders can mirror `Public/` for clarity.
 - Use `ModuleName/Public` as the include root for other modules: `#include "Core/Application/Application.h"`.
 - Limit friend includes via CMake `target_link_libraries` to express allowed module dependencies.
-- Optional: add a `Module.Build.cs`-style manifest (JSON or TOML) if you want data-driven build metadata later.
 - `Engine/Core` acts as the foundation; organise its public API into subfolders such as `Types/` (aliases + concepts),
   `Containers/`, and `Math/` for low-level primitives.
 
@@ -97,71 +96,16 @@ AltinaEngine/
 
 ## Linking Strategy
 
-### Current Approach — Dynamic Libraries (DLL/.so)
-
-- **Pros**: share engine binaries across demos and tools; faster iteration when only engine code changes; enables
-  runtime module reload/hot patching; clearer ABI boundary for plugin ecosystems; ship engine updates without
-  recompiling game code.
-- **Cons**: requires export macros (`AE_CORE_API`) and disciplined symbol visibility; additional packaging for
-  platform-specific runtimes; ABI breakage risks between engine and demos; slightly heavier load-time complexity (
-  dependency graphs, versioning).
-- **Implementation notes**: `AltinaEngineCore` builds with `AE_CORE_BUILD` defined, exporting surface symbols via
+- `AltinaEngineCore` builds with `AE_CORE_BUILD` defined, exporting surface symbols via
   `CoreAPI.h`. Post-build steps stage the `.dll/.so` into demo `Binaries/` folders.
 
 ## Coding Style Guidelines
 
-- **File layout**: mirror Unreal Engine conventions; one primary type per file named `<TypeName>.h/.cpp`, with public
-  headers under `Public/` and implementations under `Private/`.
-- **Type prefixes**:
-    - Templates and `concept`s start with `T` (`TVector`, `TUniquePtr`).
-    - Enums use `E` (`EColorSpace`).
-    - Plain structs/classes use `F` unless they derive from a special base (`FVector3`).
-    - Interfaces start with `I`;
-    - Concepts start with `C`;
-- **Member prefixes**:
-    - Constants/static constexpr values start with `k` (`kMaxLights`).
-    - Global variables/g_singletons start with `g` (`gEngineConfig`).
-    - Member variables use `m` (`mTransform`).
-    - Pointer members append `Ptr` (`mRenderDevicePtr`) to clarify ownership semantics.
-- **Functions & methods**: PascalCase (`InitializeRenderer`, `LoadModule`); boolean getters can use `Is`/`Has` prefix.
-  -- **Namespace rules**: wrap engine code in `AltinaEngine::` sub-namespaces per module; avoid `using namespace` in
-  headers.
-- **Basic Types**: Use aliases like `u32`, `f64`, `String`, instead of `unsigned int`, `long long`, `int32_t`,
-  `std::string`.
-
-### Namespace Naming Guideline
-
-- Avoid redundant `AltinaEngine` prefixes on type names inside engine modules (e.g., do not repeat the top-level
-  identifier in type names). Public API stays under `AltinaEngine::` sub-namespaces, but type identifiers, aliases and
-  traits should not include an extra `AltinaEngine` textual prefix.
-- Plan: perform a staged refactor to remove duplicated textual prefixes from TypeTraits, Concepts, container types and
-  basic aliases; document progress in `TODO.md`.
-- **Includes**: order from local module headers, other engine modules, third-party libs, then STL; enforce angle
-  brackets vs quotes per category.
-- **Formatting**: 120-column soft limit, tabs for indentation in code blocks that mimic UE (or configured via
-  clang-format profile once finalized).
-- **Comments**: use `//` for brief notes, `/** */` for API docs; prefer documenting module boundaries and lifecycle
-  contracts.
-- **Header hygiene**: forward-declare where possible, include only what you use to minimize build times.
-- **Automation**: `config/clang-format` and `config/clang-tidy` back editor integrations and CI checks; keep them
-  version-controlled alongside code changes.
-
-## Dependency Management
-
-- Use Conan or vcpkg for third-party C/C++ dependencies; prefer locking versions via `conanfile.py` or `vcpkg.json`.
-- Mirror vendored libraries into `External/` only when custom patches are required; otherwise rely on the package
-  manager cache.
-- Define platform abstraction interfaces in `Engine/Core` so dependencies remain localized.
-- Include a toolchain manifest (`conanprofile` or `vcpkg-configuration.json`) to pin compilers and triplets per
-  platform.
-- Current baseline: `vcpkg.json` + `vcpkg-configuration.json` lock the builtin registry at
-  `f38028b82d90d92d2bb2f9b2585fa1313dcd89e5`.
+- Reference `Docs/CodingStyle.md` for detailed naming, formatting, and tooling guidance.
 
 ## Testing & Samples
 
-- Keep engine self-tests under `Source/Tests/` with doctest, Catch2, or GoogleTest integrated as a module.
-- Create minimal showcase demos in `Demo/<DemoName>` consuming the engine via CMake `FetchContent` or by linking the
-  built modules.
+- Keep engine self-tests under `Source/Tests/` with CTest integrated as a module.
 
 ## Documentation & Governance
 
@@ -169,12 +113,3 @@ AltinaEngine/
 - Keep `docs/ModuleContracts.md` current with dependency boundaries and initialization order changes.
 - Reference `docs/CodingStyle.md` for detailed naming, formatting, and tooling guidance.
 - Introduce a `CONTRIBUTING.md` once module conventions stabilize.
-
-## Near-Term Focus
-
-- Flesh out `Engine/Core` with logging, assertion, and platform abstraction services.
-- Prototype `Engine/Render` to validate multi-module linking and resource lifetimes.
-- Stand up `Source/Tests` with a GoogleTest or Catch2 harness running via CTest.
-- Add packaging scripts under `Scripts/` to bundle demo binaries and assets for distribution.
-- Draft contribution guidelines and code review checklist in `docs/`.
-

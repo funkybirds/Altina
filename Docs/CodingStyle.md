@@ -14,7 +14,14 @@ AltinaEngine follows Unreal Engine inspired naming and layout conventions. Keep 
 - **Constants / constexpr**: Prefix with `k` (`kDefaultWindowWidth`).
 - **Member Variables**: Prefix with `m` (`mRenderDevicePtr`). Append `Ptr` or `Ref` to clarify ownership when valuable.
 - **Functions & Methods**: Use `PascalCase`. Boolean accessors begin with `Is`, `Has`, or `Should`.
+  - **Namespace rules**: wrap engine code in `AltinaEngine::` sub-namespaces per module; avoid `using namespace` in
+  headers.
 - **Namespaces**: `CamelCase` under the root `AltinaEngine` namespace (e.g., `AltinaEngine::Rendering`).
+  - Avoid redundant `AltinaEngine` prefixes on type names inside engine modules (e.g., do not repeat the top-level
+  identifier in type names). Public API stays under `AltinaEngine::` sub-namespaces, but type identifiers, aliases and
+  traits should not include an extra `AltinaEngine` textual prefix.
+- **Basic Types**: Use aliases like `u32`, `f64`, `String`, instead of `unsigned int`, `long long`, `int32_t`,
+  `std::string`.
 
 ## Files & Includes
 

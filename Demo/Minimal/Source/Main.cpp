@@ -1,5 +1,7 @@
 #include "Base/AltinaBase.h"
 #include "Launch/EngineLoop.h"
+#include "Input/InputSystem.h"
+#include "Input/Keys.h"
 #include "Reflection/Reflection.h"
 #include "Rhi/Command/RhiCmdBuiltins.h"
 #include "Rhi/Command/RhiCmdContextAdapter.h"
@@ -592,8 +594,52 @@ int main(int argc, char** argv) {
         [&triangleRenderer](Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport, u32 width,
             u32 height) { triangleRenderer.Render(device, viewport, width, height); });
 
+    constexpr f32 kFixedDeltaTime = 1.0f / 60.0f;
+    constexpr f32 kMoveSpeedUnitsPerSecond = 300.0f;
+    f32           positionX = 0.0f;
+    f32           positionY = 0.0f;
+    i32           lastMoveX = 0;
+    i32           lastMoveY = 0;
+
     for (i32 FrameIndex = 0; FrameIndex < 600; ++FrameIndex) {
-        EngineLoop.Tick(1.0f / 60.0f);
+        EngineLoop.Tick(kFixedDeltaTime);
+
+        if (const auto* inputSystem = EngineLoop.GetInputSystem()) {
+            i32 moveX = 0;
+            i32 moveY = 0;
+
+            if (inputSystem->IsKeyDown(Input::EKey::W)) {
+                moveY += 1;
+            }
+            if (inputSystem->IsKeyDown(Input::EKey::S)) {
+                moveY -= 1;
+            }
+            if (inputSystem->IsKeyDown(Input::EKey::A)) {
+                moveX -= 1;
+            }
+            if (inputSystem->IsKeyDown(Input::EKey::D)) {
+                moveX += 1;
+            }
+
+            if (moveX != 0 || moveY != 0) {
+                positionX += static_cast<f32>(moveX) * kMoveSpeedUnitsPerSecond *
+                    kFixedDeltaTime;
+                positionY += static_cast<f32>(moveY) * kMoveSpeedUnitsPerSecond *
+                    kFixedDeltaTime;
+            }
+
+            if (moveX != lastMoveX || moveY != lastMoveY) {
+                LogInfo(TEXT("Move input: ({}, {}), pos=({}, {})"),
+                    moveX, moveY, positionX, positionY);
+                lastMoveX = moveX;
+                lastMoveY = moveY;
+            }
+
+            if (inputSystem->WasKeyPressed(Input::EKey::Space)) {
+                LogInfo(TEXT("Space pressed."));
+            }
+        }
+
         AltinaEngine::Core::Platform::Generic::PlatformSleepMilliseconds(16);
 
         // LogError(TEXT("Frame {} processed."), FrameIndex);

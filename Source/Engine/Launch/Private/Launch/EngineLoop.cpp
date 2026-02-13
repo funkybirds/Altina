@@ -1,5 +1,8 @@
 #include "Launch/EngineLoop.h"
 
+#include "Input/InputMessageHandler.h"
+#include "Input/InputSystem.h"
+
 #include "Logging/Log.h"
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiStructs.h"
@@ -15,9 +18,20 @@ namespace AltinaEngine::Launch {
     FEngineLoop::FEngineLoop(const FStartupParameters& InStartupParameters)
         : mStartupParameters(InStartupParameters) {}
 
+    FEngineLoop::~FEngineLoop() = default;
+
     auto FEngineLoop::PreInit() -> bool {
         if (mApplication) {
             return true;
+        }
+
+        if (!mInputSystem) {
+            mInputSystem = Core::Container::MakeUnique<Input::FInputSystem>();
+        }
+
+        if (!mAppMessageHandler && mInputSystem) {
+            mAppMessageHandler =
+                Core::Container::MakeUnique<Input::FInputMessageHandler>(*mInputSystem);
         }
 
 #if AE_PLATFORM_WIN
@@ -31,6 +45,10 @@ namespace AltinaEngine::Launch {
         if (!mApplication) {
             LogError(TEXT("FEngineLoop PreInit failed: application allocation failed."));
             return false;
+        }
+
+        if (mAppMessageHandler) {
+            mApplication->RegisterMessageHandler(mAppMessageHandler.Get());
         }
 
         mApplication->Initialize();
@@ -114,6 +132,10 @@ namespace AltinaEngine::Launch {
             return;
         }
 
+        if (mInputSystem) {
+            mInputSystem->ClearFrameState();
+        }
+
         if (mApplication) {
             mApplication->Tick(InDeltaTime);
             if (!mApplication->IsRunning()) {
@@ -183,13 +205,29 @@ namespace AltinaEngine::Launch {
             mRhiContext.Reset();
         }
 
+        if (mApplication && mAppMessageHandler) {
+            mApplication->UnregisterMessageHandler(mAppMessageHandler.Get());
+        }
+
         if (mApplication) {
             mApplication->Shutdown();
             mApplication.Reset();
+        }
+
+        if (mAppMessageHandler) {
+            mAppMessageHandler.Reset();
+        }
+
+        if (mInputSystem) {
+            mInputSystem.Reset();
         }
     }
 
     void FEngineLoop::SetRenderCallback(FRenderCallback callback) {
         mRenderCallback = AltinaEngine::Move(callback);
+    }
+
+    auto FEngineLoop::GetInputSystem() const noexcept -> const Input::FInputSystem* {
+        return mInputSystem.Get();
     }
 } // namespace AltinaEngine::Launch

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Base/ApplicationAPI.h"
+#include "Application/AppMessageHandler.h"
 #include "Application/PlatformWindow.h"
 #include "Container/SmartPtr.h"
 
@@ -21,6 +22,9 @@ namespace AltinaEngine::Application {
 
         [[nodiscard]] auto IsRunning() const noexcept -> bool { return mIsRunning; }
 
+        void RegisterMessageHandler(IAppMessageHandler* InHandler);
+        void UnregisterMessageHandler(IAppMessageHandler* InHandler);
+
         void               SetWindowProperties(const FPlatformWindowProperty& InProperties);
         [[nodiscard]] auto GetWindowProperties() const noexcept -> const FPlatformWindowProperty&;
         [[nodiscard]] auto GetMainWindow() noexcept -> FPlatformWindow*;
@@ -31,6 +35,8 @@ namespace AltinaEngine::Application {
 
         virtual auto       CreatePlatformWindow() -> FWindowOwner = 0;
         virtual void       PumpPlatformMessages();
+        [[nodiscard]] auto GetMessageRouter() noexcept -> FAppMessageRouter*;
+        [[nodiscard]] auto GetMessageRouter() const noexcept -> const FAppMessageRouter*;
 
     private:
         void                    EnsureWindow();
@@ -38,6 +44,7 @@ namespace AltinaEngine::Application {
         FStartupParameters      mStartupParameters;
         FPlatformWindowProperty mWindowProperties;
         FWindowOwner            mMainWindow;
+        FAppMessageRouter       mMessageRouter;
         bool                    mIsRunning = false;
     };
 

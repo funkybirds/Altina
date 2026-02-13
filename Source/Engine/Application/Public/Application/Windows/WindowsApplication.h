@@ -26,6 +26,7 @@ using LRESULT = long long;
 #include "Application/Application.h"
 
 namespace AltinaEngine::Application {
+    class FAppMessageRouter;
 
     class AE_APPLICATION_API FWindowsPlatformWindow final : public FPlatformWindow {
     public:
@@ -44,6 +45,7 @@ namespace AltinaEngine::Application {
         [[nodiscard]] auto GetProperties() const -> FPlatformWindowProperty override;
         [[nodiscard]] auto GetNativeHandle() const noexcept -> void* override;
         [[nodiscard]] auto GetWindowHandle() const noexcept -> void*;
+        void               SetMessageRouter(FAppMessageRouter* InRouter) noexcept;
 
     private:
         static LRESULT CALLBACK WindowProc(
@@ -56,8 +58,10 @@ namespace AltinaEngine::Application {
 
         void*                   mWindowHandle   = nullptr;
         void*                   mInstanceHandle = nullptr;
+        FAppMessageRouter*      mMessageRouter  = nullptr;
         FPlatformWindowProperty mProperties{};
         FWindowExtent           mCachedSize{};
+        bool                    mIsMouseTracking = false;
     };
 
     class AE_APPLICATION_API FWindowsApplication final : public FApplication {

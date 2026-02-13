@@ -5,6 +5,156 @@
 
 namespace AltinaEngine::Application {
     namespace {
+        template <typename Func>
+        void ForEachHandler(
+            const Core::Container::TVector<IAppMessageHandler*>& handlers, Func&& fn) {
+            for (auto* handler : handlers) {
+                if (handler != nullptr) {
+                    fn(*handler);
+                }
+            }
+        }
+    } // namespace
+
+    void FAppMessageRouter::RegisterHandler(IAppMessageHandler* InHandler) {
+        if (InHandler == nullptr) {
+            return;
+        }
+
+        for (auto* handler : mHandlers) {
+            if (handler == InHandler) {
+                return;
+            }
+        }
+
+        mHandlers.PushBack(InHandler);
+    }
+
+    void FAppMessageRouter::UnregisterHandler(IAppMessageHandler* InHandler) {
+        if (InHandler == nullptr) {
+            return;
+        }
+
+        const usize handlerCount = mHandlers.Size();
+        for (usize index = 0U; index < handlerCount; ++index) {
+            if (mHandlers[index] == InHandler) {
+                for (usize shiftIndex = index + 1U; shiftIndex < handlerCount; ++shiftIndex) {
+                    mHandlers[shiftIndex - 1U] = mHandlers[shiftIndex];
+                }
+                mHandlers.PopBack();
+                break;
+            }
+        }
+    }
+
+    void FAppMessageRouter::BroadcastWindowCreated(FPlatformWindow* InWindow) {
+        ForEachHandler(mHandlers,
+            [InWindow](IAppMessageHandler& handler) { handler.OnWindowCreated(InWindow); });
+    }
+
+    void FAppMessageRouter::BroadcastWindowCloseRequested(FPlatformWindow* InWindow) {
+        ForEachHandler(mHandlers,
+            [InWindow](IAppMessageHandler& handler) { handler.OnWindowCloseRequested(InWindow); });
+    }
+
+    void FAppMessageRouter::BroadcastWindowClosed(FPlatformWindow* InWindow) {
+        ForEachHandler(mHandlers,
+            [InWindow](IAppMessageHandler& handler) { handler.OnWindowClosed(InWindow); });
+    }
+
+    void FAppMessageRouter::BroadcastWindowResized(
+        FPlatformWindow* InWindow, const FWindowExtent& InExtent) {
+        ForEachHandler(mHandlers, [InWindow, &InExtent](IAppMessageHandler& handler) {
+            handler.OnWindowResized(InWindow, InExtent);
+        });
+    }
+
+    void FAppMessageRouter::BroadcastWindowMoved(
+        FPlatformWindow* InWindow, i32 InPositionX, i32 InPositionY) {
+        ForEachHandler(
+            mHandlers, [InWindow, InPositionX, InPositionY](IAppMessageHandler& handler) {
+                handler.OnWindowMoved(InWindow, InPositionX, InPositionY);
+            });
+    }
+
+    void FAppMessageRouter::BroadcastWindowFocusGained(FPlatformWindow* InWindow) {
+        ForEachHandler(mHandlers,
+            [InWindow](IAppMessageHandler& handler) { handler.OnWindowFocusGained(InWindow); });
+    }
+
+    void FAppMessageRouter::BroadcastWindowFocusLost(FPlatformWindow* InWindow) {
+        ForEachHandler(mHandlers,
+            [InWindow](IAppMessageHandler& handler) { handler.OnWindowFocusLost(InWindow); });
+    }
+
+    void FAppMessageRouter::BroadcastWindowMinimized(FPlatformWindow* InWindow) {
+        ForEachHandler(mHandlers,
+            [InWindow](IAppMessageHandler& handler) { handler.OnWindowMinimized(InWindow); });
+    }
+
+    void FAppMessageRouter::BroadcastWindowMaximized(FPlatformWindow* InWindow) {
+        ForEachHandler(mHandlers,
+            [InWindow](IAppMessageHandler& handler) { handler.OnWindowMaximized(InWindow); });
+    }
+
+    void FAppMessageRouter::BroadcastWindowRestored(FPlatformWindow* InWindow) {
+        ForEachHandler(mHandlers,
+            [InWindow](IAppMessageHandler& handler) { handler.OnWindowRestored(InWindow); });
+    }
+
+    void FAppMessageRouter::BroadcastWindowDpiScaleChanged(
+        FPlatformWindow* InWindow, f32 InDpiScale) {
+        ForEachHandler(mHandlers, [InWindow, InDpiScale](IAppMessageHandler& handler) {
+            handler.OnWindowDpiScaleChanged(InWindow, InDpiScale);
+        });
+    }
+
+    void FAppMessageRouter::BroadcastKeyDown(u32 InKeyCode, bool InRepeat) {
+        ForEachHandler(mHandlers, [InKeyCode, InRepeat](IAppMessageHandler& handler) {
+            handler.OnKeyDown(InKeyCode, InRepeat);
+        });
+    }
+
+    void FAppMessageRouter::BroadcastKeyUp(u32 InKeyCode) {
+        ForEachHandler(
+            mHandlers, [InKeyCode](IAppMessageHandler& handler) { handler.OnKeyUp(InKeyCode); });
+    }
+
+    void FAppMessageRouter::BroadcastCharInput(u32 InCharCode) {
+        ForEachHandler(mHandlers,
+            [InCharCode](IAppMessageHandler& handler) { handler.OnCharInput(InCharCode); });
+    }
+
+    void FAppMessageRouter::BroadcastMouseMove(i32 InPositionX, i32 InPositionY) {
+        ForEachHandler(mHandlers, [InPositionX, InPositionY](IAppMessageHandler& handler) {
+            handler.OnMouseMove(InPositionX, InPositionY);
+        });
+    }
+
+    void FAppMessageRouter::BroadcastMouseEnter() {
+        ForEachHandler(mHandlers, [](IAppMessageHandler& handler) { handler.OnMouseEnter(); });
+    }
+
+    void FAppMessageRouter::BroadcastMouseLeave() {
+        ForEachHandler(mHandlers, [](IAppMessageHandler& handler) { handler.OnMouseLeave(); });
+    }
+
+    void FAppMessageRouter::BroadcastMouseButtonDown(u32 InButton) {
+        ForEachHandler(mHandlers,
+            [InButton](IAppMessageHandler& handler) { handler.OnMouseButtonDown(InButton); });
+    }
+
+    void FAppMessageRouter::BroadcastMouseButtonUp(u32 InButton) {
+        ForEachHandler(mHandlers,
+            [InButton](IAppMessageHandler& handler) { handler.OnMouseButtonUp(InButton); });
+    }
+
+    void FAppMessageRouter::BroadcastMouseWheel(f32 InDelta) {
+        ForEachHandler(
+            mHandlers, [InDelta](IAppMessageHandler& handler) { handler.OnMouseWheel(InDelta); });
+    }
+
+    namespace {
         auto NormalizeWindowProperties(FPlatformWindowProperty Properties)
             -> FPlatformWindowProperty {
             if (Properties.mWidth == 0U) {
@@ -57,8 +207,8 @@ namespace AltinaEngine::Application {
         if (!mIsRunning) {
             return;
         }
-
-        LogInfo(TEXT("AltinaEngine application tick: {}s"), InDeltaTime);
+        (void)InDeltaTime;
+        // LogInfo(TEXT("AltinaEngine application tick: {}s"), InDeltaTime);
     }
 
     void FApplication::Shutdown() {
@@ -98,6 +248,20 @@ namespace AltinaEngine::Application {
 
     void FApplication::PumpPlatformMessages() {}
 
+    void FApplication::RegisterMessageHandler(IAppMessageHandler* InHandler) {
+        mMessageRouter.RegisterHandler(InHandler);
+    }
+
+    void FApplication::UnregisterMessageHandler(IAppMessageHandler* InHandler) {
+        mMessageRouter.UnregisterHandler(InHandler);
+    }
+
+    auto FApplication::GetMessageRouter() noexcept -> FAppMessageRouter* { return &mMessageRouter; }
+
+    auto FApplication::GetMessageRouter() const noexcept -> const FAppMessageRouter* {
+        return &mMessageRouter;
+    }
+
     void FApplication::EnsureWindow() {
         if (mMainWindow) {
             return;
@@ -119,6 +283,7 @@ namespace AltinaEngine::Application {
 
         mWindowProperties = platformWindow->GetProperties();
         mMainWindow       = Move(platformWindow);
+        mMessageRouter.BroadcastWindowCreated(mMainWindow.Get());
     }
 
 } // namespace AltinaEngine::Application

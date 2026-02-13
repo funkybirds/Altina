@@ -1,7 +1,7 @@
-set(TargetName AltinaEngineLaunch)
+set(TargetName AltinaEngineInput)
 
 add_library(${TargetName} SHARED)
-add_library(AltinaEngine::Launch ALIAS ${TargetName})
+add_library(AltinaEngine::Input ALIAS ${TargetName})
 
 file(GLOB_RECURSE Target_Public_Headers
     CONFIGURE_DEPENDS
@@ -40,7 +40,7 @@ target_sources(${TargetName}
 target_include_directories(${TargetName}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Public>
-        $<INSTALL_INTERFACE:include/AltinaEngine/Launch>
+        $<INSTALL_INTERFACE:include/AltinaEngine/Input>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/Private
 )
@@ -48,23 +48,8 @@ target_include_directories(${TargetName}
 target_link_libraries(${TargetName}
     PUBLIC
         AltinaEngine::Core
-        AltinaEngine::Asset
         AltinaEngine::Application
-        AltinaEngine::Input
-        AltinaEngine::Rhi::General
 )
-
-if(WIN32)
-    target_link_libraries(${TargetName}
-        PRIVATE
-            AltinaEngine::Rhi::D3D11
-    )
-else()
-    target_link_libraries(${TargetName}
-        PRIVATE
-            AltinaEngine::Rhi::Mock
-    )
-endif()
 
 target_compile_features(${TargetName}
     PUBLIC
@@ -73,7 +58,7 @@ target_compile_features(${TargetName}
 
 target_compile_definitions(${TargetName}
     PRIVATE
-        AE_LAUNCH_BUILD
+        AE_INPUT_BUILD
 )
 
 set(Warnings
@@ -107,6 +92,6 @@ add_custom_command(
 
 set_target_properties(${TargetName}
     PROPERTIES
-        OUTPUT_NAME AltinaEngineLaunch
-        FOLDER "Engine/Launch"
+        OUTPUT_NAME AltinaEngineInput
+        FOLDER "Engine/Input"
 )

@@ -16,7 +16,13 @@
 #include "Rhi/RhiRefs.h"
 #include "Rhi/RhiViewport.h"
 
+namespace AltinaEngine::Input {
+    class FInputMessageHandler;
+    class FInputSystem;
+}
+
 namespace AltinaEngine::Launch {
+
     class AE_LAUNCH_API FEngineLoop final {
     public:
         using FRenderCallback =
@@ -24,14 +30,18 @@ namespace AltinaEngine::Launch {
 
         FEngineLoop() = default;
         explicit FEngineLoop(const FStartupParameters& InStartupParameters);
+        ~FEngineLoop();
 
         auto PreInit() -> bool;
         auto Init() -> bool;
         void Tick(float InDeltaTime);
         void Exit();
         void SetRenderCallback(FRenderCallback callback);
+        [[nodiscard]] auto GetInputSystem() const noexcept -> const Input::FInputSystem*;
 
     private:
+        Core::Container::TOwner<Input::FInputSystem>        mInputSystem;
+        Core::Container::TOwner<Input::FInputMessageHandler> mAppMessageHandler;
         Core::Container::TOwner<Application::FApplication,
             Core::Container::TPolymorphicDeleter<Application::FApplication>>
             mApplication;

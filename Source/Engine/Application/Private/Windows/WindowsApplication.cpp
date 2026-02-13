@@ -9,9 +9,10 @@
     #include "Logging/Log.h"
 
 namespace AltinaEngine::Application {
-    using AltinaEngine::Core::Container::FString;
-    using AltinaEngine::Core::Container::MakeUnique;
-    using AltinaEngine::Core::Container::MakeUniqueAs;
+    namespace Container = Core::Container;
+    using Container::FString;
+    using Container::MakeUnique;
+    using Container::MakeUniqueAs;
 
     namespace {
         constexpr const TChar* kWindowClassName = TEXT("AltinaEngineWindowClass");
@@ -161,9 +162,7 @@ namespace AltinaEngine::Application {
         return mProperties;
     }
 
-    auto FWindowsPlatformWindow::GetNativeHandle() const noexcept -> void* {
-        return mWindowHandle;
-    }
+    auto FWindowsPlatformWindow::GetNativeHandle() const noexcept -> void* { return mWindowHandle; }
 
     auto FWindowsPlatformWindow::GetWindowHandle() const noexcept -> void* { return mWindowHandle; }
 
@@ -201,19 +200,17 @@ namespace AltinaEngine::Application {
                 });
                 break;
             case WM_DESTROY:
-                dispatchIfAvailable([window](FAppMessageRouter& router) {
-                    router.BroadcastWindowClosed(window);
-                });
+                dispatchIfAvailable(
+                    [window](FAppMessageRouter& router) { router.BroadcastWindowClosed(window); });
                 PostQuitMessage(0);
                 return 0;
             case WM_SIZE:
                 if (window) {
                     window->UpdateCachedSizeFromClientRect();
                     const auto extent = window->GetSize();
-                    dispatchIfAvailable(
-                        [window, &extent](FAppMessageRouter& router) {
-                            router.BroadcastWindowResized(window, extent);
-                        });
+                    dispatchIfAvailable([window, &extent](FAppMessageRouter& router) {
+                        router.BroadcastWindowResized(window, extent);
+                    });
 
                     dispatchIfAvailable([window, InWParam](FAppMessageRouter& router) {
                         switch (InWParam) {
@@ -232,7 +229,8 @@ namespace AltinaEngine::Application {
                     });
                 }
                 break;
-            case WM_MOVE: {
+            case WM_MOVE:
+            {
                 const i32 positionX = static_cast<i32>(GET_X_LPARAM(InLParam));
                 const i32 positionY = static_cast<i32>(GET_Y_LPARAM(InLParam));
                 dispatchIfAvailable([window, positionX, positionY](FAppMessageRouter& router) {
@@ -241,17 +239,19 @@ namespace AltinaEngine::Application {
                 break;
             }
             case WM_SETFOCUS:
-                dispatchIfAvailable(
-                    [window](FAppMessageRouter& router) { router.BroadcastWindowFocusGained(window); });
+                dispatchIfAvailable([window](FAppMessageRouter& router) {
+                    router.BroadcastWindowFocusGained(window);
+                });
                 break;
             case WM_KILLFOCUS:
-                dispatchIfAvailable(
-                    [window](FAppMessageRouter& router) { router.BroadcastWindowFocusLost(window); });
+                dispatchIfAvailable([window](FAppMessageRouter& router) {
+                    router.BroadcastWindowFocusLost(window);
+                });
                 break;
             case WM_DPICHANGED:
                 if (window) {
-                    const u32 dpiX = LOWORD(InWParam);
-                    const f32 dpiScale = static_cast<f32>(dpiX) / kDefaultDpi;
+                    const u32 dpiX                  = LOWORD(InWParam);
+                    const f32 dpiScale              = static_cast<f32>(dpiX) / kDefaultDpi;
                     window->mProperties.mDpiScaling = dpiScale;
                     dispatchIfAvailable([window, dpiScale](FAppMessageRouter& router) {
                         router.BroadcastWindowDpiScaleChanged(window, dpiScale);
@@ -267,7 +267,8 @@ namespace AltinaEngine::Application {
                 }
                 break;
             case WM_KEYDOWN:
-            case WM_SYSKEYDOWN: {
+            case WM_SYSKEYDOWN:
+            {
                 const bool isRepeat = (InLParam & (1LL << 30)) != 0;
                 const u32  keyCode  = static_cast<u32>(InWParam);
                 dispatchIfAvailable([keyCode, isRepeat](FAppMessageRouter& router) {
@@ -276,25 +277,28 @@ namespace AltinaEngine::Application {
                 break;
             }
             case WM_KEYUP:
-            case WM_SYSKEYUP: {
+            case WM_SYSKEYUP:
+            {
                 const u32 keyCode = static_cast<u32>(InWParam);
                 dispatchIfAvailable(
                     [keyCode](FAppMessageRouter& router) { router.BroadcastKeyUp(keyCode); });
                 break;
             }
-            case WM_CHAR: {
+            case WM_CHAR:
+            {
                 const u32 charCode = static_cast<u32>(InWParam);
                 dispatchIfAvailable(
                     [charCode](FAppMessageRouter& router) { router.BroadcastCharInput(charCode); });
                 break;
             }
-            case WM_MOUSEMOVE: {
+            case WM_MOUSEMOVE:
+            {
                 const i32 positionX = static_cast<i32>(GET_X_LPARAM(InLParam));
                 const i32 positionY = static_cast<i32>(GET_Y_LPARAM(InLParam));
                 if (window && !window->mIsMouseTracking) {
                     TRACKMOUSEEVENT trackEvent{};
-                    trackEvent.cbSize = sizeof(TRACKMOUSEEVENT);
-                    trackEvent.dwFlags = TME_LEAVE;
+                    trackEvent.cbSize    = sizeof(TRACKMOUSEEVENT);
+                    trackEvent.dwFlags   = TME_LEAVE;
                     trackEvent.hwndTrack = InWindowHandle;
                     if (TrackMouseEvent(&trackEvent)) {
                         window->mIsMouseTracking = true;
@@ -338,22 +342,25 @@ namespace AltinaEngine::Application {
                 dispatchIfAvailable(
                     [](FAppMessageRouter& router) { router.BroadcastMouseButtonUp(2U); });
                 break;
-            case WM_XBUTTONDOWN: {
+            case WM_XBUTTONDOWN:
+            {
                 const u32 button = (GET_XBUTTON_WPARAM(InWParam) == XBUTTON2) ? 4U : 3U;
                 dispatchIfAvailable([button](FAppMessageRouter& router) {
                     router.BroadcastMouseButtonDown(button);
                 });
                 break;
             }
-            case WM_XBUTTONUP: {
+            case WM_XBUTTONUP:
+            {
                 const u32 button = (GET_XBUTTON_WPARAM(InWParam) == XBUTTON2) ? 4U : 3U;
                 dispatchIfAvailable(
                     [button](FAppMessageRouter& router) { router.BroadcastMouseButtonUp(button); });
                 break;
             }
-            case WM_MOUSEWHEEL: {
-                const f32 delta = static_cast<f32>(GET_WHEEL_DELTA_WPARAM(InWParam)) /
-                    static_cast<f32>(WHEEL_DELTA);
+            case WM_MOUSEWHEEL:
+            {
+                const f32 delta = static_cast<f32>(GET_WHEEL_DELTA_WPARAM(InWParam))
+                    / static_cast<f32>(WHEEL_DELTA);
                 dispatchIfAvailable(
                     [delta](FAppMessageRouter& router) { router.BroadcastMouseWheel(delta); });
                 break;

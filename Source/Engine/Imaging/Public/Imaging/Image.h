@@ -8,7 +8,8 @@
 #include <limits>
 
 namespace AltinaEngine::Imaging {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
 
     enum class EImageFormat : u8 {
         Unknown = 0,
@@ -31,11 +32,11 @@ namespace AltinaEngine::Imaging {
     }
 
     struct AE_IMAGING_API FImageView {
-        const u8*     mData     = nullptr;
-        u32           mWidth    = 0;
-        u32           mHeight   = 0;
-        u32           mRowPitch = 0;
-        EImageFormat  mFormat   = EImageFormat::Unknown;
+        const u8*    mData     = nullptr;
+        u32          mWidth    = 0;
+        u32          mHeight   = 0;
+        u32          mRowPitch = 0;
+        EImageFormat mFormat   = EImageFormat::Unknown;
 
         constexpr FImageView() noexcept = default;
 
@@ -44,14 +45,13 @@ namespace AltinaEngine::Imaging {
             : mData(data)
             , mWidth(width)
             , mHeight(height)
-            , mRowPitch(rowPitch == 0
-                    ? width * AltinaEngine::Imaging::GetBytesPerPixel(format)
-                    : rowPitch)
+            , mRowPitch(rowPitch == 0 ? width * AltinaEngine::Imaging::GetBytesPerPixel(format)
+                                      : rowPitch)
             , mFormat(format) {}
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {
-            return (mData != nullptr) && (mWidth > 0) && (mHeight > 0)
-                && (GetBytesPerPixel() > 0) && (mRowPitch > 0);
+            return (mData != nullptr) && (mWidth > 0) && (mHeight > 0) && (GetBytesPerPixel() > 0)
+                && (mRowPitch > 0);
         }
 
         [[nodiscard]] constexpr auto GetBytesPerPixel() const noexcept -> u32 {
@@ -121,7 +121,9 @@ namespace AltinaEngine::Imaging {
 
         [[nodiscard]] constexpr auto GetDataSize() const noexcept -> usize { return mData.Size(); }
 
-        [[nodiscard]] auto GetData() noexcept -> u8* { return mData.IsEmpty() ? nullptr : mData.Data(); }
+        [[nodiscard]] auto           GetData() noexcept -> u8* {
+            return mData.IsEmpty() ? nullptr : mData.Data();
+        }
 
         [[nodiscard]] auto GetData() const noexcept -> const u8* {
             return mData.IsEmpty() ? nullptr : mData.Data();

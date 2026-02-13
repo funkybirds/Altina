@@ -7,13 +7,14 @@
 #include <limits>
 
 namespace AltinaEngine::Asset {
+    namespace Container = Core::Container;
     namespace {
         auto ReadExact(IAssetStream& stream, void* outBuffer, usize size) -> bool {
             if (outBuffer == nullptr || size == 0U) {
                 return false;
             }
 
-            auto*       out = static_cast<u8*>(outBuffer);
+            auto*       out       = static_cast<u8*>(outBuffer);
             usize       totalRead = 0;
             const usize target    = size;
             while (totalRead < target) {
@@ -67,10 +68,10 @@ namespace AltinaEngine::Asset {
 
         template <typename TDerived, typename... Args>
         auto MakeSharedAsset(Args&&... args) -> TShared<IAsset> {
-            using Core::Container::kSmartPtrUseManagedAllocator;
-            using Core::Container::TAllocator;
-            using Core::Container::TAllocatorTraits;
-            using Core::Container::TPolymorphicDeleter;
+            using Container::kSmartPtrUseManagedAllocator;
+            using Container::TAllocator;
+            using Container::TAllocatorTraits;
+            using Container::TPolymorphicDeleter;
 
             TDerived* ptr = nullptr;
             if constexpr (kSmartPtrUseManagedAllocator) {
@@ -91,8 +92,8 @@ namespace AltinaEngine::Asset {
                 ptr = new TDerived(AltinaEngine::Forward<Args>(args)...); // NOLINT
             }
 
-            return TShared<IAsset>(ptr,
-                TPolymorphicDeleter<IAsset>(&Core::Container::DestroyPolymorphic<IAsset, TDerived>));
+            return TShared<IAsset>(
+                ptr, TPolymorphicDeleter<IAsset>(&Container::DestroyPolymorphic<IAsset, TDerived>));
         }
     } // namespace
 
@@ -141,7 +142,7 @@ namespace AltinaEngine::Asset {
         }
 
         const usize baseOffset = stream.Tell();
-        const u64   totalSize = static_cast<u64>(baseOffset) + dataSize;
+        const u64   totalSize  = static_cast<u64>(baseOffset) + dataSize;
         const u64   streamSize = stream.Size();
         if (streamSize != 0U && totalSize > streamSize) {
             return {};

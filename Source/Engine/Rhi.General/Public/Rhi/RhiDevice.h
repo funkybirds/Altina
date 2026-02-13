@@ -10,18 +10,19 @@
 #include "Types/Traits.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
-    using Core::Container::TCountRef;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::FStringView;
+    using Container::TCountRef;
+    using Container::TVector;
 
     class AE_RHI_GENERAL_API FRhiDevice : public FNonCopyableClass {
     public:
         ~FRhiDevice() override = default;
 
-        FRhiDevice(const FRhiDevice&) = delete;
-        FRhiDevice(FRhiDevice&&) = delete;
-        auto operator=(const FRhiDevice&) -> FRhiDevice& = delete;
-        auto operator=(FRhiDevice&&) -> FRhiDevice& = delete;
+        FRhiDevice(const FRhiDevice&)                                  = delete;
+        FRhiDevice(FRhiDevice&&)                                       = delete;
+        auto               operator=(const FRhiDevice&) -> FRhiDevice& = delete;
+        auto               operator=(FRhiDevice&&) -> FRhiDevice&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiDeviceDesc&;
         [[nodiscard]] auto GetAdapterDesc() const noexcept -> const FRhiAdapterDesc&;
@@ -37,7 +38,7 @@ namespace AltinaEngine::Rhi {
 
         virtual auto       CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef    = 0;
         virtual auto       CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef = 0;
-        virtual auto CreateShaderResourceView(const FRhiShaderResourceViewDesc& desc)
+        virtual auto       CreateShaderResourceView(const FRhiShaderResourceViewDesc& desc)
             -> FRhiShaderResourceViewRef;
         virtual auto CreateUnorderedAccessView(const FRhiUnorderedAccessViewDesc& desc)
             -> FRhiUnorderedAccessViewRef;
@@ -45,11 +46,11 @@ namespace AltinaEngine::Rhi {
             -> FRhiRenderTargetViewRef;
         virtual auto CreateDepthStencilView(const FRhiDepthStencilViewDesc& desc)
             -> FRhiDepthStencilViewRef;
-        virtual auto       CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef = 0;
-        virtual auto       CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef = 0;
-        virtual auto       CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef    = 0;
+        virtual auto CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef = 0;
+        virtual auto CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef    = 0;
+        virtual auto CreateShader(const FRhiShaderDesc& desc) -> FRhiShaderRef       = 0;
 
-        virtual auto       CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
+        virtual auto CreateGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc)
             -> FRhiPipelineRef = 0;
         virtual auto CreateComputePipeline(const FRhiComputePipelineDesc& desc)
             -> FRhiPipelineRef = 0;
@@ -71,8 +72,8 @@ namespace AltinaEngine::Rhi {
         virtual void BeginFrame(u64 frameIndex);
         virtual void EndFrame();
 
-        void ProcessResourceDeleteQueue(u64 completedSerial);
-        void FlushResourceDeleteQueue();
+        void         ProcessResourceDeleteQueue(u64 completedSerial);
+        void         FlushResourceDeleteQueue();
 
     protected:
         FRhiDevice(const FRhiDeviceDesc& desc, const FRhiAdapterDesc& adapterDesc);

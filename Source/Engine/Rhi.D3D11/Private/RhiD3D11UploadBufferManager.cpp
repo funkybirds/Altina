@@ -25,8 +25,8 @@
 
 namespace AltinaEngine::Rhi {
     namespace {
-        constexpr u64 kConstantBufferAlign = 16ULL;
-        constexpr u64 kConstantBufferMaxBytes = 64ULL * 1024ULL;
+        constexpr u64      kConstantBufferAlign    = 16ULL;
+        constexpr u64      kConstantBufferMaxBytes = 64ULL * 1024ULL;
 
         [[nodiscard]] auto AlignUp(u64 value, u64 alignment) noexcept -> u64 {
             if (alignment == 0ULL) {
@@ -58,8 +58,8 @@ namespace AltinaEngine::Rhi {
 
         mAlignmentBytes = (desc.mAlignmentBytes == 0ULL) ? 16ULL : desc.mAlignmentBytes;
         mAllowConstantBufferSuballocation = desc.mAllowConstantBufferSuballocation;
-        mPageSupportsConstant = mAllowConstantBufferSuballocation
-            && (mPageSizeBytes <= kConstantBufferMaxBytes);
+        mPageSupportsConstant =
+            mAllowConstantBufferSuballocation && (mPageSizeBytes <= kConstantBufferMaxBytes);
         if (mPageSupportsConstant) {
             mPageSizeBytes = AlignUp(mPageSizeBytes, kConstantBufferAlign);
             if (mPageSizeBytes > kConstantBufferMaxBytes) {
@@ -82,8 +82,7 @@ namespace AltinaEngine::Rhi {
             bufferDesc.mSizeBytes = mPageSizeBytes;
             bufferDesc.mUsage     = ERhiResourceUsage::Dynamic;
             bufferDesc.mCpuAccess = ERhiCpuAccess::Write;
-            bufferDesc.mBindFlags = ERhiBufferBindFlags::Vertex
-                | ERhiBufferBindFlags::Index
+            bufferDesc.mBindFlags = ERhiBufferBindFlags::Vertex | ERhiBufferBindFlags::Index
                 | ERhiBufferBindFlags::ShaderResource;
             if (mPageSupportsConstant) {
                 bufferDesc.mBindFlags = bufferDesc.mBindFlags | ERhiBufferBindFlags::Constant;
@@ -94,15 +93,14 @@ namespace AltinaEngine::Rhi {
                 continue;
             }
 
-            auto* d3dBuffer = static_cast<FRhiD3D11Buffer*>(buffer.Get());
+            auto*         d3dBuffer    = static_cast<FRhiD3D11Buffer*>(buffer.Get());
             ID3D11Buffer* nativeBuffer = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
 
-            FPage page{};
-            page.mBuffer = buffer;
+            FPage         page{};
+            page.mBuffer    = buffer;
             page.mSizeBytes = mPageSizeBytes;
-            page.mExecutor = Core::Memory::TAllocatorExecutor<
-                Core::Memory::FRingAllocatorPolicy, FD3D11BufferBacking>(
-                FD3D11BufferBacking(nativeBuffer, mContext, mPageSizeBytes));
+            page.mExecutor  = Core::Memory::TAllocatorExecutor<Core::Memory::FRingAllocatorPolicy,
+                 FD3D11BufferBacking>(FD3D11BufferBacking(nativeBuffer, mContext, mPageSizeBytes));
             page.mExecutor.InitPolicyFromBacking();
 
             mPages[i] = AltinaEngine::Move(page);
@@ -112,15 +110,15 @@ namespace AltinaEngine::Rhi {
     void FD3D11UploadBufferManager::Reset() {
         mPages.Clear();
         mConstantPool.Clear();
-        mDevice = nullptr;
-        mContext = nullptr;
-        mPageSizeBytes = 0ULL;
-        mAlignmentBytes = 16ULL;
-        mFrameTag = 0ULL;
-        mPageIndex = 0U;
-        mAllowConstantBufferSuballocation = false;
+        mDevice                              = nullptr;
+        mContext                             = nullptr;
+        mPageSizeBytes                       = 0ULL;
+        mAlignmentBytes                      = 16ULL;
+        mFrameTag                            = 0ULL;
+        mPageIndex                           = 0U;
+        mAllowConstantBufferSuballocation    = false;
         mSupportsConstantBufferSuballocation = false;
-        mPageSupportsConstant = false;
+        mPageSupportsConstant                = false;
     }
 
     void FD3D11UploadBufferManager::BeginFrame(u64 frameTag) {
@@ -149,14 +147,14 @@ namespace AltinaEngine::Rhi {
         page->mExecutor.GetBacking().EndWrite();
     }
 
-    auto FD3D11UploadBufferManager::Allocate(
-        u64 sizeBytes, u64 alignment, u64 tag) -> FD3D11UploadAllocation {
+    auto FD3D11UploadBufferManager::Allocate(u64 sizeBytes, u64 alignment, u64 tag)
+        -> FD3D11UploadAllocation {
         auto* page = GetCurrentPage();
         if (page == nullptr) {
             return {};
         }
         const u64 actualAlignment = (alignment == 0ULL) ? mAlignmentBytes : alignment;
-        auto allocation = page->mExecutor.Allocate(sizeBytes, actualAlignment, tag);
+        auto      allocation      = page->mExecutor.Allocate(sizeBytes, actualAlignment, tag);
         if (!allocation.IsValid()) {
             return {};
         }
@@ -168,8 +166,8 @@ namespace AltinaEngine::Rhi {
         return result;
     }
 
-    auto FD3D11UploadBufferManager::AllocateConstant(
-        u64 sizeBytes, u64 tag) -> FD3D11UploadAllocation {
+    auto FD3D11UploadBufferManager::AllocateConstant(u64 sizeBytes, u64 tag)
+        -> FD3D11UploadAllocation {
         if (sizeBytes == 0ULL) {
             return {};
         }
@@ -214,9 +212,9 @@ namespace AltinaEngine::Rhi {
         }
 
         FConstantBufferSlot slot{};
-        slot.mBuffer = buffer;
+        slot.mBuffer    = buffer;
         slot.mSizeBytes = alignedSize;
-        slot.mInUse = true;
+        slot.mInUse     = true;
         mConstantPool.PushBack(slot);
 
         FD3D11UploadAllocation result{};
@@ -239,9 +237,8 @@ namespace AltinaEngine::Rhi {
         return page->mExecutor.GetWritePointer(allocation, dstOffset);
     }
 
-    auto FD3D11UploadBufferManager::Write(
-        const FD3D11UploadAllocation& allocation, const void* data, u64 sizeBytes,
-        u64 dstOffset) -> bool {
+    auto FD3D11UploadBufferManager::Write(const FD3D11UploadAllocation& allocation,
+        const void* data, u64 sizeBytes, u64 dstOffset) -> bool {
         if (!allocation.IsValid() || data == nullptr || sizeBytes == 0ULL) {
             return false;
         }
@@ -274,8 +271,7 @@ namespace AltinaEngine::Rhi {
         if (d3dBuffer == nullptr || mContext == nullptr) {
             return false;
         }
-        FD3D11BufferBacking backing(
-            d3dBuffer->GetNativeBuffer(), mContext, bufferSizeBytes);
+        FD3D11BufferBacking backing(d3dBuffer->GetNativeBuffer(), mContext, bufferSizeBytes);
         return backing.Write(dstOffset, data, sizeBytes);
     }
 } // namespace AltinaEngine::Rhi

@@ -7,13 +7,14 @@
 #include <limits>
 
 namespace AltinaEngine::Asset {
+    namespace Container = Core::Container;
     namespace {
         auto ReadExact(IAssetStream& stream, void* outBuffer, usize size) -> bool {
             if (outBuffer == nullptr || size == 0U) {
                 return false;
             }
 
-            auto*       out = static_cast<u8*>(outBuffer);
+            auto*       out       = static_cast<u8*>(outBuffer);
             usize       totalRead = 0;
             const usize target    = size;
             while (totalRead < target) {
@@ -52,10 +53,10 @@ namespace AltinaEngine::Asset {
 
         template <typename TDerived, typename... Args>
         auto MakeSharedAsset(Args&&... args) -> TShared<IAsset> {
-            using Core::Container::kSmartPtrUseManagedAllocator;
-            using Core::Container::TAllocator;
-            using Core::Container::TAllocatorTraits;
-            using Core::Container::TPolymorphicDeleter;
+            using Container::kSmartPtrUseManagedAllocator;
+            using Container::TAllocator;
+            using Container::TAllocatorTraits;
+            using Container::TPolymorphicDeleter;
 
             TDerived* ptr = nullptr;
             if constexpr (kSmartPtrUseManagedAllocator) {
@@ -76,8 +77,8 @@ namespace AltinaEngine::Asset {
                 ptr = new TDerived(AltinaEngine::Forward<Args>(args)...); // NOLINT
             }
 
-            return TShared<IAsset>(ptr,
-                TPolymorphicDeleter<IAsset>(&Core::Container::DestroyPolymorphic<IAsset, TDerived>));
+            return TShared<IAsset>(
+                ptr, TPolymorphicDeleter<IAsset>(&Container::DestroyPolymorphic<IAsset, TDerived>));
         }
     } // namespace
 
@@ -113,9 +114,8 @@ namespace AltinaEngine::Asset {
             return {};
         }
 
-        const u64 dataSize = header.DataSize;
-        const u64 chunkTableBytes =
-            static_cast<u64>(blobDesc.ChunkCount) * sizeof(FAudioChunkDesc);
+        const u64 dataSize        = header.DataSize;
+        const u64 chunkTableBytes = static_cast<u64>(blobDesc.ChunkCount) * sizeof(FAudioChunkDesc);
         if (blobDesc.ChunkCount > 0U) {
             if (!RangeWithin(blobDesc.ChunkTableOffset, chunkTableBytes, dataSize)) {
                 return {};
@@ -148,7 +148,7 @@ namespace AltinaEngine::Asset {
         }
 
         const usize baseOffset = stream.Tell();
-        const u64   totalSize = static_cast<u64>(baseOffset) + dataSize;
+        const u64   totalSize  = static_cast<u64>(baseOffset) + dataSize;
         const u64   streamSize = stream.Size();
         if (streamSize != 0U && totalSize > streamSize) {
             return {};
@@ -162,12 +162,12 @@ namespace AltinaEngine::Asset {
                 return {};
             }
 
-            const u64 dataStart = blobDesc.DataOffset;
-            const u64 dataEnd = blobDesc.DataOffset + blobDesc.DataSize;
-            u64 totalChunkBytes = 0U;
+            const u64 dataStart       = blobDesc.DataOffset;
+            const u64 dataEnd         = blobDesc.DataOffset + blobDesc.DataSize;
+            u64       totalChunkBytes = 0U;
             for (const auto& chunk : chunks) {
                 const u64 offset = chunk.Offset;
-                const u64 size = chunk.Size;
+                const u64 size   = chunk.Size;
                 if (size == 0U) {
                     return {};
                 }
@@ -199,8 +199,8 @@ namespace AltinaEngine::Asset {
         runtimeDesc.FrameCount     = blobDesc.FrameCount;
         runtimeDesc.FramesPerChunk = blobDesc.FramesPerChunk;
 
-        return MakeSharedAsset<FAudioAsset>(runtimeDesc, AltinaEngine::Move(chunks),
-            AltinaEngine::Move(data));
+        return MakeSharedAsset<FAudioAsset>(
+            runtimeDesc, AltinaEngine::Move(chunks), AltinaEngine::Move(data));
     }
 
 } // namespace AltinaEngine::Asset

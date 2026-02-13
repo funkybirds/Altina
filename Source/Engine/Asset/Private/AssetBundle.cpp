@@ -35,9 +35,7 @@ namespace AltinaEngine::Asset {
         }
     } // namespace
 
-    FAssetBundleReader::~FAssetBundleReader() {
-        Close();
-    }
+    FAssetBundleReader::~FAssetBundleReader() { Close(); }
 
     auto FAssetBundleReader::Open(const FString& path) -> bool {
         Close();
@@ -90,8 +88,7 @@ namespace AltinaEngine::Asset {
             return false;
         }
 
-        const u64 entryBytes = static_cast<u64>(indexHeader.EntryCount)
-            * sizeof(FBundleIndexEntry);
+        const u64 entryBytes = static_cast<u64>(indexHeader.EntryCount) * sizeof(FBundleIndexEntry);
         if (sizeof(FBundleIndexHeader) + entryBytes > mHeader.IndexSize) {
             Close();
             return false;
@@ -115,13 +112,11 @@ namespace AltinaEngine::Asset {
             mFile.close();
         }
         mEntries.Clear();
-        mHeader = {};
+        mHeader   = {};
         mFileSize = 0U;
     }
 
-    auto FAssetBundleReader::IsOpen() const noexcept -> bool {
-        return mFile.is_open();
-    }
+    auto FAssetBundleReader::IsOpen() const noexcept -> bool { return mFile.is_open(); }
 
     auto FAssetBundleReader::GetEntry(const FUuid& uuid, FBundleIndexEntry& outEntry) const noexcept
         -> bool {
@@ -134,8 +129,8 @@ namespace AltinaEngine::Asset {
         return false;
     }
 
-    auto FAssetBundleReader::ReadEntry(
-        const FBundleIndexEntry& entry, TVector<u8>& outBytes) const -> bool {
+    auto FAssetBundleReader::ReadEntry(const FBundleIndexEntry& entry, TVector<u8>& outBytes) const
+        -> bool {
         outBytes.Clear();
         if (!mFile.is_open()) {
             return false;

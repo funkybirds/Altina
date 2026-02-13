@@ -13,9 +13,7 @@ namespace AltinaEngine::Core::Utility::Json {
         class FJsonReader {
         public:
             FJsonReader(FNativeStringView text, TVector<FJsonValue*>& owned, FNativeString& error)
-                : mText(text)
-                , mOwned(owned)
-                , mError(error) {}
+                : mText(text), mOwned(owned), mError(error) {}
 
             auto Parse(FJsonValue& out) -> bool {
                 ResetValue(out);
@@ -326,7 +324,7 @@ namespace AltinaEngine::Core::Utility::Json {
                 const usize end = mIndex;
                 std::string token(mText.Data() + start, mText.Data() + end);
                 char*       endPtr = nullptr;
-                out = std::strtod(token.c_str(), &endPtr);
+                out                = std::strtod(token.c_str(), &endPtr);
                 if (endPtr == token.c_str()) {
                     SetError("Invalid number.");
                     return false;
@@ -358,16 +356,14 @@ namespace AltinaEngine::Core::Utility::Json {
             }
 
         private:
-            FNativeStringView  mText;
-            usize              mIndex = 0;
+            FNativeStringView     mText;
+            usize                 mIndex = 0;
             TVector<FJsonValue*>& mOwned;
-            FNativeString&     mError;
+            FNativeString&        mError;
         };
     } // namespace
 
-    FJsonDocument::~FJsonDocument() {
-        DestroyValues();
-    }
+    FJsonDocument::~FJsonDocument() { DestroyValues(); }
 
     FJsonDocument::FJsonDocument(FJsonDocument&& other) noexcept
         : mRoot(other.mRoot)
@@ -379,9 +375,9 @@ namespace AltinaEngine::Core::Utility::Json {
     auto FJsonDocument::operator=(FJsonDocument&& other) noexcept -> FJsonDocument& {
         if (this != &other) {
             DestroyValues();
-            mRoot  = other.mRoot;
-            mOwned = AltinaEngine::Move(other.mOwned);
-            mError = AltinaEngine::Move(other.mError);
+            mRoot       = other.mRoot;
+            mOwned      = AltinaEngine::Move(other.mOwned);
+            mError      = AltinaEngine::Move(other.mError);
             other.mRoot = nullptr;
         }
         return *this;
@@ -446,7 +442,8 @@ namespace AltinaEngine::Core::Utility::Json {
         return nullptr;
     }
 
-    auto FindObjectValueInsensitive(const FJsonValue& object, const char* key) -> const FJsonValue* {
+    auto FindObjectValueInsensitive(const FJsonValue& object, const char* key)
+        -> const FJsonValue* {
         if (object.Type != EJsonType::Object) {
             return nullptr;
         }

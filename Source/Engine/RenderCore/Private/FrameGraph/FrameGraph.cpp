@@ -6,7 +6,8 @@
 
 namespace AltinaEngine::RenderCore {
 
-    auto FFrameGraphPassResources::GetTexture(FFrameGraphTextureRef ref) const -> Rhi::FRhiTexture* {
+    auto FFrameGraphPassResources::GetTexture(FFrameGraphTextureRef ref) const
+        -> Rhi::FRhiTexture* {
         return mGraph ? mGraph->ResolveTexture(ref) : nullptr;
     }
 
@@ -67,16 +68,14 @@ namespace AltinaEngine::RenderCore {
         return buf;
     }
 
-    FFrameGraphTextureRef FFrameGraphPassBuilder::Read(
-        FFrameGraphTextureRef tex, Rhi::ERhiResourceState state,
-        const Rhi::FRhiTextureViewRange& range) {
+    FFrameGraphTextureRef FFrameGraphPassBuilder::Read(FFrameGraphTextureRef tex,
+        Rhi::ERhiResourceState state, const Rhi::FRhiTextureViewRange& range) {
         mGraph.RegisterTextureAccess(mPassIndex, tex, state, false, &range);
         return tex;
     }
 
-    FFrameGraphTextureRef FFrameGraphPassBuilder::Write(
-        FFrameGraphTextureRef tex, Rhi::ERhiResourceState state,
-        const Rhi::FRhiTextureViewRange& range) {
+    FFrameGraphTextureRef FFrameGraphPassBuilder::Write(FFrameGraphTextureRef tex,
+        Rhi::ERhiResourceState state, const Rhi::FRhiTextureViewRange& range) {
         mGraph.RegisterTextureAccess(mPassIndex, tex, state, true, &range);
         return tex;
     }
@@ -121,15 +120,11 @@ namespace AltinaEngine::RenderCore {
         mGraph.SetExternalOutputInternal(mPassIndex, tex, finalState);
     }
 
-    void FFrameGraphPassBuilder::SetSideEffect() {
-        mGraph.SetSideEffectInternal(mPassIndex);
-    }
+    void FFrameGraphPassBuilder::SetSideEffect() { mGraph.SetSideEffectInternal(mPassIndex); }
 
     FFrameGraph::FFrameGraph(Rhi::FRhiDevice& device) : mDevice(&device) {}
 
-    FFrameGraph::~FFrameGraph() {
-        ResetGraph();
-    }
+    FFrameGraph::~FFrameGraph() { ResetGraph(); }
 
     void FFrameGraph::BeginFrame(u64 frameIndex) {
         if (mInFrame) {
@@ -201,15 +196,15 @@ namespace AltinaEngine::RenderCore {
         }
 
         for (auto& RTV : mRTVs) {
-            auto desc   = RTV.mDesc;
+            auto desc     = RTV.mDesc;
             desc.mTexture = ResolveTexture(FFrameGraphTextureRef{ RTV.mResourceId });
-            RTV.mView   = mDevice->CreateRenderTargetView(desc);
+            RTV.mView     = mDevice->CreateRenderTargetView(desc);
         }
 
         for (auto& DSV : mDSVs) {
-            auto desc   = DSV.mDesc;
+            auto desc     = DSV.mDesc;
             desc.mTexture = ResolveTexture(FFrameGraphTextureRef{ DSV.mResourceId });
-            DSV.mView   = mDevice->CreateDepthStencilView(desc);
+            DSV.mView     = mDevice->CreateDepthStencilView(desc);
         }
 
         for (auto& pass : mPasses) {
@@ -219,25 +214,25 @@ namespace AltinaEngine::RenderCore {
             if (!pass.mRenderTargets.IsEmpty()) {
                 pass.mCompiledColorAttachments.Resize(pass.mRenderTargets.Size());
                 for (usize i = 0; i < pass.mRenderTargets.Size(); ++i) {
-                    const auto& binding   = pass.mRenderTargets[i];
+                    const auto& binding    = pass.mRenderTargets[i];
                     auto&       attachment = pass.mCompiledColorAttachments[i];
-                    attachment.mView      = ResolveRTV(binding.mRTV);
-                    attachment.mLoadOp    = binding.mLoadOp;
-                    attachment.mStoreOp   = binding.mStoreOp;
+                    attachment.mView       = ResolveRTV(binding.mRTV);
+                    attachment.mLoadOp     = binding.mLoadOp;
+                    attachment.mStoreOp    = binding.mStoreOp;
                     attachment.mClearColor = binding.mClearColor;
                 }
             }
 
             if (pass.mHasDepthStencil) {
-                const auto& binding  = pass.mDepthStencil;
-                auto&       depthAtt = pass.mCompiledDepthAttachment;
-                depthAtt.mView        = ResolveDSV(binding.mDSV);
-                depthAtt.mDepthLoadOp = binding.mDepthLoadOp;
-                depthAtt.mDepthStoreOp = binding.mDepthStoreOp;
-                depthAtt.mStencilLoadOp = binding.mStencilLoadOp;
-                depthAtt.mStencilStoreOp = binding.mStencilStoreOp;
+                const auto& binding         = pass.mDepthStencil;
+                auto&       depthAtt        = pass.mCompiledDepthAttachment;
+                depthAtt.mView              = ResolveDSV(binding.mDSV);
+                depthAtt.mDepthLoadOp       = binding.mDepthLoadOp;
+                depthAtt.mDepthStoreOp      = binding.mDepthStoreOp;
+                depthAtt.mStencilLoadOp     = binding.mStencilLoadOp;
+                depthAtt.mStencilStoreOp    = binding.mStencilStoreOp;
                 depthAtt.mClearDepthStencil = binding.mClearDepthStencil;
-                pass.mHasCompiledDepth = true;
+                pass.mHasCompiledDepth      = true;
             }
         }
 
@@ -252,8 +247,7 @@ namespace AltinaEngine::RenderCore {
         FFrameGraphPassResources resources(*this);
 
         for (auto& pass : mPasses) {
-            const bool hasRenderPass =
-                pass.mDesc.mType == EFrameGraphPassType::Raster
+            const bool hasRenderPass = pass.mDesc.mType == EFrameGraphPassType::Raster
                 && (!pass.mCompiledColorAttachments.IsEmpty() || pass.mHasCompiledDepth);
 
             if (hasRenderPass) {
@@ -281,8 +275,8 @@ namespace AltinaEngine::RenderCore {
     FFrameGraphTextureRef FFrameGraph::ImportTexture(
         Rhi::FRhiTexture* external, Rhi::ERhiResourceState state) {
         FRdgTextureEntry entry;
-        entry.mIsExternal = true;
-        entry.mExternal   = external;
+        entry.mIsExternal         = true;
+        entry.mExternal           = external;
         entry.mDesc.mInitialState = state;
         mTextures.PushBack(entry);
         mCompiled = false;
@@ -292,8 +286,8 @@ namespace AltinaEngine::RenderCore {
     FFrameGraphBufferRef FFrameGraph::ImportBuffer(
         Rhi::FRhiBuffer* external, Rhi::ERhiResourceState state) {
         FRdgBufferEntry entry;
-        entry.mIsExternal = true;
-        entry.mExternal   = external;
+        entry.mIsExternal         = true;
+        entry.mExternal           = external;
         entry.mDesc.mInitialState = state;
         mBuffers.PushBack(entry);
         mCompiled = false;
@@ -335,7 +329,8 @@ namespace AltinaEngine::RenderCore {
         return FFrameGraphTextureRef{ static_cast<u32>(mTextures.Size()) };
     }
 
-    auto FFrameGraph::CreateBufferInternal(const FFrameGraphBufferDesc& desc) -> FFrameGraphBufferRef {
+    auto FFrameGraph::CreateBufferInternal(const FFrameGraphBufferDesc& desc)
+        -> FFrameGraphBufferRef {
         FRdgBufferEntry entry;
         entry.mDesc = desc;
         mBuffers.PushBack(entry);
@@ -343,12 +338,12 @@ namespace AltinaEngine::RenderCore {
         return FFrameGraphBufferRef{ static_cast<u32>(mBuffers.Size()) };
     }
 
-    auto FFrameGraph::CreateSRVInternal(
-        FFrameGraphTextureRef tex, const Rhi::FRhiShaderResourceViewDesc& desc) -> FFrameGraphSRVRef {
+    auto FFrameGraph::CreateSRVInternal(FFrameGraphTextureRef tex,
+        const Rhi::FRhiShaderResourceViewDesc&                desc) -> FFrameGraphSRVRef {
         FRdgSRVEntry entry;
-        entry.mIsTexture = true;
-        entry.mResourceId = tex.mId;
-        entry.mDesc = desc;
+        entry.mIsTexture     = true;
+        entry.mResourceId    = tex.mId;
+        entry.mDesc          = desc;
         entry.mDesc.mTexture = nullptr;
         entry.mDesc.mBuffer  = nullptr;
         mSRVs.PushBack(entry);
@@ -356,13 +351,12 @@ namespace AltinaEngine::RenderCore {
         return FFrameGraphSRVRef{ static_cast<u32>(mSRVs.Size()) };
     }
 
-    auto FFrameGraph::CreateUAVInternal(
-        FFrameGraphTextureRef tex, const Rhi::FRhiUnorderedAccessViewDesc& desc)
-        -> FFrameGraphUAVRef {
+    auto FFrameGraph::CreateUAVInternal(FFrameGraphTextureRef tex,
+        const Rhi::FRhiUnorderedAccessViewDesc&               desc) -> FFrameGraphUAVRef {
         FRdgUAVEntry entry;
-        entry.mIsTexture = true;
-        entry.mResourceId = tex.mId;
-        entry.mDesc = desc;
+        entry.mIsTexture     = true;
+        entry.mResourceId    = tex.mId;
+        entry.mDesc          = desc;
         entry.mDesc.mTexture = nullptr;
         entry.mDesc.mBuffer  = nullptr;
         mUAVs.PushBack(entry);
@@ -370,12 +364,12 @@ namespace AltinaEngine::RenderCore {
         return FFrameGraphUAVRef{ static_cast<u32>(mUAVs.Size()) };
     }
 
-    auto FFrameGraph::CreateSRVInternal(
-        FFrameGraphBufferRef buf, const Rhi::FRhiShaderResourceViewDesc& desc) -> FFrameGraphSRVRef {
+    auto FFrameGraph::CreateSRVInternal(FFrameGraphBufferRef buf,
+        const Rhi::FRhiShaderResourceViewDesc&               desc) -> FFrameGraphSRVRef {
         FRdgSRVEntry entry;
-        entry.mIsTexture = false;
-        entry.mResourceId = buf.mId;
-        entry.mDesc = desc;
+        entry.mIsTexture     = false;
+        entry.mResourceId    = buf.mId;
+        entry.mDesc          = desc;
         entry.mDesc.mTexture = nullptr;
         entry.mDesc.mBuffer  = nullptr;
         mSRVs.PushBack(entry);
@@ -383,13 +377,12 @@ namespace AltinaEngine::RenderCore {
         return FFrameGraphSRVRef{ static_cast<u32>(mSRVs.Size()) };
     }
 
-    auto FFrameGraph::CreateUAVInternal(
-        FFrameGraphBufferRef buf, const Rhi::FRhiUnorderedAccessViewDesc& desc)
-        -> FFrameGraphUAVRef {
+    auto FFrameGraph::CreateUAVInternal(FFrameGraphBufferRef buf,
+        const Rhi::FRhiUnorderedAccessViewDesc&              desc) -> FFrameGraphUAVRef {
         FRdgUAVEntry entry;
-        entry.mIsTexture = false;
-        entry.mResourceId = buf.mId;
-        entry.mDesc = desc;
+        entry.mIsTexture     = false;
+        entry.mResourceId    = buf.mId;
+        entry.mDesc          = desc;
         entry.mDesc.mTexture = nullptr;
         entry.mDesc.mBuffer  = nullptr;
         mUAVs.PushBack(entry);
@@ -400,8 +393,8 @@ namespace AltinaEngine::RenderCore {
     auto FFrameGraph::CreateRTVInternal(
         FFrameGraphTextureRef tex, const Rhi::FRhiRenderTargetViewDesc& desc) -> FFrameGraphRTVRef {
         FRdgRTVEntry entry;
-        entry.mResourceId = tex.mId;
-        entry.mDesc = desc;
+        entry.mResourceId    = tex.mId;
+        entry.mDesc          = desc;
         entry.mDesc.mTexture = nullptr;
         mRTVs.PushBack(entry);
         mCompiled = false;
@@ -411,8 +404,8 @@ namespace AltinaEngine::RenderCore {
     auto FFrameGraph::CreateDSVInternal(
         FFrameGraphTextureRef tex, const Rhi::FRhiDepthStencilViewDesc& desc) -> FFrameGraphDSVRef {
         FRdgDSVEntry entry;
-        entry.mResourceId = tex.mId;
-        entry.mDesc = desc;
+        entry.mResourceId    = tex.mId;
+        entry.mDesc          = desc;
         entry.mDesc.mTexture = nullptr;
         mDSVs.PushBack(entry);
         mCompiled = false;
@@ -441,8 +434,8 @@ namespace AltinaEngine::RenderCore {
         mPasses[passIndex].mAccesses.PushBack(access);
     }
 
-    void FFrameGraph::RegisterBufferAccess(u32 passIndex, FFrameGraphBufferRef buf,
-        Rhi::ERhiResourceState state, bool isWrite) {
+    void FFrameGraph::RegisterBufferAccess(
+        u32 passIndex, FFrameGraphBufferRef buf, Rhi::ERhiResourceState state, bool isWrite) {
         if (!buf.IsValid() || passIndex >= mPasses.Size()) {
             return;
         }
@@ -459,9 +452,8 @@ namespace AltinaEngine::RenderCore {
         mPasses[passIndex].mAccesses.PushBack(access);
     }
 
-    void FFrameGraph::SetRenderTargetsInternal(
-        u32 passIndex, const FRdgRenderTargetBinding* RTVs, u32 RTVCount,
-        const FRdgDepthStencilBinding* DSV) {
+    void FFrameGraph::SetRenderTargetsInternal(u32 passIndex, const FRdgRenderTargetBinding* RTVs,
+        u32 RTVCount, const FRdgDepthStencilBinding* DSV) {
         if (passIndex >= mPasses.Size()) {
             return;
         }
@@ -489,7 +481,7 @@ namespace AltinaEngine::RenderCore {
         if (tex.IsValid()) {
             const auto index = static_cast<usize>(tex.mId - 1U);
             if (index < mTextures.Size()) {
-                auto& entry = mTextures[index];
+                auto& entry             = mTextures[index];
                 entry.mIsExternalOutput = true;
                 entry.mFinalState       = finalState;
             }
@@ -502,7 +494,7 @@ namespace AltinaEngine::RenderCore {
         if (passIndex >= mPasses.Size()) {
             return;
         }
-        auto& pass = mPasses[passIndex];
+        auto& pass          = mPasses[passIndex];
         pass.mHasSideEffect = true;
         pass.mDesc.mFlags |= EFrameGraphPassFlags::NeverCull;
         mCompiled = false;
@@ -577,5 +569,3 @@ namespace AltinaEngine::RenderCore {
     }
 
 } // namespace AltinaEngine::RenderCore
-
-

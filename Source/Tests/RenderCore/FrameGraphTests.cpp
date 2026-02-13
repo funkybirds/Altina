@@ -8,8 +8,8 @@
 #include "Rhi/RhiStructs.h"
 
 namespace {
-    using AltinaEngine::TChar;
     using AltinaEngine::i32;
+    using AltinaEngine::TChar;
     using AltinaEngine::u32;
     using AltinaEngine::u64;
     using AltinaEngine::RenderCore::EFrameGraphPassType;
@@ -37,17 +37,18 @@ namespace {
     using AltinaEngine::Rhi::ERhiVendorId;
     using AltinaEngine::Rhi::FRhiAdapterDesc;
     using AltinaEngine::Rhi::FRhiBufferDesc;
+    using AltinaEngine::Rhi::FRhiBufferViewRange;
+    using AltinaEngine::Rhi::FRhiDepthStencilViewDesc;
     using AltinaEngine::Rhi::FRhiInitDesc;
+    using AltinaEngine::Rhi::FRhiMockContext;
+    using AltinaEngine::Rhi::FRhiRenderTargetViewDesc;
     using AltinaEngine::Rhi::FRhiShaderResourceViewDesc;
     using AltinaEngine::Rhi::FRhiTextureDesc;
-    using AltinaEngine::Rhi::FRhiUnorderedAccessViewDesc;
-    using AltinaEngine::Rhi::FRhiRenderTargetViewDesc;
-    using AltinaEngine::Rhi::FRhiDepthStencilViewDesc;
     using AltinaEngine::Rhi::FRhiTextureViewRange;
-    using AltinaEngine::Rhi::FRhiBufferViewRange;
-    using AltinaEngine::Rhi::FRhiMockContext;
+    using AltinaEngine::Rhi::FRhiUnorderedAccessViewDesc;
 
-    auto MakeAdapterDesc(const TChar* name, ERhiAdapterType type, ERhiVendorId vendor) -> FRhiAdapterDesc {
+    auto MakeAdapterDesc(const TChar* name, ERhiAdapterType type, ERhiVendorId vendor)
+        -> FRhiAdapterDesc {
         FRhiAdapterDesc desc;
         desc.mName.Assign(name);
         desc.mType     = type;
@@ -73,8 +74,10 @@ namespace {
 
         void RHISetGraphicsPipeline(AltinaEngine::Rhi::FRhiPipeline* /*pipeline*/) override {}
         void RHISetComputePipeline(AltinaEngine::Rhi::FRhiPipeline* /*pipeline*/) override {}
-        void RHISetPrimitiveTopology(AltinaEngine::Rhi::ERhiPrimitiveTopology /*topology*/) override {}
-        void RHISetVertexBuffer(u32 /*slot*/, const AltinaEngine::Rhi::FRhiVertexBufferView& /*view*/) override {}
+        void RHISetPrimitiveTopology(
+            AltinaEngine::Rhi::ERhiPrimitiveTopology /*topology*/) override {}
+        void RHISetVertexBuffer(
+            u32 /*slot*/, const AltinaEngine::Rhi::FRhiVertexBufferView& /*view*/) override {}
         void RHISetIndexBuffer(const AltinaEngine::Rhi::FRhiIndexBufferView& /*view*/) override {}
         void RHISetViewport(const AltinaEngine::Rhi::FRhiViewportRect& /*viewport*/) override {}
         void RHISetScissor(const AltinaEngine::Rhi::FRhiScissorRect& /*scissor*/) override {}
@@ -101,9 +104,9 @@ namespace {
 
 TEST_CASE("FrameGraph.BasicPassResources") {
     FRhiMockContext context;
-    auto device = CreateMockDevice(context);
+    auto            device = CreateMockDevice(context);
 
-    FFrameGraph graph(*device);
+    FFrameGraph     graph(*device);
     graph.BeginFrame(1);
 
     struct FPassData {
@@ -116,8 +119,8 @@ TEST_CASE("FrameGraph.BasicPassResources") {
         FFrameGraphDSVRef     mDepthDSV;
     };
 
-    bool executed = false;
-    bool resourcesResolved = false;
+    bool                executed          = false;
+    bool                resourcesResolved = false;
 
     FFrameGraphPassDesc passDesc;
     passDesc.mName  = "FrameGraph.BasicPassResources";
@@ -137,9 +140,9 @@ TEST_CASE("FrameGraph.BasicPassResources") {
 
             FFrameGraphTextureDesc depthDesc;
             depthDesc.mDesc.mDebugName.Assign(TEXT("FG_Depth"));
-            depthDesc.mDesc.mWidth  = 4U;
-            depthDesc.mDesc.mHeight = 4U;
-            depthDesc.mDesc.mFormat = ERhiFormat::D24UnormS8Uint;
+            depthDesc.mDesc.mWidth     = 4U;
+            depthDesc.mDesc.mHeight    = 4U;
+            depthDesc.mDesc.mFormat    = ERhiFormat::D24UnormS8Uint;
             depthDesc.mDesc.mBindFlags = ERhiTextureBindFlags::DepthStencil;
 
             FFrameGraphBufferDesc bufferDesc;
@@ -165,7 +168,7 @@ TEST_CASE("FrameGraph.BasicPassResources") {
             srvDesc.mDebugName.Assign(TEXT("FG_Color_SRV"));
             srvDesc.mFormat       = colorDesc.mDesc.mFormat;
             srvDesc.mTextureRange = colorRange;
-            data.mColorSRV = builder.CreateSRV(data.mColor, srvDesc);
+            data.mColorSRV        = builder.CreateSRV(data.mColor, srvDesc);
 
             FRhiBufferViewRange bufferRange{};
             bufferRange.mOffsetBytes = 0ULL;
@@ -174,7 +177,7 @@ TEST_CASE("FrameGraph.BasicPassResources") {
             FRhiUnorderedAccessViewDesc uavDesc;
             uavDesc.mDebugName.Assign(TEXT("FG_Buffer_UAV"));
             uavDesc.mBufferRange = bufferRange;
-            data.mBufferUAV = builder.CreateUAV(data.mBuffer, uavDesc);
+            data.mBufferUAV      = builder.CreateUAV(data.mBuffer, uavDesc);
 
             FRhiRenderTargetViewDesc rtvDesc;
             rtvDesc.mDebugName.Assign(TEXT("FG_Color_RTV"));
@@ -189,17 +192,17 @@ TEST_CASE("FrameGraph.BasicPassResources") {
             data.mDepthDSV  = builder.CreateDSV(data.mDepth, dsvDesc);
 
             FRdgRenderTargetBinding rtvBinding;
-            rtvBinding.mRTV = data.mColorRTV;
-            rtvBinding.mLoadOp = AltinaEngine::Rhi::ERhiLoadOp::Clear;
+            rtvBinding.mRTV           = data.mColorRTV;
+            rtvBinding.mLoadOp        = AltinaEngine::Rhi::ERhiLoadOp::Clear;
             rtvBinding.mClearColor.mR = 0.1f;
             rtvBinding.mClearColor.mG = 0.2f;
             rtvBinding.mClearColor.mB = 0.3f;
             rtvBinding.mClearColor.mA = 1.0f;
 
             FRdgDepthStencilBinding dsvBinding;
-            dsvBinding.mDSV = data.mDepthDSV;
-            dsvBinding.mDepthLoadOp = AltinaEngine::Rhi::ERhiLoadOp::Clear;
-            dsvBinding.mClearDepthStencil.mDepth = 1.0f;
+            dsvBinding.mDSV                        = data.mDepthDSV;
+            dsvBinding.mDepthLoadOp                = AltinaEngine::Rhi::ERhiLoadOp::Clear;
+            dsvBinding.mClearDepthStencil.mDepth   = 1.0f;
             dsvBinding.mClearDepthStencil.mStencil = 0U;
 
             builder.SetRenderTargets(&rtvBinding, 1U, &dsvBinding);
@@ -207,15 +210,11 @@ TEST_CASE("FrameGraph.BasicPassResources") {
         },
         [&](AltinaEngine::Rhi::FRhiCmdContext&, const FFrameGraphPassResources& res,
             const FPassData& data) {
-            executed = true;
-            resourcesResolved =
-                res.GetTexture(data.mColor) != nullptr
-                && res.GetTexture(data.mDepth) != nullptr
-                && res.GetBuffer(data.mBuffer) != nullptr
-                && res.GetSRV(data.mColorSRV) != nullptr
-                && res.GetUAV(data.mBufferUAV) != nullptr
-                && res.GetRTV(data.mColorRTV) != nullptr
-                && res.GetDSV(data.mDepthDSV) != nullptr;
+            executed          = true;
+            resourcesResolved = res.GetTexture(data.mColor) != nullptr
+                && res.GetTexture(data.mDepth) != nullptr && res.GetBuffer(data.mBuffer) != nullptr
+                && res.GetSRV(data.mColorSRV) != nullptr && res.GetUAV(data.mBufferUAV) != nullptr
+                && res.GetRTV(data.mColorRTV) != nullptr && res.GetDSV(data.mDepthDSV) != nullptr;
         });
 
     graph.Compile();
@@ -232,13 +231,13 @@ TEST_CASE("FrameGraph.BasicPassResources") {
 
 TEST_CASE("FrameGraph.ImportedTextureRoundTrip") {
     FRhiMockContext context;
-    auto device = CreateMockDevice(context);
+    auto            device = CreateMockDevice(context);
 
     FRhiTextureDesc texDesc;
     texDesc.mDebugName.Assign(TEXT("ImportedTexture"));
-    texDesc.mWidth  = 2U;
-    texDesc.mHeight = 2U;
-    texDesc.mFormat = ERhiFormat::R8G8B8A8Unorm;
+    texDesc.mWidth     = 2U;
+    texDesc.mHeight    = 2U;
+    texDesc.mFormat    = ERhiFormat::R8G8B8A8Unorm;
     texDesc.mBindFlags = ERhiTextureBindFlags::ShaderResource;
 
     auto externalTexture = device->CreateTexture(texDesc);

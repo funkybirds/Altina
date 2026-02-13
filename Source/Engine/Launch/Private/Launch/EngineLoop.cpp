@@ -15,6 +15,7 @@
 #endif
 
 namespace AltinaEngine::Launch {
+    namespace Container = Core::Container;
     FEngineLoop::FEngineLoop(const FStartupParameters& InStartupParameters)
         : mStartupParameters(InStartupParameters) {}
 
@@ -26,17 +27,17 @@ namespace AltinaEngine::Launch {
         }
 
         if (!mInputSystem) {
-            mInputSystem = Core::Container::MakeUnique<Input::FInputSystem>();
+            mInputSystem = Container::MakeUnique<Input::FInputSystem>();
         }
 
         if (!mAppMessageHandler && mInputSystem) {
-            mAppMessageHandler =
-                Core::Container::MakeUnique<Input::FInputMessageHandler>(*mInputSystem);
+            mAppMessageHandler = Container::MakeUnique<Input::FInputMessageHandler>(*mInputSystem);
         }
 
 #if AE_PLATFORM_WIN
-        mApplication = Core::Container::MakeUniqueAs<Application::FApplication,
-            Application::FWindowsApplication>(mStartupParameters);
+        mApplication =
+            Container::MakeUniqueAs<Application::FApplication, Application::FWindowsApplication>(
+                mStartupParameters);
 #else
         LogError(TEXT("FEngineLoop PreInit failed: no platform application available."));
         return false;
@@ -81,9 +82,9 @@ namespace AltinaEngine::Launch {
         }
 
 #if AE_PLATFORM_WIN
-        mRhiContext = Core::Container::MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiD3D11Context>();
+        mRhiContext = Container::MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiD3D11Context>();
 #else
-        mRhiContext = Core::Container::MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiMockContext>();
+        mRhiContext = Container::MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiMockContext>();
 #endif
 
         if (!mRhiContext) {

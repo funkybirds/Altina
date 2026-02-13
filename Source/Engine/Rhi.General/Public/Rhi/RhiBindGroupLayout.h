@@ -5,19 +5,20 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiBindGroupLayout : public FRhiResource {
     public:
         explicit FRhiBindGroupLayout(const FRhiBindGroupLayoutDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+            FRhiResourceDeleteQueue*                                deleteQueue = nullptr) noexcept;
 
         ~FRhiBindGroupLayout() override;
 
-        FRhiBindGroupLayout(const FRhiBindGroupLayout&) = delete;
-        FRhiBindGroupLayout(FRhiBindGroupLayout&&) = delete;
-        auto operator=(const FRhiBindGroupLayout&) -> FRhiBindGroupLayout& = delete;
-        auto operator=(FRhiBindGroupLayout&&) -> FRhiBindGroupLayout& = delete;
+        FRhiBindGroupLayout(const FRhiBindGroupLayout&)                                  = delete;
+        FRhiBindGroupLayout(FRhiBindGroupLayout&&)                                       = delete;
+        auto               operator=(const FRhiBindGroupLayout&) -> FRhiBindGroupLayout& = delete;
+        auto               operator=(FRhiBindGroupLayout&&) -> FRhiBindGroupLayout&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiBindGroupLayoutDesc& {
             return mDesc;

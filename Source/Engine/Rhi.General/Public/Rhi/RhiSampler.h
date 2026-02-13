@@ -5,19 +5,20 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiSampler : public FRhiResource {
     public:
-        explicit FRhiSampler(const FRhiSamplerDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+        explicit FRhiSampler(
+            const FRhiSamplerDesc& desc, FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
 
         ~FRhiSampler() override;
 
-        FRhiSampler(const FRhiSampler&) = delete;
-        FRhiSampler(FRhiSampler&&) = delete;
-        auto operator=(const FRhiSampler&) -> FRhiSampler& = delete;
-        auto operator=(FRhiSampler&&) -> FRhiSampler& = delete;
+        FRhiSampler(const FRhiSampler&)                                  = delete;
+        FRhiSampler(FRhiSampler&&)                                       = delete;
+        auto               operator=(const FRhiSampler&) -> FRhiSampler& = delete;
+        auto               operator=(FRhiSampler&&) -> FRhiSampler&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiSamplerDesc& { return mDesc; }
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {

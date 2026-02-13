@@ -36,9 +36,7 @@ namespace AltinaEngine::Input {
         return mMouseButtonsReleasedThisFrame.count(InButton) != 0U;
     }
 
-    auto FInputSystem::GetPressedKeys() const noexcept -> const FKeySet& {
-        return mPressedKeys;
-    }
+    auto FInputSystem::GetPressedKeys() const noexcept -> const FKeySet& { return mPressedKeys; }
 
     auto FInputSystem::GetPressedMouseButtons() const noexcept -> const THashSet<u32>& {
         return mPressedMouseButtons;
@@ -56,8 +54,7 @@ namespace AltinaEngine::Input {
         return mMouseButtonsPressedThisFrame;
     }
 
-    auto FInputSystem::GetMouseButtonsReleasedThisFrame() const noexcept
-        -> const THashSet<u32>& {
+    auto FInputSystem::GetMouseButtonsReleasedThisFrame() const noexcept -> const THashSet<u32>& {
         return mMouseButtonsReleasedThisFrame;
     }
 
@@ -71,9 +68,7 @@ namespace AltinaEngine::Input {
 
     auto FInputSystem::GetMouseWheelDelta() const noexcept -> f32 { return mMouseWheelDelta; }
 
-    auto FInputSystem::GetCharInputs() const noexcept -> const TVector<u32>& {
-        return mCharInputs;
-    }
+    auto FInputSystem::GetCharInputs() const noexcept -> const TVector<u32>& { return mCharInputs; }
 
     auto FInputSystem::GetWindowWidth() const noexcept -> u32 { return mWindowWidth; }
 

@@ -3,23 +3,24 @@
 #include "Container/String.h"
 
 namespace AltinaEngine::ShaderCompiler {
-    using Core::Container::FString;
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FString;
+    using Container::FStringView;
 
     namespace {
         class FShaderCompiler final : public IShaderCompiler {
         public:
             auto Compile(const FShaderCompileRequest& request) -> FShaderCompileResult override;
 
-            void CompileAsync(const FShaderCompileRequest& request,
-                FOnShaderCompiled onCompleted) override;
+            void CompileAsync(
+                const FShaderCompileRequest& request, FOnShaderCompiled onCompleted) override;
 
         private:
             auto SelectBackend(const FShaderCompileRequest& request, FString& diagnostics)
                 -> Detail::IShaderCompilerBackend*;
 
         private:
-            Detail::FDxcCompilerBackend  mDxcBackend;
+            Detail::FDxcCompilerBackend   mDxcBackend;
             Detail::FSlangCompilerBackend mSlangBackend;
         };
 
@@ -94,7 +95,7 @@ namespace AltinaEngine::ShaderCompiler {
         auto*   backend = SelectBackend(request, selectionNotes);
         if (backend == nullptr) {
             FShaderCompileResult result;
-            result.mStage = request.mSource.mStage;
+            result.mStage       = request.mSource.mStage;
             result.mSucceeded   = false;
             result.mDiagnostics = selectionNotes;
             return result;
@@ -105,8 +106,8 @@ namespace AltinaEngine::ShaderCompiler {
         return result;
     }
 
-    void FShaderCompiler::CompileAsync(const FShaderCompileRequest& request,
-        FOnShaderCompiled onCompleted) {
+    void FShaderCompiler::CompileAsync(
+        const FShaderCompileRequest& request, FOnShaderCompiled onCompleted) {
         auto result = Compile(request);
         if (onCompleted) {
             onCompleted(result);

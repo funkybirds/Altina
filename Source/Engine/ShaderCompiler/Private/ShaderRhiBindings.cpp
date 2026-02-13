@@ -8,61 +8,61 @@ namespace AltinaEngine::ShaderCompiler {
         auto ToStageFlags(EShaderStage stage) -> Rhi::ERhiShaderStageFlags {
             using Rhi::ERhiShaderStageFlags;
             switch (stage) {
-            case EShaderStage::Vertex:
-                return ERhiShaderStageFlags::Vertex;
-            case EShaderStage::Pixel:
-                return ERhiShaderStageFlags::Pixel;
-            case EShaderStage::Compute:
-                return ERhiShaderStageFlags::Compute;
-            case EShaderStage::Geometry:
-                return ERhiShaderStageFlags::Geometry;
-            case EShaderStage::Hull:
-                return ERhiShaderStageFlags::Hull;
-            case EShaderStage::Domain:
-                return ERhiShaderStageFlags::Domain;
-            case EShaderStage::Mesh:
-                return ERhiShaderStageFlags::Mesh;
-            case EShaderStage::Amplification:
-                return ERhiShaderStageFlags::Amplification;
-            case EShaderStage::Library:
-            default:
-                return ERhiShaderStageFlags::All;
+                case EShaderStage::Vertex:
+                    return ERhiShaderStageFlags::Vertex;
+                case EShaderStage::Pixel:
+                    return ERhiShaderStageFlags::Pixel;
+                case EShaderStage::Compute:
+                    return ERhiShaderStageFlags::Compute;
+                case EShaderStage::Geometry:
+                    return ERhiShaderStageFlags::Geometry;
+                case EShaderStage::Hull:
+                    return ERhiShaderStageFlags::Hull;
+                case EShaderStage::Domain:
+                    return ERhiShaderStageFlags::Domain;
+                case EShaderStage::Mesh:
+                    return ERhiShaderStageFlags::Mesh;
+                case EShaderStage::Amplification:
+                    return ERhiShaderStageFlags::Amplification;
+                case EShaderStage::Library:
+                default:
+                    return ERhiShaderStageFlags::All;
             }
         }
 
         auto ToBindingType(const FShaderResourceBinding& resource) -> Rhi::ERhiBindingType {
             using Rhi::ERhiBindingType;
             switch (resource.mType) {
-            case EShaderResourceType::ConstantBuffer:
-                return ERhiBindingType::ConstantBuffer;
-            case EShaderResourceType::Texture:
-                return ERhiBindingType::SampledTexture;
-            case EShaderResourceType::Sampler:
-                return ERhiBindingType::Sampler;
-            case EShaderResourceType::StorageBuffer:
-                return (resource.mAccess == EShaderResourceAccess::ReadWrite)
-                    ? ERhiBindingType::StorageBuffer
-                    : ERhiBindingType::SampledBuffer;
-            case EShaderResourceType::StorageTexture:
-                return (resource.mAccess == EShaderResourceAccess::ReadWrite)
-                    ? ERhiBindingType::StorageTexture
-                    : ERhiBindingType::SampledTexture;
-            case EShaderResourceType::AccelerationStructure:
-                return ERhiBindingType::AccelerationStructure;
-            default:
-                return ERhiBindingType::SampledTexture;
+                case EShaderResourceType::ConstantBuffer:
+                    return ERhiBindingType::ConstantBuffer;
+                case EShaderResourceType::Texture:
+                    return ERhiBindingType::SampledTexture;
+                case EShaderResourceType::Sampler:
+                    return ERhiBindingType::Sampler;
+                case EShaderResourceType::StorageBuffer:
+                    return (resource.mAccess == EShaderResourceAccess::ReadWrite)
+                        ? ERhiBindingType::StorageBuffer
+                        : ERhiBindingType::SampledBuffer;
+                case EShaderResourceType::StorageTexture:
+                    return (resource.mAccess == EShaderResourceAccess::ReadWrite)
+                        ? ERhiBindingType::StorageTexture
+                        : ERhiBindingType::SampledTexture;
+                case EShaderResourceType::AccelerationStructure:
+                    return ERhiBindingType::AccelerationStructure;
+                default:
+                    return ERhiBindingType::SampledTexture;
             }
         }
 
         auto HashCombine(u64& seed, u64 value) -> void {
             constexpr u64 kPrime = 1099511628211ULL;
-            seed = (seed ^ value) * kPrime;
+            seed                 = (seed ^ value) * kPrime;
         }
 
         auto BuildLayoutHash(const TVector<Rhi::FRhiBindGroupLayoutEntry>& entries, u32 setIndex)
             -> u64 {
             constexpr u64 kOffset = 1469598103934665603ULL;
-            u64 hash = kOffset;
+            u64           hash    = kOffset;
             HashCombine(hash, setIndex);
             for (const auto& entry : entries) {
                 HashCombine(hash, entry.mBinding);
@@ -75,9 +75,9 @@ namespace AltinaEngine::ShaderCompiler {
         }
 
         auto BuildPipelineHash(const TVector<Rhi::FRhiBindGroupLayoutDesc>& layouts,
-            const TVector<Rhi::FRhiPushConstantRange>& pushConstants) -> u64 {
+            const TVector<Rhi::FRhiPushConstantRange>&                      pushConstants) -> u64 {
             constexpr u64 kOffset = 1469598103934665603ULL;
-            u64 hash = kOffset;
+            u64           hash    = kOffset;
             for (const auto& layout : layouts) {
                 HashCombine(hash, layout.mSetIndex);
                 HashCombine(hash, layout.mLayoutHash);
@@ -97,7 +97,7 @@ namespace AltinaEngine::ShaderCompiler {
         const auto              stageFlags = ToStageFlags(stage);
 
         struct FSetEntries {
-            u32                                      mSetIndex = 0U;
+            u32                                    mSetIndex = 0U;
             TVector<Rhi::FRhiBindGroupLayoutEntry> mEntries;
         };
 
@@ -119,10 +119,10 @@ namespace AltinaEngine::ShaderCompiler {
             }
 
             Rhi::FRhiBindGroupLayoutEntry entry{};
-            entry.mBinding        = resource.mBinding;
-            entry.mType           = ToBindingType(resource);
-            entry.mVisibility     = stageFlags;
-            entry.mArrayCount     = 1U;
+            entry.mBinding          = resource.mBinding;
+            entry.mType             = ToBindingType(resource);
+            entry.mVisibility       = stageFlags;
+            entry.mArrayCount       = 1U;
             entry.mHasDynamicOffset = false;
             setPtr->mEntries.PushBack(entry);
         }
@@ -158,9 +158,9 @@ namespace AltinaEngine::ShaderCompiler {
 
     auto BuildRhiShaderDesc(const FShaderCompileResult& result) -> Rhi::FRhiShaderDesc {
         Rhi::FRhiShaderDesc desc{};
-        desc.mStage = result.mStage;
+        desc.mStage          = result.mStage;
         desc.mBytecode.mData = result.mBytecode;
-        desc.mReflection = result.mReflection;
+        desc.mReflection     = result.mReflection;
         return desc;
     }
 

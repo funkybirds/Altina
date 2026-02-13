@@ -8,6 +8,7 @@
 #include <new>
 
 namespace AltinaEngine::Core::Memory {
+    namespace Container = Core::Container;
     namespace Detail {
         [[nodiscard]] constexpr auto DivRoundUp(usize numerator, usize denominator) noexcept
             -> usize {
@@ -19,8 +20,8 @@ namespace AltinaEngine::Core::Memory {
     public:
         using TValueType = T;
 
-        TObjectPoolHandle() = default;
-        TObjectPoolHandle(const TObjectPoolHandle&) = delete;
+        TObjectPoolHandle()                                            = default;
+        TObjectPoolHandle(const TObjectPoolHandle&)                    = delete;
         auto operator=(const TObjectPoolHandle&) -> TObjectPoolHandle& = delete;
 
         TObjectPoolHandle(TObjectPoolHandle&& other) noexcept : mPtr(other.mPtr) {
@@ -34,19 +35,19 @@ namespace AltinaEngine::Core::Memory {
             return *this;
         }
 
-        [[nodiscard]] auto Get() noexcept -> T* { return mPtr; }
-        [[nodiscard]] auto Get() const noexcept -> const T* { return mPtr; }
+        [[nodiscard]] auto     Get() noexcept -> T* { return mPtr; }
+        [[nodiscard]] auto     Get() const noexcept -> const T* { return mPtr; }
 
-        [[nodiscard]] auto operator->() noexcept -> T* { return mPtr; }
-        [[nodiscard]] auto operator->() const noexcept -> const T* { return mPtr; }
-        [[nodiscard]] auto operator*() noexcept -> T& { return *mPtr; }
-        [[nodiscard]] auto operator*() const noexcept -> const T& { return *mPtr; }
+        [[nodiscard]] auto     operator->() noexcept -> T* { return mPtr; }
+        [[nodiscard]] auto     operator->() const noexcept -> const T* { return mPtr; }
+        [[nodiscard]] auto     operator*() noexcept -> T& { return *mPtr; }
+        [[nodiscard]] auto     operator*() const noexcept -> const T& { return *mPtr; }
 
         [[nodiscard]] explicit operator bool() const noexcept { return mPtr != nullptr; }
 
-        void Reset() noexcept { mPtr = nullptr; }
+        void                   Reset() noexcept { mPtr = nullptr; }
 
-        [[nodiscard]] auto Release() noexcept -> T* {
+        [[nodiscard]] auto     Release() noexcept -> T* {
             T* ptr = mPtr;
             mPtr   = nullptr;
             return ptr;
@@ -57,11 +58,10 @@ namespace AltinaEngine::Core::Memory {
 
         T* mPtr = nullptr;
 
-        template <typename, template <typename, typename> class, typename>
-        friend class TObjectPool;
+        template <typename, template <typename, typename> class, typename> friend class TObjectPool;
     };
 
-    template <typename T, typename TAllocator = Core::Container::TAllocator<T>>
+    template <typename T, typename TAllocator = Container::TAllocator<T>>
     class TSingleThreadedObjectPoolPolicy {
     public:
         using TValueType = T;
@@ -73,7 +73,7 @@ namespace AltinaEngine::Core::Memory {
 
         TSingleThreadedObjectPoolPolicy(const TSingleThreadedObjectPoolPolicy&) = delete;
         auto operator=(const TSingleThreadedObjectPoolPolicy&)
-            -> TSingleThreadedObjectPoolPolicy& = delete;
+            -> TSingleThreadedObjectPoolPolicy&                            = delete;
         TSingleThreadedObjectPoolPolicy(TSingleThreadedObjectPoolPolicy&&) = delete;
         auto operator=(TSingleThreadedObjectPoolPolicy&&)
             -> TSingleThreadedObjectPoolPolicy& = delete;
@@ -137,17 +137,18 @@ namespace AltinaEngine::Core::Memory {
             alignas(T) unsigned char mStorage[sizeof(T)];
         };
 
-        static constexpr usize kChunkBytes = 16 * 1024;
-        static constexpr usize kElementsPerChunk =
-            (kChunkBytes / sizeof(FNode)) > 0 ? (kChunkBytes / sizeof(FNode)) : 1;
+        static constexpr usize kChunkBytes       = 16 * 1024;
+        static constexpr usize kElementsPerChunk = (kChunkBytes / sizeof(FNode)) > 0
+            ? (kChunkBytes / sizeof(FNode))
+            : 1;
 
         struct FChunk {
             FChunk* mNext = nullptr;
             FNode   mNodes[kElementsPerChunk];
         };
 
-        using FChunkAllocator  = typename FAllocator::template Rebind<FChunk>::TOther;
-        using FChunkAllocatorTraits = Core::Container::TAllocatorTraits<FChunkAllocator>;
+        using FChunkAllocator       = typename FAllocator::template Rebind<FChunk>::TOther;
+        using FChunkAllocatorTraits = Container::TAllocatorTraits<FChunkAllocator>;
 
         [[nodiscard]] auto AddChunk() -> bool {
             FChunk* chunk = FChunkAllocatorTraits::Allocate(mChunkAllocator, 1);
@@ -177,27 +178,26 @@ namespace AltinaEngine::Core::Memory {
             return reinterpret_cast<FNode*>(storage);
         }
 
-        FNode*  mFreeList            = nullptr;
-        FChunk* mChunkList           = nullptr;
-        usize   mAllocatedChunkCount = 0;
+        FNode*          mFreeList            = nullptr;
+        FChunk*         mChunkList           = nullptr;
+        usize           mAllocatedChunkCount = 0;
         FChunkAllocator mChunkAllocator{};
     };
 
-    template <typename T, typename TAllocator = Core::Container::TAllocator<T>>
+    template <typename T, typename TAllocator = Container::TAllocator<T>>
     class TThreadSafeObjectPoolPolicy {
     public:
-        using TValueType = T;
-        using FAllocator = TAllocator;
+        using TValueType   = T;
+        using FAllocator   = TAllocator;
         using FInnerPolicy = TSingleThreadedObjectPoolPolicy<T, FAllocator>;
 
         TThreadSafeObjectPoolPolicy() = default;
         explicit TThreadSafeObjectPoolPolicy(const FAllocator& allocator) : mPolicy(allocator) {}
 
-        TThreadSafeObjectPoolPolicy(const TThreadSafeObjectPoolPolicy&) = delete;
-        auto operator=(const TThreadSafeObjectPoolPolicy&)
-            -> TThreadSafeObjectPoolPolicy& = delete;
-        TThreadSafeObjectPoolPolicy(TThreadSafeObjectPoolPolicy&&) = delete;
-        auto operator=(TThreadSafeObjectPoolPolicy&&) -> TThreadSafeObjectPoolPolicy& = delete;
+        TThreadSafeObjectPoolPolicy(const TThreadSafeObjectPoolPolicy&)                    = delete;
+        auto operator=(const TThreadSafeObjectPoolPolicy&) -> TThreadSafeObjectPoolPolicy& = delete;
+        TThreadSafeObjectPoolPolicy(TThreadSafeObjectPoolPolicy&&)                         = delete;
+        auto operator=(TThreadSafeObjectPoolPolicy&&) -> TThreadSafeObjectPoolPolicy&      = delete;
 
         [[nodiscard]] auto Allocate() -> T* {
             Threading::FScopedLock lock(mMutex);
@@ -229,9 +229,8 @@ namespace AltinaEngine::Core::Memory {
         FInnerPolicy              mPolicy;
     };
 
-    template <typename T,
-        template <typename, typename> class TPolicy = TThreadSafeObjectPoolPolicy,
-        typename TAllocator = Core::Container::TAllocator<T>>
+    template <typename T, template <typename, typename> class TPolicy = TThreadSafeObjectPoolPolicy,
+        typename TAllocator = Container::TAllocator<T>>
     class TObjectPool {
     public:
         using TValueType = T;
@@ -243,10 +242,10 @@ namespace AltinaEngine::Core::Memory {
         explicit TObjectPool(const FAllocator& allocator) : mPolicy(allocator) {}
         ~TObjectPool() { mPolicy.CleanUp(); }
 
-        TObjectPool(const TObjectPool&) = delete;
+        TObjectPool(const TObjectPool&)                    = delete;
         auto operator=(const TObjectPool&) -> TObjectPool& = delete;
-        TObjectPool(TObjectPool&&) = delete;
-        auto operator=(TObjectPool&&) -> TObjectPool& = delete;
+        TObjectPool(TObjectPool&&)                         = delete;
+        auto operator=(TObjectPool&&) -> TObjectPool&      = delete;
 
         void Init(usize size) { mPolicy.Initialize(size); }
 
@@ -260,12 +259,10 @@ namespace AltinaEngine::Core::Memory {
             return FHandle(obj);
         }
 
-        void Deallocate(FHandle& handle) { DestroyRaw(handle.Release()); }
-        void Deallocate(FHandle&& handle) { DestroyRaw(handle.Release()); }
+        void               Deallocate(FHandle& handle) { DestroyRaw(handle.Release()); }
+        void               Deallocate(FHandle&& handle) { DestroyRaw(handle.Release()); }
 
-        [[nodiscard]] auto GetPoolSize() const noexcept -> usize {
-            return mPolicy.GetPoolSize();
-        }
+        [[nodiscard]] auto GetPoolSize() const noexcept -> usize { return mPolicy.GetPoolSize(); }
 
         [[nodiscard]] auto GetPolicy() noexcept -> FPolicy& { return mPolicy; }
         [[nodiscard]] auto GetPolicy() const noexcept -> const FPolicy& { return mPolicy; }
@@ -283,9 +280,9 @@ namespace AltinaEngine::Core::Memory {
         FPolicy mPolicy{};
     };
 
-    template <typename T, typename TAllocator = Core::Container::TAllocator<T>>
+    template <typename T, typename TAllocator = Container::TAllocator<T>>
     using TThreadSafeObjectPool = TObjectPool<T, TThreadSafeObjectPoolPolicy, TAllocator>;
 
-    template <typename T, typename TAllocator = Core::Container::TAllocator<T>>
+    template <typename T, typename TAllocator = Container::TAllocator<T>>
     using TSingleThreadedObjectPool = TObjectPool<T, TSingleThreadedObjectPoolPolicy, TAllocator>;
 } // namespace AltinaEngine::Core::Memory

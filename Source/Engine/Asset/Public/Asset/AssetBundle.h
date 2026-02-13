@@ -9,15 +9,16 @@
 #include <fstream>
 
 namespace AltinaEngine::Asset {
-    using Core::Container::FString;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::FString;
+    using Container::TVector;
 
     constexpr u32 kBundleMagic   = 0x31424541u; // "AEB1"
     constexpr u16 kBundleVersion = 1;
 
     enum class EBundleFlags : u16 {
-        None         = 0,
-        HasChunks    = 1 << 0,
+        None           = 0,
+        HasChunks      = 1 << 0,
         HasCompression = 1 << 1,
         HasEncryption  = 1 << 2,
         HasHashTable   = 1 << 3
@@ -72,8 +73,8 @@ namespace AltinaEngine::Asset {
         FAssetBundleReader() = default;
         ~FAssetBundleReader();
 
-        auto Open(const FString& path) -> bool;
-        void Close();
+        auto               Open(const FString& path) -> bool;
+        void               Close();
         [[nodiscard]] auto IsOpen() const noexcept -> bool;
 
         [[nodiscard]] auto GetHeader() const noexcept -> const FBundleHeader& { return mHeader; }
@@ -82,10 +83,10 @@ namespace AltinaEngine::Asset {
         auto ReadEntry(const FBundleIndexEntry& entry, TVector<u8>& outBytes) const -> bool;
 
     private:
-        mutable std::ifstream   mFile;
-        FBundleHeader           mHeader{};
+        mutable std::ifstream      mFile;
+        FBundleHeader              mHeader{};
         TVector<FBundleIndexEntry> mEntries;
-        u64                     mFileSize = 0;
+        u64                        mFileSize = 0;
     };
 
 } // namespace AltinaEngine::Asset

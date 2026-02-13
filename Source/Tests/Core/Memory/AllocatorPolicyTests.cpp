@@ -15,7 +15,7 @@ namespace {
 TEST_CASE("AllocatorPolicy.Ring.Wrap") {
     FRingAllocatorPolicy ring(32ULL);
 
-    const auto a = ring.Allocate(12ULL, 4ULL, 1ULL);
+    const auto           a = ring.Allocate(12ULL, 4ULL, 1ULL);
     REQUIRE(a.IsValid());
     REQUIRE_EQ(a.mOffset, 0ULL);
 
@@ -45,7 +45,7 @@ TEST_CASE("AllocatorPolicy.Ring.Wrap") {
 TEST_CASE("AllocatorPolicy.Buddy.Coalesce") {
     FBuddyAllocatorPolicy buddy(1024ULL, 64ULL);
 
-    const auto a = buddy.Allocate(100ULL, 1ULL);
+    const auto            a = buddy.Allocate(100ULL, 1ULL);
     REQUIRE(a.IsValid());
     REQUIRE_EQ(a.mOffset, 0ULL);
     REQUIRE_EQ(a.mSize, 128ULL);
@@ -86,8 +86,8 @@ TEST_CASE("AllocatorPolicy.Buddy.Coalesce") {
 }
 
 TEST_CASE("AllocatorExecutor.MemoryBackingWrite") {
-    u8 buffer[64] = {};
-    FMemoryBufferBacking backing(buffer, 64ULL);
+    u8                                                             buffer[64] = {};
+    FMemoryBufferBacking                                           backing(buffer, 64ULL);
     TAllocatorExecutor<FRingAllocatorPolicy, FMemoryBufferBacking> executor(backing);
     executor.InitPolicyFromBacking();
 

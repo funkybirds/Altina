@@ -5,12 +5,13 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiBindGroup : public FRhiResource {
     public:
-        explicit FRhiBindGroup(const FRhiBindGroupDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+        explicit FRhiBindGroup(
+            const FRhiBindGroupDesc& desc, FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
 
         ~FRhiBindGroup() override;
 

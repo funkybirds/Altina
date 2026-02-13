@@ -8,8 +8,8 @@
 namespace AltinaEngine::Rhi {
     class FRhiCmdDrawIndexed final : public FRhiCmd {
     public:
-        FRhiCmdDrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
-            i32 vertexOffset, u32 firstInstance)
+        FRhiCmdDrawIndexed(
+            u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance)
             : mIndexCount(indexCount)
             , mInstanceCount(instanceCount)
             , mFirstIndex(firstIndex)
@@ -17,34 +17,34 @@ namespace AltinaEngine::Rhi {
             , mFirstInstance(firstInstance) {}
 
         void Execute(FRhiCmdContext& context) override {
-            context.RHIDrawIndexed(mIndexCount, mInstanceCount, mFirstIndex,
-                mVertexOffset, mFirstInstance);
+            context.RHIDrawIndexed(
+                mIndexCount, mInstanceCount, mFirstIndex, mVertexOffset, mFirstInstance);
         }
 
     private:
-        u32 mIndexCount = 0U;
+        u32 mIndexCount    = 0U;
         u32 mInstanceCount = 0U;
-        u32 mFirstIndex = 0U;
-        i32 mVertexOffset = 0;
+        u32 mFirstIndex    = 0U;
+        i32 mVertexOffset  = 0;
         u32 mFirstInstance = 0U;
     };
 
     class FRhiCmdDraw final : public FRhiCmd {
     public:
         FRhiCmdDraw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance)
-            : mVertexCount(vertexCount),
-              mInstanceCount(instanceCount),
-              mFirstVertex(firstVertex),
-              mFirstInstance(firstInstance) {}
+            : mVertexCount(vertexCount)
+            , mInstanceCount(instanceCount)
+            , mFirstVertex(firstVertex)
+            , mFirstInstance(firstInstance) {}
 
         void Execute(FRhiCmdContext& context) override {
             context.RHIDraw(mVertexCount, mInstanceCount, mFirstVertex, mFirstInstance);
         }
 
     private:
-        u32 mVertexCount = 0U;
+        u32 mVertexCount   = 0U;
         u32 mInstanceCount = 0U;
-        u32 mFirstVertex = 0U;
+        u32 mFirstVertex   = 0U;
         u32 mFirstInstance = 0U;
     };
 
@@ -66,7 +66,7 @@ namespace AltinaEngine::Rhi {
         void Execute(FRhiCmdContext& context) override { context.RHISetVertexBuffer(mSlot, mView); }
 
     private:
-        u32 mSlot = 0U;
+        u32                  mSlot = 0U;
         FRhiVertexBufferView mView{};
     };
 
@@ -75,7 +75,9 @@ namespace AltinaEngine::Rhi {
         explicit FRhiCmdSetPrimitiveTopology(ERhiPrimitiveTopology topology)
             : mTopology(topology) {}
 
-        void Execute(FRhiCmdContext& context) override { context.RHISetPrimitiveTopology(mTopology); }
+        void Execute(FRhiCmdContext& context) override {
+            context.RHISetPrimitiveTopology(mTopology);
+        }
 
     private:
         ERhiPrimitiveTopology mTopology = ERhiPrimitiveTopology::TriangleList;
@@ -109,26 +111,26 @@ namespace AltinaEngine::Rhi {
         void Execute(FRhiCmdContext& context) override { context.RHIClearColor(mTarget, mColor); }
 
     private:
-        FRhiTexture* mTarget = nullptr;
+        FRhiTexture*   mTarget = nullptr;
         FRhiClearColor mColor{};
     };
 
     class FRhiCmdSetRenderTargets final : public FRhiCmd {
     public:
-        FRhiCmdSetRenderTargets(u32 colorTargetCount, FRhiTexture* const* colorTargets,
-            FRhiTexture* depthTarget)
-            : mColorTargetCount(colorTargetCount),
-              mColorTargets(colorTargets),
-              mDepthTarget(depthTarget) {}
+        FRhiCmdSetRenderTargets(
+            u32 colorTargetCount, FRhiTexture* const* colorTargets, FRhiTexture* depthTarget)
+            : mColorTargetCount(colorTargetCount)
+            , mColorTargets(colorTargets)
+            , mDepthTarget(depthTarget) {}
 
         void Execute(FRhiCmdContext& context) override {
             context.RHISetRenderTargets(mColorTargetCount, mColorTargets, mDepthTarget);
         }
 
     private:
-        u32 mColorTargetCount = 0U;
-        FRhiTexture* const* mColorTargets = nullptr;
-        FRhiTexture* mDepthTarget = nullptr;
+        u32                 mColorTargetCount = 0U;
+        FRhiTexture* const* mColorTargets     = nullptr;
+        FRhiTexture*        mDepthTarget      = nullptr;
     };
 
     class FRhiCmdBeginRenderPass final : public FRhiCmd {
@@ -170,22 +172,22 @@ namespace AltinaEngine::Rhi {
 
     class FRhiCmdSetBindGroup final : public FRhiCmd {
     public:
-        FRhiCmdSetBindGroup(u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets,
-            u32 dynamicOffsetCount)
-            : mSetIndex(setIndex),
-              mGroup(group),
-              mDynamicOffsets(dynamicOffsets),
-              mDynamicOffsetCount(dynamicOffsetCount) {}
+        FRhiCmdSetBindGroup(
+            u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets, u32 dynamicOffsetCount)
+            : mSetIndex(setIndex)
+            , mGroup(group)
+            , mDynamicOffsets(dynamicOffsets)
+            , mDynamicOffsetCount(dynamicOffsetCount) {}
 
         void Execute(FRhiCmdContext& context) override {
             context.RHISetBindGroup(mSetIndex, mGroup, mDynamicOffsets, mDynamicOffsetCount);
         }
 
     private:
-        u32 mSetIndex = 0U;
-        FRhiBindGroup* mGroup = nullptr;
-        const u32* mDynamicOffsets = nullptr;
-        u32 mDynamicOffsetCount = 0U;
+        u32            mSetIndex           = 0U;
+        FRhiBindGroup* mGroup              = nullptr;
+        const u32*     mDynamicOffsets     = nullptr;
+        u32            mDynamicOffsetCount = 0U;
     };
 
     class FRhiCmdDispatch final : public FRhiCmd {

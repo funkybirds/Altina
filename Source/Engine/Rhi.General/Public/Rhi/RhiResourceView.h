@@ -8,19 +8,20 @@
 #include "Rhi/RhiTexture.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiResourceView : public FRhiResource {
     public:
-        explicit FRhiResourceView(ERhiResourceViewType type,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+        explicit FRhiResourceView(
+            ERhiResourceViewType type, FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
 
         ~FRhiResourceView() override;
 
-        FRhiResourceView(const FRhiResourceView&) = delete;
-        FRhiResourceView(FRhiResourceView&&) = delete;
-        auto operator=(const FRhiResourceView&) -> FRhiResourceView& = delete;
-        auto operator=(FRhiResourceView&&) -> FRhiResourceView& = delete;
+        FRhiResourceView(const FRhiResourceView&)                                  = delete;
+        FRhiResourceView(FRhiResourceView&&)                                       = delete;
+        auto               operator=(const FRhiResourceView&) -> FRhiResourceView& = delete;
+        auto               operator=(FRhiResourceView&&) -> FRhiResourceView&      = delete;
 
         [[nodiscard]] auto GetViewType() const noexcept -> ERhiResourceViewType {
             return mViewType;
@@ -37,10 +38,10 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiShaderResourceView() override;
 
-        FRhiShaderResourceView(const FRhiShaderResourceView&) = delete;
-        FRhiShaderResourceView(FRhiShaderResourceView&&) = delete;
+        FRhiShaderResourceView(const FRhiShaderResourceView&)                    = delete;
+        FRhiShaderResourceView(FRhiShaderResourceView&&)                         = delete;
         auto operator=(const FRhiShaderResourceView&) -> FRhiShaderResourceView& = delete;
-        auto operator=(FRhiShaderResourceView&&) -> FRhiShaderResourceView& = delete;
+        auto operator=(FRhiShaderResourceView&&) -> FRhiShaderResourceView&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiShaderResourceViewDesc& {
             return mDesc;
@@ -70,10 +71,10 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiUnorderedAccessView() override;
 
-        FRhiUnorderedAccessView(const FRhiUnorderedAccessView&) = delete;
-        FRhiUnorderedAccessView(FRhiUnorderedAccessView&&) = delete;
+        FRhiUnorderedAccessView(const FRhiUnorderedAccessView&)                    = delete;
+        FRhiUnorderedAccessView(FRhiUnorderedAccessView&&)                         = delete;
         auto operator=(const FRhiUnorderedAccessView&) -> FRhiUnorderedAccessView& = delete;
-        auto operator=(FRhiUnorderedAccessView&&) -> FRhiUnorderedAccessView& = delete;
+        auto operator=(FRhiUnorderedAccessView&&) -> FRhiUnorderedAccessView&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiUnorderedAccessViewDesc& {
             return mDesc;
@@ -103,10 +104,10 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiRenderTargetView() override;
 
-        FRhiRenderTargetView(const FRhiRenderTargetView&) = delete;
-        FRhiRenderTargetView(FRhiRenderTargetView&&) = delete;
-        auto operator=(const FRhiRenderTargetView&) -> FRhiRenderTargetView& = delete;
-        auto operator=(FRhiRenderTargetView&&) -> FRhiRenderTargetView& = delete;
+        FRhiRenderTargetView(const FRhiRenderTargetView&)                                  = delete;
+        FRhiRenderTargetView(FRhiRenderTargetView&&)                                       = delete;
+        auto               operator=(const FRhiRenderTargetView&) -> FRhiRenderTargetView& = delete;
+        auto               operator=(FRhiRenderTargetView&&) -> FRhiRenderTargetView&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiRenderTargetViewDesc& {
             return mDesc;
@@ -134,10 +135,10 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiDepthStencilView() override;
 
-        FRhiDepthStencilView(const FRhiDepthStencilView&) = delete;
-        FRhiDepthStencilView(FRhiDepthStencilView&&) = delete;
-        auto operator=(const FRhiDepthStencilView&) -> FRhiDepthStencilView& = delete;
-        auto operator=(FRhiDepthStencilView&&) -> FRhiDepthStencilView& = delete;
+        FRhiDepthStencilView(const FRhiDepthStencilView&)                                  = delete;
+        FRhiDepthStencilView(FRhiDepthStencilView&&)                                       = delete;
+        auto               operator=(const FRhiDepthStencilView&) -> FRhiDepthStencilView& = delete;
+        auto               operator=(FRhiDepthStencilView&&) -> FRhiDepthStencilView&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiDepthStencilViewDesc& {
             return mDesc;

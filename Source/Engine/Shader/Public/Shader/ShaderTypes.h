@@ -4,7 +4,8 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Shader {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
 
     enum class EShaderStage : u8 {
         Vertex = 0,
@@ -19,7 +20,7 @@ namespace AltinaEngine::Shader {
     };
 
     struct FShaderBytecode {
-        TVector<u8> mData;
+        TVector<u8>        mData;
 
         [[nodiscard]] auto IsEmpty() const noexcept -> bool { return mData.IsEmpty(); }
         [[nodiscard]] auto Data() const noexcept -> const u8* { return mData.Data(); }

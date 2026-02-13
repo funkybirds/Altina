@@ -5,7 +5,8 @@
 #include "Container/Vector.h"
 
 namespace AltinaEngine::Application {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
     class FPlatformWindow;
     struct FWindowExtent;
 
@@ -17,7 +18,7 @@ namespace AltinaEngine::Application {
         virtual void OnWindowCloseRequested([[maybe_unused]] FPlatformWindow* InWindow) {}
         virtual void OnWindowClosed([[maybe_unused]] FPlatformWindow* InWindow) {}
         virtual void OnWindowResized([[maybe_unused]] FPlatformWindow* InWindow,
-            [[maybe_unused]] const FWindowExtent& InExtent) {}
+            [[maybe_unused]] const FWindowExtent&                      InExtent) {}
         virtual void OnWindowMoved([[maybe_unused]] FPlatformWindow* InWindow,
             [[maybe_unused]] i32 InPositionX, [[maybe_unused]] i32 InPositionY) {}
         virtual void OnWindowFocusGained([[maybe_unused]] FPlatformWindow* InWindow) {}
@@ -25,15 +26,15 @@ namespace AltinaEngine::Application {
         virtual void OnWindowMinimized([[maybe_unused]] FPlatformWindow* InWindow) {}
         virtual void OnWindowMaximized([[maybe_unused]] FPlatformWindow* InWindow) {}
         virtual void OnWindowRestored([[maybe_unused]] FPlatformWindow* InWindow) {}
-        virtual void OnWindowDpiScaleChanged([[maybe_unused]] FPlatformWindow* InWindow,
-            [[maybe_unused]] f32 InDpiScale) {}
+        virtual void OnWindowDpiScaleChanged(
+            [[maybe_unused]] FPlatformWindow* InWindow, [[maybe_unused]] f32 InDpiScale) {}
 
         virtual void OnKeyDown([[maybe_unused]] u32 InKeyCode, [[maybe_unused]] bool InRepeat) {}
         virtual void OnKeyUp([[maybe_unused]] u32 InKeyCode) {}
         virtual void OnCharInput([[maybe_unused]] u32 InCharCode) {}
 
-        virtual void OnMouseMove([[maybe_unused]] i32 InPositionX,
-            [[maybe_unused]] i32 InPositionY) {}
+        virtual void OnMouseMove(
+            [[maybe_unused]] i32 InPositionX, [[maybe_unused]] i32 InPositionY) {}
         virtual void OnMouseEnter() {}
         virtual void OnMouseLeave() {}
         virtual void OnMouseButtonDown([[maybe_unused]] u32 InButton) {}

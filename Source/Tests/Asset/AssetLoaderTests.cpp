@@ -19,16 +19,17 @@
 #include "TestHarness.h"
 
 namespace {
-    using AltinaEngine::u8;
+    namespace Container = AltinaEngine::Core::Container;
     using AltinaEngine::u16;
     using AltinaEngine::u32;
     using AltinaEngine::u64;
+    using AltinaEngine::u8;
     using AltinaEngine::usize;
+    using AltinaEngine::Asset::FAssetBundleReader;
     using AltinaEngine::Asset::FAssetDesc;
     using AltinaEngine::Asset::FAssetHandle;
     using AltinaEngine::Asset::FAssetManager;
     using AltinaEngine::Asset::FAssetRegistry;
-    using AltinaEngine::Asset::FAssetBundleReader;
     using AltinaEngine::Asset::FAudioAsset;
     using AltinaEngine::Asset::FAudioLoader;
     using AltinaEngine::Asset::FMaterialAsset;
@@ -41,38 +42,38 @@ namespace {
     using AltinaEngine::Asset::GetAudioBytesPerSample;
     using AltinaEngine::Asset::GetMeshIndexStride;
     using AltinaEngine::Asset::GetTextureBytesPerPixel;
-    using AltinaEngine::Core::Container::FString;
-    using AltinaEngine::Core::Container::TVector;
+    using Container::FString;
+    using Container::TVector;
 
     auto ToFString(const std::filesystem::path& path) -> FString {
         FString out;
-    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
         const auto wide = path.wstring();
         if (!wide.empty()) {
             out.Append(wide.c_str(), wide.size());
         }
-    #else
+#else
         const auto narrow = path.string();
         if (!narrow.empty()) {
             out.Append(narrow.c_str(), narrow.size());
         }
-    #endif
+#endif
         return out;
     }
 
     auto GetRegistryPath() -> std::filesystem::path {
-    #if defined(AE_SOURCE_DIR)
-        return std::filesystem::path(AE_SOURCE_DIR)
-            / "build" / "Cooked" / "Win64" / "Registry" / "AssetRegistry.json";
-    #else
-        return std::filesystem::current_path()
-            / "build" / "Cooked" / "Win64" / "Registry" / "AssetRegistry.json";
+#if defined(AE_SOURCE_DIR)
+        return std::filesystem::path(AE_SOURCE_DIR) / "build" / "Cooked" / "Win64" / "Registry"
+            / "AssetRegistry.json";
+#else
+        return std::filesystem::current_path() / "build" / "Cooked" / "Win64" / "Registry"
+            / "AssetRegistry.json";
 #endif
     }
 
     struct FScopedCurrentPath {
         std::filesystem::path Prev;
-        bool Ok = false;
+        bool                  Ok = false;
 
         explicit FScopedCurrentPath(const std::filesystem::path& path) {
             std::error_code ec;
@@ -96,15 +97,12 @@ namespace {
     class FTestAssetStream final : public AltinaEngine::Asset::IAssetStream {
     public:
         explicit FTestAssetStream(const TVector<u8>& data)
-            : mData(data.Data())
-            , mSize(data.Size()) {}
+            : mData(data.Data()), mSize(data.Size()) {}
 
         [[nodiscard]] auto Size() const noexcept -> usize override { return mSize; }
         [[nodiscard]] auto Tell() const noexcept -> usize override { return mOffset; }
 
-        void Seek(usize offset) noexcept override {
-            mOffset = (offset > mSize) ? mSize : offset;
-        }
+        void Seek(usize offset) noexcept override { mOffset = (offset > mSize) ? mSize : offset; }
 
         auto Read(void* outBuffer, usize bytesToRead) -> usize override {
             if (outBuffer == nullptr || bytesToRead == 0U || mData == nullptr) {
@@ -134,12 +132,12 @@ namespace {
             return 0U;
         }
 
-        u32 width = desc.Width;
+        u32 width  = desc.Width;
         u32 height = desc.Height;
-        u64 total = 0U;
+        u64 total  = 0U;
         for (u32 mip = 0; mip < desc.MipCount; ++mip) {
             total += static_cast<u64>(width) * static_cast<u64>(height) * bytesPerPixel;
-            width = (width > 1U) ? (width >> 1U) : 1U;
+            width  = (width > 1U) ? (width >> 1U) : 1U;
             height = (height > 1U) ? (height >> 1U) : 1U;
         }
         return total;
@@ -148,14 +146,14 @@ namespace {
 
 TEST_CASE("Asset.Texture2D.EngineFormat.Load") {
     FAssetRegistry registry;
-    const auto registryPath = GetRegistryPath();
+    const auto     registryPath = GetRegistryPath();
     REQUIRE(registry.LoadFromJsonFile(ToFString(registryPath)));
 
-    const auto cookedRoot = registryPath.parent_path().parent_path();
+    const auto         cookedRoot = registryPath.parent_path().parent_path();
     FScopedCurrentPath scopedPath(cookedRoot);
     REQUIRE(scopedPath.Ok);
 
-    FAssetManager manager;
+    FAssetManager    manager;
     FTexture2DLoader loader;
     manager.SetRegistry(&registry);
     manager.RegisterLoader(&loader);
@@ -189,15 +187,15 @@ TEST_CASE("Asset.Texture2D.EngineFormat.Load") {
 
 TEST_CASE("Asset.Mesh.EngineFormat.Load") {
     FAssetRegistry registry;
-    const auto registryPath = GetRegistryPath();
+    const auto     registryPath = GetRegistryPath();
     REQUIRE(registry.LoadFromJsonFile(ToFString(registryPath)));
 
-    const auto cookedRoot = registryPath.parent_path().parent_path();
+    const auto         cookedRoot = registryPath.parent_path().parent_path();
     FScopedCurrentPath scopedPath(cookedRoot);
     REQUIRE(scopedPath.Ok);
 
     FAssetManager manager;
-    FMeshLoader loader;
+    FMeshLoader   loader;
     manager.SetRegistry(&registry);
     manager.RegisterLoader(&loader);
 
@@ -238,30 +236,30 @@ TEST_CASE("Asset.Mesh.EngineFormat.Load") {
 
 TEST_CASE("Asset.Material.EngineFormat.Load") {
     AltinaEngine::FUuid::FBytes uuidBytes{};
-    uuidBytes[0] = 0x11;
-    uuidBytes[1] = 0x22;
-    uuidBytes[2] = 0x33;
-    uuidBytes[3] = 0x44;
+    uuidBytes[0]  = 0x11;
+    uuidBytes[1]  = 0x22;
+    uuidBytes[2]  = 0x33;
+    uuidBytes[3]  = 0x44;
     uuidBytes[15] = 0x55;
     AltinaEngine::FUuid textureUuid(uuidBytes);
 
-    FAssetHandle textureHandle{};
+    FAssetHandle        textureHandle{};
     textureHandle.Uuid = textureUuid;
     textureHandle.Type = AltinaEngine::Asset::EAssetType::Texture2D;
 
     AltinaEngine::Asset::FMaterialBlobDesc blobDesc{};
-    blobDesc.ShadingModel  = 1;
-    blobDesc.BlendMode     = 2;
-    blobDesc.Flags         = 0x4;
-    blobDesc.AlphaCutoff   = 0.5f;
-    blobDesc.ScalarCount   = 2;
-    blobDesc.VectorCount   = 1;
-    blobDesc.TextureCount  = 1;
+    blobDesc.ShadingModel = 1;
+    blobDesc.BlendMode    = 2;
+    blobDesc.Flags        = 0x4;
+    blobDesc.AlphaCutoff  = 0.5f;
+    blobDesc.ScalarCount  = 2;
+    blobDesc.VectorCount  = 1;
+    blobDesc.TextureCount = 1;
 
-    const u32 scalarBytes = blobDesc.ScalarCount
-        * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialScalarParam));
-    const u32 vectorBytes = blobDesc.VectorCount
-        * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialVectorParam));
+    const u32 scalarBytes =
+        blobDesc.ScalarCount * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialScalarParam));
+    const u32 vectorBytes =
+        blobDesc.VectorCount * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialVectorParam));
     const u32 textureBytes = blobDesc.TextureCount
         * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialTextureParam));
 
@@ -297,8 +295,8 @@ TEST_CASE("Asset.Material.EngineFormat.Load") {
     vectors[0].Value[3] = 0.4f;
 
     AltinaEngine::Asset::FMaterialTextureParam textures[1]{};
-    textures[0].NameHash = 0x4444U;
-    textures[0].Texture  = textureHandle;
+    textures[0].NameHash     = 0x4444U;
+    textures[0].Texture      = textureHandle;
     textures[0].SamplerFlags = 0x1U;
 
     std::memcpy(writePtr + blobDesc.ScalarsOffset, scalars, sizeof(scalars));
@@ -306,9 +304,9 @@ TEST_CASE("Asset.Material.EngineFormat.Load") {
     std::memcpy(writePtr + blobDesc.TexturesOffset, textures, sizeof(textures));
 
     FTestAssetStream stream(cooked);
-    FMaterialLoader loader;
+    FMaterialLoader  loader;
 
-    FAssetDesc desc{};
+    FAssetDesc       desc{};
     desc.Material.ShadingModel = blobDesc.ShadingModel;
     desc.Material.TextureBindings.PushBack(textureHandle);
 
@@ -336,14 +334,14 @@ TEST_CASE("Asset.Material.EngineFormat.Load") {
 
 TEST_CASE("Asset.Bundle.RoundTrip") {
     AltinaEngine::FUuid::FBytes uuidBytes{};
-    uuidBytes[0] = 0xAA;
-    uuidBytes[1] = 0xBB;
-    uuidBytes[2] = 0xCC;
-    uuidBytes[3] = 0xDD;
+    uuidBytes[0]  = 0xAA;
+    uuidBytes[1]  = 0xBB;
+    uuidBytes[2]  = 0xCC;
+    uuidBytes[3]  = 0xDD;
     uuidBytes[15] = 0xEE;
     AltinaEngine::FUuid assetUuid(uuidBytes);
 
-    TVector<u8> payload;
+    TVector<u8>         payload;
     payload.Resize(12);
     for (usize i = 0; i < payload.Size(); ++i) {
         payload[i] = static_cast<u8>(i + 1U);
@@ -358,42 +356,42 @@ TEST_CASE("Asset.Bundle.RoundTrip") {
         header.Magic   = AltinaEngine::Asset::kBundleMagic;
         header.Version = AltinaEngine::Asset::kBundleVersion;
 
-        file.write(reinterpret_cast<const char*>(&header),
-            static_cast<std::streamsize>(sizeof(header)));
+        file.write(
+            reinterpret_cast<const char*>(&header), static_cast<std::streamsize>(sizeof(header)));
 
         AltinaEngine::Asset::FBundleIndexEntry entry{};
-        const auto& bytes = assetUuid.GetBytes();
+        const auto&                            bytes = assetUuid.GetBytes();
         for (usize index = 0; index < AltinaEngine::FUuid::kByteCount; ++index) {
             entry.Uuid[index] = bytes[index];
         }
-        entry.Type        = static_cast<u32>(AltinaEngine::Asset::EAssetType::Texture2D);
-        entry.Compression = static_cast<u32>(AltinaEngine::Asset::EBundleCompression::None);
-        entry.Offset      = sizeof(header);
-        entry.Size        = static_cast<u64>(payload.Size());
-        entry.RawSize     = static_cast<u64>(payload.Size());
-        entry.ChunkCount  = 0;
+        entry.Type             = static_cast<u32>(AltinaEngine::Asset::EAssetType::Texture2D);
+        entry.Compression      = static_cast<u32>(AltinaEngine::Asset::EBundleCompression::None);
+        entry.Offset           = sizeof(header);
+        entry.Size             = static_cast<u64>(payload.Size());
+        entry.RawSize          = static_cast<u64>(payload.Size());
+        entry.ChunkCount       = 0;
         entry.ChunkTableOffset = 0;
 
         file.write(reinterpret_cast<const char*>(payload.Data()),
             static_cast<std::streamsize>(payload.Size()));
 
-        const u64 indexOffset = entry.Offset + entry.Size;
+        const u64                               indexOffset = entry.Offset + entry.Size;
         AltinaEngine::Asset::FBundleIndexHeader indexHeader{};
-        indexHeader.EntryCount = 1;
+        indexHeader.EntryCount      = 1;
         indexHeader.StringTableSize = 0;
 
         file.write(reinterpret_cast<const char*>(&indexHeader),
             static_cast<std::streamsize>(sizeof(indexHeader)));
-        file.write(reinterpret_cast<const char*>(&entry),
-            static_cast<std::streamsize>(sizeof(entry)));
+        file.write(
+            reinterpret_cast<const char*>(&entry), static_cast<std::streamsize>(sizeof(entry)));
 
         header.IndexOffset = indexOffset;
         header.IndexSize   = sizeof(indexHeader) + sizeof(entry);
         header.BundleSize  = header.IndexOffset + header.IndexSize;
 
         file.seekp(0, std::ios::beg);
-        file.write(reinterpret_cast<const char*>(&header),
-            static_cast<std::streamsize>(sizeof(header)));
+        file.write(
+            reinterpret_cast<const char*>(&header), static_cast<std::streamsize>(sizeof(header)));
     }
 
     FAssetBundleReader reader;
@@ -414,17 +412,17 @@ TEST_CASE("Asset.Bundle.RoundTrip") {
 }
 
 TEST_CASE("Asset.Audio.EngineFormat.Load") {
-    const u32 channels = 1;
-    const u32 sampleRate = 48000;
-    const u32 frameCount = 8;
+    const u32 channels       = 1;
+    const u32 sampleRate     = 48000;
+    const u32 frameCount     = 8;
     const u32 framesPerChunk = 4;
-    const u32 chunkCount = 2;
-    const u32 sampleFormat = AltinaEngine::Asset::kAudioSampleFormatPcm16;
+    const u32 chunkCount     = 2;
+    const u32 sampleFormat   = AltinaEngine::Asset::kAudioSampleFormatPcm16;
 
     const u32 bytesPerSample = GetAudioBytesPerSample(sampleFormat);
     REQUIRE(bytesPerSample == 2U);
 
-    const u32 dataSize = frameCount * channels * bytesPerSample;
+    const u32 dataSize        = frameCount * channels * bytesPerSample;
     const u32 chunkTableBytes = chunkCount * sizeof(AltinaEngine::Asset::FAudioChunkDesc);
 
     AltinaEngine::Asset::FAudioBlobDesc blobDesc{};
@@ -464,9 +462,9 @@ TEST_CASE("Asset.Audio.EngineFormat.Load") {
     std::memcpy(writePtr + blobDesc.DataOffset, samples, sizeof(samples));
 
     FTestAssetStream stream(cooked);
-    FAudioLoader loader;
+    FAudioLoader     loader;
 
-    FAssetDesc desc{};
+    FAssetDesc       desc{};
     desc.Audio.Codec      = AltinaEngine::Asset::kAudioCodecPcm;
     desc.Audio.Channels   = channels;
     desc.Audio.SampleRate = sampleRate;
@@ -491,15 +489,15 @@ TEST_CASE("Asset.Audio.EngineFormat.Load") {
 
 TEST_CASE("Asset.Audio.EngineFormat.LoadFromRegistry") {
     FAssetRegistry registry;
-    const auto registryPath = GetRegistryPath();
+    const auto     registryPath = GetRegistryPath();
     REQUIRE(registry.LoadFromJsonFile(ToFString(registryPath)));
 
-    const auto cookedRoot = registryPath.parent_path().parent_path();
+    const auto         cookedRoot = registryPath.parent_path().parent_path();
     FScopedCurrentPath scopedPath(cookedRoot);
     REQUIRE(scopedPath.Ok);
 
     FAssetManager manager;
-    FAudioLoader loader;
+    FAudioLoader  loader;
     manager.SetRegistry(&registry);
     manager.RegisterLoader(&loader);
 
@@ -543,8 +541,8 @@ TEST_CASE("Asset.Audio.EngineFormat.LoadFromRegistry") {
     REQUIRE(!audio->GetData().IsEmpty());
 
     if (registryDesc->Audio.DurationSeconds > 0.0f) {
-        const float duration = static_cast<float>(runtime.FrameCount)
-            / static_cast<float>(runtime.SampleRate);
+        const float duration =
+            static_cast<float>(runtime.FrameCount) / static_cast<float>(runtime.SampleRate);
         REQUIRE(std::abs(duration - registryDesc->Audio.DurationSeconds) < 0.02f);
     }
 

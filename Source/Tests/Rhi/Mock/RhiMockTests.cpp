@@ -134,7 +134,7 @@ TEST_CASE("RhiMock.SubmitPropagatesSyncValues") {
     auto queue = device->GetQueue(ERhiQueueType::Graphics);
     REQUIRE(queue);
 
-    auto fence = device->CreateFence(1ULL);
+    auto fence     = device->CreateFence(1ULL);
     auto semaphore = device->CreateSemaphore(true, 2ULL);
     REQUIRE(fence);
     REQUIRE(semaphore);

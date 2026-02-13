@@ -6,9 +6,7 @@
 namespace AltinaEngine::Rhi {
     class FRhiCmdExecutor {
     public:
-        static void Execute(FRhiCmdList& list, FRhiCmdContext& context) {
-            list.Execute(context);
-        }
+        static void Execute(FRhiCmdList& list, FRhiCmdContext& context) { list.Execute(context); }
     };
 
 } // namespace AltinaEngine::Rhi

@@ -13,16 +13,17 @@ struct ID3D11DomainShader;
 struct ID3D11ComputeShader;
 
 namespace AltinaEngine::Rhi {
+    namespace Container = Core::Container;
     class AE_RHI_D3D11_API FRhiD3D11Shader final : public FRhiShader {
     public:
         FRhiD3D11Shader(const FRhiShaderDesc& desc, ID3D11DeviceChild* shader);
         explicit FRhiD3D11Shader(const FRhiShaderDesc& desc);
         ~FRhiD3D11Shader() override;
 
-        FRhiD3D11Shader(const FRhiD3D11Shader&) = delete;
-        FRhiD3D11Shader(FRhiD3D11Shader&&) = delete;
-        auto operator=(const FRhiD3D11Shader&) -> FRhiD3D11Shader& = delete;
-        auto operator=(FRhiD3D11Shader&&) -> FRhiD3D11Shader& = delete;
+        FRhiD3D11Shader(const FRhiD3D11Shader&)                                  = delete;
+        FRhiD3D11Shader(FRhiD3D11Shader&&)                                       = delete;
+        auto               operator=(const FRhiD3D11Shader&) -> FRhiD3D11Shader& = delete;
+        auto               operator=(FRhiD3D11Shader&&) -> FRhiD3D11Shader&      = delete;
 
         [[nodiscard]] auto GetNativeShader() const noexcept -> ID3D11DeviceChild*;
         [[nodiscard]] auto GetVertexShader() const noexcept -> ID3D11VertexShader*;
@@ -34,7 +35,7 @@ namespace AltinaEngine::Rhi {
 
     private:
         struct FState;
-        Core::Container::TOwner<FState> mState;
+        Container::TOwner<FState> mState;
     };
 
 } // namespace AltinaEngine::Rhi

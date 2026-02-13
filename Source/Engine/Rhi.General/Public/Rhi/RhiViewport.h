@@ -6,23 +6,24 @@
 #include "Container/StringView.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiViewport : public FRhiResource {
     public:
-        explicit FRhiViewport(const FRhiViewportDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+        explicit FRhiViewport(
+            const FRhiViewportDesc& desc, FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
 
         ~FRhiViewport() override;
 
-        FRhiViewport(const FRhiViewport&) = delete;
-        FRhiViewport(FRhiViewport&&) = delete;
-        auto operator=(const FRhiViewport&) -> FRhiViewport& = delete;
-        auto operator=(FRhiViewport&&) -> FRhiViewport& = delete;
+        FRhiViewport(const FRhiViewport&)                                          = delete;
+        FRhiViewport(FRhiViewport&&)                                               = delete;
+        auto                       operator=(const FRhiViewport&) -> FRhiViewport& = delete;
+        auto                       operator=(FRhiViewport&&) -> FRhiViewport&      = delete;
 
-        virtual void Resize(u32 width, u32 height) = 0;
+        virtual void               Resize(u32 width, u32 height)                  = 0;
         [[nodiscard]] virtual auto GetBackBuffer() const noexcept -> FRhiTexture* = 0;
-        virtual void Present(const FRhiPresentInfo& info) = 0;
+        virtual void               Present(const FRhiPresentInfo& info)           = 0;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiViewportDesc& { return mDesc; }
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {

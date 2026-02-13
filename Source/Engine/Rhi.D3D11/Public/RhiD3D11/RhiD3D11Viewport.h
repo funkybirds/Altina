@@ -14,9 +14,9 @@ namespace AltinaEngine::Rhi {
             ID3D11DeviceContext* immediateContext);
         ~FRhiD3D11Viewport() override;
 
-        void Resize(u32 width, u32 height) override;
+        void               Resize(u32 width, u32 height) override;
         [[nodiscard]] auto GetBackBuffer() const noexcept -> FRhiTexture* override;
-        void Present(const FRhiPresentInfo& info) override;
+        void               Present(const FRhiPresentInfo& info) override;
 
         [[nodiscard]] auto GetSwapChain() const noexcept -> IDXGISwapChain*;
         [[nodiscard]] auto IsValid() const noexcept -> bool;
@@ -25,7 +25,7 @@ namespace AltinaEngine::Rhi {
         bool CreateSwapChain();
         bool CreateBackBuffer();
         void ReleaseBackBuffer();
-        u32 ResolvePresentFlags(u32 syncInterval, u32 flags) const noexcept;
+        u32  ResolvePresentFlags(u32 syncInterval, u32 flags) const noexcept;
 
         struct FState;
         FState* mState = nullptr;

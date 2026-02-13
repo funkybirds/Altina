@@ -27,15 +27,16 @@
 #include <vector>
 
 namespace AltinaEngine::Tools::AssetPipeline {
+    namespace Container = Core::Container;
     namespace {
-        using Core::Container::FNativeString;
-        using Core::Container::FNativeStringView;
-        using Core::Container::TSpan;
-        using Core::Container::TVector;
+        using Container::FNativeString;
+        using Container::FNativeStringView;
+        using Container::TSpan;
+        using Container::TVector;
         using Core::Utility::Json::EJsonType;
+        using Core::Utility::Json::FindObjectValueInsensitive;
         using Core::Utility::Json::FJsonDocument;
         using Core::Utility::Json::FJsonValue;
-        using Core::Utility::Json::FindObjectValueInsensitive;
         using Core::Utility::Json::GetNumberValue;
         using Core::Utility::Json::GetStringValue;
 
@@ -48,7 +49,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         };
 
         struct FCommandLine {
-            std::string Command;
+            std::string                                  Command;
             std::unordered_map<std::string, std::string> Options;
         };
 
@@ -64,16 +65,16 @@ namespace AltinaEngine::Tools::AssetPipeline {
         };
 
         struct FRegistryEntry {
-            std::string       Uuid;
-            Asset::EAssetType Type = Asset::EAssetType::Unknown;
-            std::string       VirtualPath;
-            std::string       CookedPath;
+            std::string           Uuid;
+            Asset::EAssetType     Type = Asset::EAssetType::Unknown;
+            std::string           VirtualPath;
+            std::string           CookedPath;
             Asset::FTexture2DDesc TextureDesc{};
-            bool              HasTextureDesc = false;
-            Asset::FMeshDesc  MeshDesc{};
-            bool              HasMeshDesc = false;
-            Asset::FAudioDesc AudioDesc{};
-            bool              HasAudioDesc = false;
+            bool                  HasTextureDesc = false;
+            Asset::FMeshDesc      MeshDesc{};
+            bool                  HasMeshDesc = false;
+            Asset::FAudioDesc     AudioDesc{};
+            bool                  HasAudioDesc = false;
         };
 
         struct FCookCacheEntry {
@@ -92,7 +93,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         constexpr u32 kCookPipelineVersion = 4;
         constexpr u64 kFnvOffsetBasis      = 14695981039346656037ULL;
         constexpr u64 kFnvPrime            = 1099511628211ULL;
-        auto ToLowerAscii(char value) -> char {
+        auto          ToLowerAscii(char value) -> char {
             if (value >= 'A' && value <= 'Z') {
                 return static_cast<char>(value - 'A' + 'a');
             }
@@ -148,9 +149,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return out;
         }
 
-        auto MakeRelativePath(
-            const std::filesystem::path& root, const std::filesystem::path& path) -> std::string {
-            std::error_code ec;
+        auto MakeRelativePath(const std::filesystem::path& root, const std::filesystem::path& path)
+            -> std::string {
+            std::error_code       ec;
             std::filesystem::path rel = std::filesystem::relative(path, root, ec);
             if (ec) {
                 return NormalizePath(path);
@@ -297,15 +298,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
 
         auto GetUtcTimestamp() -> std::string {
-            using clock = std::chrono::system_clock;
-            const auto now = clock::now();
+            using clock                 = std::chrono::system_clock;
+            const auto        now       = clock::now();
             const std::time_t timeValue = clock::to_time_t(now);
-            std::tm utc{};
-    #if defined(_WIN32)
+            std::tm           utc{};
+#if defined(_WIN32)
             gmtime_s(&utc, &timeValue);
-    #else
+#else
             gmtime_r(&timeValue, &utc);
-    #endif
+#endif
             char buffer[32];
             std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02dT%02d:%02d:%02dZ",
                 utc.tm_year + 1900, utc.tm_mon + 1, utc.tm_mday, utc.tm_hour, utc.tm_min,
@@ -340,8 +341,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             outBytes.resize(size);
             if (size > 0U) {
-                file.read(reinterpret_cast<char*>(outBytes.data()),
-                    static_cast<std::streamsize>(size));
+                file.read(
+                    reinterpret_cast<char*>(outBytes.data()), static_cast<std::streamsize>(size));
             }
             return file.good() || file.eof();
         }
@@ -357,8 +358,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return file.good();
         }
 
-        auto WriteBytesFile(
-            const std::filesystem::path& path, const std::vector<u8>& bytes) -> bool {
+        auto WriteBytesFile(const std::filesystem::path& path, const std::vector<u8>& bytes)
+            -> bool {
             std::ofstream file(path, std::ios::binary);
             if (!file) {
                 return false;
@@ -380,7 +381,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             bytes.Resize(static_cast<usize>(sourceBytes.size()));
             std::memcpy(bytes.Data(), sourceBytes.data(), sourceBytes.size());
 
-            const TSpan<u8> span(bytes);
+            const TSpan<u8>          span(bytes);
             Imaging::FPngImageReader pngReader;
             if (pngReader.CanRead(span)) {
                 return pngReader.Read(span, outImage);
@@ -440,8 +441,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::memcpy(outCooked.data(), &header, sizeof(Asset::FAssetBlobHeader));
             std::memcpy(outCooked.data() + sizeof(Asset::FAssetBlobHeader), &blobDesc,
                 sizeof(Asset::FTexture2DBlobDesc));
-            std::memcpy(
-                outCooked.data() + sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FTexture2DBlobDesc),
+            std::memcpy(outCooked.data() + sizeof(Asset::FAssetBlobHeader)
+                    + sizeof(Asset::FTexture2DBlobDesc),
                 image.GetData(), dataSize);
 
             outDesc.Width    = blobDesc.Width;
@@ -485,10 +486,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
 
         struct FWavInfo {
-            u32 Channels     = 0;
-            u32 SampleRate   = 0;
-            u32 SampleFormat = 0;
-            u32 FrameCount   = 0;
+            u32             Channels     = 0;
+            u32             SampleRate   = 0;
+            u32             SampleFormat = 0;
+            u32             FrameCount   = 0;
             std::vector<u8> Data;
         };
 
@@ -503,14 +504,14 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            size_t offset = 12U;
-            bool hasFmt = false;
-            bool hasData = false;
-            u16 audioFormat = 0;
-            u16 channels = 0;
-            u32 sampleRate = 0;
-            u16 blockAlign = 0;
-            u16 bitsPerSample = 0;
+            size_t          offset        = 12U;
+            bool            hasFmt        = false;
+            bool            hasData       = false;
+            u16             audioFormat   = 0;
+            u16             channels      = 0;
+            u32             sampleRate    = 0;
+            u16             blockAlign    = 0;
+            u16             bitsPerSample = 0;
             std::vector<u8> data;
 
             while (offset + 8U <= bytes.size()) {
@@ -570,8 +571,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     hasFmt = true;
                 } else if (MatchTag(bytes, offset, "data")) {
                     data.assign(bytes.begin() + static_cast<std::ptrdiff_t>(chunkDataOffset),
-                        bytes.begin()
-                            + static_cast<std::ptrdiff_t>(chunkDataOffset + chunkSize));
+                        bytes.begin() + static_cast<std::ptrdiff_t>(chunkDataOffset + chunkSize));
                     hasData = true;
                 }
 
@@ -588,19 +588,19 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            u32 sampleFormat = Asset::kAudioSampleFormatUnknown;
+            u32 sampleFormat   = Asset::kAudioSampleFormatUnknown;
             u32 bytesPerSample = 0;
             if (audioFormat == 1) {
                 if (bitsPerSample != 16U) {
                     return false;
                 }
-                sampleFormat = Asset::kAudioSampleFormatPcm16;
+                sampleFormat   = Asset::kAudioSampleFormatPcm16;
                 bytesPerSample = 2;
             } else if (audioFormat == 3) {
                 if (bitsPerSample != 32U) {
                     return false;
                 }
-                sampleFormat = Asset::kAudioSampleFormatPcm32f;
+                sampleFormat   = Asset::kAudioSampleFormatPcm32f;
                 bytesPerSample = 4;
             } else {
                 return false;
@@ -623,11 +623,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            outInfo.Channels = channels;
-            outInfo.SampleRate = sampleRate;
+            outInfo.Channels     = channels;
+            outInfo.SampleRate   = sampleRate;
             outInfo.SampleFormat = sampleFormat;
-            outInfo.FrameCount = static_cast<u32>(frameCount64);
-            outInfo.Data = std::move(data);
+            outInfo.FrameCount   = static_cast<u32>(frameCount64);
+            outInfo.Data         = std::move(data);
             return true;
         }
 
@@ -652,13 +652,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
             if (version != 0U) {
                 return false;
             }
-            const u8 channels = packet[11];
-            u32 sampleRate = 0;
+            const u8 channels   = packet[11];
+            u32      sampleRate = 0;
             std::memcpy(&sampleRate, packet.data() + 12, sizeof(u32));
             if (channels == 0U || sampleRate == 0U) {
                 return false;
             }
-            outInfo.Channels = channels;
+            outInfo.Channels   = channels;
             outInfo.SampleRate = sampleRate;
             return true;
         }
@@ -668,13 +668,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            size_t offset = 0U;
-            bool gotId = false;
+            size_t          offset = 0U;
+            bool            gotId  = false;
             std::vector<u8> packet;
-            u64 lastGranule = 0U;
-            bool hasGranule = false;
-            u32 serial = 0U;
-            bool serialSet = false;
+            u64             lastGranule = 0U;
+            bool            hasGranule  = false;
+            u32             serial      = 0U;
+            bool            serialSet   = false;
 
             while (offset + 27U <= bytes.size()) {
                 if (!MatchTag(bytes, offset, "OggS")) {
@@ -693,15 +693,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return false;
                 }
                 if (!serialSet) {
-                    serial = pageSerial;
+                    serial    = pageSerial;
                     serialSet = true;
                 } else if (pageSerial != serial) {
                     return false;
                 }
 
-                const u8 segmentCount = bytes[offset + 26U];
+                const u8     segmentCount  = bytes[offset + 26U];
                 const size_t segmentOffset = offset + 27U;
-                const size_t dataOffset = segmentOffset + segmentCount;
+                const size_t dataOffset    = segmentOffset + segmentCount;
                 if (dataOffset > bytes.size()) {
                     return false;
                 }
@@ -715,7 +715,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
                 if (granule != 0xFFFFFFFFFFFFFFFFULL) {
                     lastGranule = granule;
-                    hasGranule = true;
+                    hasGranule  = true;
                 }
 
                 if (!gotId) {
@@ -725,8 +725,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         if (segSize > 0U) {
                             packet.insert(packet.end(),
                                 bytes.begin() + static_cast<std::ptrdiff_t>(dataPos),
-                                bytes.begin()
-                                    + static_cast<std::ptrdiff_t>(dataPos + segSize));
+                                bytes.begin() + static_cast<std::ptrdiff_t>(dataPos + segSize));
                         }
                         dataPos += segSize;
                         if (segSize < 255U) {
@@ -823,11 +822,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::string ext = sourcePath.extension().string();
             ToLowerAscii(ext);
 
-            u32 codec = 0;
-            u32 sampleFormat = 0;
-            u32 channels = 0;
-            u32 sampleRate = 0;
-            u32 frameCount = 0;
+            u32             codec        = 0;
+            u32             sampleFormat = 0;
+            u32             channels     = 0;
+            u32             sampleRate   = 0;
+            u32             frameCount   = 0;
             std::vector<u8> data;
 
             if (ext == ".wav") {
@@ -835,26 +834,26 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 if (!ParseWav(sourceBytes, wav)) {
                     return false;
                 }
-                codec = Asset::kAudioCodecPcm;
+                codec        = Asset::kAudioCodecPcm;
                 sampleFormat = wav.SampleFormat;
-                channels = wav.Channels;
-                sampleRate = wav.SampleRate;
-                frameCount = wav.FrameCount;
-                data = std::move(wav.Data);
+                channels     = wav.Channels;
+                sampleRate   = wav.SampleRate;
+                frameCount   = wav.FrameCount;
+                data         = std::move(wav.Data);
             } else if (ext == ".ogg") {
                 FOggInfo ogg{};
                 if (!ParseOggVorbis(sourceBytes, ogg)) {
                     return false;
                 }
-                codec = Asset::kAudioCodecOggVorbis;
+                codec        = Asset::kAudioCodecOggVorbis;
                 sampleFormat = Asset::kAudioSampleFormatPcm16;
-                channels = ogg.Channels;
-                sampleRate = ogg.SampleRate;
+                channels     = ogg.Channels;
+                sampleRate   = ogg.SampleRate;
                 if (ogg.FrameCount > std::numeric_limits<u32>::max()) {
                     return false;
                 }
                 frameCount = static_cast<u32>(ogg.FrameCount);
-                data = sourceBytes;
+                data       = sourceBytes;
             } else {
                 return false;
             }
@@ -864,7 +863,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             std::vector<Asset::FAudioChunkDesc> chunks;
-            u32 framesPerChunk = 0;
+            u32                                 framesPerChunk = 0;
             if (codec == Asset::kAudioCodecPcm) {
                 const u32 bytesPerSample = Asset::GetAudioBytesPerSample(sampleFormat);
                 if (bytesPerSample == 0U) {
@@ -876,9 +875,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
 
                 constexpr u32 kTargetFramesPerChunk = 4096;
-                framesPerChunk = frameCount < kTargetFramesPerChunk ? frameCount : kTargetFramesPerChunk;
-                const u32 chunkCount =
-                    (frameCount + framesPerChunk - 1U) / framesPerChunk;
+                framesPerChunk =
+                    frameCount < kTargetFramesPerChunk ? frameCount : kTargetFramesPerChunk;
+                const u32 chunkCount = (frameCount + framesPerChunk - 1U) / framesPerChunk;
 
                 if (chunkCount == 0U) {
                     return false;
@@ -889,7 +888,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 for (u32 chunkIndex = 0; chunkIndex < chunkCount; ++chunkIndex) {
                     const u32 takeFrames =
                         remainingFrames < framesPerChunk ? remainingFrames : framesPerChunk;
-                    const u32 chunkBytes = takeFrames * bytesPerFrame;
+                    const u32              chunkBytes = takeFrames * bytesPerFrame;
                     Asset::FAudioChunkDesc chunk{};
                     chunk.Offset = 0U; // filled after table size known.
                     chunk.Size   = chunkBytes;
@@ -898,8 +897,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
             } else {
                 constexpr u32 kTargetChunkBytes = 64U * 1024U;
-                const u32 dataSize = static_cast<u32>(data.size());
-                u32 chunkCount = (dataSize + kTargetChunkBytes - 1U) / kTargetChunkBytes;
+                const u32     dataSize          = static_cast<u32>(data.size());
+                u32           chunkCount = (dataSize + kTargetChunkBytes - 1U) / kTargetChunkBytes;
                 if (chunkCount == 0U) {
                     chunkCount = 1U;
                 }
@@ -926,8 +925,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             if (chunkTableBytes > std::numeric_limits<u32>::max()) {
                 return false;
             }
-            const u32 dataOffset = static_cast<u32>(chunkTableBytes);
-            u32 runningOffset = 0U;
+            const u32 dataOffset    = static_cast<u32>(chunkTableBytes);
+            u32       runningOffset = 0U;
             for (auto& chunk : chunks) {
                 chunk.Offset = dataOffset + runningOffset;
                 runningOffset += chunk.Size;
@@ -941,8 +940,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            outDesc.Codec = codec;
-            outDesc.Channels = channels;
+            outDesc.Codec      = codec;
+            outDesc.Channels   = channels;
             outDesc.SampleRate = sampleRate;
             outDesc.DurationSeconds =
                 static_cast<f32>(static_cast<double>(frameCount) / static_cast<double>(sampleRate));
@@ -962,23 +961,23 @@ namespace AltinaEngine::Tools::AssetPipeline {
         };
 
         struct FMeshBuildResult {
-            std::vector<u8> VertexData;
-            std::vector<u8> IndexData;
+            std::vector<u8>                              VertexData;
+            std::vector<u8>                              IndexData;
             std::vector<Asset::FMeshVertexAttributeDesc> Attributes;
-            std::vector<Asset::FMeshSubMeshDesc> SubMeshes;
-            u32 VertexCount  = 0;
-            u32 IndexCount   = 0;
-            u32 VertexStride = 0;
-            u32 IndexType    = Asset::kMeshIndexTypeUint32;
-            u32 VertexFormatMask = 0;
-            float BoundsMin[3] = { 0.0f, 0.0f, 0.0f };
-            float BoundsMax[3] = { 0.0f, 0.0f, 0.0f };
+            std::vector<Asset::FMeshSubMeshDesc>         SubMeshes;
+            u32                                          VertexCount  = 0;
+            u32                                          IndexCount   = 0;
+            u32                                          VertexStride = 0;
+            u32                                          IndexType    = Asset::kMeshIndexTypeUint32;
+            u32                                          VertexFormatMask = 0;
+            float                                        BoundsMin[3]     = { 0.0f, 0.0f, 0.0f };
+            float                                        BoundsMax[3]     = { 0.0f, 0.0f, 0.0f };
         };
 
         struct FObjIndex {
-            int V  = -1;
-            int Vt = -1;
-            int Vn = -1;
+            int  V  = -1;
+            int  Vt = -1;
+            int  Vn = -1;
 
             auto operator==(const FObjIndex& other) const noexcept -> bool {
                 return V == other.V && Vt == other.Vt && Vn == other.Vn;
@@ -1011,15 +1010,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            int v = 0;
-            int vt = 0;
-            int vn = 0;
+            int    v  = 0;
+            int    vt = 0;
+            int    vn = 0;
 
             size_t firstSlash = token.find('/');
             if (firstSlash == std::string::npos) {
                 v = std::stoi(token);
             } else {
-                v = std::stoi(token.substr(0, firstSlash));
+                v                  = std::stoi(token.substr(0, firstSlash));
                 size_t secondSlash = token.find('/', firstSlash + 1);
                 if (secondSlash == std::string::npos) {
                     const auto vtText = token.substr(firstSlash + 1);
@@ -1051,23 +1050,23 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             Asset::FMeshBlobDesc blobDesc{};
-            blobDesc.VertexCount     = mesh.VertexCount;
-            blobDesc.IndexCount      = mesh.IndexCount;
-            blobDesc.VertexStride    = mesh.VertexStride;
-            blobDesc.IndexType       = mesh.IndexType;
-            blobDesc.AttributeCount  = static_cast<u32>(mesh.Attributes.size());
-            blobDesc.SubMeshCount    = static_cast<u32>(mesh.SubMeshes.size());
-            blobDesc.VertexDataSize  = static_cast<u32>(mesh.VertexData.size());
-            blobDesc.IndexDataSize   = static_cast<u32>(mesh.IndexData.size());
-            blobDesc.BoundsMin[0]    = mesh.BoundsMin[0];
-            blobDesc.BoundsMin[1]    = mesh.BoundsMin[1];
-            blobDesc.BoundsMin[2]    = mesh.BoundsMin[2];
-            blobDesc.BoundsMax[0]    = mesh.BoundsMax[0];
-            blobDesc.BoundsMax[1]    = mesh.BoundsMax[1];
-            blobDesc.BoundsMax[2]    = mesh.BoundsMax[2];
-            blobDesc.Flags           = 1U;
+            blobDesc.VertexCount    = mesh.VertexCount;
+            blobDesc.IndexCount     = mesh.IndexCount;
+            blobDesc.VertexStride   = mesh.VertexStride;
+            blobDesc.IndexType      = mesh.IndexType;
+            blobDesc.AttributeCount = static_cast<u32>(mesh.Attributes.size());
+            blobDesc.SubMeshCount   = static_cast<u32>(mesh.SubMeshes.size());
+            blobDesc.VertexDataSize = static_cast<u32>(mesh.VertexData.size());
+            blobDesc.IndexDataSize  = static_cast<u32>(mesh.IndexData.size());
+            blobDesc.BoundsMin[0]   = mesh.BoundsMin[0];
+            blobDesc.BoundsMin[1]   = mesh.BoundsMin[1];
+            blobDesc.BoundsMin[2]   = mesh.BoundsMin[2];
+            blobDesc.BoundsMax[0]   = mesh.BoundsMax[0];
+            blobDesc.BoundsMax[1]   = mesh.BoundsMax[1];
+            blobDesc.BoundsMax[2]   = mesh.BoundsMax[2];
+            blobDesc.Flags          = 1U;
 
-            const u32 attrBytes    = blobDesc.AttributeCount * sizeof(Asset::FMeshVertexAttributeDesc);
+            const u32 attrBytes = blobDesc.AttributeCount * sizeof(Asset::FMeshVertexAttributeDesc);
             const u32 subMeshBytes = blobDesc.SubMeshCount * sizeof(Asset::FMeshSubMeshDesc);
 
             blobDesc.AttributesOffset = 0;
@@ -1075,15 +1074,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
             blobDesc.VertexDataOffset = blobDesc.SubMeshesOffset + subMeshBytes;
             blobDesc.IndexDataOffset  = blobDesc.VertexDataOffset + blobDesc.VertexDataSize;
 
-            const u32 dataSize = blobDesc.IndexDataOffset + blobDesc.IndexDataSize;
+            const u32               dataSize = blobDesc.IndexDataOffset + blobDesc.IndexDataSize;
 
             Asset::FAssetBlobHeader header{};
             header.Type     = static_cast<u8>(Asset::EAssetType::Mesh);
             header.DescSize = static_cast<u32>(sizeof(Asset::FMeshBlobDesc));
             header.DataSize = dataSize;
 
-            const usize totalSize = sizeof(Asset::FAssetBlobHeader)
-                + sizeof(Asset::FMeshBlobDesc) + dataSize;
+            const usize totalSize =
+                sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FMeshBlobDesc) + dataSize;
             outCooked.resize(totalSize);
 
             u8* writePtr = outCooked.data();
@@ -1093,10 +1092,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
             writePtr += sizeof(blobDesc);
 
             if (!mesh.Attributes.empty()) {
-                std::memcpy(writePtr + blobDesc.AttributesOffset, mesh.Attributes.data(), attrBytes);
+                std::memcpy(
+                    writePtr + blobDesc.AttributesOffset, mesh.Attributes.data(), attrBytes);
             }
             if (!mesh.SubMeshes.empty()) {
-                std::memcpy(writePtr + blobDesc.SubMeshesOffset, mesh.SubMeshes.data(), subMeshBytes);
+                std::memcpy(
+                    writePtr + blobDesc.SubMeshesOffset, mesh.SubMeshes.data(), subMeshBytes);
             }
             if (!mesh.VertexData.empty()) {
                 std::memcpy(writePtr + blobDesc.VertexDataOffset, mesh.VertexData.data(),
@@ -1121,27 +1122,27 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            std::vector<FVec3> positions;
-            std::vector<FVec3> normals;
-            std::vector<FVec2> texcoords;
+            std::vector<FVec3>                                positions;
+            std::vector<FVec3>                                normals;
+            std::vector<FVec2>                                texcoords;
 
-            std::vector<FVec3> outPositions;
-            std::vector<FVec3> outNormals;
-            std::vector<FVec2> outTexcoords;
-            std::vector<u32> indices;
+            std::vector<FVec3>                                outPositions;
+            std::vector<FVec3>                                outNormals;
+            std::vector<FVec2>                                outTexcoords;
+            std::vector<u32>                                  indices;
             std::unordered_map<FObjIndex, u32, FObjIndexHash> indexMap;
 
-            bool hasNormal = false;
-            bool hasTexcoord = false;
-            bool boundsSet = false;
+            bool                                              hasNormal   = false;
+            bool                                              hasTexcoord = false;
+            bool                                              boundsSet   = false;
 
-            std::string line;
+            std::string                                       line;
             while (std::getline(file, line)) {
                 if (line.empty()) {
                     continue;
                 }
                 std::istringstream stream(line);
-                std::string tag;
+                std::string        tag;
                 stream >> tag;
                 if (tag == "v") {
                     FVec3 v{};
@@ -1166,11 +1167,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
 
                 std::vector<FObjIndex> face;
-                std::string token;
+                std::string            token;
                 while (stream >> token) {
                     FObjIndex idx{};
-                    if (!ParseObjIndexToken(token, positions.size(), texcoords.size(),
-                            normals.size(), idx)) {
+                    if (!ParseObjIndexToken(
+                            token, positions.size(), texcoords.size(), normals.size(), idx)) {
                         return false;
                     }
                     if (idx.Vt >= 0) {
@@ -1192,7 +1193,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         return it->second;
                     }
 
-                    const FVec3 pos = positions[static_cast<size_t>(idx.V)];
+                    const FVec3 pos  = positions[static_cast<size_t>(idx.V)];
                     const FVec3 norm = (idx.Vn >= 0 && static_cast<size_t>(idx.Vn) < normals.size())
                         ? normals[static_cast<size_t>(idx.Vn)]
                         : FVec3{};
@@ -1211,7 +1212,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         outMesh.BoundsMax[0] = pos.X;
                         outMesh.BoundsMax[1] = pos.Y;
                         outMesh.BoundsMax[2] = pos.Z;
-                        boundsSet = true;
+                        boundsSet            = true;
                     } else {
                         outMesh.BoundsMin[0] = std::min(outMesh.BoundsMin[0], pos.X);
                         outMesh.BoundsMin[1] = std::min(outMesh.BoundsMin[1], pos.Y);
@@ -1241,15 +1242,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            const bool includeNormals = hasNormal;
+            const bool includeNormals   = hasNormal;
             const bool includeTexcoords = hasTexcoord;
 
-            u32 offset = 0;
+            u32        offset = 0;
             outMesh.Attributes.clear();
             {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic = Asset::kMeshSemanticPosition;
-                attr.Format = Asset::kMeshVertexFormatR32G32B32Float;
+                attr.Semantic      = Asset::kMeshSemanticPosition;
+                attr.Format        = Asset::kMeshVertexFormatR32G32B32Float;
                 attr.AlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 12;
@@ -1257,8 +1258,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
             if (includeNormals) {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic = Asset::kMeshSemanticNormal;
-                attr.Format = Asset::kMeshVertexFormatR32G32B32Float;
+                attr.Semantic      = Asset::kMeshSemanticNormal;
+                attr.Format        = Asset::kMeshVertexFormatR32G32B32Float;
                 attr.AlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 12;
@@ -1266,9 +1267,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
             if (includeTexcoords) {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic = Asset::kMeshSemanticTexCoord;
+                attr.Semantic      = Asset::kMeshSemanticTexCoord;
                 attr.SemanticIndex = 0;
-                attr.Format = Asset::kMeshVertexFormatR32G32Float;
+                attr.Format        = Asset::kMeshVertexFormatR32G32Float;
                 attr.AlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 8;
@@ -1276,12 +1277,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             outMesh.VertexStride = offset;
-            outMesh.VertexCount = static_cast<u32>(outPositions.size());
+            outMesh.VertexCount  = static_cast<u32>(outPositions.size());
 
-            outMesh.VertexData.resize(static_cast<size_t>(outMesh.VertexStride) * outMesh.VertexCount);
+            outMesh.VertexData.resize(
+                static_cast<size_t>(outMesh.VertexStride) * outMesh.VertexCount);
             for (size_t i = 0; i < outPositions.size(); ++i) {
-                u8* dst = outMesh.VertexData.data()
-                    + i * static_cast<size_t>(outMesh.VertexStride);
+                u8* dst = outMesh.VertexData.data() + i * static_cast<size_t>(outMesh.VertexStride);
                 std::memcpy(dst, &outPositions[i], sizeof(FVec3));
                 u32 writeOffset = 12;
                 if (includeNormals) {
@@ -1293,12 +1294,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
             }
 
-            const u32 maxIndex = indices.empty()
-                ? 0U
-                : *std::max_element(indices.begin(), indices.end());
-            outMesh.IndexType = (maxIndex <= 0xFFFFu)
-                ? Asset::kMeshIndexTypeUint16
-                : Asset::kMeshIndexTypeUint32;
+            const u32 maxIndex =
+                indices.empty() ? 0U : *std::max_element(indices.begin(), indices.end());
+            outMesh.IndexType =
+                (maxIndex <= 0xFFFFu) ? Asset::kMeshIndexTypeUint16 : Asset::kMeshIndexTypeUint32;
             outMesh.IndexCount = static_cast<u32>(indices.size());
 
             if (outMesh.IndexType == Asset::kMeshIndexTypeUint16) {
@@ -1309,32 +1308,31 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
             } else {
                 outMesh.IndexData.resize(indices.size() * sizeof(u32));
-                std::memcpy(outMesh.IndexData.data(), indices.data(),
-                    indices.size() * sizeof(u32));
+                std::memcpy(outMesh.IndexData.data(), indices.data(), indices.size() * sizeof(u32));
             }
 
             Asset::FMeshSubMeshDesc subMesh{};
-            subMesh.IndexStart = 0;
-            subMesh.IndexCount = outMesh.IndexCount;
-            subMesh.BaseVertex = 0;
+            subMesh.IndexStart   = 0;
+            subMesh.IndexCount   = outMesh.IndexCount;
+            subMesh.BaseVertex   = 0;
             subMesh.MaterialSlot = 0;
-            outMesh.SubMeshes = { subMesh };
+            outMesh.SubMeshes    = { subMesh };
 
             return true;
         }
 
         struct FGltfBufferView {
-            u32 Buffer = 0;
+            u32 Buffer     = 0;
             u32 ByteOffset = 0;
             u32 ByteLength = 0;
             u32 ByteStride = 0;
         };
 
         struct FGltfAccessor {
-            u32 BufferView = 0;
-            u32 ByteOffset = 0;
-            u32 Count = 0;
-            u32 ComponentType = 0;
+            u32         BufferView    = 0;
+            u32         ByteOffset    = 0;
+            u32         Count         = 0;
+            u32         ComponentType = 0;
             std::string Type;
         };
 
@@ -1386,7 +1384,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 outBin.clear();
                 while (offset + 8 <= bytes.size()) {
                     const u32 chunkLength = ReadU32(offset);
-                    const u32 chunkType = ReadU32(offset + 4);
+                    const u32 chunkType   = ReadU32(offset + 4);
                     offset += 8;
                     if (offset + chunkLength > bytes.size()) {
                         return false;
@@ -1429,8 +1427,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
 
         auto ReadAccessorFloats(const std::vector<std::vector<u8>>& buffers,
-            const std::vector<FGltfBufferView>& views,
-            const std::vector<FGltfAccessor>& accessors,
+            const std::vector<FGltfBufferView>& views, const std::vector<FGltfAccessor>& accessors,
             u32 accessorIndex, u32 expectedComponents, std::vector<float>& outValues) -> bool {
             if (accessorIndex >= accessors.size()) {
                 return false;
@@ -1451,7 +1448,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
             const auto& buffer = buffers[view.Buffer];
 
-            u32 components = 0;
+            u32         components = 0;
             if (accessor.Type == "VEC2") {
                 components = 2;
             } else if (accessor.Type == "VEC3") {
@@ -1467,9 +1464,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             const u32 componentSize = 4;
-            const u32 stride = (view.ByteStride != 0) ? view.ByteStride : (components * componentSize);
+            const u32 stride =
+                (view.ByteStride != 0) ? view.ByteStride : (components * componentSize);
             const u64 baseOffset = static_cast<u64>(view.ByteOffset) + accessor.ByteOffset;
-            const u64 required = static_cast<u64>(stride) * (accessor.Count - 1)
+            const u64 required   = static_cast<u64>(stride) * (accessor.Count - 1)
                 + static_cast<u64>(components * componentSize);
             if (baseOffset + required > buffer.size()) {
                 return false;
@@ -1485,9 +1483,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
 
         auto ReadAccessorIndices(const std::vector<std::vector<u8>>& buffers,
-            const std::vector<FGltfBufferView>& views,
-            const std::vector<FGltfAccessor>& accessors, u32 accessorIndex,
-            std::vector<u32>& outIndices) -> bool {
+            const std::vector<FGltfBufferView>& views, const std::vector<FGltfAccessor>& accessors,
+            u32 accessorIndex, std::vector<u32>& outIndices) -> bool {
             if (accessorIndex >= accessors.size()) {
                 return false;
             }
@@ -1507,7 +1504,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
             const auto& buffer = buffers[view.Buffer];
 
-            u32 componentSize = 0;
+            u32         componentSize = 0;
             if (accessor.ComponentType == 5123u) {
                 componentSize = 2;
             } else if (accessor.ComponentType == 5125u) {
@@ -1516,10 +1513,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            const u32 stride = (view.ByteStride != 0) ? view.ByteStride : componentSize;
+            const u32 stride     = (view.ByteStride != 0) ? view.ByteStride : componentSize;
             const u64 baseOffset = static_cast<u64>(view.ByteOffset) + accessor.ByteOffset;
-            const u64 required = static_cast<u64>(stride) * (accessor.Count - 1)
-                + static_cast<u64>(componentSize);
+            const u64 required =
+                static_cast<u64>(stride) * (accessor.Count - 1) + static_cast<u64>(componentSize);
             if (baseOffset + required > buffer.size()) {
                 return false;
             }
@@ -1529,11 +1526,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 const u64 srcOffset = baseOffset + static_cast<u64>(i) * stride;
                 if (componentSize == 2) {
                     u16 value = 0;
-                    std::memcpy(&value, buffer.data() + static_cast<size_t>(srcOffset), sizeof(u16));
+                    std::memcpy(
+                        &value, buffer.data() + static_cast<size_t>(srcOffset), sizeof(u16));
                     outIndices[i] = value;
                 } else {
                     u32 value = 0;
-                    std::memcpy(&value, buffer.data() + static_cast<size_t>(srcOffset), sizeof(u32));
+                    std::memcpy(
+                        &value, buffer.data() + static_cast<size_t>(srcOffset), sizeof(u32));
                     outIndices[i] = value;
                 }
             }
@@ -1542,7 +1541,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
         auto CookMeshFromGltf(const std::filesystem::path& sourcePath, FMeshBuildResult& outMesh,
             std::vector<u8>& outCookKeyBytes) -> bool {
-            std::string jsonText;
+            std::string     jsonText;
             std::vector<u8> binChunk;
             if (!LoadGltfJson(sourcePath, jsonText, binChunk)) {
                 return false;
@@ -1552,7 +1551,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             native.Append(jsonText.c_str(), jsonText.size());
             const FNativeStringView view(native.GetData(), native.Length());
 
-            FJsonDocument document;
+            FJsonDocument           document;
             if (!document.Parse(view)) {
                 return false;
             }
@@ -1578,7 +1577,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
 
                 std::vector<u8> bufferBytes;
-                FNativeString uriText;
+                FNativeString   uriText;
                 if (GetStringValue(FindObjectValueInsensitive(*bufferObj, "Uri"), uriText)) {
                     const std::string uri = ToStdString(uriText);
                     if (!ReadGltfBufferUri(basePath, uri, bufferBytes)) {
@@ -1591,7 +1590,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     bufferBytes = binChunk;
                 }
 
-                outCookKeyBytes.insert(outCookKeyBytes.end(), bufferBytes.begin(), bufferBytes.end());
+                outCookKeyBytes.insert(
+                    outCookKeyBytes.end(), bufferBytes.begin(), bufferBytes.end());
                 buffers.push_back(AltinaEngine::Move(bufferBytes));
             }
 
@@ -1614,8 +1614,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         bufferView.ByteLength)) {
                     return false;
                 }
-                ReadJsonU32(FindObjectValueInsensitive(*viewObj, "ByteOffset"), bufferView.ByteOffset);
-                ReadJsonU32(FindObjectValueInsensitive(*viewObj, "ByteStride"), bufferView.ByteStride);
+                ReadJsonU32(
+                    FindObjectValueInsensitive(*viewObj, "ByteOffset"), bufferView.ByteOffset);
+                ReadJsonU32(
+                    FindObjectValueInsensitive(*viewObj, "ByteStride"), bufferView.ByteStride);
                 bufferViews.push_back(bufferView);
             }
 
@@ -1633,13 +1635,16 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
 
                 FGltfAccessor accessor{};
-                if (!ReadJsonU32(FindObjectValueInsensitive(*accessorObj, "BufferView"), accessor.BufferView)
+                if (!ReadJsonU32(
+                        FindObjectValueInsensitive(*accessorObj, "BufferView"), accessor.BufferView)
                     || !ReadJsonU32(FindObjectValueInsensitive(*accessorObj, "ComponentType"),
                         accessor.ComponentType)
-                    || !ReadJsonU32(FindObjectValueInsensitive(*accessorObj, "Count"), accessor.Count)) {
+                    || !ReadJsonU32(
+                        FindObjectValueInsensitive(*accessorObj, "Count"), accessor.Count)) {
                     return false;
                 }
-                ReadJsonU32(FindObjectValueInsensitive(*accessorObj, "ByteOffset"), accessor.ByteOffset);
+                ReadJsonU32(
+                    FindObjectValueInsensitive(*accessorObj, "ByteOffset"), accessor.ByteOffset);
 
                 FNativeString typeText;
                 if (!GetStringValue(FindObjectValueInsensitive(*accessorObj, "Type"), typeText)) {
@@ -1691,11 +1696,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::vector<float> positions;
             std::vector<float> normals;
             std::vector<float> uvs;
-            if (!ReadAccessorFloats(buffers, bufferViews, accessors, positionAccessor, 3, positions)) {
+            if (!ReadAccessorFloats(
+                    buffers, bufferViews, accessors, positionAccessor, 3, positions)) {
                 return false;
             }
             if (normalAccessor != std::numeric_limits<u32>::max()) {
-                if (!ReadAccessorFloats(buffers, bufferViews, accessors, normalAccessor, 3, normals)) {
+                if (!ReadAccessorFloats(
+                        buffers, bufferViews, accessors, normalAccessor, 3, normals)) {
                     return false;
                 }
             }
@@ -1717,10 +1724,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             std::vector<u32> indices;
-            u32 indicesAccessor = std::numeric_limits<u32>::max();
+            u32              indicesAccessor = std::numeric_limits<u32>::max();
             ReadJsonU32(FindObjectValueInsensitive(*primObj, "Indices"), indicesAccessor);
             if (indicesAccessor != std::numeric_limits<u32>::max()) {
-                if (!ReadAccessorIndices(buffers, bufferViews, accessors, indicesAccessor, indices)) {
+                if (!ReadAccessorIndices(
+                        buffers, bufferViews, accessors, indicesAccessor, indices)) {
                     return false;
                 }
             } else {
@@ -1737,15 +1745,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            const bool includeNormals = !normals.empty();
+            const bool includeNormals   = !normals.empty();
             const bool includeTexcoords = !uvs.empty();
 
-            u32 offset = 0;
+            u32        offset = 0;
             outMesh.Attributes.clear();
             {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic = Asset::kMeshSemanticPosition;
-                attr.Format = Asset::kMeshVertexFormatR32G32B32Float;
+                attr.Semantic      = Asset::kMeshSemanticPosition;
+                attr.Format        = Asset::kMeshVertexFormatR32G32B32Float;
                 attr.AlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 12;
@@ -1753,8 +1761,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
             if (includeNormals) {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic = Asset::kMeshSemanticNormal;
-                attr.Format = Asset::kMeshVertexFormatR32G32B32Float;
+                attr.Semantic      = Asset::kMeshSemanticNormal;
+                attr.Format        = Asset::kMeshVertexFormatR32G32B32Float;
                 attr.AlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 12;
@@ -1762,9 +1770,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
             if (includeTexcoords) {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic = Asset::kMeshSemanticTexCoord;
+                attr.Semantic      = Asset::kMeshSemanticTexCoord;
                 attr.SemanticIndex = 0;
-                attr.Format = Asset::kMeshVertexFormatR32G32Float;
+                attr.Format        = Asset::kMeshVertexFormatR32G32Float;
                 attr.AlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 8;
@@ -1772,7 +1780,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             outMesh.VertexStride = offset;
-            outMesh.VertexCount = vertexCount;
+            outMesh.VertexCount  = vertexCount;
 
             outMesh.VertexData.resize(static_cast<size_t>(outMesh.VertexStride) * vertexCount);
             bool boundsSet = false;
@@ -1799,7 +1807,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     outMesh.BoundsMax[0] = pos.X;
                     outMesh.BoundsMax[1] = pos.Y;
                     outMesh.BoundsMax[2] = pos.Z;
-                    boundsSet = true;
+                    boundsSet            = true;
                 } else {
                     outMesh.BoundsMin[0] = std::min(outMesh.BoundsMin[0], pos.X);
                     outMesh.BoundsMin[1] = std::min(outMesh.BoundsMin[1], pos.Y);
@@ -1815,9 +1823,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 maxIndex = std::max(maxIndex, idx);
             }
 
-            outMesh.IndexType = (maxIndex <= 0xFFFFu)
-                ? Asset::kMeshIndexTypeUint16
-                : Asset::kMeshIndexTypeUint32;
+            outMesh.IndexType =
+                (maxIndex <= 0xFFFFu) ? Asset::kMeshIndexTypeUint16 : Asset::kMeshIndexTypeUint32;
             outMesh.IndexCount = static_cast<u32>(indices.size());
 
             if (outMesh.IndexType == Asset::kMeshIndexTypeUint16) {
@@ -1828,28 +1835,27 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
             } else {
                 outMesh.IndexData.resize(indices.size() * sizeof(u32));
-                std::memcpy(outMesh.IndexData.data(), indices.data(),
-                    indices.size() * sizeof(u32));
+                std::memcpy(outMesh.IndexData.data(), indices.data(), indices.size() * sizeof(u32));
             }
 
             Asset::FMeshSubMeshDesc subMesh{};
-            subMesh.IndexStart = 0;
-            subMesh.IndexCount = outMesh.IndexCount;
-            subMesh.BaseVertex = 0;
+            subMesh.IndexStart   = 0;
+            subMesh.IndexCount   = outMesh.IndexCount;
+            subMesh.BaseVertex   = 0;
             subMesh.MaterialSlot = 0;
-            outMesh.SubMeshes = { subMesh };
+            outMesh.SubMeshes    = { subMesh };
 
             return true;
         }
 
         auto CookMesh(const std::filesystem::path& sourcePath, std::vector<u8>& outCooked,
             Asset::FMeshDesc& outDesc, std::vector<u8>& outCookKeyBytes) -> bool {
-            const std::string ext = sourcePath.extension().string();
-            std::string extLower = ext;
+            const std::string ext      = sourcePath.extension().string();
+            std::string       extLower = ext;
             ToLowerAscii(extLower);
 
             FMeshBuildResult mesh{};
-            bool ok = false;
+            bool             ok = false;
             if (extLower == ".obj") {
                 ok = CookMeshFromObj(sourcePath, mesh);
             } else if (extLower == ".gltf" || extLower == ".glb") {
@@ -1866,11 +1872,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
 
         struct FBundledAsset {
-            FUuid               Uuid;
-            std::string         UuidText;
-            Asset::EAssetType   Type = Asset::EAssetType::Unknown;
-            std::string         CookedPath;
-            std::vector<u8>     Data;
+            FUuid             Uuid;
+            std::string       UuidText;
+            Asset::EAssetType Type = Asset::EAssetType::Unknown;
+            std::string       CookedPath;
+            std::vector<u8>   Data;
         };
 
         void WriteBundleUuid(Asset::FBundleIndexEntry& entry, const FUuid& uuid) {
@@ -1881,7 +1887,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
 
         auto LoadRegistryAssets(const std::filesystem::path& registryPath,
-            const std::filesystem::path& cookedRoot, std::vector<FBundledAsset>& outAssets) -> bool {
+            const std::filesystem::path& cookedRoot, std::vector<FBundledAsset>& outAssets)
+            -> bool {
             outAssets.clear();
 
             std::string text;
@@ -1893,7 +1900,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             native.Append(text.c_str(), text.size());
             const FNativeStringView view(native.GetData(), native.Length());
 
-            FJsonDocument document;
+            FJsonDocument           document;
             if (!document.Parse(view)) {
                 return false;
             }
@@ -1923,8 +1930,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 if (!GetStringValue(FindObjectValueInsensitive(*assetValue, "Type"), typeText)) {
                     continue;
                 }
-                if (!GetStringValue(FindObjectValueInsensitive(*assetValue, "CookedPath"),
-                        cookedText)) {
+                if (!GetStringValue(
+                        FindObjectValueInsensitive(*assetValue, "CookedPath"), cookedText)) {
                     continue;
                 }
 
@@ -1935,9 +1942,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
 
                 FBundledAsset asset{};
-                asset.Uuid = uuid;
+                asset.Uuid     = uuid;
                 asset.UuidText = ToStdString(uuidText);
-                asset.Type = ParseAssetType(ToStdString(typeText));
+                asset.Type     = ParseAssetType(ToStdString(typeText));
                 if (asset.Type == Asset::EAssetType::Unknown) {
                     continue;
                 }
@@ -1965,7 +1972,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             native.Append(text.c_str(), text.size());
             const FNativeStringView view(native.GetData(), native.Length());
 
-            FJsonDocument document;
+            FJsonDocument           document;
             if (!document.Parse(view)) {
                 return false;
             }
@@ -2000,7 +2007,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
 
         auto WriteMetaFile(const FAssetRecord& asset) -> bool {
-            const std::string uuid = ToStdString(asset.Uuid.ToNativeString());
+            const std::string  uuid = ToStdString(asset.Uuid.ToNativeString());
 
             std::ostringstream stream;
             stream << "{\n";
@@ -2047,9 +2054,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     continue;
                 }
 
-                std::string sourceRel = MakeRelativePath(repoRoot, sourcePath);
+                std::string           sourceRel = MakeRelativePath(repoRoot, sourcePath);
 
-                std::filesystem::path relVirtual = std::filesystem::relative(sourcePath, assetsRoot, ec);
+                std::filesystem::path relVirtual =
+                    std::filesystem::relative(sourcePath, assetsRoot, ec);
                 if (ec) {
                     relVirtual = sourcePath.filename();
                     ec.clear();
@@ -2064,13 +2072,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 ToLowerAscii(virtualPath);
 
                 FAssetRecord record{};
-                record.SourcePath     = sourcePath;
-                record.MetaPath       = sourcePath;
+                record.SourcePath = sourcePath;
+                record.MetaPath   = sourcePath;
                 record.MetaPath += ".meta";
-                record.SourcePathRel  = sourceRel;
-                record.VirtualPath    = virtualPath;
-                record.Type           = type;
-                record.ImporterName   = GetImporterName(type);
+                record.SourcePathRel   = sourceRel;
+                record.VirtualPath     = virtualPath;
+                record.Type            = type;
+                record.ImporterName    = GetImporterName(type);
                 record.ImporterVersion = 1U;
 
                 outAssets.push_back(record);
@@ -2082,7 +2090,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             CollectAssetsInDirectory(repoRoot / "Assets", "Engine", repoRoot, outAssets);
 
-            std::error_code ec;
+            std::error_code             ec;
             const std::filesystem::path demoRoot = repoRoot / "Demo";
             if (!std::filesystem::exists(demoRoot, ec)) {
                 return true;
@@ -2129,12 +2137,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return WriteMetaFile(asset);
             }
 
-            asset.Uuid = FUuid::New();
+            asset.Uuid         = FUuid::New();
             asset.ImporterName = GetImporterName(asset.Type);
             return WriteMetaFile(asset);
         }
-        auto ParseCommandLine(int argc, char** argv, FCommandLine& outCommand,
-            std::string& outError) -> bool {
+        auto ParseCommandLine(
+            int argc, char** argv, FCommandLine& outCommand, std::string& outError) -> bool {
             if (argc < 2) {
                 outError = "Missing command.";
                 return false;
@@ -2144,7 +2152,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             for (int index = 2; index < argc; ++index) {
                 std::string arg = argv[index];
                 if (arg.rfind("--", 0) == 0) {
-                    std::string key = arg.substr(2);
+                    std::string key   = arg.substr(2);
                     std::string value = "true";
                     if (index + 1 < argc && std::string(argv[index + 1]).rfind("--", 0) != 0) {
                         value = argv[index + 1];
@@ -2170,7 +2178,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
         auto BuildPaths(const FCommandLine& command, const std::string& platform) -> FToolPaths {
             std::filesystem::path root;
-            auto rootIt = command.Options.find("root");
+            auto                  rootIt = command.Options.find("root");
             if (rootIt != command.Options.end()) {
                 root = std::filesystem::path(rootIt->second);
             } else {
@@ -2178,20 +2186,20 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             std::filesystem::path buildRoot = root / "build";
-            auto buildIt = command.Options.find("build-root");
+            auto                  buildIt   = command.Options.find("build-root");
             if (buildIt != command.Options.end()) {
                 buildRoot = std::filesystem::path(buildIt->second);
             }
 
             FToolPaths paths{};
-            paths.Root       = std::filesystem::absolute(root);
-            paths.BuildRoot  = std::filesystem::absolute(buildRoot);
-            paths.CookedRoot = paths.BuildRoot / "Cooked" / platform;
-            paths.CacheRoot  = paths.BuildRoot / "Cache";
+            paths.Root          = std::filesystem::absolute(root);
+            paths.BuildRoot     = std::filesystem::absolute(buildRoot);
+            paths.CookedRoot    = paths.BuildRoot / "Cooked" / platform;
+            paths.CacheRoot     = paths.BuildRoot / "Cache";
             paths.CookCachePath = paths.CacheRoot / "CookKeys.json";
             return paths;
         }
-        auto LoadCookCache(const std::filesystem::path& cachePath,
+        auto LoadCookCache(const std::filesystem::path&       cachePath,
             std::unordered_map<std::string, FCookCacheEntry>& outEntries) -> bool {
             outEntries.clear();
             if (!std::filesystem::exists(cachePath)) {
@@ -2207,7 +2215,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             native.Append(text.c_str(), text.size());
             const FNativeStringView view(native.GetData(), native.Length());
 
-            FJsonDocument document;
+            FJsonDocument           document;
             if (!document.Parse(view)) {
                 return false;
             }
@@ -2230,7 +2238,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 FNativeString uuidText;
                 FNativeString cookKeyText;
                 if (!GetStringValue(FindObjectValueInsensitive(*entry, "Uuid"), uuidText)
-                    || !GetStringValue(FindObjectValueInsensitive(*entry, "CookKey"), cookKeyText)) {
+                    || !GetStringValue(
+                        FindObjectValueInsensitive(*entry, "CookKey"), cookKeyText)) {
                     continue;
                 }
 
@@ -2249,7 +2258,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
 
                 FNativeString lastCookedText;
-                if (GetStringValue(FindObjectValueInsensitive(*entry, "LastCooked"), lastCookedText)) {
+                if (GetStringValue(
+                        FindObjectValueInsensitive(*entry, "LastCooked"), lastCookedText)) {
                     cacheEntry.LastCooked = ToStdString(lastCookedText);
                 }
 
@@ -2260,7 +2270,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             return true;
         }
-        auto SaveCookCache(const std::filesystem::path& cachePath,
+        auto SaveCookCache(const std::filesystem::path&             cachePath,
             const std::unordered_map<std::string, FCookCacheEntry>& entries) -> bool {
             std::vector<std::string> keys;
             keys.reserve(entries.size());
@@ -2305,7 +2315,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return WriteTextFile(cachePath, stream.str());
         }
         auto WriteRegistry(const std::filesystem::path& registryPath,
-            const std::vector<FRegistryEntry>& assets) -> bool {
+            const std::vector<FRegistryEntry>&          assets) -> bool {
             std::ostringstream stream;
             stream << "{\n";
             stream << "  \"SchemaVersion\": 1,\n";
@@ -2324,13 +2334,14 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 switch (entry.Type) {
                     case Asset::EAssetType::Texture2D:
                         if (entry.HasTextureDesc) {
-                            stream << "\"Width\": " << entry.TextureDesc.Width << ", \"Height\": "
-                                   << entry.TextureDesc.Height << ", \"Format\": "
-                                   << entry.TextureDesc.Format << ", \"MipCount\": "
-                                   << entry.TextureDesc.MipCount << ", \"SRGB\": "
-                                   << (entry.TextureDesc.SRGB ? "true" : "false");
+                            stream << "\"Width\": " << entry.TextureDesc.Width
+                                   << ", \"Height\": " << entry.TextureDesc.Height
+                                   << ", \"Format\": " << entry.TextureDesc.Format
+                                   << ", \"MipCount\": " << entry.TextureDesc.MipCount
+                                   << ", \"SRGB\": " << (entry.TextureDesc.SRGB ? "true" : "false");
                         } else {
-                            stream << "\"Width\": 0, \"Height\": 0, \"Format\": 0, \"MipCount\": 0, \"SRGB\": true";
+                            stream
+                                << "\"Width\": 0, \"Height\": 0, \"Format\": 0, \"MipCount\": 0, \"SRGB\": true";
                         }
                         break;
                     case Asset::EAssetType::Mesh:
@@ -2339,7 +2350,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                                    << ", \"IndexFormat\": " << entry.MeshDesc.IndexFormat
                                    << ", \"SubMeshCount\": " << entry.MeshDesc.SubMeshCount;
                         } else {
-                            stream << "\"VertexFormat\": 0, \"IndexFormat\": 0, \"SubMeshCount\": 0";
+                            stream
+                                << "\"VertexFormat\": 0, \"IndexFormat\": 0, \"SubMeshCount\": 0";
                         }
                         break;
                     case Asset::EAssetType::Material:
@@ -2348,12 +2360,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         break;
                     case Asset::EAssetType::Audio:
                         if (entry.HasAudioDesc) {
-                            stream << "\"Codec\": " << entry.AudioDesc.Codec << ", \"Channels\": "
-                                   << entry.AudioDesc.Channels << ", \"SampleRate\": "
-                                   << entry.AudioDesc.SampleRate << ", \"Duration\": "
-                                   << entry.AudioDesc.DurationSeconds;
+                            stream << "\"Codec\": " << entry.AudioDesc.Codec
+                                   << ", \"Channels\": " << entry.AudioDesc.Channels
+                                   << ", \"SampleRate\": " << entry.AudioDesc.SampleRate
+                                   << ", \"Duration\": " << entry.AudioDesc.DurationSeconds;
                         } else {
-                            stream << "\"Codec\": 0, \"Channels\": 0, \"SampleRate\": 0, \"Duration\": 0";
+                            stream
+                                << "\"Codec\": 0, \"Channels\": 0, \"SampleRate\": 0, \"Duration\": 0";
                         }
                         break;
                     default:
@@ -2378,11 +2391,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return WriteTextFile(registryPath, stream.str());
         }
         auto ImportAssets(const FCommandLine& command) -> int {
-            const std::string demoFilter = command.Options.contains("demo")
-                ? command.Options.at("demo")
-                : std::string();
+            const std::string demoFilter =
+                command.Options.contains("demo") ? command.Options.at("demo") : std::string();
 
-            FToolPaths paths = BuildPaths(command, "Win64");
+            FToolPaths                paths = BuildPaths(command, "Win64");
 
             std::vector<FAssetRecord> assets;
             if (!CollectAssets(paths.Root, demoFilter, assets)) {
@@ -2406,11 +2418,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             const std::string platform = command.Options.contains("platform")
                 ? command.Options.at("platform")
                 : std::string("Win64");
-            const std::string demoFilter = command.Options.contains("demo")
-                ? command.Options.at("demo")
-                : std::string();
+            const std::string demoFilter =
+                command.Options.contains("demo") ? command.Options.at("demo") : std::string();
 
-            FToolPaths paths = BuildPaths(command, platform);
+            FToolPaths                paths = BuildPaths(command, platform);
 
             std::vector<FAssetRecord> assets;
             if (!CollectAssets(paths.Root, demoFilter, assets)) {
@@ -2440,18 +2451,19 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     continue;
                 }
 
-                std::vector<u8> cookedBytes;
-                std::vector<u8> cookKeyExtras;
+                std::vector<u8>       cookedBytes;
+                std::vector<u8>       cookKeyExtras;
                 Asset::FTexture2DDesc textureDesc{};
                 Asset::FMeshDesc      meshDesc{};
                 Asset::FAudioDesc     audioDesc{};
-                const bool isTexture = asset.Type == Asset::EAssetType::Texture2D;
-                const bool isMesh    = asset.Type == Asset::EAssetType::Mesh;
-                const bool isAudio   = asset.Type == Asset::EAssetType::Audio;
+                const bool            isTexture = asset.Type == Asset::EAssetType::Texture2D;
+                const bool            isMesh    = asset.Type == Asset::EAssetType::Mesh;
+                const bool            isAudio   = asset.Type == Asset::EAssetType::Audio;
                 if (isTexture) {
                     constexpr bool kDefaultSrgb = true;
                     if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
-                        std::cerr << "Failed to cook texture: " << asset.SourcePath.string() << "\n";
+                        std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
+                                  << "\n";
                         continue;
                     }
                 } else if (isMesh) {
@@ -2468,16 +2480,17 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     cookedBytes = bytes;
                 }
 
-                const std::string uuid = ToStdString(asset.Uuid.ToNativeString());
-                const std::string cookedRel = "Assets/" + uuid + ".bin";
-                const std::filesystem::path cookedPath = paths.CookedRoot / "Assets" / (uuid + ".bin");
+                const std::string           uuid      = ToStdString(asset.Uuid.ToNativeString());
+                const std::string           cookedRel = "Assets/" + uuid + ".bin";
+                const std::filesystem::path cookedPath =
+                    paths.CookedRoot / "Assets" / (uuid + ".bin");
 
                 const std::string cookKey = isMesh
                     ? BuildCookKeyWithExtras(bytes, cookKeyExtras, asset, platform)
                     : BuildCookKey(bytes, asset, platform);
 
-                bool needsCook = true;
-                auto cacheIt = cacheEntries.find(uuid);
+                bool              needsCook = true;
+                auto              cacheIt   = cacheEntries.find(uuid);
                 if (cacheIt != cacheEntries.end()) {
                     if (cacheIt->second.CookKey == cookKey && std::filesystem::exists(cookedPath)) {
                         needsCook = false;
@@ -2488,7 +2501,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     std::error_code ec;
                     std::filesystem::create_directories(cookedPath.parent_path(), ec);
                     if (!WriteBytesFile(cookedPath, cookedBytes)) {
-                        std::cerr << "Failed to write cooked asset: " << cookedPath.string() << "\n";
+                        std::cerr << "Failed to write cooked asset: " << cookedPath.string()
+                                  << "\n";
                         continue;
                     }
                     ++cookedCount;
@@ -2520,7 +2534,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 registryAssets.push_back(registryEntry);
             }
 
-            const std::filesystem::path registryPath = paths.CookedRoot / "Registry" / "AssetRegistry.json";
+            const std::filesystem::path registryPath =
+                paths.CookedRoot / "Registry" / "AssetRegistry.json";
             if (!WriteRegistry(registryPath, registryAssets)) {
                 std::cerr << "Failed to write registry: " << registryPath.string() << "\n";
                 return 1;
@@ -2540,11 +2555,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             const std::string platform = command.Options.contains("platform")
                 ? command.Options.at("platform")
                 : std::string("Win64");
-            const std::string demoFilter = command.Options.contains("demo")
-                ? command.Options.at("demo")
-                : std::string();
+            const std::string demoFilter =
+                command.Options.contains("demo") ? command.Options.at("demo") : std::string();
 
-            FToolPaths paths = BuildPaths(command, platform);
+            FToolPaths                  paths = BuildPaths(command, platform);
             const std::filesystem::path registryPath =
                 paths.CookedRoot / "Registry" / "AssetRegistry.json";
 
@@ -2579,7 +2593,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             file.write(reinterpret_cast<const char*>(&header),
                 static_cast<std::streamsize>(sizeof(header)));
 
-            u64 offset = sizeof(header);
+            u64                                   offset = sizeof(header);
             std::vector<Asset::FBundleIndexEntry> entries;
             entries.reserve(assets.size());
 
@@ -2591,12 +2605,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
                 Asset::FBundleIndexEntry entry{};
                 WriteBundleUuid(entry, asset.Uuid);
-                entry.Type        = static_cast<u32>(asset.Type);
-                entry.Compression = static_cast<u32>(Asset::EBundleCompression::None);
-                entry.Offset      = offset;
-                entry.Size        = static_cast<u64>(asset.Data.size());
-                entry.RawSize     = static_cast<u64>(asset.Data.size());
-                entry.ChunkCount  = 0;
+                entry.Type             = static_cast<u32>(asset.Type);
+                entry.Compression      = static_cast<u32>(Asset::EBundleCompression::None);
+                entry.Offset           = offset;
+                entry.Size             = static_cast<u64>(asset.Data.size());
+                entry.RawSize          = static_cast<u64>(asset.Data.size());
+                entry.ChunkCount       = 0;
                 entry.ChunkTableOffset = 0;
 
                 file.write(reinterpret_cast<const char*>(asset.Data.data()),
@@ -2605,9 +2619,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 entries.push_back(entry);
             }
 
-            const u64 indexOffset = offset;
+            const u64                 indexOffset = offset;
             Asset::FBundleIndexHeader indexHeader{};
-            indexHeader.EntryCount = static_cast<u32>(entries.size());
+            indexHeader.EntryCount      = static_cast<u32>(entries.size());
             indexHeader.StringTableSize = 0;
 
             file.write(reinterpret_cast<const char*>(&indexHeader),
@@ -2615,7 +2629,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             if (!entries.empty()) {
                 file.write(reinterpret_cast<const char*>(entries.data()),
-                    static_cast<std::streamsize>(entries.size() * sizeof(Asset::FBundleIndexEntry)));
+                    static_cast<std::streamsize>(
+                        entries.size() * sizeof(Asset::FBundleIndexEntry)));
             }
 
             const u64 indexSize = sizeof(indexHeader)
@@ -2650,7 +2665,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             native.Append(text.c_str(), text.size());
             const FNativeStringView view(native.GetData(), native.Length());
 
-            FJsonDocument document;
+            FJsonDocument           document;
             if (!document.Parse(view)) {
                 std::cerr << "Registry JSON parse failed.\n";
                 return 1;
@@ -2662,8 +2677,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return 1;
             }
 
-            const FJsonValue* schemaValue = FindObjectValueInsensitive(*root, "SchemaVersion");
-            double schemaNumber = 0.0;
+            const FJsonValue* schemaValue  = FindObjectValueInsensitive(*root, "SchemaVersion");
+            double            schemaNumber = 0.0;
             if (!GetNumberValue(schemaValue, schemaNumber)) {
                 std::cerr << "SchemaVersion missing or invalid.\n";
                 return 1;
@@ -2677,7 +2692,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             std::unordered_set<std::string> uuidSet;
             std::unordered_set<std::string> pathSet;
-            bool ok = true;
+            bool                            ok = true;
 
             for (const auto* assetValue : assetsValue->Array) {
                 if (assetValue == nullptr || assetValue->Type != EJsonType::Object) {
@@ -2692,14 +2707,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
                 if (!GetStringValue(FindObjectValueInsensitive(*assetValue, "Uuid"), uuidText)
                     || !GetStringValue(FindObjectValueInsensitive(*assetValue, "Type"), typeText)
-                    || !GetStringValue(FindObjectValueInsensitive(*assetValue, "VirtualPath"), pathText)) {
+                    || !GetStringValue(
+                        FindObjectValueInsensitive(*assetValue, "VirtualPath"), pathText)) {
                     std::cerr << "Asset missing required fields.\n";
                     ok = false;
                     continue;
                 }
 
-                std::string uuid = ToStdString(uuidText);
-                std::string type = ToStdString(typeText);
+                std::string uuid  = ToStdString(uuidText);
+                std::string type  = ToStdString(typeText);
                 std::string vpath = ToStdString(pathText);
                 ToLowerAscii(uuid);
                 ToLowerAscii(vpath);
@@ -2728,8 +2744,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return 0;
         }
         auto CleanCache(const FCommandLine& command) -> int {
-            FToolPaths paths = BuildPaths(command, "Win64");
-            auto cacheIt = command.Options.find("cache");
+            FToolPaths paths   = BuildPaths(command, "Win64");
+            auto       cacheIt = command.Options.find("cache");
             if (cacheIt == command.Options.end()) {
                 std::cerr << "Specify --cache to remove cook cache.\n";
                 return 1;

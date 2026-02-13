@@ -6,7 +6,7 @@
 namespace AltinaEngine::Rhi {
     class FRhiCmd {
     public:
-        virtual ~FRhiCmd() = default;
+        virtual ~FRhiCmd()                            = default;
         virtual void Execute(FRhiCmdContext& context) = 0;
     };
 

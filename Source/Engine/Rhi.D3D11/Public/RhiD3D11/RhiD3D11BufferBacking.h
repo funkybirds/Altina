@@ -27,17 +27,17 @@ namespace AltinaEngine::Rhi {
         [[nodiscard]] auto GetData() noexcept -> void* { return mMappedData; }
         [[nodiscard]] auto GetData() const noexcept -> const void* { return mMappedData; }
 
-        void SetDefaultMapMode(ED3D11MapMode mode);
-        auto BeginWrite(ED3D11MapMode mode) -> bool;
-        void EndWrite();
+        void               SetDefaultMapMode(ED3D11MapMode mode);
+        auto               BeginWrite(ED3D11MapMode mode) -> bool;
+        void               EndWrite();
 
-        auto Write(u64 offset, const void* data, u64 sizeBytes) -> bool;
+        auto               Write(u64 offset, const void* data, u64 sizeBytes) -> bool;
 
     private:
-        ID3D11Buffer*        mBuffer = nullptr;
-        ID3D11DeviceContext* mContext = nullptr;
-        u8*                  mMappedData = nullptr;
-        u64                  mSizeBytes = 0ULL;
+        ID3D11Buffer*        mBuffer         = nullptr;
+        ID3D11DeviceContext* mContext        = nullptr;
+        u8*                  mMappedData     = nullptr;
+        u64                  mSizeBytes      = 0ULL;
         ED3D11MapMode        mDefaultMapMode = ED3D11MapMode::WriteDiscard;
     };
 } // namespace AltinaEngine::Rhi

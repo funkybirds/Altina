@@ -6,8 +6,9 @@
 #include "Container/Vector.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::TShared;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TShared;
+    using Container::TVector;
 
     struct FRhiD3D11ContextState;
 
@@ -20,12 +21,11 @@ namespace AltinaEngine::Rhi {
         auto InitializeBackend(const FRhiInitDesc& desc) -> bool override;
         void ShutdownBackend() override;
         void EnumerateAdaptersInternal(TVector<TShared<FRhiAdapter>>& outAdapters) override;
-        auto CreateDeviceInternal(
-            const TShared<FRhiAdapter>& adapter, const FRhiDeviceDesc& desc)
+        auto CreateDeviceInternal(const TShared<FRhiAdapter>& adapter, const FRhiDeviceDesc& desc)
             -> TShared<FRhiDevice> override;
 
     private:
-        Core::Container::TOwner<FRhiD3D11ContextState> mState;
+        Container::TOwner<FRhiD3D11ContextState> mState;
     };
 
 } // namespace AltinaEngine::Rhi

@@ -5,10 +5,11 @@
 #include <string_view>
 
 namespace {
+    namespace Container = AltinaEngine::Core::Container;
     using AltinaEngine::FUuid;
     using AltinaEngine::u8;
-    using AltinaEngine::Core::Container::FNativeString;
-    using AltinaEngine::Core::Container::FNativeStringView;
+    using Container::FNativeString;
+    using Container::FNativeStringView;
 
     auto EqualsLiteral(const FNativeString& value, const char* expected) -> bool {
         const std::string_view view(value.GetData(), value.Length());
@@ -30,7 +31,7 @@ TEST_CASE("Uuid parse and format") {
     const char* compact    = "550e8400e29b41d4a716446655440000";
     const char* uppercase  = "550E8400-E29B-41D4-A716-446655440000";
 
-    FUuid a;
+    FUuid       a;
     REQUIRE(FUuid::TryParse(FNativeStringView(hyphenated), a));
 
     FUuid b;

@@ -5,7 +5,8 @@
 #include "Container/Vector.h"
 
 namespace AltinaEngine::Asset {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
 
     class AE_ASSET_API FTexture2DAsset final : public IAsset {
     public:

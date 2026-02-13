@@ -10,9 +10,8 @@ namespace AltinaEngine::Rhi {
     public:
         template <typename TContext>
             requires AltinaEngine::CClassBaseOf<FRhiCommandContext, TContext>
-                  && AltinaEngine::CClassBaseOf<IRhiCmdContextOps, TContext>
-        explicit FRhiCmdContextAdapter(TContext& context)
-            : mContext(&context), mOps(&context) {}
+                         && AltinaEngine::CClassBaseOf<IRhiCmdContextOps, TContext>
+        explicit FRhiCmdContextAdapter(TContext& context) : mContext(&context), mOps(&context) {}
 
         FRhiCmdContextAdapter(FRhiCommandContext& context, IRhiCmdContextOps& ops)
             : mContext(&context), mOps(&ops) {}
@@ -76,15 +75,15 @@ namespace AltinaEngine::Rhi {
             mOps->RHISetBindGroup(setIndex, group, dynamicOffsets, dynamicOffsetCount);
         }
 
-        void RHIDraw(u32 vertexCount, u32 instanceCount, u32 firstVertex,
-            u32 firstInstance) override {
+        void RHIDraw(
+            u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) override {
             mOps->RHIDraw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
 
-        void RHIDrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
-            i32 vertexOffset, u32 firstInstance) override {
-            mOps->RHIDrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset,
-                firstInstance);
+        void RHIDrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset,
+            u32 firstInstance) override {
+            mOps->RHIDrawIndexed(
+                indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
         }
 
         void RHIDispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) override {

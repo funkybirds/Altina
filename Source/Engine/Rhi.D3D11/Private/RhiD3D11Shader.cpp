@@ -19,7 +19,8 @@
 #endif
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::MakeUnique;
+    namespace Container = Core::Container;
+    using Container::MakeUnique;
 #if AE_PLATFORM_WIN
     using Microsoft::WRL::ComPtr;
 

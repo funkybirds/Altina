@@ -5,22 +5,23 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiPipeline : public FRhiResource {
     public:
         explicit FRhiPipeline(const FRhiGraphicsPipelineDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+            FRhiResourceDeleteQueue*                          deleteQueue = nullptr) noexcept;
 
         explicit FRhiPipeline(const FRhiComputePipelineDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+            FRhiResourceDeleteQueue*                         deleteQueue = nullptr) noexcept;
 
         ~FRhiPipeline() override;
 
-        FRhiPipeline(const FRhiPipeline&) = delete;
-        FRhiPipeline(FRhiPipeline&&) = delete;
-        auto operator=(const FRhiPipeline&) -> FRhiPipeline& = delete;
-        auto operator=(FRhiPipeline&&) -> FRhiPipeline& = delete;
+        FRhiPipeline(const FRhiPipeline&)                                  = delete;
+        FRhiPipeline(FRhiPipeline&&)                                       = delete;
+        auto               operator=(const FRhiPipeline&) -> FRhiPipeline& = delete;
+        auto               operator=(FRhiPipeline&&) -> FRhiPipeline&      = delete;
 
         [[nodiscard]] auto IsGraphics() const noexcept -> bool { return mIsGraphics; }
         [[nodiscard]] auto GetGraphicsDesc() const noexcept -> const FRhiGraphicsPipelineDesc& {

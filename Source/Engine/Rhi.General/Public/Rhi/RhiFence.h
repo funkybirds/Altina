@@ -5,7 +5,8 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiFence : public FRhiResource {
     public:
@@ -13,10 +14,10 @@ namespace AltinaEngine::Rhi {
 
         ~FRhiFence() override;
 
-        FRhiFence(const FRhiFence&) = delete;
-        FRhiFence(FRhiFence&&) = delete;
-        auto operator=(const FRhiFence&) -> FRhiFence& = delete;
-        auto operator=(FRhiFence&&) -> FRhiFence& = delete;
+        FRhiFence(const FRhiFence&)                                  = delete;
+        FRhiFence(FRhiFence&&)                                       = delete;
+        auto               operator=(const FRhiFence&) -> FRhiFence& = delete;
+        auto               operator=(FRhiFence&&) -> FRhiFence&      = delete;
 
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {
             return mDebugName.ToView();

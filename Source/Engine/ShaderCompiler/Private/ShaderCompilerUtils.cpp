@@ -6,10 +6,11 @@
 #include <type_traits>
 
 namespace AltinaEngine::ShaderCompiler::Detail {
+    namespace Container = Core::Container;
     namespace {
         template <typename CharT>
-        auto FromPathImpl(const std::filesystem::path& path) -> Core::Container::TBasicString<CharT> {
-            Core::Container::TBasicString<CharT> out;
+        auto FromPathImpl(const std::filesystem::path& path) -> Container::TBasicString<CharT> {
+            Container::TBasicString<CharT> out;
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 const auto native = path.wstring();
                 out.Append(native.c_str(), native.size());
@@ -25,7 +26,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         template <typename CharT>
-        auto ToPathImpl(const Core::Container::TBasicString<CharT>& value) -> std::filesystem::path {
+        auto ToPathImpl(const Container::TBasicString<CharT>& value) -> std::filesystem::path {
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 return std::filesystem::path(std::wstring(value.GetData(), value.Length()));
             } else {
@@ -33,9 +34,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
         }
 
-        auto ToPath(const FString& value) -> std::filesystem::path {
-            return ToPathImpl(value);
-        }
+        auto ToPath(const FString& value) -> std::filesystem::path { return ToPathImpl(value); }
     } // namespace
 
     void AppendDiagnosticLine(FString& diagnostics, const TChar* line) {
@@ -58,12 +57,12 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         diagnostics.Append(text.GetData(), text.Length());
     }
 
-    auto BuildTempOutputPath(const FString& sourcePath, const FString& suffix,
-        const FString& extension) -> FString {
+    auto BuildTempOutputPath(
+        const FString& sourcePath, const FString& suffix, const FString& extension) -> FString {
         static std::atomic<u32> counter{ 0 };
         std::error_code         ec;
 
-        std::filesystem::path dir;
+        std::filesystem::path   dir;
         try {
             dir = std::filesystem::temp_directory_path();
         } catch (...) {
@@ -80,7 +79,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             stem = std::filesystem::path("shader");
         }
 
-        const auto uniqueId = counter.fetch_add(1, std::memory_order_relaxed);
+        const auto            uniqueId = counter.fetch_add(1, std::memory_order_relaxed);
         std::filesystem::path filename = stem;
         filename += std::filesystem::path("_");
         filename += std::filesystem::path(std::to_string(uniqueId));

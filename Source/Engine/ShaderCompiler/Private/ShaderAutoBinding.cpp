@@ -11,16 +11,17 @@
 #include <type_traits>
 
 namespace AltinaEngine::ShaderCompiler::Detail {
+    namespace Container = Core::Container;
     namespace {
         constexpr u32 kGroupCount = static_cast<u32>(EAutoBindingGroup::Count);
 
-        constexpr u32 kDx11CbvBase[kGroupCount] = { 0U, 4U, 8U };
-        constexpr u32 kDx11SrvBase[kGroupCount] = { 0U, 16U, 32U };
+        constexpr u32 kDx11CbvBase[kGroupCount]     = { 0U, 4U, 8U };
+        constexpr u32 kDx11SrvBase[kGroupCount]     = { 0U, 16U, 32U };
         constexpr u32 kDx11SamplerBase[kGroupCount] = { 0U, 4U, 8U };
-        constexpr u32 kDx11UavBase[kGroupCount] = { 0U, 4U, 8U };
+        constexpr u32 kDx11UavBase[kGroupCount]     = { 0U, 4U, 8U };
 
         template <typename CharT>
-        auto ToPathImpl(const Core::Container::TBasicString<CharT>& value) -> std::filesystem::path {
+        auto ToPathImpl(const Container::TBasicString<CharT>& value) -> std::filesystem::path {
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 return std::filesystem::path(std::wstring(value.GetData(), value.Length()));
             } else {
@@ -28,13 +29,11 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
         }
 
-        auto ToPath(const FString& value) -> std::filesystem::path {
-            return ToPathImpl(value);
-        }
+        auto ToPath(const FString& value) -> std::filesystem::path { return ToPathImpl(value); }
 
         template <typename CharT>
-        auto FromPathImpl(const std::filesystem::path& path) -> Core::Container::TBasicString<CharT> {
-            Core::Container::TBasicString<CharT> out;
+        auto FromPathImpl(const std::filesystem::path& path) -> Container::TBasicString<CharT> {
+            Container::TBasicString<CharT> out;
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 const auto native = path.wstring();
                 out.Append(native.c_str(), native.size());
@@ -59,8 +58,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         auto SplitArgs(const std::string& text, std::string& a, std::string& b) -> bool {
-            int depthAngle = 0;
-            int depthParen = 0;
+            int depthAngle   = 0;
+            int depthParen   = 0;
             int depthBracket = 0;
             for (size_t i = 0; i < text.size(); ++i) {
                 const char ch = text[i];
@@ -92,34 +91,44 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto GetRegisterChar(EAutoBindingResource resource) -> char {
             switch (resource) {
-            case EAutoBindingResource::CBuffer: return 'b';
-            case EAutoBindingResource::SRV: return 't';
-            case EAutoBindingResource::UAV: return 'u';
-            case EAutoBindingResource::Sampler: return 's';
-            default: return 't';
+                case EAutoBindingResource::CBuffer:
+                    return 'b';
+                case EAutoBindingResource::SRV:
+                    return 't';
+                case EAutoBindingResource::UAV:
+                    return 'u';
+                case EAutoBindingResource::Sampler:
+                    return 's';
+                default:
+                    return 't';
             }
         }
 
         auto GetDx11Base(EAutoBindingResource resource, u32 group) -> u32 {
             switch (resource) {
-            case EAutoBindingResource::CBuffer: return kDx11CbvBase[group];
-            case EAutoBindingResource::SRV: return kDx11SrvBase[group];
-            case EAutoBindingResource::UAV: return kDx11UavBase[group];
-            case EAutoBindingResource::Sampler: return kDx11SamplerBase[group];
-            default: return 0U;
+                case EAutoBindingResource::CBuffer:
+                    return kDx11CbvBase[group];
+                case EAutoBindingResource::SRV:
+                    return kDx11SrvBase[group];
+                case EAutoBindingResource::UAV:
+                    return kDx11UavBase[group];
+                case EAutoBindingResource::Sampler:
+                    return kDx11SamplerBase[group];
+                default:
+                    return 0U;
             }
         }
 
-        auto BuildRegisterSuffix(Rhi::ERhiBackend backend, EAutoBindingResource resource,
-            u32 index, u32 group) -> std::string {
+        auto BuildRegisterSuffix(Rhi::ERhiBackend backend, EAutoBindingResource resource, u32 index,
+            u32 group) -> std::string {
             const char reg = GetRegisterChar(resource);
             if (backend == Rhi::ERhiBackend::DirectX11) {
                 const u32 dx11Index = GetDx11Base(resource, group) + index;
                 return std::string("register(") + reg + std::to_string(dx11Index) + ")";
             }
 
-            return std::string("register(") + reg + std::to_string(index)
-                + ", space" + std::to_string(group) + ")";
+            return std::string("register(") + reg + std::to_string(index) + ", space"
+                + std::to_string(group) + ")";
         }
 
         auto ResolveGroupToken(const std::string& token, EAutoBindingGroup& outGroup) -> bool {
@@ -160,11 +169,11 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         struct FMarker {
-            size_t              mStart = 0;
-            size_t              mEnd = 0;
-            EAutoBindingGroup   mGroup = EAutoBindingGroup::PerFrame;
+            size_t               mStart    = 0;
+            size_t               mEnd      = 0;
+            EAutoBindingGroup    mGroup    = EAutoBindingGroup::PerFrame;
             EAutoBindingResource mResource = EAutoBindingResource::SRV;
-            std::string         mArgs;
+            std::string          mArgs;
         };
 
         auto TryParseMarker(const std::string& text, size_t pos, FMarker& outMarker) -> bool {
@@ -172,7 +181,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 return false;
             }
 
-            size_t cursor = pos + 7;
+            size_t       cursor   = pos + 7;
             const size_t groupEnd = text.find('_', cursor);
             if (groupEnd == std::string::npos) {
                 return false;
@@ -184,13 +193,13 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 return false;
             }
 
-            cursor = groupEnd + 1;
+            cursor                   = groupEnd + 1;
             const size_t resourceEnd = text.find_first_of(" \t\r\n(", cursor);
             if (resourceEnd == std::string::npos) {
                 return false;
             }
 
-            const std::string resourceToken = text.substr(cursor, resourceEnd - cursor);
+            const std::string    resourceToken = text.substr(cursor, resourceEnd - cursor);
             EAutoBindingResource resource{};
             if (!ResolveResourceToken(resourceToken, resource)) {
                 return false;
@@ -205,8 +214,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
 
             size_t parenStart = cursor;
-            int    depth = 0;
-            size_t parenEnd = std::string::npos;
+            int    depth      = 0;
+            size_t parenEnd   = std::string::npos;
             for (size_t i = parenStart + 1; i < text.size(); ++i) {
                 const char ch = text[i];
                 if (ch == '(') {
@@ -233,9 +242,9 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto BuildReplacement(const FMarker& marker, Rhi::ERhiBackend backend,
             FAutoBindingLayout& layout, FString& diagnostics) -> std::string {
-            const u32 groupIndex = static_cast<u32>(marker.mGroup);
-            const u32 resourceIndex = static_cast<u32>(marker.mResource);
-            const u32 bindingIndex = layout.mCounts[groupIndex][resourceIndex]++;
+            const u32 groupIndex          = static_cast<u32>(marker.mGroup);
+            const u32 resourceIndex       = static_cast<u32>(marker.mResource);
+            const u32 bindingIndex        = layout.mCounts[groupIndex][resourceIndex]++;
             layout.mGroupUsed[groupIndex] = true;
 
             const std::string registerSuffix =
@@ -267,8 +276,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             std::string typeName;
             std::string name;
             if (!SplitArgs(args, typeName, name)) {
-                AppendDiagnosticLine(diagnostics,
-                    TEXT("AutoBinding: SRV/UAV requires Type, Name."));
+                AppendDiagnosticLine(
+                    diagnostics, TEXT("AutoBinding: SRV/UAV requires Type, Name."));
                 return {};
             }
 
@@ -278,9 +287,9 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
     auto ApplyAutoBindings(const FString& sourcePath, Rhi::ERhiBackend backend,
         FAutoBindingOutput& outResult, FString& diagnostics) -> bool {
-        outResult.mApplied   = false;
+        outResult.mApplied    = false;
         outResult.mSourcePath = sourcePath;
-        outResult.mLayout    = {};
+        outResult.mLayout     = {};
 
         FNativeString sourceText;
         if (!Core::Platform::ReadFileTextUtf8(sourcePath, sourceText)) {
@@ -292,7 +301,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         std::string       output;
         output.reserve(input.size() + 256);
 
-        size_t cursor = 0;
+        size_t cursor  = 0;
         bool   applied = false;
         while (cursor < input.size()) {
             const size_t found = input.find("AE_PER_", cursor);
@@ -326,10 +335,10 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             return true;
         }
 
-        std::filesystem::path originalPath = ToPath(sourcePath);
-        const std::filesystem::path extension = originalPath.extension();
+        std::filesystem::path       originalPath = ToPath(sourcePath);
+        const std::filesystem::path extension    = originalPath.extension();
 
-        FString extensionText;
+        FString                     extensionText;
         if (!extension.empty()) {
             extensionText = FromPath(extension);
         } else {
@@ -341,13 +350,12 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         std::ofstream file(ToPath(tempPath), std::ios::binary | std::ios::trunc);
         if (!file) {
-            AppendDiagnosticLine(diagnostics,
-                TEXT("AutoBinding: failed to write preprocessed shader."));
+            AppendDiagnosticLine(
+                diagnostics, TEXT("AutoBinding: failed to write preprocessed shader."));
             return false;
         }
 
-        const std::string header =
-            std::string("// AutoBinding generated\n#line 1 \"")
+        const std::string header = std::string("// AutoBinding generated\n#line 1 \"")
             + originalPath.generic_string() + "\"\n";
         file.write(header.data(), static_cast<std::streamsize>(header.size()));
         file.write(output.data(), static_cast<std::streamsize>(output.size()));

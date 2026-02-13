@@ -3,20 +3,22 @@
 #include "Asset/AssetTypes.h"
 
 namespace AltinaEngine::Asset {
-    using Core::Container::FNativeString;
-    using Core::Container::FNativeStringView;
-    using Core::Container::FStringView;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::FNativeString;
+    using Container::FNativeStringView;
+    using Container::FString;
+    using Container::FStringView;
+    using Container::TVector;
 
     class AE_ASSET_API FAssetRegistry {
     public:
-        [[nodiscard]] auto LoadFromJsonFile(const Core::Container::FString& path) -> bool;
+        [[nodiscard]] auto LoadFromJsonFile(const FString& path) -> bool;
         [[nodiscard]] auto LoadFromJsonText(FNativeStringView text) -> bool;
         [[nodiscard]] auto GetLastError() const noexcept -> FNativeStringView;
 
-        void Clear();
-        void AddAsset(FAssetDesc desc);
-        void AddRedirector(FAssetRedirector redirector);
+        void               Clear();
+        void               AddAsset(FAssetDesc desc);
+        void               AddRedirector(FAssetRedirector redirector);
 
         [[nodiscard]] auto FindByPath(FStringView path) const noexcept -> FAssetHandle;
         [[nodiscard]] auto FindByUuid(const FUuid& uuid) const noexcept -> FAssetHandle;

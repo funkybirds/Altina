@@ -9,6 +9,7 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Shader {
+    namespace Container = Core::Container;
     class AE_SHADER_API FShaderPropertyBag {
     public:
         struct FPropertyDesc {
@@ -21,8 +22,8 @@ namespace AltinaEngine::Shader {
         FShaderPropertyBag() = default;
         explicit FShaderPropertyBag(const FShaderConstantBuffer& cbuffer) { Init(cbuffer); }
 
-        void Init(const FShaderConstantBuffer& cbuffer);
-        void Reset();
+        void               Init(const FShaderConstantBuffer& cbuffer);
+        void               Reset();
 
         [[nodiscard]] auto IsValid() const noexcept -> bool { return mSizeBytes > 0U; }
         [[nodiscard]] auto GetName() const noexcept -> const FString& { return mName; }
@@ -43,13 +44,11 @@ namespace AltinaEngine::Shader {
         auto SetRaw(const FString& name, const void* data, u32 sizeBytes) -> bool;
         auto SetRaw(const TChar* name, const void* data, u32 sizeBytes) -> bool;
 
-        template <typename T>
-        auto Set(const FString& name, const T& value) -> bool {
+        template <typename T> auto Set(const FString& name, const T& value) -> bool {
             return SetRaw(name, &value, static_cast<u32>(sizeof(T)));
         }
 
-        template <typename T>
-        auto Set(const TChar* name, const T& value) -> bool {
+        template <typename T> auto Set(const TChar* name, const T& value) -> bool {
             return SetRaw(name, &value, static_cast<u32>(sizeof(T)));
         }
 
@@ -61,8 +60,7 @@ namespace AltinaEngine::Shader {
             return SetRaw(name, values, static_cast<u32>(sizeof(T) * count));
         }
 
-        template <typename T>
-        auto SetArray(const TChar* name, const T* values, u32 count) -> bool {
+        template <typename T> auto SetArray(const TChar* name, const T* values, u32 count) -> bool {
             if (values == nullptr || count == 0U) {
                 return false;
             }
@@ -78,16 +76,15 @@ namespace AltinaEngine::Shader {
             auto operator()(const FString& a, const FString& b) const noexcept -> bool;
         };
 
-        using FPropertyMap = Core::Container::THashMap<FString, FPropertyDesc, FStringHash,
-            FStringEqual>;
+        using FPropertyMap = Container::THashMap<FString, FPropertyDesc, FStringHash, FStringEqual>;
 
-        FString    mName;
-        u32        mSizeBytes = 0U;
-        u32        mSet = 0U;
-        u32        mBinding = 0U;
-        u32        mRegister = 0U;
-        u32        mSpace = 0U;
-        TVector<u8> mData;
+        FString      mName;
+        u32          mSizeBytes = 0U;
+        u32          mSet       = 0U;
+        u32          mBinding   = 0U;
+        u32          mRegister  = 0U;
+        u32          mSpace     = 0U;
+        TVector<u8>  mData;
         FPropertyMap mProperties;
     };
 } // namespace AltinaEngine::Shader

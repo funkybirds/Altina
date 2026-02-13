@@ -6,9 +6,10 @@
 #include <type_traits>
 
 namespace AltinaEngine::Core::Platform {
+    namespace Container = Core::Container;
     namespace {
         template <typename CharT>
-        auto ToPathImpl(const Core::Container::TBasicString<CharT>& value) -> std::filesystem::path {
+        auto ToPathImpl(const Container::TBasicString<CharT>& value) -> std::filesystem::path {
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 return std::filesystem::path(std::wstring(value.GetData(), value.Length()));
             } else {
@@ -16,9 +17,7 @@ namespace AltinaEngine::Core::Platform {
             }
         }
 
-        auto ToPath(const FString& value) -> std::filesystem::path {
-            return ToPathImpl(value);
-        }
+        auto ToPath(const FString& value) -> std::filesystem::path { return ToPathImpl(value); }
     } // namespace
 
     auto ReadFileBytes(const FString& path, TVector<u8>& outBytes) -> bool {
@@ -61,8 +60,8 @@ namespace AltinaEngine::Core::Platform {
             return false;
         }
 
-        std::string content((std::istreambuf_iterator<char>(file)),
-            std::istreambuf_iterator<char>());
+        std::string content(
+            (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         if (!content.empty()) {
             outText.Append(content.c_str(), content.size());
         }

@@ -4,10 +4,11 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Core::Memory {
+    namespace Container = Core::Container;
     struct FRingAllocation {
-        u64 mOffset = 0ULL;
-        u64 mSize   = 0ULL;
-        u64 mTag    = 0ULL;
+        u64                mOffset = 0ULL;
+        u64                mSize   = 0ULL;
+        u64                mTag    = 0ULL;
 
         [[nodiscard]] auto IsValid() const noexcept -> bool { return mSize != 0ULL; }
     };
@@ -37,7 +38,7 @@ namespace AltinaEngine::Core::Memory {
                 return {};
             }
 
-            const u64 align = (alignment == 0ULL) ? 1ULL : alignment;
+            const u64 align       = (alignment == 0ULL) ? 1ULL : alignment;
             const u64 alignedHead = AlignUp(mHead, align);
 
             if (mHead < mTail) {
@@ -93,7 +94,7 @@ namespace AltinaEngine::Core::Memory {
 
         auto CommitAllocation(u64 offset, u64 sizeBytes, u64 tag) -> FRingAllocation {
             const u64 end = offset + sizeBytes;
-            mHead = (end >= mCapacity) ? 0ULL : end;
+            mHead         = (end >= mCapacity) ? 0ULL : end;
             mQueue.PushBack(FQueueEntry{ end, tag });
 
             FRingAllocation allocation{};
@@ -103,9 +104,9 @@ namespace AltinaEngine::Core::Memory {
             return allocation;
         }
 
-        u64 mCapacity = 0ULL;
-        u64 mHead     = 0ULL;
-        u64 mTail     = 0ULL;
-        Core::Container::TDeque<FQueueEntry> mQueue;
+        u64                            mCapacity = 0ULL;
+        u64                            mHead     = 0ULL;
+        u64                            mTail     = 0ULL;
+        Container::TDeque<FQueueEntry> mQueue;
     };
 } // namespace AltinaEngine::Core::Memory

@@ -22,11 +22,12 @@
 #include <type_traits>
 
 namespace AltinaEngine::Rhi {
+    namespace Container = Core::Container;
     namespace {
         template <typename TBase, typename TDerived, typename... Args>
         auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
-            using AllocatorType = Core::Container::TAllocator<TDerived>;
-            using Traits        = Core::Container::TAllocatorTraits<AllocatorType>;
+            using AllocatorType = Container::TAllocator<TDerived>;
+            using Traits        = Container::TAllocatorTraits<AllocatorType>;
 
             static_assert(std::is_base_of_v<TBase, TDerived>,
                 "MakeSharedAs requires TDerived to derive from TBase.");
@@ -153,7 +154,7 @@ namespace AltinaEngine::Rhi {
                 mBackBuffer = FRhiTextureRef::Adopt(new FRhiMockTexture(texDesc, mCounters));
             }
 
-            FRhiTextureRef mBackBuffer;
+            FRhiTextureRef            mBackBuffer;
             TShared<FRhiMockCounters> mCounters;
         };
 
@@ -309,23 +310,23 @@ namespace AltinaEngine::Rhi {
                 }
             }
 
-            [[nodiscard]] auto GetCompletedValue() const noexcept -> u64 override {
-                return mValue;
-            }
-            void SignalCPU(u64 value) override { mValue = value; }
-            void WaitCPU(u64 value) override { mValue = value; }
-            void Reset(u64 value) override { mValue = value; }
+            [[nodiscard]] auto GetCompletedValue() const noexcept -> u64 override { return mValue; }
+            void               SignalCPU(u64 value) override { mValue = value; }
+            void               WaitCPU(u64 value) override { mValue = value; }
+            void               Reset(u64 value) override { mValue = value; }
 
         private:
-            u64 mValue = 0ULL;
+            u64                       mValue = 0ULL;
             TShared<FRhiMockCounters> mCounters;
         };
 
         class FRhiMockSemaphore final : public FRhiSemaphore {
         public:
             FRhiMockSemaphore(bool timeline, u64 initialValue, TShared<FRhiMockCounters> counters)
-                : FRhiSemaphore(), mIsTimeline(timeline), mValue(initialValue),
-                  mCounters(AltinaEngine::Move(counters)) {
+                : FRhiSemaphore()
+                , mIsTimeline(timeline)
+                , mValue(initialValue)
+                , mCounters(AltinaEngine::Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -337,28 +338,23 @@ namespace AltinaEngine::Rhi {
                 }
             }
 
-            [[nodiscard]] auto IsTimeline() const noexcept -> bool override {
-                return mIsTimeline;
-            }
-            [[nodiscard]] auto GetCurrentValue() const noexcept -> u64 override {
-                return mValue;
-            }
-            void Signal(u64 value) {
+            [[nodiscard]] auto IsTimeline() const noexcept -> bool override { return mIsTimeline; }
+            [[nodiscard]] auto GetCurrentValue() const noexcept -> u64 override { return mValue; }
+            void               Signal(u64 value) {
                 if (mIsTimeline) {
                     mValue = value;
                 }
             }
 
         private:
-            bool mIsTimeline = false;
-            u64  mValue      = 0ULL;
+            bool                      mIsTimeline = false;
+            u64                       mValue      = 0ULL;
             TShared<FRhiMockCounters> mCounters;
         };
 
         class FRhiMockCommandPool final : public FRhiCommandPool {
         public:
-            FRhiMockCommandPool(
-                const FRhiCommandPoolDesc& desc, TShared<FRhiMockCounters> counters)
+            FRhiMockCommandPool(const FRhiCommandPoolDesc& desc, TShared<FRhiMockCounters> counters)
                 : FRhiCommandPool(desc), mCounters(AltinaEngine::Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
@@ -399,14 +395,13 @@ namespace AltinaEngine::Rhi {
             TShared<FRhiMockCounters> mCounters;
         };
 
-        class FRhiMockCommandContext final : public FRhiCommandContext,
-                                             public IRhiCmdContextOps {
+        class FRhiMockCommandContext final : public FRhiCommandContext, public IRhiCmdContextOps {
         public:
             FRhiMockCommandContext(const FRhiCommandContextDesc& desc,
                 FRhiCommandListRef commandList, TShared<FRhiMockCounters> counters)
-                : FRhiCommandContext(desc),
-                  mCommandList(AltinaEngine::Move(commandList)),
-                  mCounters(AltinaEngine::Move(counters)) {
+                : FRhiCommandContext(desc)
+                , mCommandList(AltinaEngine::Move(commandList))
+                , mCounters(AltinaEngine::Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -418,8 +413,8 @@ namespace AltinaEngine::Rhi {
                 }
             }
 
-            void Begin() override {}
-            void End() override {}
+            void               Begin() override {}
+            void               End() override {}
             [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override {
                 return mCommandList.Get();
             }
@@ -431,24 +426,25 @@ namespace AltinaEngine::Rhi {
             void RHISetIndexBuffer(const FRhiIndexBufferView& /*view*/) override {}
             void RHISetViewport(const FRhiViewportRect& /*viewport*/) override {}
             void RHISetScissor(const FRhiScissorRect& /*scissor*/) override {}
-            void RHISetRenderTargets(u32 /*colorTargetCount*/,
-                FRhiTexture* const* /*colorTargets*/, FRhiTexture* /*depthTarget*/) override {}
+            void RHISetRenderTargets(u32 /*colorTargetCount*/, FRhiTexture* const* /*colorTargets*/,
+                FRhiTexture* /*depthTarget*/) override {}
             void RHIBeginRenderPass(const FRhiRenderPassDesc& /*desc*/) override {}
             void RHIEndRenderPass() override {}
             void RHIBeginTransition(const FRhiTransitionCreateInfo& /*info*/) override {}
             void RHIEndTransition(const FRhiTransitionCreateInfo& /*info*/) override {}
-            void RHIClearColor(FRhiTexture* /*colorTarget*/,
-                const FRhiClearColor& /*color*/) override {}
+            void RHIClearColor(
+                FRhiTexture* /*colorTarget*/, const FRhiClearColor& /*color*/) override {}
             void RHISetBindGroup(u32 /*setIndex*/, FRhiBindGroup* /*group*/,
                 const u32* /*dynamicOffsets*/, u32 /*dynamicOffsetCount*/) override {}
             void RHIDraw(u32 /*vertexCount*/, u32 /*instanceCount*/, u32 /*firstVertex*/,
                 u32 /*firstInstance*/) override {}
             void RHIDrawIndexed(u32 /*indexCount*/, u32 /*instanceCount*/, u32 /*firstIndex*/,
                 i32 /*vertexOffset*/, u32 /*firstInstance*/) override {}
-            void RHIDispatch(u32 /*groupCountX*/, u32 /*groupCountY*/, u32 /*groupCountZ*/) override {}
+            void RHIDispatch(
+                u32 /*groupCountX*/, u32 /*groupCountY*/, u32 /*groupCountZ*/) override {}
 
         private:
-            FRhiCommandListRef mCommandList;
+            FRhiCommandListRef        mCommandList;
             TShared<FRhiMockCounters> mCounters;
         };
 
@@ -505,18 +501,18 @@ namespace AltinaEngine::Rhi {
                 SetSupportedFeatures(features);
                 SetSupportedLimits(limits);
                 FRhiQueueCapabilities queueCaps;
-                queueCaps.mSupportsGraphics = true;
-                queueCaps.mSupportsCompute  = true;
-                queueCaps.mSupportsCopy     = true;
+                queueCaps.mSupportsGraphics     = true;
+                queueCaps.mSupportsCompute      = true;
+                queueCaps.mSupportsCopy         = true;
                 queueCaps.mSupportsAsyncCompute = false;
                 queueCaps.mSupportsAsyncCopy    = false;
                 SetQueueCapabilities(queueCaps);
-                RegisterQueue(ERhiQueueType::Graphics,
-                    MakeResource<FRhiMockQueue>(ERhiQueueType::Graphics));
-                RegisterQueue(ERhiQueueType::Compute,
-                    MakeResource<FRhiMockQueue>(ERhiQueueType::Compute));
-                RegisterQueue(ERhiQueueType::Copy,
-                    MakeResource<FRhiMockQueue>(ERhiQueueType::Copy));
+                RegisterQueue(
+                    ERhiQueueType::Graphics, MakeResource<FRhiMockQueue>(ERhiQueueType::Graphics));
+                RegisterQueue(
+                    ERhiQueueType::Compute, MakeResource<FRhiMockQueue>(ERhiQueueType::Compute));
+                RegisterQueue(
+                    ERhiQueueType::Copy, MakeResource<FRhiMockQueue>(ERhiQueueType::Copy));
                 if (mCounters) {
                     ++mCounters->mDeviceCreated;
                 }
@@ -561,8 +557,7 @@ namespace AltinaEngine::Rhi {
                 -> FRhiBindGroupLayoutRef override {
                 return MakeResource<FRhiMockBindGroupLayout>(desc, mCounters);
             }
-            auto CreateBindGroup(const FRhiBindGroupDesc& desc)
-                -> FRhiBindGroupRef override {
+            auto CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef override {
                 return MakeResource<FRhiMockBindGroup>(desc, mCounters);
             }
 
@@ -573,13 +568,11 @@ namespace AltinaEngine::Rhi {
                 return MakeResource<FRhiMockSemaphore>(timeline, initialValue, mCounters);
             }
 
-            auto CreateCommandPool(const FRhiCommandPoolDesc& desc)
-                -> FRhiCommandPoolRef override {
+            auto CreateCommandPool(const FRhiCommandPoolDesc& desc) -> FRhiCommandPoolRef override {
                 return MakeResource<FRhiMockCommandPool>(desc, mCounters);
             }
 
-            auto CreateCommandList(const FRhiCommandListDesc& desc)
-                -> FRhiCommandListRef override {
+            auto CreateCommandList(const FRhiCommandListDesc& desc) -> FRhiCommandListRef override {
                 return MakeResource<FRhiMockCommandList>(desc, mCounters);
             }
 
@@ -589,7 +582,7 @@ namespace AltinaEngine::Rhi {
                 listDesc.mDebugName = desc.mDebugName;
                 listDesc.mQueueType = desc.mQueueType;
                 listDesc.mListType  = desc.mListType;
-                auto commandList = MakeResource<FRhiMockCommandList>(listDesc, mCounters);
+                auto commandList    = MakeResource<FRhiMockCommandList>(listDesc, mCounters);
                 return MakeResource<FRhiMockCommandContext>(
                     desc, AltinaEngine::Move(commandList), mCounters);
             }
@@ -599,14 +592,12 @@ namespace AltinaEngine::Rhi {
         };
     } // namespace
 
-    FRhiMockContext::FRhiMockContext()
-        : mCounters(Core::Container::MakeShared<FRhiMockCounters>()) {}
+    FRhiMockContext::FRhiMockContext() : mCounters(Container::MakeShared<FRhiMockCounters>()) {}
 
     FRhiMockContext::~FRhiMockContext() { Shutdown(); }
 
-    void FRhiMockContext::AddAdapter(
-        const FRhiAdapterDesc& desc, const FRhiSupportedFeatures& features,
-        const FRhiSupportedLimits& limits) {
+    void FRhiMockContext::AddAdapter(const FRhiAdapterDesc& desc,
+        const FRhiSupportedFeatures& features, const FRhiSupportedLimits& limits) {
         FRhiMockAdapterConfig config;
         config.mDesc     = desc;
         config.mFeatures = features;
@@ -698,9 +689,8 @@ namespace AltinaEngine::Rhi {
         outAdapters.Reserve(mAdapterConfigs.Size());
 
         for (const auto& config : mAdapterConfigs) {
-            outAdapters.PushBack(
-                MakeSharedAs<FRhiAdapter, FRhiMockAdapter>(config.mDesc, config.mFeatures,
-                    config.mLimits));
+            outAdapters.PushBack(MakeSharedAs<FRhiAdapter, FRhiMockAdapter>(
+                config.mDesc, config.mFeatures, config.mLimits));
         }
     }
 

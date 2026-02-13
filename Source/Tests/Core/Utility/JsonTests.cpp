@@ -5,16 +5,17 @@
 #include <string_view>
 
 namespace {
-    using AltinaEngine::Core::Container::FNativeString;
-    using AltinaEngine::Core::Container::FNativeStringView;
+    namespace Container = AltinaEngine::Core::Container;
     using AltinaEngine::Core::Utility::Json::EJsonType;
-    using AltinaEngine::Core::Utility::Json::FJsonDocument;
-    using AltinaEngine::Core::Utility::Json::FJsonValue;
     using AltinaEngine::Core::Utility::Json::FindObjectValue;
     using AltinaEngine::Core::Utility::Json::FindObjectValueInsensitive;
+    using AltinaEngine::Core::Utility::Json::FJsonDocument;
+    using AltinaEngine::Core::Utility::Json::FJsonValue;
     using AltinaEngine::Core::Utility::Json::GetBoolValue;
     using AltinaEngine::Core::Utility::Json::GetNumberValue;
     using AltinaEngine::Core::Utility::Json::GetStringValue;
+    using Container::FNativeString;
+    using Container::FNativeStringView;
 
     auto EqualsLiteral(const FNativeString& value, const char* expected) -> bool {
         const std::string_view view(value.GetData(), value.Length());
@@ -23,7 +24,7 @@ namespace {
 } // namespace
 
 TEST_CASE("Json parse simple object") {
-    const char* json = "{\"Name\":\"Test\",\"Value\":12.5,\"Flag\":true}";
+    const char*   json = "{\"Name\":\"Test\",\"Value\":12.5,\"Flag\":true}";
     FJsonDocument doc;
     REQUIRE(doc.Parse(FNativeStringView(json)));
 
@@ -124,7 +125,7 @@ TEST_CASE("Json parse arrays and nested objects") {
 }
 
 TEST_CASE("Json parse root array") {
-    const char* json = "[\"a\", 1, false, null, {\"k\":\"v\"}]";
+    const char*   json = "[\"a\", 1, false, null, {\"k\":\"v\"}]";
     FJsonDocument doc;
     REQUIRE(doc.Parse(FNativeStringView(json)));
 
@@ -157,7 +158,7 @@ TEST_CASE("Json parse root array") {
 }
 
 TEST_CASE("Json case-insensitive key lookup") {
-    const char* json = "{\"SchemaVersion\":1}";
+    const char*   json = "{\"SchemaVersion\":1}";
     FJsonDocument doc;
     REQUIRE(doc.Parse(FNativeStringView(json)));
 
@@ -170,7 +171,7 @@ TEST_CASE("Json case-insensitive key lookup") {
 }
 
 TEST_CASE("Json unicode escape ascii") {
-    const char* json = "{\"Text\":\"\\u0041\\u0042\"}";
+    const char*   json = "{\"Text\":\"\\u0041\\u0042\"}";
     FJsonDocument doc;
     REQUIRE(doc.Parse(FNativeStringView(json)));
 

@@ -36,7 +36,7 @@ namespace AltinaEngine::Imaging {
         using Microsoft::WRL::ComPtr;
 
         struct FComInitScope {
-            HRESULT mResult = E_FAIL;
+            HRESULT mResult       = E_FAIL;
             bool    mShouldUninit = false;
 
             FComInitScope() {
@@ -140,14 +140,14 @@ namespace AltinaEngine::Imaging {
                 return false;
             }
 
-            hr = converter->CopyPixels(nullptr, outImage.GetRowPitch(),
-                static_cast<UINT>(dataSize), outImage.GetData());
+            hr = converter->CopyPixels(
+                nullptr, outImage.GetRowPitch(), static_cast<UINT>(dataSize), outImage.GetData());
             return SUCCEEDED(hr);
         }
 
         struct FEncodedPixels {
-            const u8*          mData      = nullptr;
-            u32                mRowPitch  = 0;
+            const u8*          mData        = nullptr;
+            u32                mRowPitch    = 0;
             WICPixelFormatGUID mPixelFormat = GUID_WICPixelFormatDontCare;
             TVector<u8>        mScratch;
         };
@@ -392,12 +392,9 @@ namespace AltinaEngine::Imaging {
 #endif
     }
 
-    FJpegImageWriter::FJpegImageWriter(u8 quality) noexcept
-        : mQuality(quality) {}
+    FJpegImageWriter::FJpegImageWriter(u8 quality) noexcept : mQuality(quality) {}
 
-    void FJpegImageWriter::SetQuality(u8 quality) noexcept {
-        mQuality = quality;
-    }
+    void FJpegImageWriter::SetQuality(u8 quality) noexcept { mQuality = quality; }
 
     auto FJpegImageWriter::Write(const FImageView& image, TVector<u8>& outBytes) const -> bool {
 #if AE_PLATFORM_WIN
@@ -407,8 +404,8 @@ namespace AltinaEngine::Imaging {
         }
 
         const float quality = static_cast<float>(mQuality) / 100.0f;
-        return EncodeWicImage(pixels, image.mWidth, image.mHeight, GUID_ContainerFormatJpeg,
-            quality, outBytes);
+        return EncodeWicImage(
+            pixels, image.mWidth, image.mHeight, GUID_ContainerFormatJpeg, quality, outBytes);
 #else
         (void)image;
         outBytes.Clear();
@@ -449,8 +446,8 @@ namespace AltinaEngine::Imaging {
             return false;
         }
 
-        return EncodeWicImage(pixels, image.mWidth, image.mHeight, GUID_ContainerFormatPng, -1.0f,
-            outBytes);
+        return EncodeWicImage(
+            pixels, image.mWidth, image.mHeight, GUID_ContainerFormatPng, -1.0f, outBytes);
 #else
         (void)image;
         outBytes.Clear();

@@ -9,6 +9,7 @@
 struct ID3D11DeviceContext;
 
 namespace AltinaEngine::Rhi {
+    namespace Container = Core::Container;
     class FRhiD3D11Device;
 
     enum class ED3D11StagingMapMode : u8 {
@@ -18,9 +19,9 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FD3D11StagingAllocation {
-        FRhiBuffer* mBuffer = nullptr;
-        u64         mSize   = 0ULL;
-        u32         mPoolIndex = 0U;
+        FRhiBuffer*        mBuffer    = nullptr;
+        u64                mSize      = 0ULL;
+        u32                mPoolIndex = 0U;
 
         [[nodiscard]] auto IsValid() const noexcept -> bool { return mBuffer != nullptr; }
     };
@@ -35,8 +36,7 @@ namespace AltinaEngine::Rhi {
         auto Acquire(u64 sizeBytes, ERhiCpuAccess access) -> FD3D11StagingAllocation;
         void Release(const FD3D11StagingAllocation& allocation);
 
-        auto Map(const FD3D11StagingAllocation& allocation, ED3D11StagingMapMode mode)
-            -> void*;
+        auto Map(const FD3D11StagingAllocation& allocation, ED3D11StagingMapMode mode) -> void*;
         void Unmap(const FD3D11StagingAllocation& allocation);
 
     private:
@@ -47,8 +47,8 @@ namespace AltinaEngine::Rhi {
             bool          mInUse     = false;
         };
 
-        FRhiD3D11Device*        mDevice = nullptr;
-        ::ID3D11DeviceContext* mContext = nullptr;
-        Core::Container::TVector<FStagingEntry> mEntries;
+        FRhiD3D11Device*                  mDevice  = nullptr;
+        ::ID3D11DeviceContext*            mContext = nullptr;
+        Container::TVector<FStagingEntry> mEntries;
     };
 } // namespace AltinaEngine::Rhi

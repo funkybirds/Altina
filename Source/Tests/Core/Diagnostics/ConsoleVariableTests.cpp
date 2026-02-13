@@ -3,7 +3,8 @@
 #include "../../Engine/Core/Public/Console/ConsoleVariable.h"
 
 using namespace AltinaEngine::Core::Console;
-using AltinaEngine::Core::Container::FString;
+namespace Container = AltinaEngine::Core::Container;
+using Container::FString;
 
 TEST_CASE("ConsoleVariable: basic register and parsing") {
     // Register variable with integer default

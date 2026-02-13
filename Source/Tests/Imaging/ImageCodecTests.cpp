@@ -8,15 +8,16 @@
 #include <fstream>
 
 namespace AltinaEngine::Imaging {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
 
     static void HsvToRgb(f32 h, f32 s, f32 v, u8& outR, u8& outG, u8& outB) {
-        const f32 c = v * s;
+        const f32 c  = v * s;
         const f32 h6 = h * 6.0f;
-        const f32 x = c * (1.0f - std::fabs(std::fmod(h6, 2.0f) - 1.0f));
-        f32 r1 = 0.0f;
-        f32 g1 = 0.0f;
-        f32 b1 = 0.0f;
+        const f32 x  = c * (1.0f - std::fabs(std::fmod(h6, 2.0f) - 1.0f));
+        f32       r1 = 0.0f;
+        f32       g1 = 0.0f;
+        f32       b1 = 0.0f;
 
         if (h6 >= 0.0f && h6 < 1.0f) {
             r1 = c;
@@ -39,9 +40,9 @@ namespace AltinaEngine::Imaging {
         }
 
         const f32 m = v - c;
-        outR = static_cast<u8>(std::clamp((r1 + m) * 255.0f, 0.0f, 255.0f));
-        outG = static_cast<u8>(std::clamp((g1 + m) * 255.0f, 0.0f, 255.0f));
-        outB = static_cast<u8>(std::clamp((b1 + m) * 255.0f, 0.0f, 255.0f));
+        outR        = static_cast<u8>(std::clamp((r1 + m) * 255.0f, 0.0f, 255.0f));
+        outG        = static_cast<u8>(std::clamp((g1 + m) * 255.0f, 0.0f, 255.0f));
+        outB        = static_cast<u8>(std::clamp((b1 + m) * 255.0f, 0.0f, 255.0f));
     }
 
     static auto MakeHsvDiskImage(u32 size) -> FImage {
@@ -50,26 +51,26 @@ namespace AltinaEngine::Imaging {
             return image;
         }
 
-        const f32 radius = static_cast<f32>(size) * 0.5f;
-        const f32 center = radius - 0.5f;
+        const f32 radius    = static_cast<f32>(size) * 0.5f;
+        const f32 center    = radius - 0.5f;
         const f32 invRadius = radius > 0.0f ? 1.0f / radius : 0.0f;
-        u8*       data = image.GetData();
-        const u32 pitch = image.GetRowPitch();
+        u8*       data      = image.GetData();
+        const u32 pitch     = image.GetRowPitch();
 
         for (u32 y = 0; y < size; ++y) {
             for (u32 x = 0; x < size; ++x) {
-                const f32 dx = (static_cast<f32>(x) - center) * invRadius;
-                const f32 dy = (static_cast<f32>(y) - center) * invRadius;
+                const f32 dx   = (static_cast<f32>(x) - center) * invRadius;
+                const f32 dy   = (static_cast<f32>(y) - center) * invRadius;
                 const f32 dist = std::sqrt(dx * dx + dy * dy);
 
-                u8* pixel = data + static_cast<usize>(y) * pitch + static_cast<usize>(x) * 4;
+                u8*       pixel = data + static_cast<usize>(y) * pitch + static_cast<usize>(x) * 4;
                 if (dist <= 1.0f) {
                     const f32 angle = std::atan2(dy, dx);
-                    const f32 hue = (angle + 3.1415926535f) / (2.0f * 3.1415926535f);
-                    const f32 sat = dist;
-                    u8 r = 0;
-                    u8 g = 0;
-                    u8 b = 0;
+                    const f32 hue   = (angle + 3.1415926535f) / (2.0f * 3.1415926535f);
+                    const f32 sat   = dist;
+                    u8        r     = 0;
+                    u8        g     = 0;
+                    u8        b     = 0;
                     HsvToRgb(hue, sat, 1.0f, r, g, b);
                     pixel[0] = r;
                     pixel[1] = g;
@@ -87,7 +88,8 @@ namespace AltinaEngine::Imaging {
         return image;
     }
 
-    static auto WriteFileBytes(const std::filesystem::path& path, const TVector<u8>& bytes) -> bool {
+    static auto WriteFileBytes(const std::filesystem::path& path, const TVector<u8>& bytes)
+        -> bool {
         std::ofstream file(path, std::ios::binary | std::ios::trunc);
         if (!file) {
             return false;
@@ -116,9 +118,9 @@ namespace AltinaEngine::Imaging {
     }
 
     static auto MakeTestImage() -> FImage {
-        FImage image(4, 4, EImageFormat::RGBA8);
-        u8*   data   = image.GetData();
-        const u32 pitch  = image.GetRowPitch();
+        FImage    image(4, 4, EImageFormat::RGBA8);
+        u8*       data  = image.GetData();
+        const u32 pitch = image.GetRowPitch();
 
         for (u32 y = 0; y < image.GetHeight(); ++y) {
             for (u32 x = 0; x < image.GetWidth(); ++x) {
@@ -154,7 +156,7 @@ namespace AltinaEngine::Imaging {
 
 #if AE_PLATFORM_WIN
     TEST_CASE("Imaging PNG roundtrip") {
-        FImage image = MakeTestImage();
+        FImage          image = MakeTestImage();
 
         FPngImageWriter writer;
         TVector<u8>     bytes;
@@ -169,7 +171,7 @@ namespace AltinaEngine::Imaging {
 
         FPngImageReader reader;
         FImage          decoded;
-        if (!reader.Read(Core::Container::TSpan<u8>(bytes), decoded)) {
+        if (!reader.Read(Container::TSpan<u8>(bytes), decoded)) {
             REQUIRE(false);
             return;
         }
@@ -177,7 +179,7 @@ namespace AltinaEngine::Imaging {
     }
 
     TEST_CASE("Imaging JPEG roundtrip") {
-        FImage image = MakeTestImage();
+        FImage           image = MakeTestImage();
 
         FJpegImageWriter writer(90);
         TVector<u8>      bytes;
@@ -192,7 +194,7 @@ namespace AltinaEngine::Imaging {
 
         FJpegImageReader reader;
         FImage           decoded;
-        if (!reader.Read(Core::Container::TSpan<u8>(bytes), decoded)) {
+        if (!reader.Read(Container::TSpan<u8>(bytes), decoded)) {
             REQUIRE(false);
             return;
         }
@@ -200,8 +202,8 @@ namespace AltinaEngine::Imaging {
         REQUIRE_EQ(decoded.GetHeight(), image.GetHeight());
         REQUIRE_EQ(decoded.GetFormat(), EImageFormat::RGBA8);
 
-        const u8* srcData = image.GetData();
-        const u8* dstData = decoded.GetData();
+        const u8*  srcData       = image.GetData();
+        const u8*  dstData       = decoded.GetData();
         const auto bytesPerPixel = GetBytesPerPixel(image.GetFormat());
         const auto pixelCount    = image.GetWidth() * image.GetHeight();
 
@@ -215,7 +217,7 @@ namespace AltinaEngine::Imaging {
     }
 
     TEST_CASE("Imaging HSV disk saved and reloaded") {
-        const u32 size = 256;
+        const u32 size  = 256;
         FImage    image = MakeHsvDiskImage(size);
         if (!image.IsValid()) {
             REQUIRE(false);
@@ -223,15 +225,15 @@ namespace AltinaEngine::Imaging {
         }
 
         std::error_code ec;
-        const auto outputDir = std::filesystem::current_path() / "ImagingTestOutputs";
+        const auto      outputDir = std::filesystem::current_path() / "ImagingTestOutputs";
         std::filesystem::create_directories(outputDir, ec);
         if (ec) {
             REQUIRE(false);
             return;
         }
 
-        const auto pngPath = outputDir / "hsv_disk.png";
-        const auto jpgPath = outputDir / "hsv_disk.jpg";
+        const auto      pngPath = outputDir / "hsv_disk.png";
+        const auto      jpgPath = outputDir / "hsv_disk.jpg";
 
         FPngImageWriter pngWriter;
         TVector<u8>     pngBytes;
@@ -262,7 +264,7 @@ namespace AltinaEngine::Imaging {
         }
         FPngImageReader pngReader;
         FImage          pngImage;
-        if (!pngReader.Read(Core::Container::TSpan<u8>(pngFileBytes), pngImage)) {
+        if (!pngReader.Read(Container::TSpan<u8>(pngFileBytes), pngImage)) {
             REQUIRE(false);
             return;
         }
@@ -277,7 +279,7 @@ namespace AltinaEngine::Imaging {
         }
         FJpegImageReader jpegReader;
         FImage           jpegImage;
-        if (!jpegReader.Read(Core::Container::TSpan<u8>(jpegFileBytes), jpegImage)) {
+        if (!jpegReader.Read(Container::TSpan<u8>(jpegFileBytes), jpegImage)) {
             REQUIRE(false);
             return;
         }
@@ -286,17 +288,11 @@ namespace AltinaEngine::Imaging {
         REQUIRE_EQ(jpegImage.GetFormat(), EImageFormat::RGBA8);
     }
 #else
-    TEST_CASE("Imaging PNG roundtrip (unsupported platform)") {
-        REQUIRE(true);
-    }
+    TEST_CASE("Imaging PNG roundtrip (unsupported platform)") { REQUIRE(true); }
 
-    TEST_CASE("Imaging JPEG roundtrip (unsupported platform)") {
-        REQUIRE(true);
-    }
+    TEST_CASE("Imaging JPEG roundtrip (unsupported platform)") { REQUIRE(true); }
 
-    TEST_CASE("Imaging HSV disk saved and reloaded (unsupported platform)") {
-        REQUIRE(true);
-    }
+    TEST_CASE("Imaging HSV disk saved and reloaded (unsupported platform)") { REQUIRE(true); }
 #endif
 
 } // namespace AltinaEngine::Imaging

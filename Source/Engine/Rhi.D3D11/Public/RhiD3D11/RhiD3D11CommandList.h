@@ -13,8 +13,8 @@ namespace AltinaEngine::Rhi {
 
         [[nodiscard]] auto GetNativeCommandList() const noexcept -> ID3D11CommandList*;
 
-        void Reset(FRhiCommandPool* pool) override;
-        void Close() override;
+        void               Reset(FRhiCommandPool* pool) override;
+        void               Close() override;
 
     private:
         void SetNativeCommandList(ID3D11CommandList* list);

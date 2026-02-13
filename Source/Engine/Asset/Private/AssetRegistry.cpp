@@ -33,9 +33,9 @@
 namespace AltinaEngine::Asset {
     namespace {
         using Core::Utility::Json::EJsonType;
+        using Core::Utility::Json::FindObjectValueInsensitive;
         using Core::Utility::Json::FJsonDocument;
         using Core::Utility::Json::FJsonValue;
-        using Core::Utility::Json::FindObjectValueInsensitive;
         using Core::Utility::Json::GetBoolValue;
         using Core::Utility::Json::GetNumberValue;
         using Core::Utility::Json::GetStringValue;
@@ -46,7 +46,8 @@ namespace AltinaEngine::Asset {
             }
 
             for (usize i = 0; i < left.Length(); ++i) {
-                if (Core::Algorithm::ToLowerChar(left[i]) != Core::Algorithm::ToLowerChar(right[i])) {
+                if (Core::Algorithm::ToLowerChar(left[i])
+                    != Core::Algorithm::ToLowerChar(right[i])) {
                     return false;
                 }
             }
@@ -63,7 +64,8 @@ namespace AltinaEngine::Asset {
                 return false;
             }
             for (usize i = 0; i < length; ++i) {
-                if (Core::Algorithm::ToLowerChar(text[i]) != Core::Algorithm::ToLowerChar(literal[i])) {
+                if (Core::Algorithm::ToLowerChar(text[i])
+                    != Core::Algorithm::ToLowerChar(literal[i])) {
                     return false;
                 }
             }
@@ -111,8 +113,8 @@ namespace AltinaEngine::Asset {
                 return out;
             }
             std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-            MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()),
-                wide.data(), wideCount);
+            MultiByteToWideChar(
+                CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), wide.data(), wideCount);
             out.Append(wide.c_str(), wide.size());
     #else
             out.Append(utf8.c_str(), utf8.size());
@@ -124,7 +126,7 @@ namespace AltinaEngine::Asset {
         }
 
         void ReadU32Field(const FJsonValue& object, const char* key, u32& out) {
-            const FJsonValue* value = FindObjectValueInsensitive(object, key);
+            const FJsonValue* value  = FindObjectValueInsensitive(object, key);
             double            number = 0.0;
             if (!GetNumberValue(value, number)) {
                 return;
@@ -139,7 +141,7 @@ namespace AltinaEngine::Asset {
         }
 
         void ReadFloatField(const FJsonValue& object, const char* key, f32& out) {
-            const FJsonValue* value = FindObjectValueInsensitive(object, key);
+            const FJsonValue* value  = FindObjectValueInsensitive(object, key);
             double            number = 0.0;
             if (!GetNumberValue(value, number)) {
                 return;
@@ -149,7 +151,7 @@ namespace AltinaEngine::Asset {
 
         void ReadBoolField(const FJsonValue& object, const char* key, bool& out) {
             const FJsonValue* value = FindObjectValueInsensitive(object, key);
-            bool              flag = false;
+            bool              flag  = false;
             if (!GetBoolValue(value, flag)) {
                 return;
             }
@@ -184,7 +186,7 @@ namespace AltinaEngine::Asset {
                     if (!ParseUuid(uuidText, uuid)) {
                         continue;
                     }
-                    EAssetType type = EAssetType::Texture2D;
+                    EAssetType    type = EAssetType::Texture2D;
                     FNativeString typeText;
                     if (GetStringValue(FindObjectValueInsensitive(*item, "Type"), typeText)) {
                         type = ParseAssetType(
@@ -250,8 +252,8 @@ namespace AltinaEngine::Asset {
             return true;
         }
 
-        auto ParseDependencies(
-            const FJsonValue& object, TVector<FAssetHandle>& outDependencies) -> bool {
+        auto ParseDependencies(const FJsonValue& object, TVector<FAssetHandle>& outDependencies)
+            -> bool {
             const FJsonValue* deps = FindObjectValueInsensitive(object, "Dependencies");
             if (deps == nullptr) {
                 return true;
@@ -283,7 +285,7 @@ namespace AltinaEngine::Asset {
                         continue;
                     }
 
-                    EAssetType type = EAssetType::Unknown;
+                    EAssetType    type = EAssetType::Unknown;
                     FNativeString typeText;
                     if (GetStringValue(FindObjectValueInsensitive(*item, "Type"), typeText)) {
                         type = ParseAssetType(
@@ -323,7 +325,8 @@ namespace AltinaEngine::Asset {
                     outError = "Asset missing Type.";
                     return false;
                 }
-                if (!GetStringValue(FindObjectValueInsensitive(*assetValue, "VirtualPath"), virtualPathText)) {
+                if (!GetStringValue(
+                        FindObjectValueInsensitive(*assetValue, "VirtualPath"), virtualPathText)) {
                     outError = "Asset missing VirtualPath.";
                     return false;
                 }
@@ -346,7 +349,8 @@ namespace AltinaEngine::Asset {
                 desc.Handle.Type = type;
                 desc.VirtualPath = FromUtf8(virtualPathText);
 
-                if (GetStringValue(FindObjectValueInsensitive(*assetValue, "CookedPath"), cookedPathText)) {
+                if (GetStringValue(
+                        FindObjectValueInsensitive(*assetValue, "CookedPath"), cookedPathText)) {
                     desc.CookedPath = FromUtf8(cookedPathText);
                 }
 
@@ -382,8 +386,10 @@ namespace AltinaEngine::Asset {
                     FNativeString oldPathText;
 
                     if (!GetStringValue(FindObjectValueInsensitive(*entry, "OldUuid"), oldUuidText)
-                        || !GetStringValue(FindObjectValueInsensitive(*entry, "NewUuid"), newUuidText)
-                        || !GetStringValue(FindObjectValueInsensitive(*entry, "OldVirtualPath"), oldPathText)) {
+                        || !GetStringValue(
+                            FindObjectValueInsensitive(*entry, "NewUuid"), newUuidText)
+                        || !GetStringValue(
+                            FindObjectValueInsensitive(*entry, "OldVirtualPath"), oldPathText)) {
                         outError = "Redirector missing required fields.";
                         return false;
                     }
@@ -414,7 +420,7 @@ namespace AltinaEngine::Asset {
         mLastError.Clear();
     }
 
-    auto FAssetRegistry::LoadFromJsonFile(const Core::Container::FString& path) -> bool {
+    auto FAssetRegistry::LoadFromJsonFile(const FString& path) -> bool {
         mLastError.Clear();
 
         FNativeString text;
@@ -547,5 +553,3 @@ namespace AltinaEngine::Asset {
     }
 
 } // namespace AltinaEngine::Asset
-
-

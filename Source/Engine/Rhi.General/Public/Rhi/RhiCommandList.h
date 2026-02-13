@@ -6,19 +6,20 @@
 #include "Container/StringView.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiCommandList : public FRhiResource {
     public:
         explicit FRhiCommandList(const FRhiCommandListDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+            FRhiResourceDeleteQueue*                        deleteQueue = nullptr) noexcept;
 
         ~FRhiCommandList() override;
 
-        FRhiCommandList(const FRhiCommandList&) = delete;
-        FRhiCommandList(FRhiCommandList&&) = delete;
-        auto operator=(const FRhiCommandList&) -> FRhiCommandList& = delete;
-        auto operator=(FRhiCommandList&&) -> FRhiCommandList& = delete;
+        FRhiCommandList(const FRhiCommandList&)                                  = delete;
+        FRhiCommandList(FRhiCommandList&&)                                       = delete;
+        auto               operator=(const FRhiCommandList&) -> FRhiCommandList& = delete;
+        auto               operator=(FRhiCommandList&&) -> FRhiCommandList&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiCommandListDesc& { return mDesc; }
         [[nodiscard]] auto GetQueueType() const noexcept -> ERhiQueueType {
@@ -38,7 +39,7 @@ namespace AltinaEngine::Rhi {
         }
 
         virtual void Reset(FRhiCommandPool* pool) = 0;
-        virtual void Close() = 0;
+        virtual void Close()                      = 0;
 
     private:
         FRhiCommandListDesc mDesc;

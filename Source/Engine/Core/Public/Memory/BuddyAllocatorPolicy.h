@@ -4,10 +4,11 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Core::Memory {
+    namespace Container = Core::Container;
     struct FBuddyAllocation {
-        u64 mOffset = 0ULL;
-        u64 mSize   = 0ULL;
-        u32 mOrder  = 0U;
+        u64                mOffset = 0ULL;
+        u64                mSize   = 0ULL;
+        u32                mOrder  = 0U;
 
         [[nodiscard]] auto IsValid() const noexcept -> bool { return mSize != 0ULL; }
     };
@@ -27,8 +28,8 @@ namespace AltinaEngine::Core::Memory {
                 mFreeLists.Clear();
                 return;
             }
-            mTotalSize    = NextPowerOfTwo(Max(totalSizeBytes, mMinBlockSize));
-            mMaxOrder     = ComputeOrder(mTotalSize);
+            mTotalSize = NextPowerOfTwo(Max(totalSizeBytes, mMinBlockSize));
+            mMaxOrder  = ComputeOrder(mTotalSize);
 
             mFreeLists.Clear();
             mFreeLists.Resize(static_cast<usize>(mMaxOrder) + 1U);
@@ -48,14 +49,14 @@ namespace AltinaEngine::Core::Memory {
         [[nodiscard]] auto GetMinBlockSize() const noexcept -> u64 { return mMinBlockSize; }
         [[nodiscard]] auto GetMaxOrder() const noexcept -> u32 { return mMaxOrder; }
 
-        auto Allocate(u64 sizeBytes, u64 alignment) -> FBuddyAllocation {
+        auto               Allocate(u64 sizeBytes, u64 alignment) -> FBuddyAllocation {
             if (sizeBytes == 0ULL || mMinBlockSize == 0ULL || mTotalSize == 0ULL) {
                 return {};
             }
 
-            const u64 align = NormalizeAlignment(alignment);
+            const u64 align    = NormalizeAlignment(alignment);
             u64       required = Max(sizeBytes, align);
-            required = NextPowerOfTwo(Max(required, mMinBlockSize));
+            required           = NextPowerOfTwo(Max(required, mMinBlockSize));
 
             const u32 targetOrder = ComputeOrder(required);
             if (targetOrder > mMaxOrder) {
@@ -73,7 +74,7 @@ namespace AltinaEngine::Core::Memory {
             u64 offset = PopFreeBlock(order);
             while (order > targetOrder) {
                 --order;
-                const u64 splitSize = BlockSize(order);
+                const u64 splitSize   = BlockSize(order);
                 const u64 buddyOffset = offset + splitSize;
                 mFreeLists[static_cast<usize>(order)].PushBack(buddyOffset);
             }
@@ -150,7 +151,7 @@ namespace AltinaEngine::Core::Memory {
         }
 
         auto PopFreeBlock(u32 order) -> u64 {
-            auto& list = mFreeLists[static_cast<usize>(order)];
+            auto&     list   = mFreeLists[static_cast<usize>(order)];
             const u64 offset = list.Back();
             list.PopBack();
             return offset;
@@ -168,12 +169,12 @@ namespace AltinaEngine::Core::Memory {
             return false;
         }
 
-        u64 mTotalSize    = 0ULL;
-        u64 mMinBlockSize = 0ULL;
-        u32 mMaxOrder     = 0U;
-        Core::Container::TVector<Core::Container::TVector<u64>> mFreeLists;
+        u64                                         mTotalSize    = 0ULL;
+        u64                                         mMinBlockSize = 0ULL;
+        u32                                         mMaxOrder     = 0U;
+        Container::TVector<Container::TVector<u64>> mFreeLists;
 
-        [[nodiscard]] static constexpr auto Max(u64 a, u64 b) noexcept -> u64 {
+        [[nodiscard]] static constexpr auto         Max(u64 a, u64 b) noexcept -> u64 {
             return (a > b) ? a : b;
         }
 

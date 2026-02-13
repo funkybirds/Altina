@@ -8,13 +8,14 @@
 #include <limits>
 
 namespace AltinaEngine::Asset {
+    namespace Container = Core::Container;
     namespace {
         auto ReadExact(IAssetStream& stream, void* outBuffer, usize size) -> bool {
             if (outBuffer == nullptr || size == 0U) {
                 return false;
             }
 
-            auto*       out = static_cast<u8*>(outBuffer);
+            auto*       out       = static_cast<u8*>(outBuffer);
             usize       totalRead = 0;
             const usize target    = size;
             while (totalRead < target) {
@@ -42,8 +43,8 @@ namespace AltinaEngine::Asset {
                 && desc.SRGB == srgb;
         }
 
-        auto ComputeTightlyPackedSize(const FTexture2DBlobDesc& blobDesc, u32 bytesPerPixel,
-            u64& outSize) noexcept -> bool {
+        auto ComputeTightlyPackedSize(
+            const FTexture2DBlobDesc& blobDesc, u32 bytesPerPixel, u64& outSize) noexcept -> bool {
             if (bytesPerPixel == 0U) {
                 return false;
             }
@@ -96,10 +97,10 @@ namespace AltinaEngine::Asset {
 
         template <typename TDerived, typename... Args>
         auto MakeSharedAsset(Args&&... args) -> TShared<IAsset> {
-            using Core::Container::kSmartPtrUseManagedAllocator;
-            using Core::Container::TAllocator;
-            using Core::Container::TAllocatorTraits;
-            using Core::Container::TPolymorphicDeleter;
+            using Container::kSmartPtrUseManagedAllocator;
+            using Container::TAllocator;
+            using Container::TAllocatorTraits;
+            using Container::TPolymorphicDeleter;
 
             TDerived* ptr = nullptr;
             if constexpr (kSmartPtrUseManagedAllocator) {
@@ -120,8 +121,8 @@ namespace AltinaEngine::Asset {
                 ptr = new TDerived(AltinaEngine::Forward<Args>(args)...); // NOLINT
             }
 
-            return TShared<IAsset>(ptr,
-                TPolymorphicDeleter<IAsset>(&Core::Container::DestroyPolymorphic<IAsset, TDerived>));
+            return TShared<IAsset>(
+                ptr, TPolymorphicDeleter<IAsset>(&Container::DestroyPolymorphic<IAsset, TDerived>));
         }
     } // namespace
 

@@ -9,13 +9,13 @@ namespace AltinaEngine::Rhi {
 
     class AE_RHI_GENERAL_API FRhiResource : public FNonCopyableClass {
     public:
-        FRhiResource(const FRhiResource&) = delete;
-        FRhiResource(FRhiResource&&) = delete;
-        auto operator=(const FRhiResource&) -> FRhiResource& = delete;
-        auto operator=(FRhiResource&&) -> FRhiResource& = delete;
+        FRhiResource(const FRhiResource&)                                  = delete;
+        FRhiResource(FRhiResource&&)                                       = delete;
+        auto               operator=(const FRhiResource&) -> FRhiResource& = delete;
+        auto               operator=(FRhiResource&&) -> FRhiResource&      = delete;
 
-        void AddRef() noexcept;
-        void Release() noexcept;
+        void               AddRef() noexcept;
+        void               Release() noexcept;
 
         [[nodiscard]] auto GetRefCount() const noexcept -> u32;
 

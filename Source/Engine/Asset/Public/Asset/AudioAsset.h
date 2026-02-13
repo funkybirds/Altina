@@ -5,7 +5,8 @@
 #include "Container/Vector.h"
 
 namespace AltinaEngine::Asset {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
 
     struct AE_ASSET_API FAudioRuntimeDesc {
         u32 Codec          = 0;
@@ -27,9 +28,9 @@ namespace AltinaEngine::Asset {
         [[nodiscard]] auto GetData() const noexcept -> const TVector<u8>& { return mData; }
 
     private:
-        FAudioRuntimeDesc       mDesc{};
+        FAudioRuntimeDesc        mDesc{};
         TVector<FAudioChunkDesc> mChunks;
-        TVector<u8>             mData;
+        TVector<u8>              mData;
     };
 
 } // namespace AltinaEngine::Asset

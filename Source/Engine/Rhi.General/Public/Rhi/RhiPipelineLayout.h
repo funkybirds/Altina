@@ -5,19 +5,20 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiPipelineLayout : public FRhiResource {
     public:
         explicit FRhiPipelineLayout(const FRhiPipelineLayoutDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+            FRhiResourceDeleteQueue*                              deleteQueue = nullptr) noexcept;
 
         ~FRhiPipelineLayout() override;
 
-        FRhiPipelineLayout(const FRhiPipelineLayout&) = delete;
-        FRhiPipelineLayout(FRhiPipelineLayout&&) = delete;
-        auto operator=(const FRhiPipelineLayout&) -> FRhiPipelineLayout& = delete;
-        auto operator=(FRhiPipelineLayout&&) -> FRhiPipelineLayout& = delete;
+        FRhiPipelineLayout(const FRhiPipelineLayout&)                                  = delete;
+        FRhiPipelineLayout(FRhiPipelineLayout&&)                                       = delete;
+        auto               operator=(const FRhiPipelineLayout&) -> FRhiPipelineLayout& = delete;
+        auto               operator=(FRhiPipelineLayout&&) -> FRhiPipelineLayout&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiPipelineLayoutDesc& {
             return mDesc;

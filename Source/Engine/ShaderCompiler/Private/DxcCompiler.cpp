@@ -39,8 +39,9 @@
 #endif
 
 namespace AltinaEngine::ShaderCompiler::Detail {
-    using Core::Container::FString;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::FString;
+    using Container::TVector;
     using Core::Platform::ReadFileBytes;
     using Core::Platform::RemoveFileIfExists;
     using Core::Platform::RunProcess;
@@ -195,10 +196,10 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         struct FStructMemberInfo {
-            std::string                   mName;
-            ID3D12ShaderReflectionType*   mType = nullptr;
-            D3D12_SHADER_TYPE_DESC        mDesc{};
-            u32                           mOffset = 0U;
+            std::string                 mName;
+            ID3D12ShaderReflectionType* mType = nullptr;
+            D3D12_SHADER_TYPE_DESC      mDesc{};
+            u32                         mOffset = 0U;
         };
 
         auto AppendCBufferMember(FShaderConstantBuffer& outCb, const std::string& name,
@@ -254,22 +255,21 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 [](const auto& lhs, const auto& rhs) { return lhs.mOffset < rhs.mOffset; });
 
             for (usize i = 0; i < members.Size(); ++i) {
-                const auto& entry = members[i];
+                const auto& entry     = members[i];
                 u32         sizeBytes = 0U;
                 if (entry.mOffset < parentSize) {
                     if (i + 1 < members.Size()) {
                         const u32 nextOffset = members[i + 1].mOffset;
-                        sizeBytes = (nextOffset > entry.mOffset)
-                            ? (nextOffset - entry.mOffset)
-                            : 0U;
+                        sizeBytes =
+                            (nextOffset > entry.mOffset) ? (nextOffset - entry.mOffset) : 0U;
                     } else {
                         sizeBytes = parentSize - entry.mOffset;
                     }
                 }
 
-                const std::string fullName = prefix + "." + entry.mName;
-                const u32 elementCount = static_cast<u32>(entry.mDesc.Elements);
-                const u32 elementStride =
+                const std::string fullName     = prefix + "." + entry.mName;
+                const u32         elementCount = static_cast<u32>(entry.mDesc.Elements);
+                const u32         elementStride =
                     (elementCount > 0U && sizeBytes > 0U) ? (sizeBytes / elementCount) : 0U;
                 AppendCBufferMember(outCb, fullName, baseOffset + entry.mOffset, sizeBytes,
                     elementCount, elementStride);
@@ -277,8 +277,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 const bool isStruct = entry.mDesc.Class == D3D_SVC_STRUCT;
                 if (isStruct && entry.mDesc.Elements == 0 && entry.mDesc.Members > 0
                     && sizeBytes > 0U) {
-                    AppendStructMembers(entry.mType, fullName,
-                        baseOffset + entry.mOffset, sizeBytes, outCb);
+                    AppendStructMembers(
+                        entry.mType, fullName, baseOffset + entry.mOffset, sizeBytes, outCb);
                 }
             }
         }
@@ -430,12 +430,12 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 cbInfo.mName      = ConvertNameToString(cbDesc.Name);
                 cbInfo.mSizeBytes = cbDesc.Size;
 
-                u32 bindingSet = 0U;
-                u32 bindingIndex = 0U;
+                u32 bindingSet      = 0U;
+                u32 bindingIndex    = 0U;
                 u32 bindingRegister = 0U;
-                u32 bindingSpace = 0U;
-                if (FindConstantBufferBinding(outReflection, cbDesc.Name,
-                        bindingSet, bindingIndex, bindingRegister, bindingSpace)) {
+                u32 bindingSpace    = 0U;
+                if (FindConstantBufferBinding(outReflection, cbDesc.Name, bindingSet, bindingIndex,
+                        bindingRegister, bindingSpace)) {
                     cbInfo.mSet      = bindingSet;
                     cbInfo.mBinding  = bindingIndex;
                     cbInfo.mRegister = bindingRegister;
@@ -458,22 +458,21 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                         varType->GetDesc(&typeDesc);
                     }
 
-                    const u32 elementCount = static_cast<u32>(typeDesc.Elements);
-                    const u32 elementStride =
-                        (elementCount > 0U && varDesc.Size > 0U)
+                    const u32 elementCount  = static_cast<u32>(typeDesc.Elements);
+                    const u32 elementStride = (elementCount > 0U && varDesc.Size > 0U)
                         ? (static_cast<u32>(varDesc.Size) / elementCount)
                         : 0U;
 
                     AppendCBufferMember(cbInfo, std::string(varDesc.Name),
-                        static_cast<u32>(varDesc.StartOffset),
-                        static_cast<u32>(varDesc.Size), elementCount, elementStride);
+                        static_cast<u32>(varDesc.StartOffset), static_cast<u32>(varDesc.Size),
+                        elementCount, elementStride);
 
                     const bool isStruct = varType != nullptr && typeDesc.Class == D3D_SVC_STRUCT;
                     if (isStruct && typeDesc.Elements == 0 && typeDesc.Members > 0
                         && varDesc.Size > 0U) {
                         AppendStructMembers(varType, std::string(varDesc.Name),
-                            static_cast<u32>(varDesc.StartOffset),
-                            static_cast<u32>(varDesc.Size), cbInfo);
+                            static_cast<u32>(varDesc.StartOffset), static_cast<u32>(varDesc.Size),
+                            cbInfo);
                     }
                 }
 

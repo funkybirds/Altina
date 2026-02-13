@@ -31,6 +31,7 @@
 #include <limits>
 
 namespace AltinaEngine::Rhi {
+    namespace Container = Core::Container;
 #if AE_PLATFORM_WIN
     using Microsoft::WRL::ComPtr;
 
@@ -57,7 +58,7 @@ namespace AltinaEngine::Rhi {
     struct FRhiD3D11Sampler::FState {};
 #endif
 
-    using Core::Container::MakeUnique;
+    using Container::MakeUnique;
 
 #if AE_PLATFORM_WIN
     enum class ED3D11BufferLockPath : u8 {
@@ -73,12 +74,12 @@ namespace AltinaEngine::Rhi {
     } // namespace
 
     struct FD3D11BufferLockState {
-        ED3D11BufferLockPath      mPath = ED3D11BufferLockPath::None;
-        FRhiD3D11Device*          mDevice = nullptr;
-        ID3D11DeviceContext*      mContext = nullptr;
-        ID3D11Buffer*             mNativeBuffer = nullptr;
-        FD3D11UploadAllocation    mUpload;
-        FD3D11StagingAllocation   mStaging;
+        ED3D11BufferLockPath    mPath         = ED3D11BufferLockPath::None;
+        FRhiD3D11Device*        mDevice       = nullptr;
+        ID3D11DeviceContext*    mContext      = nullptr;
+        ID3D11Buffer*           mNativeBuffer = nullptr;
+        FD3D11UploadAllocation  mUpload;
+        FD3D11StagingAllocation mStaging;
     };
 #endif
 
@@ -147,20 +148,20 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        ID3D11DeviceContext* context = device->GetImmediateContext();
+        ID3D11DeviceContext* context      = device->GetImmediateContext();
         ID3D11Buffer*        nativeBuffer = GetNativeBuffer();
         if (context == nullptr || nativeBuffer == nullptr) {
             return {};
         }
 
-        const bool cpuRead  = HasAnyFlags(desc.mCpuAccess, ERhiCpuAccess::Read);
-        const bool cpuWrite = HasAnyFlags(desc.mCpuAccess, ERhiCpuAccess::Write);
+        const bool cpuRead   = HasAnyFlags(desc.mCpuAccess, ERhiCpuAccess::Read);
+        const bool cpuWrite  = HasAnyFlags(desc.mCpuAccess, ERhiCpuAccess::Write);
         const bool isDynamic = desc.mUsage == ERhiResourceUsage::Dynamic;
         const bool isStaging = desc.mUsage == ERhiResourceUsage::Staging;
 
         if (isStaging) {
-            const bool wantsRead = (mode == ERhiBufferLockMode::Read)
-                || (mode == ERhiBufferLockMode::ReadWrite);
+            const bool wantsRead =
+                (mode == ERhiBufferLockMode::Read) || (mode == ERhiBufferLockMode::ReadWrite);
             const bool wantsWrite = (mode == ERhiBufferLockMode::Write)
                 || (mode == ERhiBufferLockMode::WriteDiscard)
                 || (mode == ERhiBufferLockMode::WriteNoOverwrite)
@@ -177,39 +178,39 @@ namespace AltinaEngine::Rhi {
 
             lock.mData = static_cast<u8*>(mapped.pData) + offset;
 
-            auto* state = new FD3D11BufferLockState{};
-            state->mPath = ED3D11BufferLockPath::DirectMap;
-            state->mDevice = device;
-            state->mContext = context;
+            auto* state          = new FD3D11BufferLockState{};
+            state->mPath         = ED3D11BufferLockPath::DirectMap;
+            state->mDevice       = device;
+            state->mContext      = context;
             state->mNativeBuffer = nativeBuffer;
-            lock.mHandle = state;
+            lock.mHandle         = state;
             return lock;
         }
 
-        const bool wantsRead = (mode == ERhiBufferLockMode::Read)
-            || (mode == ERhiBufferLockMode::ReadWrite);
+        const bool wantsRead =
+            (mode == ERhiBufferLockMode::Read) || (mode == ERhiBufferLockMode::ReadWrite);
         const bool wantsWrite = (mode == ERhiBufferLockMode::Write)
             || (mode == ERhiBufferLockMode::WriteDiscard)
             || (mode == ERhiBufferLockMode::WriteNoOverwrite)
             || (mode == ERhiBufferLockMode::ReadWrite);
 
         if (isDynamic && cpuWrite && wantsWrite && !wantsRead) {
-            const D3D11_MAP mapMode =
-                (mode == ERhiBufferLockMode::WriteDiscard) ? D3D11_MAP_WRITE_DISCARD
-                                                           : D3D11_MAP_WRITE_NO_OVERWRITE;
-            D3D11_MAPPED_SUBRESOURCE mapped = {};
-            const HRESULT hr = context->Map(nativeBuffer, 0U, mapMode, 0U, &mapped);
+            const D3D11_MAP          mapMode = (mode == ERhiBufferLockMode::WriteDiscard)
+                         ? D3D11_MAP_WRITE_DISCARD
+                         : D3D11_MAP_WRITE_NO_OVERWRITE;
+            D3D11_MAPPED_SUBRESOURCE mapped  = {};
+            const HRESULT            hr      = context->Map(nativeBuffer, 0U, mapMode, 0U, &mapped);
             if (FAILED(hr) || mapped.pData == nullptr) {
                 return {};
             }
             lock.mData = static_cast<u8*>(mapped.pData) + offset;
 
-            auto* state = new FD3D11BufferLockState{};
-            state->mPath = ED3D11BufferLockPath::DirectMap;
-            state->mDevice = device;
-            state->mContext = context;
+            auto* state          = new FD3D11BufferLockState{};
+            state->mPath         = ED3D11BufferLockPath::DirectMap;
+            state->mDevice       = device;
+            state->mContext      = context;
             state->mNativeBuffer = nativeBuffer;
-            lock.mHandle = state;
+            lock.mHandle         = state;
             return lock;
         }
 
@@ -225,8 +226,9 @@ namespace AltinaEngine::Rhi {
                 return {};
             }
 
-            auto* stagingBuffer = static_cast<FRhiD3D11Buffer*>(staging.mBuffer);
-            ID3D11Buffer* stagingNative = stagingBuffer ? stagingBuffer->GetNativeBuffer() : nullptr;
+            auto*         stagingBuffer = static_cast<FRhiD3D11Buffer*>(staging.mBuffer);
+            ID3D11Buffer* stagingNative =
+                stagingBuffer ? stagingBuffer->GetNativeBuffer() : nullptr;
             if (stagingNative == nullptr) {
                 stagingManager->Release(staging);
                 return {};
@@ -240,8 +242,7 @@ namespace AltinaEngine::Rhi {
             context->CopySubresourceRegion(stagingNative, 0U, 0U, 0U, 0U, nativeBuffer, 0U, &box);
 
             void* mappedData = stagingManager->Map(
-                staging, wantsWrite ? ED3D11StagingMapMode::ReadWrite
-                                    : ED3D11StagingMapMode::Read);
+                staging, wantsWrite ? ED3D11StagingMapMode::ReadWrite : ED3D11StagingMapMode::Read);
             if (mappedData == nullptr) {
                 stagingManager->Release(staging);
                 return {};
@@ -249,13 +250,13 @@ namespace AltinaEngine::Rhi {
 
             lock.mData = mappedData;
 
-            auto* state = new FD3D11BufferLockState{};
-            state->mPath = ED3D11BufferLockPath::Staging;
-            state->mDevice = device;
-            state->mContext = context;
+            auto* state          = new FD3D11BufferLockState{};
+            state->mPath         = ED3D11BufferLockPath::Staging;
+            state->mDevice       = device;
+            state->mContext      = context;
             state->mNativeBuffer = nativeBuffer;
-            state->mStaging = staging;
-            lock.mHandle = state;
+            state->mStaging      = staging;
+            lock.mHandle         = state;
             return lock;
         }
 
@@ -274,13 +275,13 @@ namespace AltinaEngine::Rhi {
             }
             lock.mData = writePtr;
 
-            auto* state = new FD3D11BufferLockState{};
-            state->mPath = ED3D11BufferLockPath::Upload;
-            state->mDevice = device;
-            state->mContext = context;
+            auto* state          = new FD3D11BufferLockState{};
+            state->mPath         = ED3D11BufferLockPath::Upload;
+            state->mDevice       = device;
+            state->mContext      = context;
             state->mNativeBuffer = nativeBuffer;
-            state->mUpload = upload;
-            lock.mHandle = state;
+            state->mUpload       = upload;
+            lock.mHandle         = state;
             return lock;
         }
 #else
@@ -321,11 +322,11 @@ namespace AltinaEngine::Rhi {
             }
             case ED3D11BufferLockPath::Staging:
             {
-                auto* stagingManager = state->mDevice ? state->mDevice->GetStagingBufferManager()
-                                                      : nullptr;
+                auto* stagingManager =
+                    state->mDevice ? state->mDevice->GetStagingBufferManager() : nullptr;
                 if (stagingManager && state->mNativeBuffer) {
-                    if (lock.mMode == ERhiBufferLockMode::ReadWrite
-                        && lock.mData && lock.mSize > 0ULL) {
+                    if (lock.mMode == ERhiBufferLockMode::ReadWrite && lock.mData
+                        && lock.mSize > 0ULL) {
                         D3D11_BOX box = {};
                         if (BuildBufferBox(lock.mOffset, lock.mSize, box)) {
                             state->mContext->UpdateSubresource(
@@ -509,7 +510,7 @@ namespace AltinaEngine::Rhi {
         }
 
         [[nodiscard]] auto BuildBufferBox(u64 offset, u64 size, D3D11_BOX& box) noexcept -> bool {
-            const u64 end = offset + size;
+            const u64 end     = offset + size;
             const u64 maxUint = static_cast<u64>(std::numeric_limits<UINT>::max());
             if (offset > maxUint || end > maxUint) {
                 return false;

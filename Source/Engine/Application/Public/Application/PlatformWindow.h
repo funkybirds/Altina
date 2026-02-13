@@ -5,7 +5,8 @@
 #include "Container/String.h"
 
 namespace AltinaEngine::Application {
-    using AltinaEngine::Core::Container::FString;
+    namespace Container = Core::Container;
+    using Container::FString;
 
     enum class EWindowDisplayMode : u8 {
         Windowed = 0,

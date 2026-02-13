@@ -14,7 +14,7 @@ namespace AltinaEngine::Core::Container {
         // Access
         auto Get() const noexcept -> T& { return *mPtr; }
         auto operator()() const noexcept -> T& { return *mPtr; }
-        operator T&() const noexcept { return *mPtr; }
+             operator T&() const noexcept { return *mPtr; }
 
         // No ownership semantics: copyable and assignable
         TRef(const TRef& other) noexcept                           = default;

@@ -11,6 +11,7 @@ namespace AltinaEngine::Core::Container {
 }
 
 namespace AltinaEngine {
+    namespace Container = Core::Container;
     // Begin Traits
     template <typename...> using TVoid = void;
     template <typename...> struct TTypeSet;
@@ -262,7 +263,7 @@ namespace AltinaEngine {
     struct TMemberFunctionTrait<R (C::*)(Args...)> : TFalseType {
         using TReturnType = R;
         using TClassType  = C;
-        using TArgsTuple  = Core::Container::TTuple<Args...>;
+        using TArgsTuple  = Container::TTuple<Args...>;
     };
     template <typename T>
     concept CMemberPointer = requires(T t) {

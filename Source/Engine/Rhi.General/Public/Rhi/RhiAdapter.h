@@ -5,17 +5,18 @@
 #include "Types/NonCopyable.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiAdapter : public FNonCopyableClass {
     public:
         explicit FRhiAdapter(FRhiAdapterDesc desc);
         ~FRhiAdapter() override = default;
 
-        FRhiAdapter(const FRhiAdapter&) = delete;
-        FRhiAdapter(FRhiAdapter&&) = delete;
-        auto operator=(const FRhiAdapter&) -> FRhiAdapter& = delete;
-        auto operator=(FRhiAdapter&&) -> FRhiAdapter& = delete;
+        FRhiAdapter(const FRhiAdapter&)                                  = delete;
+        FRhiAdapter(FRhiAdapter&&)                                       = delete;
+        auto               operator=(const FRhiAdapter&) -> FRhiAdapter& = delete;
+        auto               operator=(FRhiAdapter&&) -> FRhiAdapter&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiAdapterDesc&;
         [[nodiscard]] auto GetName() const noexcept -> FStringView;

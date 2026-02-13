@@ -8,14 +8,15 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Imaging {
-    using Core::Container::TSpan;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TSpan;
+    using Container::TVector;
 
     class AE_IMAGING_API FImageReader {
     public:
         virtual ~FImageReader() = default;
 
-        [[nodiscard]] virtual auto CanRead(TSpan<u8> bytes) const noexcept -> bool = 0;
+        [[nodiscard]] virtual auto CanRead(TSpan<u8> bytes) const noexcept -> bool       = 0;
         [[nodiscard]] virtual auto Read(TSpan<u8> bytes, FImage& outImage) const -> bool = 0;
     };
 
@@ -23,7 +24,8 @@ namespace AltinaEngine::Imaging {
     public:
         virtual ~FImageWriter() = default;
 
-        [[nodiscard]] virtual auto Write(const FImageView& image, TVector<u8>& outBytes) const -> bool = 0;
+        [[nodiscard]] virtual auto Write(const FImageView& image, TVector<u8>& outBytes) const
+            -> bool = 0;
     };
 
     class AE_IMAGING_API FJpegImageReader final : public FImageReader {
@@ -36,9 +38,10 @@ namespace AltinaEngine::Imaging {
     public:
         explicit FJpegImageWriter(u8 quality = 90) noexcept;
 
-        void SetQuality(u8 quality) noexcept;
+        void               SetQuality(u8 quality) noexcept;
 
-        [[nodiscard]] auto Write(const FImageView& image, TVector<u8>& outBytes) const -> bool override;
+        [[nodiscard]] auto Write(const FImageView& image, TVector<u8>& outBytes) const
+            -> bool override;
 
     private:
         u8 mQuality = 90;
@@ -52,7 +55,8 @@ namespace AltinaEngine::Imaging {
 
     class AE_IMAGING_API FPngImageWriter final : public FImageWriter {
     public:
-        [[nodiscard]] auto Write(const FImageView& image, TVector<u8>& outBytes) const -> bool override;
+        [[nodiscard]] auto Write(const FImageView& image, TVector<u8>& outBytes) const
+            -> bool override;
     };
 
 } // namespace AltinaEngine::Imaging

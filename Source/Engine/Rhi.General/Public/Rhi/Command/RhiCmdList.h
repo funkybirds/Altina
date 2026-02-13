@@ -10,8 +10,9 @@
 #include <new>
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::TAllocator;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TAllocator;
+    using Container::TVector;
 
     class FRhiCmdList : public FNonCopyableClass {
     public:
@@ -41,7 +42,7 @@ namespace AltinaEngine::Rhi {
             if (!memory) {
                 return nullptr;
             }
-            auto* command = ::new (memory) TCmd(AltinaEngine::Forward<Args>(args)...);
+            auto*         command = ::new (memory) TCmd(AltinaEngine::Forward<Args>(args)...);
             FCommandEntry entry{};
             entry.mCommand = command;
             entry.mDestroy = &DestroyCommand<TCmd>;
@@ -61,9 +62,7 @@ namespace AltinaEngine::Rhi {
             return static_cast<u32>(mCommands.Size());
         }
 
-        [[nodiscard]] auto IsEmpty() const noexcept -> bool {
-            return mCommands.IsEmpty();
-        }
+        [[nodiscard]] auto IsEmpty() const noexcept -> bool { return mCommands.IsEmpty(); }
 
     private:
         struct FBlock {
@@ -73,14 +72,13 @@ namespace AltinaEngine::Rhi {
         };
 
         struct FCommandEntry {
-            FRhiCmd* mCommand = nullptr;
+            FRhiCmd* mCommand                  = nullptr;
             void (*mDestroy)(FRhiCmd* command) = nullptr;
         };
 
-        static constexpr usize kDefaultBlockSize = 64 * 1024;
+        static constexpr usize               kDefaultBlockSize = 64 * 1024;
 
-        template <typename TCmd>
-        static void DestroyCommand(FRhiCmd* command) {
+        template <typename TCmd> static void DestroyCommand(FRhiCmd* command) {
             static_cast<TCmd*>(command)->~TCmd();
         }
 
@@ -105,11 +103,11 @@ namespace AltinaEngine::Rhi {
                 AllocateBlock(size + alignment);
             }
 
-            FBlock* block = &mBlocks.Back();
+            FBlock* block  = &mBlocks.Back();
             usize   offset = AlignUp(block->mOffset, alignment);
             if (offset + size > block->mSize) {
                 AllocateBlock(size + alignment);
-                block = &mBlocks.Back();
+                block  = &mBlocks.Back();
                 offset = AlignUp(block->mOffset, alignment);
             }
 
@@ -118,12 +116,11 @@ namespace AltinaEngine::Rhi {
         }
 
         void AllocateBlock(usize minSize) {
-            const usize blockSize =
-                (mBlockSize > minSize) ? mBlockSize : minSize;
-            u8* data = mAllocator.Allocate(blockSize);
-            FBlock block;
-            block.mData = data;
-            block.mSize = blockSize;
+            const usize blockSize = (mBlockSize > minSize) ? mBlockSize : minSize;
+            u8*         data      = mAllocator.Allocate(blockSize);
+            FBlock      block;
+            block.mData   = data;
+            block.mSize   = blockSize;
             block.mOffset = 0;
             mBlocks.PushBack(block);
         }

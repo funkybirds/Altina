@@ -24,11 +24,11 @@ namespace AltinaEngine::Rhi {
     namespace {
         auto ToD3D11Map(ED3D11MapMode mode) noexcept -> D3D11_MAP {
             switch (mode) {
-            case ED3D11MapMode::WriteNoOverwrite:
-                return D3D11_MAP_WRITE_NO_OVERWRITE;
-            case ED3D11MapMode::WriteDiscard:
-            default:
-                return D3D11_MAP_WRITE_DISCARD;
+                case ED3D11MapMode::WriteNoOverwrite:
+                    return D3D11_MAP_WRITE_NO_OVERWRITE;
+                case ED3D11MapMode::WriteDiscard:
+                default:
+                    return D3D11_MAP_WRITE_DISCARD;
             }
         }
     } // namespace
@@ -41,16 +41,16 @@ namespace AltinaEngine::Rhi {
 
     void FD3D11BufferBacking::Reset() {
         EndWrite();
-        mBuffer = nullptr;
-        mContext = nullptr;
+        mBuffer    = nullptr;
+        mContext   = nullptr;
         mSizeBytes = 0ULL;
     }
 
     void FD3D11BufferBacking::SetBuffer(
         ID3D11Buffer* buffer, ID3D11DeviceContext* context, u64 sizeBytes) {
         EndWrite();
-        mBuffer = buffer;
-        mContext = context;
+        mBuffer    = buffer;
+        mContext   = context;
         mSizeBytes = sizeBytes;
     }
 
@@ -58,21 +58,13 @@ namespace AltinaEngine::Rhi {
         return (mBuffer != nullptr) && (mContext != nullptr) && (mSizeBytes != 0ULL);
     }
 
-    auto FD3D11BufferBacking::GetBuffer() const noexcept -> ID3D11Buffer* {
-        return mBuffer;
-    }
+    auto FD3D11BufferBacking::GetBuffer() const noexcept -> ID3D11Buffer* { return mBuffer; }
 
-    auto FD3D11BufferBacking::GetSizeBytes() const noexcept -> u64 {
-        return mSizeBytes;
-    }
+    auto FD3D11BufferBacking::GetSizeBytes() const noexcept -> u64 { return mSizeBytes; }
 
-    auto FD3D11BufferBacking::IsMapped() const noexcept -> bool {
-        return mMappedData != nullptr;
-    }
+    auto FD3D11BufferBacking::IsMapped() const noexcept -> bool { return mMappedData != nullptr; }
 
-    void FD3D11BufferBacking::SetDefaultMapMode(ED3D11MapMode mode) {
-        mDefaultMapMode = mode;
-    }
+    void FD3D11BufferBacking::SetDefaultMapMode(ED3D11MapMode mode) { mDefaultMapMode = mode; }
 
     auto FD3D11BufferBacking::BeginWrite(ED3D11MapMode mode) -> bool {
 #if AE_PLATFORM_WIN
@@ -84,8 +76,7 @@ namespace AltinaEngine::Rhi {
         }
 
         D3D11_MAPPED_SUBRESOURCE mapped = {};
-        const HRESULT            hr =
-            mContext->Map(mBuffer, 0U, ToD3D11Map(mode), 0U, &mapped);
+        const HRESULT            hr     = mContext->Map(mBuffer, 0U, ToD3D11Map(mode), 0U, &mapped);
         if (FAILED(hr)) {
             return false;
         }
@@ -125,8 +116,7 @@ namespace AltinaEngine::Rhi {
         }
 
         D3D11_MAPPED_SUBRESOURCE mapped = {};
-        const HRESULT            hr =
-            mContext->Map(mBuffer, 0U, ToD3D11Map(mDefaultMapMode), 0U, &mapped);
+        const HRESULT hr = mContext->Map(mBuffer, 0U, ToD3D11Map(mDefaultMapMode), 0U, &mapped);
         if (FAILED(hr) || mapped.pData == nullptr) {
             return false;
         }

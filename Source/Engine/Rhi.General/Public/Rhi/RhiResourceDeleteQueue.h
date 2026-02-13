@@ -5,13 +5,14 @@
 #include "Types/NonCopyable.h"
 
 namespace AltinaEngine::Rhi {
+    namespace Container = Core::Container;
     class FRhiResource;
 
     class AE_RHI_GENERAL_API FRhiResourceDeleteQueue : public FNonCopyableClass {
     public:
-        void Enqueue(FRhiResource* resource, u64 serial);
-        void Process(u64 completedSerial);
-        void Flush();
+        void               Enqueue(FRhiResource* resource, u64 serial);
+        void               Process(u64 completedSerial);
+        void               Flush();
 
         [[nodiscard]] auto GetPendingCount() const noexcept -> u32;
 
@@ -21,7 +22,7 @@ namespace AltinaEngine::Rhi {
             u64           mSerial   = 0ULL;
         };
 
-        Core::Container::TVector<FEntry> mEntries;
+        Container::TVector<FEntry> mEntries;
     };
 
 } // namespace AltinaEngine::Rhi

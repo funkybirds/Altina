@@ -5,7 +5,8 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiBuffer : public FRhiResource {
     public:
@@ -19,15 +20,15 @@ namespace AltinaEngine::Rhi {
             [[nodiscard]] auto IsValid() const noexcept -> bool { return mData != nullptr; }
         };
 
-        explicit FRhiBuffer(const FRhiBufferDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+        explicit FRhiBuffer(
+            const FRhiBufferDesc& desc, FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
 
         ~FRhiBuffer() override;
 
-        FRhiBuffer(const FRhiBuffer&) = delete;
-        FRhiBuffer(FRhiBuffer&&) = delete;
-        auto operator=(const FRhiBuffer&) -> FRhiBuffer& = delete;
-        auto operator=(FRhiBuffer&&) -> FRhiBuffer& = delete;
+        FRhiBuffer(const FRhiBuffer&)                                  = delete;
+        FRhiBuffer(FRhiBuffer&&)                                       = delete;
+        auto               operator=(const FRhiBuffer&) -> FRhiBuffer& = delete;
+        auto               operator=(FRhiBuffer&&) -> FRhiBuffer&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiBufferDesc& { return mDesc; }
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {

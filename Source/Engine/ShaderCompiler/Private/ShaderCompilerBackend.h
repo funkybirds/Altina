@@ -5,7 +5,8 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::ShaderCompiler::Detail {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
 #ifndef AE_SHADER_COMPILER_ENABLE_DXC
     #define AE_SHADER_COMPILER_ENABLE_DXC 0
@@ -19,8 +20,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
     public:
         virtual ~IShaderCompilerBackend() = default;
 
-        [[nodiscard]] virtual auto GetDisplayName() const noexcept -> FStringView = 0;
-        [[nodiscard]] virtual auto IsAvailable() const noexcept -> bool = 0;
+        [[nodiscard]] virtual auto GetDisplayName() const noexcept -> FStringView          = 0;
+        [[nodiscard]] virtual auto IsAvailable() const noexcept -> bool                    = 0;
         virtual auto Compile(const FShaderCompileRequest& request) -> FShaderCompileResult = 0;
     };
 

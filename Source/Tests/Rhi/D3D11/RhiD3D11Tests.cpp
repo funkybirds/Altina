@@ -52,12 +52,12 @@
 namespace {
     using AltinaEngine::u32;
     using AltinaEngine::Rhi::ERhiQueueType;
-    using AltinaEngine::Rhi::FRhiCommandList;
     using AltinaEngine::Rhi::FRhiCommandContextDesc;
-    using AltinaEngine::Rhi::FRhiShaderDesc;
-    using AltinaEngine::Rhi::FRhiSubmitInfo;
+    using AltinaEngine::Rhi::FRhiCommandList;
     using AltinaEngine::Rhi::FRhiD3D11CommandContext;
     using AltinaEngine::Rhi::FRhiD3D11Device;
+    using AltinaEngine::Rhi::FRhiShaderDesc;
+    using AltinaEngine::Rhi::FRhiSubmitInfo;
 
 #if AE_PLATFORM_WIN
     auto CompileD3D11ShaderDXBC(const char* source, const char* entryPoint,
@@ -69,7 +69,7 @@ namespace {
 
         Microsoft::WRL::ComPtr<ID3DBlob> bytecode;
         Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+        const UINT                       flags = D3DCOMPILE_ENABLE_STRICTNESS;
         const HRESULT hr = D3DCompile(source, std::strlen(source), nullptr, nullptr, nullptr,
             entryPoint, targetProfile, flags, 0, &bytecode, &errors);
 
@@ -155,23 +155,22 @@ TEST_CASE("RhiD3D11.DeviceCreation") {
     FRhiBufferDesc bufferDesc;
     bufferDesc.mSizeBytes = 256;
     bufferDesc.mBindFlags = ERhiBufferBindFlags::Vertex;
-    const auto buffer = device->CreateBuffer(bufferDesc);
+    const auto buffer     = device->CreateBuffer(bufferDesc);
     REQUIRE(buffer);
 
     FRhiTextureDesc textureDesc;
     textureDesc.mWidth  = 4;
     textureDesc.mHeight = 4;
-    const auto texture = device->CreateTexture(textureDesc);
+    const auto texture  = device->CreateTexture(textureDesc);
     REQUIRE(texture);
 
     FRhiSamplerDesc samplerDesc;
-    const auto sampler = device->CreateSampler(samplerDesc);
+    const auto      sampler = device->CreateSampler(samplerDesc);
     REQUIRE(sampler);
 
     AltinaEngine::Shader::FShaderBytecode bytecode;
-    std::string compileErrors;
-    if (!CompileD3D11ShaderDXBC(kMinimalVsShader, "VSMain", "vs_5_0", bytecode,
-            compileErrors)) {
+    std::string                           compileErrors;
+    if (!CompileD3D11ShaderDXBC(kMinimalVsShader, "VSMain", "vs_5_0", bytecode, compileErrors)) {
         if (!compileErrors.empty()) {
             std::cerr << "[SKIP] D3D11 D3DCompile failed:\n" << compileErrors << "\n";
         }
@@ -179,7 +178,7 @@ TEST_CASE("RhiD3D11.DeviceCreation") {
     }
 
     FRhiShaderDesc shaderDesc;
-    shaderDesc.mStage = AltinaEngine::Shader::EShaderStage::Vertex;
+    shaderDesc.mStage    = AltinaEngine::Shader::EShaderStage::Vertex;
     shaderDesc.mBytecode = AltinaEngine::Move(bytecode);
 
     const auto shader = device->CreateShader(shaderDesc);
@@ -212,7 +211,7 @@ TEST_CASE("RhiD3D11.DeferredContextSubmitExecutes") {
 
     auto* d3dDevice = static_cast<FRhiD3D11Device*>(device.Get());
     REQUIRE(d3dDevice);
-    ID3D11Device* nativeDevice = d3dDevice->GetNativeDevice();
+    ID3D11Device*        nativeDevice     = d3dDevice->GetNativeDevice();
     ID3D11DeviceContext* immediateContext = d3dDevice->GetImmediateContext();
     if (!nativeDevice || !immediateContext) {
         return;
@@ -227,7 +226,7 @@ TEST_CASE("RhiD3D11.DeferredContextSubmitExecutes") {
 
     FRhiCommandContextDesc ctxDesc;
     ctxDesc.mQueueType = ERhiQueueType::Graphics;
-    auto cmdContext = device->CreateCommandContext(ctxDesc);
+    auto cmdContext    = device->CreateCommandContext(ctxDesc);
     REQUIRE(cmdContext);
 
     auto* d3dContext = static_cast<FRhiD3D11CommandContext*>(cmdContext.Get());
@@ -245,8 +244,8 @@ TEST_CASE("RhiD3D11.DeferredContextSubmitExecutes") {
     auto* rhiCommandList = d3dContext->GetCommandList();
     REQUIRE(rhiCommandList);
     FRhiCommandList* commandLists[] = { rhiCommandList };
-    FRhiSubmitInfo submit{};
-    submit.mCommandLists = commandLists;
+    FRhiSubmitInfo   submit{};
+    submit.mCommandLists     = commandLists;
     submit.mCommandListCount = 1U;
 
     auto queue = device->GetQueue(ERhiQueueType::Graphics);
@@ -273,13 +272,13 @@ TEST_CASE("RhiD3D11.DeferredContextSubmitExecutes") {
 
 TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
 #if AE_PLATFORM_WIN
+    using AltinaEngine::Rhi::FRhiCmdContextAdapter;
+    using AltinaEngine::Rhi::FRhiCmdDispatch;
+    using AltinaEngine::Rhi::FRhiCmdExecutor;
+    using AltinaEngine::Rhi::FRhiCmdList;
     using AltinaEngine::Rhi::FRhiD3D11Context;
     using AltinaEngine::Rhi::FRhiD3D11Shader;
     using AltinaEngine::Rhi::FRhiInitDesc;
-    using AltinaEngine::Rhi::FRhiCmdContextAdapter;
-    using AltinaEngine::Rhi::FRhiCmdExecutor;
-    using AltinaEngine::Rhi::FRhiCmdList;
-    using AltinaEngine::Rhi::FRhiCmdDispatch;
     using AltinaEngine::Rhi::kRhiInvalidAdapterIndex;
     using Microsoft::WRL::ComPtr;
 
@@ -299,16 +298,15 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
 
     auto* d3dDevice = static_cast<FRhiD3D11Device*>(device.Get());
     REQUIRE(d3dDevice);
-    ID3D11Device* nativeDevice = d3dDevice->GetNativeDevice();
+    ID3D11Device*        nativeDevice     = d3dDevice->GetNativeDevice();
     ID3D11DeviceContext* immediateContext = d3dDevice->GetImmediateContext();
     if (!nativeDevice || !immediateContext) {
         return;
     }
 
     AltinaEngine::Shader::FShaderBytecode bytecode;
-    std::string compileErrors;
-    if (!CompileD3D11ShaderDXBC(kMinimalCsShader, "CSMain", "cs_5_0", bytecode,
-            compileErrors)) {
+    std::string                           compileErrors;
+    if (!CompileD3D11ShaderDXBC(kMinimalCsShader, "CSMain", "cs_5_0", bytecode, compileErrors)) {
         if (!compileErrors.empty()) {
             std::cerr << "[SKIP] D3D11 D3DCompile failed:\n" << compileErrors << "\n";
         }
@@ -316,24 +314,24 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
     }
 
     FRhiShaderDesc shaderDesc;
-    shaderDesc.mStage = AltinaEngine::Shader::EShaderStage::Compute;
+    shaderDesc.mStage    = AltinaEngine::Shader::EShaderStage::Compute;
     shaderDesc.mBytecode = AltinaEngine::Move(bytecode);
 
     const auto shader = device->CreateShader(shaderDesc);
     REQUIRE(shader);
 
-    auto* d3dShader = static_cast<FRhiD3D11Shader*>(shader.Get());
+    auto*                d3dShader     = static_cast<FRhiD3D11Shader*>(shader.Get());
     ID3D11ComputeShader* computeShader = d3dShader ? d3dShader->GetComputeShader() : nullptr;
     if (!computeShader) {
         return;
     }
 
-    const u32 initialValue = 0U;
+    const u32         initialValue = 0U;
     D3D11_BUFFER_DESC bufferDesc{};
-    bufferDesc.ByteWidth = sizeof(u32);
-    bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-    bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-    bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    bufferDesc.ByteWidth           = sizeof(u32);
+    bufferDesc.Usage               = D3D11_USAGE_DEFAULT;
+    bufferDesc.BindFlags           = D3D11_BIND_UNORDERED_ACCESS;
+    bufferDesc.MiscFlags           = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
     bufferDesc.StructureByteStride = sizeof(u32);
 
     D3D11_SUBRESOURCE_DATA initData{};
@@ -345,10 +343,10 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
     }
 
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-    uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+    uavDesc.ViewDimension       = D3D11_UAV_DIMENSION_BUFFER;
     uavDesc.Buffer.FirstElement = 0U;
-    uavDesc.Buffer.NumElements = 1U;
-    uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+    uavDesc.Buffer.NumElements  = 1U;
+    uavDesc.Format              = DXGI_FORMAT_UNKNOWN;
 
     ComPtr<ID3D11UnorderedAccessView> uav;
     if (FAILED(nativeDevice->CreateUnorderedAccessView(buffer.Get(), &uavDesc, &uav))) {
@@ -356,10 +354,10 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
     }
 
     D3D11_BUFFER_DESC stagingDesc = bufferDesc;
-    stagingDesc.Usage = D3D11_USAGE_STAGING;
-    stagingDesc.BindFlags = 0U;
-    stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    stagingDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    stagingDesc.Usage             = D3D11_USAGE_STAGING;
+    stagingDesc.BindFlags         = 0U;
+    stagingDesc.CPUAccessFlags    = D3D11_CPU_ACCESS_READ;
+    stagingDesc.MiscFlags         = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 
     ComPtr<ID3D11Buffer> staging;
     if (FAILED(nativeDevice->CreateBuffer(&stagingDesc, nullptr, &staging))) {
@@ -368,7 +366,7 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
 
     FRhiCommandContextDesc ctxDesc;
     ctxDesc.mQueueType = ERhiQueueType::Compute;
-    auto cmdContext = device->CreateCommandContext(ctxDesc);
+    auto cmdContext    = device->CreateCommandContext(ctxDesc);
     REQUIRE(cmdContext);
 
     auto* d3dContext = static_cast<FRhiD3D11CommandContext*>(cmdContext.Get());
@@ -395,8 +393,8 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
     auto* rhiCommandList = d3dContext->GetCommandList();
     REQUIRE(rhiCommandList);
     FRhiCommandList* commandLists[] = { rhiCommandList };
-    FRhiSubmitInfo submit{};
-    submit.mCommandLists = commandLists;
+    FRhiSubmitInfo   submit{};
+    submit.mCommandLists     = commandLists;
     submit.mCommandListCount = 1U;
 
     auto queue = device->GetQueue(ERhiQueueType::Compute);
@@ -433,8 +431,8 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
     using AltinaEngine::Rhi::FRhiBindGroupLayoutEntry;
     using AltinaEngine::Rhi::FRhiCommandContextDesc;
     using AltinaEngine::Rhi::FRhiD3D11Context;
-    using AltinaEngine::Rhi::FRhiD3D11Texture;
     using AltinaEngine::Rhi::FRhiD3D11Device;
+    using AltinaEngine::Rhi::FRhiD3D11Texture;
     using AltinaEngine::Rhi::FRhiGraphicsPipelineDesc;
     using AltinaEngine::Rhi::FRhiInitDesc;
     using AltinaEngine::Rhi::FRhiPipelineLayoutDesc;
@@ -471,16 +469,15 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
 
     AltinaEngine::Shader::FShaderBytecode vsBytecode;
     AltinaEngine::Shader::FShaderBytecode psBytecode;
-    std::string compileErrors;
-    if (!CompileD3D11ShaderDXBC(kMinimalVsShader, "VSMain", "vs_5_0", vsBytecode,
-            compileErrors)) {
+    std::string                           compileErrors;
+    if (!CompileD3D11ShaderDXBC(kMinimalVsShader, "VSMain", "vs_5_0", vsBytecode, compileErrors)) {
         if (!compileErrors.empty()) {
             std::cerr << "[SKIP] D3D11 D3DCompile failed:\n" << compileErrors << "\n";
         }
         return;
     }
-    if (!CompileD3D11ShaderDXBC(kGraphicsUavPsShader, "PSMain", "ps_5_0", psBytecode,
-            compileErrors)) {
+    if (!CompileD3D11ShaderDXBC(
+            kGraphicsUavPsShader, "PSMain", "ps_5_0", psBytecode, compileErrors)) {
         if (!compileErrors.empty()) {
             std::cerr << "[SKIP] D3D11 D3DCompile failed:\n" << compileErrors << "\n";
         }
@@ -529,20 +526,20 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
     pipelineDesc.mPipelineLayout = pipelineLayout.Get();
     pipelineDesc.mVertexShader   = vs.Get();
     pipelineDesc.mPixelShader    = ps.Get();
-    const auto pipeline = device->CreateGraphicsPipeline(pipelineDesc);
+    const auto pipeline          = device->CreateGraphicsPipeline(pipelineDesc);
     REQUIRE(pipeline);
 
     FRhiTextureDesc rtvDesc;
-    rtvDesc.mWidth     = 4U;
-    rtvDesc.mHeight    = 4U;
-    rtvDesc.mBindFlags = AltinaEngine::Rhi::ERhiTextureBindFlags::RenderTarget;
+    rtvDesc.mWidth         = 4U;
+    rtvDesc.mHeight        = 4U;
+    rtvDesc.mBindFlags     = AltinaEngine::Rhi::ERhiTextureBindFlags::RenderTarget;
     const auto colorTarget = device->CreateTexture(rtvDesc);
     REQUIRE(colorTarget);
 
     FRhiTextureDesc uavDesc;
-    uavDesc.mWidth     = 4U;
-    uavDesc.mHeight    = 4U;
-    uavDesc.mBindFlags = AltinaEngine::Rhi::ERhiTextureBindFlags::UnorderedAccess;
+    uavDesc.mWidth        = 4U;
+    uavDesc.mHeight       = 4U;
+    uavDesc.mBindFlags    = AltinaEngine::Rhi::ERhiTextureBindFlags::UnorderedAccess;
     const auto uavTexture = device->CreateTexture(uavDesc);
     REQUIRE(uavTexture);
 
@@ -557,7 +554,7 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
     REQUIRE(bindGroup);
 
     FRhiCommandContextDesc ctxDesc;
-    ctxDesc.mQueueType = ERhiQueueType::Graphics;
+    ctxDesc.mQueueType    = ERhiQueueType::Graphics;
     const auto cmdContext = device->CreateCommandContext(ctxDesc);
     REQUIRE(cmdContext);
 
@@ -575,17 +572,15 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
         return;
     }
 
-    ComPtr<ID3D11RenderTargetView> rtv;
-    ComPtr<ID3D11DepthStencilView> dsv;
+    ComPtr<ID3D11RenderTargetView>    rtv;
+    ComPtr<ID3D11DepthStencilView>    dsv;
     ComPtr<ID3D11UnorderedAccessView> uav;
 
     deferredContext->OMGetRenderTargetsAndUnorderedAccessViews(
         1U, rtv.GetAddressOf(), dsv.GetAddressOf(), 1U, 1U, uav.GetAddressOf());
 
-    auto* expectedRtv =
-        static_cast<FRhiD3D11Texture*>(colorTarget.Get())->GetRenderTargetView();
-    auto* expectedUav =
-        static_cast<FRhiD3D11Texture*>(uavTexture.Get())->GetUnorderedAccessView();
+    auto* expectedRtv = static_cast<FRhiD3D11Texture*>(colorTarget.Get())->GetRenderTargetView();
+    auto* expectedUav = static_cast<FRhiD3D11Texture*>(uavTexture.Get())->GetUnorderedAccessView();
 
     REQUIRE(rtv.Get() == expectedRtv);
     REQUIRE(uav.Get() == expectedUav);
@@ -607,9 +602,9 @@ TEST_CASE("RhiD3D11.BufferLockCpuGpu") {
     using AltinaEngine::Rhi::FRhiD3D11Device;
     using AltinaEngine::Rhi::FRhiDeviceDesc;
     using AltinaEngine::Rhi::FRhiInitDesc;
+    using AltinaEngine::Rhi::kRhiInvalidAdapterIndex;
     using AltinaEngine::Rhi::RHIExit;
     using AltinaEngine::Rhi::RHIInit;
-    using AltinaEngine::Rhi::kRhiInvalidAdapterIndex;
     using Microsoft::WRL::ComPtr;
 
     FRhiD3D11Context context;
@@ -625,14 +620,14 @@ TEST_CASE("RhiD3D11.BufferLockCpuGpu") {
     REQUIRE(d3dDevice);
 
     bool frameBegun = false;
-    auto cleanup = [&]() {
+    auto cleanup    = [&]() {
         if (frameBegun) {
             d3dDevice->GetUploadBufferManager()->EndFrame();
         }
         RHIExit(context);
     };
 
-    ID3D11Device* nativeDevice = d3dDevice->GetNativeDevice();
+    ID3D11Device*        nativeDevice     = d3dDevice->GetNativeDevice();
     ID3D11DeviceContext* immediateContext = d3dDevice->GetImmediateContext();
     if (!nativeDevice || !immediateContext) {
         cleanup();
@@ -641,19 +636,19 @@ TEST_CASE("RhiD3D11.BufferLockCpuGpu") {
 
     FRhiBufferDesc bufferDesc;
     bufferDesc.mSizeBytes = sizeof(u32);
-    bufferDesc.mUsage = ERhiResourceUsage::Default;
+    bufferDesc.mUsage     = ERhiResourceUsage::Default;
     bufferDesc.mBindFlags = ERhiBufferBindFlags::UnorderedAccess;
-    const auto buffer = device->CreateBuffer(bufferDesc);
+    const auto buffer     = device->CreateBuffer(bufferDesc);
     REQUIRE(buffer);
 
-    const u32 cpuValue = 42U;
-    auto* uploadManager = d3dDevice->GetUploadBufferManager();
+    const u32 cpuValue      = 42U;
+    auto*     uploadManager = d3dDevice->GetUploadBufferManager();
     if (!uploadManager) {
         cleanup();
         return;
     }
     uploadManager->BeginFrame(0ULL);
-    frameBegun = true;
+    frameBegun     = true;
     auto writeLock = buffer->Lock(0ULL, sizeof(u32), ERhiBufferLockMode::WriteDiscard);
     REQUIRE(writeLock.IsValid());
     std::memcpy(writeLock.mData, &cpuValue, sizeof(u32));
@@ -666,9 +661,8 @@ TEST_CASE("RhiD3D11.BufferLockCpuGpu") {
     REQUIRE_EQ(readValue, cpuValue);
 
     AltinaEngine::Shader::FShaderBytecode bytecode;
-    std::string compileErrors;
-    if (!CompileD3D11ShaderDXBC(kRawBufferCsShader, "CSMain", "cs_5_0", bytecode,
-            compileErrors)) {
+    std::string                           compileErrors;
+    if (!CompileD3D11ShaderDXBC(kRawBufferCsShader, "CSMain", "cs_5_0", bytecode, compileErrors)) {
         cleanup();
         return;
     }
@@ -680,9 +674,8 @@ TEST_CASE("RhiD3D11.BufferLockCpuGpu") {
         return;
     }
 
-    auto* d3dBuffer = static_cast<FRhiD3D11Buffer*>(buffer.Get());
-    ID3D11UnorderedAccessView* uav =
-        d3dBuffer ? d3dBuffer->GetUnorderedAccessView() : nullptr;
+    auto*                      d3dBuffer = static_cast<FRhiD3D11Buffer*>(buffer.Get());
+    ID3D11UnorderedAccessView* uav = d3dBuffer ? d3dBuffer->GetUnorderedAccessView() : nullptr;
     if (!uav) {
         cleanup();
         return;

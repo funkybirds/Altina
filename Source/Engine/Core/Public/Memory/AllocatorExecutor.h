@@ -6,7 +6,7 @@
 
 namespace AltinaEngine::Core::Memory {
     struct FMemoryBufferBacking {
-        u8* mData = nullptr;
+        u8* mData      = nullptr;
         u64 mSizeBytes = 0ULL;
 
         FMemoryBufferBacking() = default;
@@ -56,7 +56,7 @@ namespace AltinaEngine::Core::Memory {
         TAllocatorExecutor() = default;
         explicit TAllocatorExecutor(const FBacking& backing) : mBacking(backing) {}
 
-        void SetBacking(const FBacking& backing) { mBacking = backing; }
+        void               SetBacking(const FBacking& backing) { mBacking = backing; }
 
         [[nodiscard]] auto GetBacking() noexcept -> FBacking& { return mBacking; }
         [[nodiscard]] auto GetBacking() const noexcept -> const FBacking& { return mBacking; }
@@ -64,7 +64,7 @@ namespace AltinaEngine::Core::Memory {
         [[nodiscard]] auto GetPolicy() noexcept -> FPolicy& { return mPolicy; }
         [[nodiscard]] auto GetPolicy() const noexcept -> const FPolicy& { return mPolicy; }
 
-        void Reset() {
+        void               Reset() {
             if constexpr (requires(FPolicy& p) { p.Reset(); }) {
                 mPolicy.Reset();
             }
@@ -72,24 +72,20 @@ namespace AltinaEngine::Core::Memory {
 
         void InitPolicyFromBacking()
             requires Detail::CBufferBackingHasSize<FBacking>
-            && requires(FPolicy& p, u64 sizeBytes) {
-                p.Init(sizeBytes);
-            }
+            && requires(FPolicy& p, u64 sizeBytes) { p.Init(sizeBytes); }
         {
             mPolicy.Init(mBacking.GetSizeBytes());
         }
 
         void InitPolicyFromBacking(u64 minBlockSizeBytes)
             requires Detail::CBufferBackingHasSize<FBacking>
-            && requires(FPolicy& p, u64 sizeBytes, u64 minBlockBytes) {
-                p.Init(sizeBytes, minBlockBytes);
-            }
+            && requires(
+                FPolicy& p, u64 sizeBytes, u64 minBlockBytes) { p.Init(sizeBytes, minBlockBytes); }
         {
             mPolicy.Init(mBacking.GetSizeBytes(), minBlockSizeBytes);
         }
 
-        template <typename... Args>
-        auto Allocate(Args&&... args) {
+        template <typename... Args> auto Allocate(Args&&... args) {
             return mPolicy.Allocate(AltinaEngine::Forward<Args>(args)...);
         }
 
@@ -122,8 +118,7 @@ namespace AltinaEngine::Core::Memory {
                 if (dst == nullptr) {
                     return false;
                 }
-                Platform::Generic::Memcpy(
-                    dst + writeOffset, data, static_cast<usize>(sizeBytes));
+                Platform::Generic::Memcpy(dst + writeOffset, data, static_cast<usize>(sizeBytes));
                 return true;
             } else {
                 return false;
@@ -164,8 +159,8 @@ namespace AltinaEngine::Core::Memory {
         }
 
         template <typename TAllocation>
-        auto Free(const TAllocation& allocation)
-            -> bool requires requires(FPolicy& p, const TAllocation& a) { p.Free(a); }
+        auto Free(const TAllocation& allocation) -> bool
+            requires requires(FPolicy& p, const TAllocation& a) { p.Free(a); }
         {
             return mPolicy.Free(allocation);
         }

@@ -31,11 +31,11 @@ namespace AltinaEngine::Rhi {
         ComPtr<ID3D11DeviceContext> mImmediateContext;
         ComPtr<IDXGISwapChain1>     mSwapChain;
         FRhiTextureRef              mBackBuffer;
-        u32                         mWidth = 0U;
-        u32                         mHeight = 0U;
-        u32                         mBufferCount = 2U;
-        ERhiFormat                  mFormat = ERhiFormat::B8G8R8A8Unorm;
-        bool                        mAllowTearing = false;
+        u32                         mWidth            = 0U;
+        u32                         mHeight           = 0U;
+        u32                         mBufferCount      = 2U;
+        ERhiFormat                  mFormat           = ERhiFormat::B8G8R8A8Unorm;
+        bool                        mAllowTearing     = false;
         bool                        mTearingSupported = false;
     };
 #else
@@ -87,14 +87,12 @@ namespace AltinaEngine::Rhi {
             return allowTearing == TRUE;
         }
 
-        auto ClampExtent(u32 value) noexcept -> u32 {
-            return (value > 0U) ? value : 1U;
-        }
+        auto ClampExtent(u32 value) noexcept -> u32 { return (value > 0U) ? value : 1U; }
 #endif
     } // namespace
 
-    FRhiD3D11Viewport::FRhiD3D11Viewport(const FRhiViewportDesc& desc, ID3D11Device* device,
-        ID3D11DeviceContext* immediateContext)
+    FRhiD3D11Viewport::FRhiD3D11Viewport(
+        const FRhiViewportDesc& desc, ID3D11Device* device, ID3D11DeviceContext* immediateContext)
         : FRhiViewport(desc) {
         mState = new FState{};
 
@@ -115,7 +113,7 @@ namespace AltinaEngine::Rhi {
         if ((width == 0U || height == 0U) && desc.mNativeHandle != nullptr) {
             RECT rect{};
             if (GetClientRect(static_cast<HWND>(desc.mNativeHandle), &rect)) {
-                const u32 rectWidth = static_cast<u32>(rect.right - rect.left);
+                const u32 rectWidth  = static_cast<u32>(rect.right - rect.left);
                 const u32 rectHeight = static_cast<u32>(rect.bottom - rect.top);
                 if (width == 0U) {
                     width = rectWidth;
@@ -126,10 +124,10 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        mState->mWidth       = ClampExtent(width);
-        mState->mHeight      = ClampExtent(height);
-        mState->mBufferCount = (desc.mBufferCount > 0U) ? desc.mBufferCount : 2U;
-        mState->mFormat      = desc.mFormat;
+        mState->mWidth        = ClampExtent(width);
+        mState->mHeight       = ClampExtent(height);
+        mState->mBufferCount  = (desc.mBufferCount > 0U) ? desc.mBufferCount : 2U;
+        mState->mFormat       = desc.mFormat;
         mState->mAllowTearing = desc.mAllowTearing;
 
         UpdateExtent(mState->mWidth, mState->mHeight);
@@ -198,16 +196,14 @@ namespace AltinaEngine::Rhi {
             mState->mImmediateContext->Flush();
         }
 
-        const DXGI_FORMAT format = ToD3D11Format(mState->mFormat);
-        const bool allowTearing = mState->mAllowTearing && mState->mTearingSupported;
-        const UINT flags = allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0U;
+        const DXGI_FORMAT format       = ToD3D11Format(mState->mFormat);
+        const bool        allowTearing = mState->mAllowTearing && mState->mTearingSupported;
+        const UINT        flags        = allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0U;
 
-        HRESULT hr =
-            mState->mSwapChain->ResizeBuffers(mState->mBufferCount, newWidth, newHeight, format,
-                flags);
+        HRESULT           hr = mState->mSwapChain->ResizeBuffers(
+            mState->mBufferCount, newWidth, newHeight, format, flags);
         if (FAILED(hr)) {
-            LogError(TEXT("RHI(D3D11): ResizeBuffers failed (hr=0x{:08X})."),
-                static_cast<u32>(hr));
+            LogError(TEXT("RHI(D3D11): ResizeBuffers failed (hr=0x{:08X})."), static_cast<u32>(hr));
 
             if (hr == DXGI_ERROR_INVALID_CALL) {
                 mState->mSwapChain.Reset();
@@ -242,9 +238,9 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        const u32 syncInterval = info.mSyncInterval;
-        const u32 flags = ResolvePresentFlags(syncInterval, info.mFlags);
-        const HRESULT hr = mState->mSwapChain->Present(syncInterval, flags);
+        const u32     syncInterval = info.mSyncInterval;
+        const u32     flags        = ResolvePresentFlags(syncInterval, info.mFlags);
+        const HRESULT hr           = mState->mSwapChain->Present(syncInterval, flags);
         if (hr == DXGI_STATUS_OCCLUDED) {
             if (mState->mImmediateContext) {
                 mState->mImmediateContext->Flush();
@@ -289,26 +285,26 @@ namespace AltinaEngine::Rhi {
         }
 
         mState->mTearingSupported = QueryTearingSupport(factory.Get());
-        mState->mAllowTearing = mState->mAllowTearing && mState->mTearingSupported;
+        mState->mAllowTearing     = mState->mAllowTearing && mState->mTearingSupported;
 
         DXGI_SWAP_CHAIN_DESC1 swapDesc{};
-        swapDesc.Width       = mState->mWidth;
-        swapDesc.Height      = mState->mHeight;
-        swapDesc.Format      = format;
-        swapDesc.Stereo      = FALSE;
+        swapDesc.Width              = mState->mWidth;
+        swapDesc.Height             = mState->mHeight;
+        swapDesc.Format             = format;
+        swapDesc.Stereo             = FALSE;
         swapDesc.SampleDesc.Count   = 1;
         swapDesc.SampleDesc.Quality = 0;
-        swapDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapDesc.BufferCount = (mState->mBufferCount < 2U) ? 2U : mState->mBufferCount;
-        swapDesc.Scaling     = DXGI_SCALING_STRETCH;
-        swapDesc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-        swapDesc.AlphaMode   = DXGI_ALPHA_MODE_UNSPECIFIED;
-        swapDesc.Flags       = mState->mAllowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0U;
+        swapDesc.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapDesc.BufferCount        = (mState->mBufferCount < 2U) ? 2U : mState->mBufferCount;
+        swapDesc.Scaling            = DXGI_SCALING_STRETCH;
+        swapDesc.SwapEffect         = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        swapDesc.AlphaMode          = DXGI_ALPHA_MODE_UNSPECIFIED;
+        swapDesc.Flags = mState->mAllowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0U;
 
-        HWND hwnd = static_cast<HWND>(desc.mNativeHandle);
+        HWND                    hwnd = static_cast<HWND>(desc.mNativeHandle);
         ComPtr<IDXGISwapChain1> swapChain;
-        const HRESULT hr = factory->CreateSwapChainForHwnd(mState->mDevice.Get(), hwnd, &swapDesc,
-            nullptr, nullptr, &swapChain);
+        const HRESULT           hr = factory->CreateSwapChainForHwnd(
+            mState->mDevice.Get(), hwnd, &swapDesc, nullptr, nullptr, &swapChain);
         if (FAILED(hr) || !swapChain) {
             LogError(TEXT("RHI(D3D11): CreateSwapChainForHwnd failed (hr=0x{:08X})."),
                 static_cast<u32>(hr));
@@ -317,7 +313,7 @@ namespace AltinaEngine::Rhi {
 
         factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
 
-        mState->mSwapChain = AltinaEngine::Move(swapChain);
+        mState->mSwapChain   = AltinaEngine::Move(swapChain);
         mState->mBufferCount = swapDesc.BufferCount;
         return true;
 #else
@@ -334,8 +330,7 @@ namespace AltinaEngine::Rhi {
         ReleaseBackBuffer();
 
         ComPtr<ID3D11Texture2D> backBuffer;
-        const HRESULT hr =
-            mState->mSwapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
+        const HRESULT           hr = mState->mSwapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
         if (FAILED(hr) || !backBuffer) {
             return false;
         }

@@ -38,12 +38,12 @@ namespace AltinaEngine::Asset {
     };
 
     struct AE_ASSET_API FMeshBlobDesc {
-        u32 VertexCount     = 0;
-        u32 IndexCount      = 0;
-        u32 VertexStride    = 0;
-        u32 IndexType       = 0;
-        u32 AttributeCount  = 0;
-        u32 SubMeshCount    = 0;
+        u32 VertexCount      = 0;
+        u32 IndexCount       = 0;
+        u32 VertexStride     = 0;
+        u32 IndexType        = 0;
+        u32 AttributeCount   = 0;
+        u32 SubMeshCount     = 0;
         u32 AttributesOffset = 0;
         u32 SubMeshesOffset  = 0;
         u32 VertexDataOffset = 0;
@@ -91,15 +91,15 @@ namespace AltinaEngine::Asset {
     };
 
     struct AE_ASSET_API FMaterialBlobDesc {
-        u32 ShadingModel  = 0;
-        u32 BlendMode     = 0;
-        u32 Flags         = 0;
-        f32 AlphaCutoff   = 0.0f;
-        u32 ScalarCount   = 0;
-        u32 VectorCount   = 0;
-        u32 TextureCount  = 0;
-        u32 ScalarsOffset = 0;
-        u32 VectorsOffset = 0;
+        u32 ShadingModel   = 0;
+        u32 BlendMode      = 0;
+        u32 Flags          = 0;
+        f32 AlphaCutoff    = 0.0f;
+        u32 ScalarCount    = 0;
+        u32 VectorCount    = 0;
+        u32 TextureCount   = 0;
+        u32 ScalarsOffset  = 0;
+        u32 VectorsOffset  = 0;
         u32 TexturesOffset = 0;
     };
 
@@ -114,34 +114,34 @@ namespace AltinaEngine::Asset {
     };
 
     struct AE_ASSET_API FMaterialTextureParam {
-        u32         NameHash = 0;
+        u32          NameHash = 0;
         FAssetHandle Texture;
-        u32         SamplerFlags = 0;
+        u32          SamplerFlags = 0;
     };
 
-    constexpr u32 kMeshSemanticPosition = 0;
-    constexpr u32 kMeshSemanticNormal   = 1;
-    constexpr u32 kMeshSemanticTangent  = 2;
-    constexpr u32 kMeshSemanticTexCoord = 3;
-    constexpr u32 kMeshSemanticColor    = 4;
+    constexpr u32                kMeshSemanticPosition = 0;
+    constexpr u32                kMeshSemanticNormal   = 1;
+    constexpr u32                kMeshSemanticTangent  = 2;
+    constexpr u32                kMeshSemanticTexCoord = 3;
+    constexpr u32                kMeshSemanticColor    = 4;
 
-    constexpr u32 kMeshVertexMaskPosition = 1u << 0;
-    constexpr u32 kMeshVertexMaskNormal   = 1u << 1;
-    constexpr u32 kMeshVertexMaskTexCoord0 = 1u << 2;
+    constexpr u32                kMeshVertexMaskPosition  = 1u << 0;
+    constexpr u32                kMeshVertexMaskNormal    = 1u << 1;
+    constexpr u32                kMeshVertexMaskTexCoord0 = 1u << 2;
 
-    constexpr u32 kMeshVertexFormatUnknown        = 0;
-    constexpr u32 kMeshVertexFormatR32Float       = 1;
-    constexpr u32 kMeshVertexFormatR32G32Float    = 2;
-    constexpr u32 kMeshVertexFormatR32G32B32Float = 3;
-    constexpr u32 kMeshVertexFormatR32G32B32A32Float = 4;
+    constexpr u32                kMeshVertexFormatUnknown           = 0;
+    constexpr u32                kMeshVertexFormatR32Float          = 1;
+    constexpr u32                kMeshVertexFormatR32G32Float       = 2;
+    constexpr u32                kMeshVertexFormatR32G32B32Float    = 3;
+    constexpr u32                kMeshVertexFormatR32G32B32A32Float = 4;
 
-    constexpr u32 kAudioCodecUnknown   = 0;
-    constexpr u32 kAudioCodecPcm       = 1;
-    constexpr u32 kAudioCodecOggVorbis = 2;
+    constexpr u32                kAudioCodecUnknown   = 0;
+    constexpr u32                kAudioCodecPcm       = 1;
+    constexpr u32                kAudioCodecOggVorbis = 2;
 
-    constexpr u32 kAudioSampleFormatUnknown = 0;
-    constexpr u32 kAudioSampleFormatPcm16   = 1;
-    constexpr u32 kAudioSampleFormatPcm32f  = 2;
+    constexpr u32                kAudioSampleFormatUnknown = 0;
+    constexpr u32                kAudioSampleFormatPcm16   = 1;
+    constexpr u32                kAudioSampleFormatPcm32f  = 2;
 
     [[nodiscard]] constexpr auto GetAudioBytesPerSample(u32 format) noexcept -> u32 {
         switch (format) {
@@ -154,10 +154,10 @@ namespace AltinaEngine::Asset {
         }
     }
 
-    constexpr u32 kTextureFormatUnknown = 0;
-    constexpr u32 kTextureFormatR8      = 1;
-    constexpr u32 kTextureFormatRGB8    = 2;
-    constexpr u32 kTextureFormatRGBA8   = 3;
+    constexpr u32                kTextureFormatUnknown = 0;
+    constexpr u32                kTextureFormatR8      = 1;
+    constexpr u32                kTextureFormatRGB8    = 2;
+    constexpr u32                kTextureFormatRGBA8   = 3;
 
     [[nodiscard]] constexpr auto GetTextureBytesPerPixel(u32 format) noexcept -> u32 {
         switch (format) {
@@ -172,8 +172,8 @@ namespace AltinaEngine::Asset {
         }
     }
 
-    constexpr u32 kMeshIndexTypeUint16 = 0;
-    constexpr u32 kMeshIndexTypeUint32 = 1;
+    constexpr u32                kMeshIndexTypeUint16 = 0;
+    constexpr u32                kMeshIndexTypeUint32 = 1;
 
     [[nodiscard]] constexpr auto GetMeshIndexStride(u32 indexType) noexcept -> u32 {
         switch (indexType) {

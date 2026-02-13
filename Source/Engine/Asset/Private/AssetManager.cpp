@@ -4,18 +4,20 @@
 #include <cstring>
 
 namespace AltinaEngine::Asset {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
     using Core::Platform::ReadFileBytes;
 
     namespace {
         class FMemoryAssetStream final : public IAssetStream {
         public:
-            explicit FMemoryAssetStream(const TVector<u8>& data) : mData(data.Data()), mSize(data.Size()) {}
+            explicit FMemoryAssetStream(const TVector<u8>& data)
+                : mData(data.Data()), mSize(data.Size()) {}
 
             [[nodiscard]] auto Size() const noexcept -> usize override { return mSize; }
             [[nodiscard]] auto Tell() const noexcept -> usize override { return mOffset; }
 
-            void Seek(usize offset) noexcept override {
+            void               Seek(usize offset) noexcept override {
                 mOffset = (offset > mSize) ? mSize : offset;
             }
 
@@ -121,7 +123,7 @@ namespace AltinaEngine::Asset {
             return;
         }
 
-        const usize lastIndex = mCache.Size() - 1;
+        const usize lastIndex   = mCache.Size() - 1;
         const usize removeIndex = static_cast<usize>(index);
         if (removeIndex != lastIndex) {
             mCache[removeIndex] = mCache[lastIndex];
@@ -129,9 +131,7 @@ namespace AltinaEngine::Asset {
         mCache.PopBack();
     }
 
-    void FAssetManager::ClearCache() {
-        mCache.Clear();
-    }
+    void FAssetManager::ClearCache() { mCache.Clear(); }
 
     auto FAssetManager::FindLoaded(const FAssetHandle& handle) const -> TShared<IAsset> {
         const isize index = FindCacheIndex(handle);

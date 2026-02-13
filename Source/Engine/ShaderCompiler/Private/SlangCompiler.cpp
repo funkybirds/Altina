@@ -34,15 +34,16 @@
 #endif
 
 namespace AltinaEngine::ShaderCompiler::Detail {
-    using Core::Container::FString;
+    namespace Container = Core::Container;
+    using Container::FString;
     using Core::Platform::ReadFileBytes;
     using Core::Platform::ReadFileTextUtf8;
     using Core::Platform::RemoveFileIfExists;
     using Core::Platform::RunProcess;
 
     namespace {
-        using Core::Container::FNativeString;
-        using Core::Container::FStringView;
+        using Container::FNativeString;
+        using Container::FStringView;
 
         constexpr const TChar* kSlangName = TEXT("Slang");
         constexpr const TChar* kSlangDisabledMessage =
@@ -65,12 +66,12 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         };
 
         struct FJsonValue {
-            EJsonType              mType = EJsonType::Null;
-            bool                   mBool = false;
-            double                 mNumber = 0.0;
-            FNativeString          mString;
-            TVector<FJsonValue*>   mArray;
-            TVector<FJsonPair>     mObject;
+            EJsonType            mType   = EJsonType::Null;
+            bool                 mBool   = false;
+            double               mNumber = 0.0;
+            FNativeString        mString;
+            TVector<FJsonValue*> mArray;
+            TVector<FJsonPair>   mObject;
         };
 
         class FJsonReader {
@@ -159,26 +160,42 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                         }
                         const char esc = *mPtr++;
                         switch (esc) {
-                        case '"': out.Append("\"", 1); break;
-                        case '\\': out.Append("\\", 1); break;
-                        case '/': out.Append("/", 1); break;
-                        case 'b': out.Append("\b", 1); break;
-                        case 'f': out.Append("\f", 1); break;
-                        case 'n': out.Append("\n", 1); break;
-                        case 'r': out.Append("\r", 1); break;
-                        case 't': out.Append("\t", 1); break;
-                        case 'u':
-                            // Skip unicode escape for now; emit placeholder.
-                            if (mEnd - mPtr >= 4) {
-                                mPtr += 4;
-                            } else {
-                                mPtr = mEnd;
-                            }
-                            out.Append("?", 1);
-                            break;
-                        default:
-                            out.Append(&esc, 1);
-                            break;
+                            case '"':
+                                out.Append("\"", 1);
+                                break;
+                            case '\\':
+                                out.Append("\\", 1);
+                                break;
+                            case '/':
+                                out.Append("/", 1);
+                                break;
+                            case 'b':
+                                out.Append("\b", 1);
+                                break;
+                            case 'f':
+                                out.Append("\f", 1);
+                                break;
+                            case 'n':
+                                out.Append("\n", 1);
+                                break;
+                            case 'r':
+                                out.Append("\r", 1);
+                                break;
+                            case 't':
+                                out.Append("\t", 1);
+                                break;
+                            case 'u':
+                                // Skip unicode escape for now; emit placeholder.
+                                if (mEnd - mPtr >= 4) {
+                                    mPtr += 4;
+                                } else {
+                                    mPtr = mEnd;
+                                }
+                                out.Append("?", 1);
+                                break;
+                            default:
+                                out.Append(&esc, 1);
+                                break;
                         }
                     } else {
                         out.Append(&ch, 1);
@@ -283,12 +300,12 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
             auto ParseBool(bool& out) -> bool {
                 if ((mEnd - mPtr) >= 4 && std::strncmp(mPtr, "true", 4) == 0) {
-                    out  = true;
+                    out = true;
                     mPtr += 4;
                     return true;
                 }
                 if ((mEnd - mPtr) >= 5 && std::strncmp(mPtr, "false", 5) == 0) {
-                    out  = false;
+                    out = false;
                     mPtr += 5;
                     return true;
                 }
@@ -317,10 +334,10 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
 
         private:
-            const char*           mPtr   = nullptr;
-            const char*           mEnd   = nullptr;
-            const char*           mError = nullptr;
-            TVector<FJsonValue*>  mOwnedValues;
+            const char*          mPtr   = nullptr;
+            const char*          mEnd   = nullptr;
+            const char*          mError = nullptr;
+            TVector<FJsonValue*> mOwnedValues;
         };
 
         auto FindObjectValue(const FJsonValue& object, const char* key) -> const FJsonValue* {
@@ -427,19 +444,19 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     continue;
                 }
 
-                u32 offsetBytes = 0U;
+                u32         offsetBytes = 0U;
                 const auto* offsetValue = FindObjectValue(*field, "offset");
                 if (!GetLayoutOffsetBytes(offsetValue, offsetBytes)) {
                     GetNumberAsU32(FindObjectValue(*field, "uniformOffset"), offsetBytes);
                 }
 
                 const auto* fieldTypeLayout = FindObjectValue(*field, "typeLayout");
-                u32         sizeBytes = 0U;
+                u32         sizeBytes       = 0U;
                 if (!GetLayoutSizeBytes(fieldTypeLayout, sizeBytes)) {
                     GetNumberAsU32(FindObjectValue(*field, "size"), sizeBytes);
                 }
 
-                const auto* fieldType = FindObjectValue(*field, "type");
+                const auto*   fieldType = FindObjectValue(*field, "type");
                 FNativeString kind;
                 if (fieldType != nullptr && fieldType->mType == EJsonType::Object) {
                     GetStringValue(FindObjectValue(*fieldType, "kind"), kind);
@@ -447,7 +464,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
                 u32 elementCount = 0U;
                 GetNumberAsU32(FindObjectValue(*field, "elementCount"), elementCount);
-                if (elementCount == 0U && fieldType != nullptr && fieldType->mType == EJsonType::Object) {
+                if (elementCount == 0U && fieldType != nullptr
+                    && fieldType->mType == EJsonType::Object) {
                     GetNumberAsU32(FindObjectValue(*fieldType, "elementCount"), elementCount);
                 }
 
@@ -472,10 +490,10 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 outCb.mMembers.PushBack(member);
 
                 const std::string kindStr(kind.GetData(), kind.Length());
-                const bool isArray = (kindStr == "array");
+                const bool        isArray = (kindStr == "array");
                 if (!isArray && kindStr == "struct") {
-                    ParseSlangTypeLayoutFields(fieldTypeLayout, fullName,
-                        baseOffset + offsetBytes, outCb);
+                    ParseSlangTypeLayoutFields(
+                        fieldTypeLayout, fullName, baseOffset + offsetBytes, outCb);
                 }
             }
         }
@@ -486,9 +504,9 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 return out;
             }
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-#if AE_PLATFORM_WIN
-            const int wideCount = MultiByteToWideChar(CP_UTF8, 0, value.GetData(),
-                static_cast<int>(value.Length()), nullptr, 0);
+    #if AE_PLATFORM_WIN
+            const int wideCount = MultiByteToWideChar(
+                CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()), nullptr, 0);
             if (wideCount <= 0) {
                 return out;
             }
@@ -496,9 +514,9 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             MultiByteToWideChar(CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()),
                 wide.data(), wideCount);
             out.Append(wide.c_str(), wide.size());
-#else
+    #else
             out.Append(value.GetData(), value.Length());
-#endif
+    #endif
 #else
             out.Append(value.GetData(), value.Length());
 #endif
@@ -506,8 +524,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         auto MapResourceKind(const FNativeString& kind, const FNativeString& baseShape,
-            const FNativeString& access, EShaderResourceAccess& outAccess)
-            -> EShaderResourceType {
+            const FNativeString& access, EShaderResourceAccess& outAccess) -> EShaderResourceType {
             outAccess = EShaderResourceAccess::ReadOnly;
             const std::string accessStr(access.GetData(), access.Length());
             if (accessStr == "readWrite") {
@@ -545,7 +562,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto ParseSlangReflectionJson(const FNativeString& text, FShaderReflection& outReflection,
             FString& diagnostics) -> bool {
-            FJsonValue root;
+            FJsonValue  root;
             FJsonReader reader(text);
             if (!reader.Parse(root) || root.mType != EJsonType::Object) {
                 AppendDiagnosticLine(diagnostics, TEXT("Failed to parse Slang reflection JSON."));
@@ -570,9 +587,9 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                         continue;
                     }
 
-                    const auto* bindingObj = FindObjectValue(*param, "binding");
-                    u32 bindingIndex       = 0;
-                    u32 bindingSet         = 0;
+                    const auto* bindingObj   = FindObjectValue(*param, "binding");
+                    u32         bindingIndex = 0;
+                    u32         bindingSet   = 0;
                     if (bindingObj != nullptr && bindingObj->mType == EJsonType::Object) {
                         double indexValue = 0.0;
                         if (GetNumberValue(FindObjectValue(*bindingObj, "index"), indexValue)) {
@@ -584,7 +601,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                         }
                     }
 
-                    const auto* typeObj = FindObjectValue(*param, "type");
+                    const auto*   typeObj = FindObjectValue(*param, "type");
                     FNativeString kind;
                     FNativeString baseShape;
                     FNativeString access;
@@ -606,18 +623,19 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     const std::string kindStr(kind.GetData(), kind.Length());
                     if (kindStr == "constantBuffer") {
                         FShaderConstantBuffer cbInfo{};
-                        cbInfo.mName      = binding.mName;
-                        cbInfo.mBinding   = binding.mBinding;
-                        cbInfo.mSet       = binding.mSet;
-                        cbInfo.mRegister  = binding.mRegister;
-                        cbInfo.mSpace     = binding.mSpace;
+                        cbInfo.mName     = binding.mName;
+                        cbInfo.mBinding  = binding.mBinding;
+                        cbInfo.mSet      = binding.mSet;
+                        cbInfo.mRegister = binding.mRegister;
+                        cbInfo.mSpace    = binding.mSpace;
 
                         const auto* typeLayout = FindObjectValue(*param, "typeLayout");
-                        const auto* layout = typeLayout;
+                        const auto* layout     = typeLayout;
                         if (typeLayout != nullptr && typeLayout->mType == EJsonType::Object) {
                             const auto* elementLayout =
                                 FindObjectValue(*typeLayout, "elementTypeLayout");
-                            if (elementLayout != nullptr && elementLayout->mType == EJsonType::Object) {
+                            if (elementLayout != nullptr
+                                && elementLayout->mType == EJsonType::Object) {
                                 layout = elementLayout;
                             }
                         }
@@ -658,51 +676,51 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto GetStageName(EShaderStage stage) -> const TChar* {
             switch (stage) {
-            case EShaderStage::Vertex:
-                return TEXT("vertex");
-            case EShaderStage::Pixel:
-                return TEXT("fragment");
-            case EShaderStage::Compute:
-                return TEXT("compute");
-            case EShaderStage::Geometry:
-                return TEXT("geometry");
-            case EShaderStage::Hull:
-                return TEXT("hull");
-            case EShaderStage::Domain:
-                return TEXT("domain");
-            case EShaderStage::Mesh:
-                return TEXT("mesh");
-            case EShaderStage::Amplification:
-                return TEXT("amplification");
-            case EShaderStage::Library:
-                return TEXT("library");
-            default:
-                return TEXT("fragment");
+                case EShaderStage::Vertex:
+                    return TEXT("vertex");
+                case EShaderStage::Pixel:
+                    return TEXT("fragment");
+                case EShaderStage::Compute:
+                    return TEXT("compute");
+                case EShaderStage::Geometry:
+                    return TEXT("geometry");
+                case EShaderStage::Hull:
+                    return TEXT("hull");
+                case EShaderStage::Domain:
+                    return TEXT("domain");
+                case EShaderStage::Mesh:
+                    return TEXT("mesh");
+                case EShaderStage::Amplification:
+                    return TEXT("amplification");
+                case EShaderStage::Library:
+                    return TEXT("library");
+                default:
+                    return TEXT("fragment");
             }
         }
 
         auto GetProfilePrefix(EShaderStage stage) -> const TChar* {
             switch (stage) {
-            case EShaderStage::Vertex:
-                return TEXT("vs");
-            case EShaderStage::Pixel:
-                return TEXT("ps");
-            case EShaderStage::Compute:
-                return TEXT("cs");
-            case EShaderStage::Geometry:
-                return TEXT("gs");
-            case EShaderStage::Hull:
-                return TEXT("hs");
-            case EShaderStage::Domain:
-                return TEXT("ds");
-            case EShaderStage::Mesh:
-                return TEXT("ms");
-            case EShaderStage::Amplification:
-                return TEXT("as");
-            case EShaderStage::Library:
-                return TEXT("lib");
-            default:
-                return TEXT("ps");
+                case EShaderStage::Vertex:
+                    return TEXT("vs");
+                case EShaderStage::Pixel:
+                    return TEXT("ps");
+                case EShaderStage::Compute:
+                    return TEXT("cs");
+                case EShaderStage::Geometry:
+                    return TEXT("gs");
+                case EShaderStage::Hull:
+                    return TEXT("hs");
+                case EShaderStage::Domain:
+                    return TEXT("ds");
+                case EShaderStage::Mesh:
+                    return TEXT("ms");
+                case EShaderStage::Amplification:
+                    return TEXT("as");
+                case EShaderStage::Library:
+                    return TEXT("lib");
+                default:
+                    return TEXT("ps");
             }
         }
 
@@ -711,64 +729,64 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             profile.Append(GetProfilePrefix(stage));
             profile.Append(TEXT("_"));
             switch (backend) {
-            case Rhi::ERhiBackend::DirectX11:
-                profile.Append(TEXT("5_0"));
-                break;
-            case Rhi::ERhiBackend::DirectX12:
-            case Rhi::ERhiBackend::Vulkan:
-            default:
-                profile.Append(TEXT("6_6"));
-                break;
+                case Rhi::ERhiBackend::DirectX11:
+                    profile.Append(TEXT("5_0"));
+                    break;
+                case Rhi::ERhiBackend::DirectX12:
+                case Rhi::ERhiBackend::Vulkan:
+                default:
+                    profile.Append(TEXT("6_6"));
+                    break;
             }
             return profile;
         }
 
         auto GetTargetForBackend(Rhi::ERhiBackend backend) -> const TChar* {
             switch (backend) {
-            case Rhi::ERhiBackend::DirectX11:
-                return TEXT("dxbc");
-            case Rhi::ERhiBackend::DirectX12:
-                return TEXT("dxil");
-            case Rhi::ERhiBackend::Vulkan:
-                return TEXT("spirv");
-            default:
-                return TEXT("dxil");
+                case Rhi::ERhiBackend::DirectX11:
+                    return TEXT("dxbc");
+                case Rhi::ERhiBackend::DirectX12:
+                    return TEXT("dxil");
+                case Rhi::ERhiBackend::Vulkan:
+                    return TEXT("spirv");
+                default:
+                    return TEXT("dxil");
             }
         }
 
         auto GetOptimizationFlag(EShaderOptimization optimization) -> FString {
             switch (optimization) {
-            case EShaderOptimization::Debug:
-                return FString(TEXT("-O0"));
-            case EShaderOptimization::Performance:
-                return FString(TEXT("-O3"));
-            case EShaderOptimization::Size:
-                return FString(TEXT("-O2"));
-            case EShaderOptimization::Default:
-            default:
-                return FString(TEXT("-O1"));
+                case EShaderOptimization::Debug:
+                    return FString(TEXT("-O0"));
+                case EShaderOptimization::Performance:
+                    return FString(TEXT("-O3"));
+                case EShaderOptimization::Size:
+                    return FString(TEXT("-O2"));
+                case EShaderOptimization::Default:
+                default:
+                    return FString(TEXT("-O1"));
             }
         }
 
         auto BuildOutputExtension(Rhi::ERhiBackend backend) -> FString {
             switch (backend) {
-            case Rhi::ERhiBackend::Vulkan:
-                return FString(TEXT(".spv"));
-            case Rhi::ERhiBackend::DirectX11:
-                return FString(TEXT(".dxbc"));
-            case Rhi::ERhiBackend::DirectX12:
-            default:
-                return FString(TEXT(".dxil"));
+                case Rhi::ERhiBackend::Vulkan:
+                    return FString(TEXT(".spv"));
+                case Rhi::ERhiBackend::DirectX11:
+                    return FString(TEXT(".dxbc"));
+                case Rhi::ERhiBackend::DirectX12:
+                default:
+                    return FString(TEXT(".dxil"));
             }
         }
 
         auto GetLanguageFlag(EShaderSourceLanguage language) -> const TChar* {
             switch (language) {
-            case EShaderSourceLanguage::Slang:
-                return TEXT("slang");
-            case EShaderSourceLanguage::Hlsl:
-            default:
-                return TEXT("hlsl");
+                case EShaderSourceLanguage::Slang:
+                    return TEXT("slang");
+                case EShaderSourceLanguage::Hlsl:
+                default:
+                    return TEXT("hlsl");
             }
         }
 
@@ -781,9 +799,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             return out;
         }
 
-        void AddArg(TVector<FString>& args, const TChar* text) {
-            args.EmplaceBack(text);
-        }
+        void AddArg(TVector<FString>& args, const TChar* text) { args.EmplaceBack(text); }
 
         void AppendVulkanBindingArgs(const FVulkanBindingOptions& options,
             const TVector<u32>* spaces, TVector<FString>& args) {
@@ -838,8 +854,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         FAutoBindingOutput autoBinding;
-        if (!ApplyAutoBindings(request.mSource.mPath, request.mOptions.mTargetBackend,
-                autoBinding, result.mDiagnostics)) {
+        if (!ApplyAutoBindings(request.mSource.mPath, request.mOptions.mTargetBackend, autoBinding,
+                result.mDiagnostics)) {
             result.mSucceeded = false;
             return result;
         }
@@ -847,12 +863,10 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         const FString sourcePath =
             autoBinding.mApplied ? autoBinding.mSourcePath : request.mSource.mPath;
 
-        const FString outputPath =
-            BuildTempOutputPath(sourcePath, FString(TEXT("slang")),
-                BuildOutputExtension(request.mOptions.mTargetBackend));
+        const FString outputPath = BuildTempOutputPath(sourcePath, FString(TEXT("slang")),
+            BuildOutputExtension(request.mOptions.mTargetBackend));
         const FString reflectionPath =
-            BuildTempOutputPath(sourcePath, FString(TEXT("slang")),
-                FString(TEXT(".json")));
+            BuildTempOutputPath(sourcePath, FString(TEXT("slang")), FString(TEXT(".json")));
 
         TVector<FString> args;
         AddArg(args, TEXT("-lang"));
@@ -871,8 +885,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             args.PushBack(request.mOptions.mTargetProfile);
         } else {
             AddArg(args, TEXT("-profile"));
-            args.PushBack(BuildDefaultProfile(request.mSource.mStage,
-                request.mOptions.mTargetBackend));
+            args.PushBack(
+                BuildDefaultProfile(request.mSource.mStage, request.mOptions.mTargetBackend));
         }
 
         if (request.mOptions.mDebugInfo) {
@@ -944,12 +958,12 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         FNativeString reflectionJson;
         if (!ReadFileTextUtf8(reflectionPath, reflectionJson)) {
-            AppendDiagnosticLine(result.mDiagnostics,
-                TEXT("Failed to read Slang reflection JSON."));
-        } else if (!ParseSlangReflectionJson(reflectionJson, result.mReflection,
-                       result.mDiagnostics)) {
-            AppendDiagnosticLine(result.mDiagnostics,
-                TEXT("Failed to parse Slang reflection JSON."));
+            AppendDiagnosticLine(
+                result.mDiagnostics, TEXT("Failed to read Slang reflection JSON."));
+        } else if (!ParseSlangReflectionJson(
+                       reflectionJson, result.mReflection, result.mDiagnostics)) {
+            AppendDiagnosticLine(
+                result.mDiagnostics, TEXT("Failed to parse Slang reflection JSON."));
         }
 
         RemoveFileIfExists(reflectionPath);

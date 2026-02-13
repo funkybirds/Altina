@@ -47,21 +47,22 @@
 #include <limits>
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
 #if AE_PLATFORM_WIN
     using Microsoft::WRL::ComPtr;
 
     struct FRhiD3D11Device::FState {
-        ComPtr<ID3D11Device>        mDevice;
-        ComPtr<ID3D11DeviceContext> mImmediateContext;
-        D3D_FEATURE_LEVEL           mFeatureLevel = D3D_FEATURE_LEVEL_11_0;
-        FD3D11UploadBufferManager   mUploadManager;
-        FD3D11StagingBufferManager  mStagingManager;
-        u64                         mFrameIndex = 0ULL;
-        u64                         mCompletedSerial = 0ULL;
-        u32                         mFrameQueryIndex = 0U;
+        ComPtr<ID3D11Device>         mDevice;
+        ComPtr<ID3D11DeviceContext>  mImmediateContext;
+        D3D_FEATURE_LEVEL            mFeatureLevel = D3D_FEATURE_LEVEL_11_0;
+        FD3D11UploadBufferManager    mUploadManager;
+        FD3D11StagingBufferManager   mStagingManager;
+        u64                          mFrameIndex      = 0ULL;
+        u64                          mCompletedSerial = 0ULL;
+        u32                          mFrameQueryIndex = 0U;
         TVector<ComPtr<ID3D11Query>> mFrameQueries;
-        TVector<u64>                mFrameQuerySerials;
+        TVector<u64>                 mFrameQuerySerials;
     };
 
     struct FRhiD3D11CommandList::FState {
@@ -69,15 +70,15 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiD3D11CommandContext::FState {
-        ComPtr<ID3D11Device>        mDevice;
-        ComPtr<ID3D11DeviceContext> mDeferredContext;
+        ComPtr<ID3D11Device>         mDevice;
+        ComPtr<ID3D11DeviceContext>  mDeferredContext;
         ComPtr<ID3D11DeviceContext1> mDeferredContext1;
-        FRhiD3D11GraphicsPipeline*  mCurrentGraphicsPipeline = nullptr;
-        FRhiD3D11ComputePipeline*   mCurrentComputePipeline = nullptr;
-        bool                        mUseComputeBindings = false;
-        ID3D11RenderTargetView*     mCurrentRtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
-        UINT                        mCurrentRtvCount = 0U;
-        ID3D11DepthStencilView*     mCurrentDsv = nullptr;
+        FRhiD3D11GraphicsPipeline*   mCurrentGraphicsPipeline                             = nullptr;
+        FRhiD3D11ComputePipeline*    mCurrentComputePipeline                              = nullptr;
+        bool                         mUseComputeBindings                                  = false;
+        ID3D11RenderTargetView*      mCurrentRtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
+        UINT                         mCurrentRtvCount                                     = 0U;
+        ID3D11DepthStencilView*      mCurrentDsv                                          = nullptr;
     };
 #else
     struct FRhiD3D11Device::FState {};
@@ -211,8 +212,8 @@ namespace AltinaEngine::Rhi {
             return stage == EShaderStage::Compute;
         }
 
-        void BindConstantBuffer(ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
-            ID3D11Buffer* buffer) {
+        void BindConstantBuffer(
+            ID3D11DeviceContext* context, EShaderStage stage, UINT slot, ID3D11Buffer* buffer) {
             switch (stage) {
                 case EShaderStage::Vertex:
                     context->VSSetConstantBuffers(slot, 1, &buffer);
@@ -358,8 +359,7 @@ namespace AltinaEngine::Rhi {
         }
 
         auto ToD3D11IndexFormat(ERhiIndexType type) noexcept -> DXGI_FORMAT {
-            return (type == ERhiIndexType::Uint16) ? DXGI_FORMAT_R16_UINT
-                                                   : DXGI_FORMAT_R32_UINT;
+            return (type == ERhiIndexType::Uint16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
         }
 
         auto GetRenderTargetViewHandle(FRhiRenderTargetView* view) noexcept
@@ -397,21 +397,21 @@ namespace AltinaEngine::Rhi {
         mState->mCurrentGraphicsPipeline = graphicsPipeline;
         mState->mUseComputeBindings      = false;
 
-        ID3D11InputLayout*  inputLayout = nullptr;
-        ID3D11VertexShader* vertexShader = nullptr;
-        ID3D11PixelShader*  pixelShader  = nullptr;
+        ID3D11InputLayout*    inputLayout    = nullptr;
+        ID3D11VertexShader*   vertexShader   = nullptr;
+        ID3D11PixelShader*    pixelShader    = nullptr;
         ID3D11GeometryShader* geometryShader = nullptr;
-        ID3D11HullShader*   hullShader   = nullptr;
-        ID3D11DomainShader* domainShader = nullptr;
+        ID3D11HullShader*     hullShader     = nullptr;
+        ID3D11DomainShader*   domainShader   = nullptr;
 
         if (graphicsPipeline != nullptr) {
-            inputLayout = graphicsPipeline->GetInputLayout();
+            inputLayout      = graphicsPipeline->GetInputLayout();
             const auto& desc = pipeline->GetGraphicsDesc();
-            auto* vs = static_cast<FRhiD3D11Shader*>(desc.mVertexShader);
-            auto* ps = static_cast<FRhiD3D11Shader*>(desc.mPixelShader);
-            auto* gs = static_cast<FRhiD3D11Shader*>(desc.mGeometryShader);
-            auto* hs = static_cast<FRhiD3D11Shader*>(desc.mHullShader);
-            auto* ds = static_cast<FRhiD3D11Shader*>(desc.mDomainShader);
+            auto*       vs   = static_cast<FRhiD3D11Shader*>(desc.mVertexShader);
+            auto*       ps   = static_cast<FRhiD3D11Shader*>(desc.mPixelShader);
+            auto*       gs   = static_cast<FRhiD3D11Shader*>(desc.mGeometryShader);
+            auto*       hs   = static_cast<FRhiD3D11Shader*>(desc.mHullShader);
+            auto*       ds   = static_cast<FRhiD3D11Shader*>(desc.mDomainShader);
 
             vertexShader   = vs ? vs->GetVertexShader() : nullptr;
             pixelShader    = ps ? ps->GetPixelShader() : nullptr;
@@ -449,8 +449,8 @@ namespace AltinaEngine::Rhi {
         ID3D11ComputeShader* computeShader = nullptr;
         if (computePipeline != nullptr) {
             const auto& desc = pipeline->GetComputeDesc();
-            auto* cs = static_cast<FRhiD3D11Shader*>(desc.mComputeShader);
-            computeShader = cs ? cs->GetComputeShader() : nullptr;
+            auto*       cs   = static_cast<FRhiD3D11Shader*>(desc.mComputeShader);
+            computeShader    = cs ? cs->GetComputeShader() : nullptr;
         }
         context->CSSetShader(computeShader, nullptr, 0);
 #else
@@ -481,7 +481,7 @@ namespace AltinaEngine::Rhi {
         ID3D11Buffer* buffer = nullptr;
         if (view.mBuffer) {
             auto* d3dBuffer = static_cast<FRhiD3D11Buffer*>(view.mBuffer);
-            buffer = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
+            buffer          = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
         }
 
         const UINT stride = static_cast<UINT>(view.mStrideBytes);
@@ -503,11 +503,11 @@ namespace AltinaEngine::Rhi {
         ID3D11Buffer* buffer = nullptr;
         if (view.mBuffer) {
             auto* d3dBuffer = static_cast<FRhiD3D11Buffer*>(view.mBuffer);
-            buffer = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
+            buffer          = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
         }
 
-        const DXGI_FORMAT format = buffer ? ToD3D11IndexFormat(view.mIndexType)
-                                          : DXGI_FORMAT_UNKNOWN;
+        const DXGI_FORMAT format =
+            buffer ? ToD3D11IndexFormat(view.mIndexType) : DXGI_FORMAT_UNKNOWN;
         context->IASetIndexBuffer(buffer, format, static_cast<UINT>(view.mOffsetBytes));
 #else
         (void)view;
@@ -560,8 +560,8 @@ namespace AltinaEngine::Rhi {
 #endif
     }
 
-    void FRhiD3D11CommandContext::RHISetRenderTargets(u32 colorTargetCount,
-        FRhiTexture* const* colorTargets, FRhiTexture* depthTarget) {
+    void FRhiD3D11CommandContext::RHISetRenderTargets(
+        u32 colorTargetCount, FRhiTexture* const* colorTargets, FRhiTexture* depthTarget) {
 #if AE_PLATFORM_WIN
         ID3D11DeviceContext* context = GetDeferredContext();
         if (!context || !mState) {
@@ -569,20 +569,20 @@ namespace AltinaEngine::Rhi {
         }
 
         const UINT maxTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
-        const UINT rtvCount   = (colorTargetCount > maxTargets)
-            ? maxTargets
-            : static_cast<UINT>(colorTargetCount);
+        const UINT rtvCount =
+            (colorTargetCount > maxTargets) ? maxTargets : static_cast<UINT>(colorTargetCount);
 
         ID3D11RenderTargetView* rtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
         for (UINT i = 0; i < rtvCount; ++i) {
-            auto* texture = colorTargets ? static_cast<FRhiD3D11Texture*>(colorTargets[i]) : nullptr;
+            auto* texture =
+                colorTargets ? static_cast<FRhiD3D11Texture*>(colorTargets[i]) : nullptr;
             rtvs[i] = texture ? texture->GetRenderTargetView() : nullptr;
         }
 
         ID3D11DepthStencilView* dsv = nullptr;
         if (depthTarget != nullptr) {
             auto* depthTexture = static_cast<FRhiD3D11Texture*>(depthTarget);
-            dsv = depthTexture ? depthTexture->GetDepthStencilView() : nullptr;
+            dsv                = depthTexture ? depthTexture->GetDepthStencilView() : nullptr;
         }
 
         context->OMSetRenderTargets(rtvCount, rtvCount ? rtvs : nullptr, dsv);
@@ -607,11 +607,11 @@ namespace AltinaEngine::Rhi {
         }
 
         const UINT maxTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
-        const UINT rtvCount =
-            (desc.mColorAttachments && desc.mColorAttachmentCount > 0U)
-                ? ((desc.mColorAttachmentCount > maxTargets) ? maxTargets
-                                                             : static_cast<UINT>(desc.mColorAttachmentCount))
-                : 0U;
+        const UINT rtvCount   = (desc.mColorAttachments && desc.mColorAttachmentCount > 0U)
+              ? ((desc.mColorAttachmentCount > maxTargets)
+                        ? maxTargets
+                        : static_cast<UINT>(desc.mColorAttachmentCount))
+              : 0U;
 
         ID3D11RenderTargetView* rtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
         if (desc.mColorAttachments) {
@@ -642,19 +642,15 @@ namespace AltinaEngine::Rhi {
                 if (!rtvs[i]) {
                     continue;
                 }
-                const float clearColor[4] = {
-                    attachment.mClearColor.mR,
-                    attachment.mClearColor.mG,
-                    attachment.mClearColor.mB,
-                    attachment.mClearColor.mA
-                };
+                const float clearColor[4] = { attachment.mClearColor.mR, attachment.mClearColor.mG,
+                    attachment.mClearColor.mB, attachment.mClearColor.mA };
                 context->ClearRenderTargetView(rtvs[i], clearColor);
             }
         }
 
         if (desc.mDepthStencilAttachment && dsv) {
-            const auto& ds = *desc.mDepthStencilAttachment;
-            UINT clearFlags = 0U;
+            const auto& ds         = *desc.mDepthStencilAttachment;
+            UINT        clearFlags = 0U;
             if (ds.mDepthLoadOp == ERhiLoadOp::Clear && !ds.mReadOnlyDepth) {
                 clearFlags |= D3D11_CLEAR_DEPTH;
             }
@@ -662,8 +658,7 @@ namespace AltinaEngine::Rhi {
                 clearFlags |= D3D11_CLEAR_STENCIL;
             }
             if (clearFlags != 0U) {
-                context->ClearDepthStencilView(
-                    dsv, clearFlags, ds.mClearDepthStencil.mDepth,
+                context->ClearDepthStencilView(dsv, clearFlags, ds.mClearDepthStencil.mDepth,
                     static_cast<UINT8>(ds.mClearDepthStencil.mStencil));
             }
         }
@@ -698,8 +693,8 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        auto* texture = static_cast<FRhiD3D11Texture*>(colorTarget);
-        ID3D11RenderTargetView* rtv = texture ? texture->GetRenderTargetView() : nullptr;
+        auto*                   texture = static_cast<FRhiD3D11Texture*>(colorTarget);
+        ID3D11RenderTargetView* rtv     = texture ? texture->GetRenderTargetView() : nullptr;
         if (!rtv) {
             return;
         }
@@ -712,8 +707,8 @@ namespace AltinaEngine::Rhi {
 #endif
     }
 
-    void FRhiD3D11CommandContext::RHISetBindGroup(u32 setIndex, FRhiBindGroup* group,
-        const u32* dynamicOffsets, u32 dynamicOffsetCount) {
+    void FRhiD3D11CommandContext::RHISetBindGroup(
+        u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets, u32 dynamicOffsetCount) {
 #if AE_PLATFORM_WIN
         ID3D11DeviceContext* context = GetDeferredContext();
         if (!context || !mState || group == nullptr) {
@@ -725,15 +720,14 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        const FRhiBindGroupLayout* groupLayout  = groupDesc.mLayout;
-        const auto*                layoutEntries =
-            groupLayout ? &groupLayout->GetDesc().mEntries : nullptr;
+        const FRhiBindGroupLayout* groupLayout = groupDesc.mLayout;
+        const auto* layoutEntries = groupLayout ? &groupLayout->GetDesc().mEntries : nullptr;
 
         const FRhiD3D11GraphicsPipeline* graphicsPipeline = mState->mCurrentGraphicsPipeline;
-        const FRhiD3D11ComputePipeline* computePipeline   = mState->mCurrentComputePipeline;
+        const FRhiD3D11ComputePipeline*  computePipeline  = mState->mCurrentComputePipeline;
 
         auto getDynamicOffsetBytes = [&](const FRhiBindGroupEntry& entry,
-                                         bool& hasDynamicOffset) -> u64 {
+                                         bool&                     hasDynamicOffset) -> u64 {
             hasDynamicOffset = false;
             if (!groupLayout || layoutEntries == nullptr || dynamicOffsets == nullptr
                 || dynamicOffsetCount == 0U) {
@@ -772,12 +766,12 @@ namespace AltinaEngine::Rhi {
                     switch (mapping.mType) {
                         case ERhiBindingType::ConstantBuffer:
                         {
-                            auto* buffer = static_cast<FRhiD3D11Buffer*>(entry.mBuffer);
+                            auto*         buffer = static_cast<FRhiD3D11Buffer*>(entry.mBuffer);
                             ID3D11Buffer* nativeBuffer =
                                 buffer ? buffer->GetNativeBuffer() : nullptr;
                             ID3D11DeviceContext1* context1 = mState->mDeferredContext1.Get();
-                            bool                 hasDynamicOffset = false;
-                            const u64            dynamicOffsetBytes =
+                            bool                  hasDynamicOffset = false;
+                            const u64             dynamicOffsetBytes =
                                 getDynamicOffsetBytes(entry, hasDynamicOffset);
 
                             const bool wantsRange =
@@ -785,8 +779,8 @@ namespace AltinaEngine::Rhi {
 
                             if (context1 && wantsRange && buffer != nullptr) {
                                 const u64 bufferSizeBytes = buffer->GetDesc().mSizeBytes;
-                                u64       offsetBytes = entry.mOffset + dynamicOffsetBytes;
-                                u64       sizeBytes   = entry.mSize;
+                                u64       offsetBytes     = entry.mOffset + dynamicOffsetBytes;
+                                u64       sizeBytes       = entry.mSize;
 
                                 if (sizeBytes == 0ULL) {
                                     sizeBytes = (offsetBytes <= bufferSizeBytes)
@@ -794,12 +788,10 @@ namespace AltinaEngine::Rhi {
                                         : 0ULL;
                                 }
 
-                                const bool validRange =
-                                    (offsetBytes <= bufferSizeBytes)
+                                const bool validRange = (offsetBytes <= bufferSizeBytes)
                                     && (sizeBytes != 0ULL)
                                     && (sizeBytes <= (bufferSizeBytes - offsetBytes))
-                                    && (offsetBytes % 16ULL == 0ULL)
-                                    && (sizeBytes % 16ULL == 0ULL);
+                                    && (offsetBytes % 16ULL == 0ULL) && (sizeBytes % 16ULL == 0ULL);
 
                                 if (validRange) {
                                     const u64 firstConstant64 = offsetBytes / 16ULL;
@@ -807,11 +799,11 @@ namespace AltinaEngine::Rhi {
                                     const u64 maxUint =
                                         static_cast<u64>(std::numeric_limits<UINT>::max());
                                     if (firstConstant64 <= maxUint && numConstants64 <= maxUint) {
-                                        const UINT firstConstant = static_cast<UINT>(firstConstant64);
-                                        const UINT numConstants  = static_cast<UINT>(numConstants64);
-                                        BindConstantBufferWithOffset(
-                                            context1, mapping.mStage, slot, nativeBuffer,
-                                            firstConstant, numConstants);
+                                        const UINT firstConstant =
+                                            static_cast<UINT>(firstConstant64);
+                                        const UINT numConstants = static_cast<UINT>(numConstants64);
+                                        BindConstantBufferWithOffset(context1, mapping.mStage, slot,
+                                            nativeBuffer, firstConstant, numConstants);
                                         break;
                                     }
                                 }
@@ -969,8 +961,8 @@ namespace AltinaEngine::Rhi {
 
     namespace {
 #if AE_PLATFORM_WIN
-        using Core::Container::FString;
-        using Core::Container::TVector;
+        using Container::FString;
+        using Container::TVector;
 
         auto ToD3D11Format(ERhiFormat format) noexcept -> DXGI_FORMAT {
             switch (format) {
@@ -1399,7 +1391,7 @@ namespace AltinaEngine::Rhi {
                 }
 
                 D3D11_QUERY_DESC queryDesc{};
-                queryDesc.Query = D3D11_QUERY_EVENT;
+                queryDesc.Query     = D3D11_QUERY_EVENT;
                 queryDesc.MiscFlags = 0U;
 
                 bool queryOk = true;
@@ -1480,8 +1472,8 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiD3D11Device::CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef {
 #if AE_PLATFORM_WIN
-        auto viewport = MakeResource<FRhiD3D11Viewport>(
-            desc, GetNativeDevice(), GetImmediateContext());
+        auto viewport =
+            MakeResource<FRhiD3D11Viewport>(desc, GetNativeDevice(), GetImmediateContext());
         if (viewport && !viewport->IsValid()) {
             viewport->SetDeleteQueue(nullptr);
             viewport.Reset();
@@ -1665,8 +1657,8 @@ namespace AltinaEngine::Rhi {
 
         if (mState->mImmediateContext && !mState->mFrameQueries.IsEmpty()) {
             const u32 queryCount = static_cast<u32>(mState->mFrameQueries.Size());
-            const u32 index = (queryCount > 0U) ? (mState->mFrameQueryIndex % queryCount) : 0U;
-            auto& query = mState->mFrameQueries[index];
+            const u32 index      = (queryCount > 0U) ? (mState->mFrameQueryIndex % queryCount) : 0U;
+            auto&     query      = mState->mFrameQueries[index];
             if (query) {
                 mState->mFrameQuerySerials[index] = mState->mFrameIndex;
                 mState->mImmediateContext->End(query.Get());

@@ -9,7 +9,8 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::RenderCore {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
 
     enum class EFrameGraphQueue : u8 {
         Graphics = 0,
@@ -29,23 +30,24 @@ namespace AltinaEngine::RenderCore {
         ExternalOutput = 1u << 1
     };
 
-    [[nodiscard]] constexpr auto operator|(EFrameGraphPassFlags lhs, EFrameGraphPassFlags rhs) noexcept
-        -> EFrameGraphPassFlags {
+    [[nodiscard]] constexpr auto operator|(
+        EFrameGraphPassFlags lhs, EFrameGraphPassFlags rhs) noexcept -> EFrameGraphPassFlags {
         return static_cast<EFrameGraphPassFlags>(ToUnderlying(lhs) | ToUnderlying(rhs));
     }
 
-    [[nodiscard]] constexpr auto operator&(EFrameGraphPassFlags lhs, EFrameGraphPassFlags rhs) noexcept
-        -> EFrameGraphPassFlags {
+    [[nodiscard]] constexpr auto operator&(
+        EFrameGraphPassFlags lhs, EFrameGraphPassFlags rhs) noexcept -> EFrameGraphPassFlags {
         return static_cast<EFrameGraphPassFlags>(ToUnderlying(lhs) & ToUnderlying(rhs));
     }
 
-    constexpr auto operator|=(EFrameGraphPassFlags& lhs, EFrameGraphPassFlags rhs) noexcept -> EFrameGraphPassFlags& {
+    constexpr auto operator|=(EFrameGraphPassFlags& lhs, EFrameGraphPassFlags rhs) noexcept
+        -> EFrameGraphPassFlags& {
         lhs = lhs | rhs;
         return lhs;
     }
 
-    [[nodiscard]] constexpr auto HasAnyFlags(EFrameGraphPassFlags value, EFrameGraphPassFlags flags) noexcept
-        -> bool {
+    [[nodiscard]] constexpr auto HasAnyFlags(
+        EFrameGraphPassFlags value, EFrameGraphPassFlags flags) noexcept -> bool {
         return (ToUnderlying(value) & ToUnderlying(flags)) != 0;
     }
 
@@ -60,32 +62,32 @@ namespace AltinaEngine::RenderCore {
     };
 
     struct FFrameGraphTextureRef {
-        u32 mId = 0;
+        u32                          mId = 0;
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool { return mId != 0U; }
     };
 
     struct FFrameGraphBufferRef {
-        u32 mId = 0;
+        u32                          mId = 0;
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool { return mId != 0U; }
     };
 
     struct FFrameGraphSRVRef {
-        u32 mId = 0;
+        u32                          mId = 0;
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool { return mId != 0U; }
     };
 
     struct FFrameGraphUAVRef {
-        u32 mId = 0;
+        u32                          mId = 0;
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool { return mId != 0U; }
     };
 
     struct FFrameGraphRTVRef {
-        u32 mId = 0;
+        u32                          mId = 0;
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool { return mId != 0U; }
     };
 
     struct FFrameGraphDSVRef {
-        u32 mId = 0;
+        u32                          mId = 0;
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool { return mId != 0U; }
     };
 
@@ -108,18 +110,18 @@ namespace AltinaEngine::RenderCore {
     };
 
     struct FRdgRenderTargetBinding {
-        FFrameGraphRTVRef mRTV;
-        Rhi::ERhiLoadOp   mLoadOp  = Rhi::ERhiLoadOp::Load;
-        Rhi::ERhiStoreOp  mStoreOp = Rhi::ERhiStoreOp::Store;
+        FFrameGraphRTVRef   mRTV;
+        Rhi::ERhiLoadOp     mLoadOp     = Rhi::ERhiLoadOp::Load;
+        Rhi::ERhiStoreOp    mStoreOp    = Rhi::ERhiStoreOp::Store;
         Rhi::FRhiClearColor mClearColor = {};
     };
 
     struct FRdgDepthStencilBinding {
-        FFrameGraphDSVRef  mDSV;
-        Rhi::ERhiLoadOp    mDepthLoadOp   = Rhi::ERhiLoadOp::Load;
-        Rhi::ERhiStoreOp   mDepthStoreOp  = Rhi::ERhiStoreOp::Store;
-        Rhi::ERhiLoadOp    mStencilLoadOp = Rhi::ERhiLoadOp::Load;
-        Rhi::ERhiStoreOp   mStencilStoreOp = Rhi::ERhiStoreOp::Store;
+        FFrameGraphDSVRef          mDSV;
+        Rhi::ERhiLoadOp            mDepthLoadOp       = Rhi::ERhiLoadOp::Load;
+        Rhi::ERhiStoreOp           mDepthStoreOp      = Rhi::ERhiStoreOp::Store;
+        Rhi::ERhiLoadOp            mStencilLoadOp     = Rhi::ERhiLoadOp::Load;
+        Rhi::ERhiStoreOp           mStencilStoreOp    = Rhi::ERhiStoreOp::Store;
         Rhi::FRhiClearDepthStencil mClearDepthStencil = {};
     };
 
@@ -138,8 +140,8 @@ namespace AltinaEngine::RenderCore {
         FFrameGraphTextureRef Write(FFrameGraphTextureRef tex, Rhi::ERhiResourceState state,
             const Rhi::FRhiTextureViewRange& range);
 
-        FFrameGraphSRVRef CreateSRV(
-            FFrameGraphTextureRef tex, const Rhi::FRhiShaderResourceViewDesc& desc);
+        FFrameGraphSRVRef     CreateSRV(
+                FFrameGraphTextureRef tex, const Rhi::FRhiShaderResourceViewDesc& desc);
         FFrameGraphUAVRef CreateUAV(
             FFrameGraphTextureRef tex, const Rhi::FRhiUnorderedAccessViewDesc& desc);
         FFrameGraphSRVRef CreateSRV(
@@ -165,19 +167,19 @@ namespace AltinaEngine::RenderCore {
         u32          mPassIndex = 0;
     };
 
-    using TRdgPassExecuteFn =
-        void (*)(Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& res);
+    using TRdgPassExecuteFn = void (*)(
+        Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& res);
 
     template <typename PassData>
-    using TRdgPassExecuteWithDataFn = void (*)(Rhi::FRhiCmdContext& ctx,
-        const FFrameGraphPassResources& res, const PassData& data);
+    using TRdgPassExecuteWithDataFn = void (*)(
+        Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& res, const PassData& data);
 
     struct FFrameGraphPassDesc {
-        const char*   mName  = "UnnamedPass";
-        EFrameGraphPassType  mType  = EFrameGraphPassType::Raster;
-        EFrameGraphQueue     mQueue = EFrameGraphQueue::Graphics;
-        EFrameGraphPassFlags mFlags = EFrameGraphPassFlags::None;
-        TRdgPassExecuteFn mExecute = nullptr;
+        const char*          mName    = "UnnamedPass";
+        EFrameGraphPassType  mType    = EFrameGraphPassType::Raster;
+        EFrameGraphQueue     mQueue   = EFrameGraphQueue::Graphics;
+        EFrameGraphPassFlags mFlags   = EFrameGraphPassFlags::None;
+        TRdgPassExecuteFn    mExecute = nullptr;
     };
 
     class AE_RENDER_CORE_API FFrameGraph {
@@ -185,10 +187,10 @@ namespace AltinaEngine::RenderCore {
         explicit FFrameGraph(Rhi::FRhiDevice& device);
         ~FFrameGraph();
 
-        FFrameGraph(const FFrameGraph&) = delete;
+        FFrameGraph(const FFrameGraph&)                    = delete;
         auto operator=(const FFrameGraph&) -> FFrameGraph& = delete;
-        FFrameGraph(FFrameGraph&&) = delete;
-        auto operator=(FFrameGraph&&) -> FFrameGraph& = delete;
+        FFrameGraph(FFrameGraph&&)                         = delete;
+        auto operator=(FFrameGraph&&) -> FFrameGraph&      = delete;
 
         void BeginFrame(u64 frameIndex);
         void EndFrame();
@@ -198,16 +200,16 @@ namespace AltinaEngine::RenderCore {
             const u32 passIndex = AllocatePass(desc);
             auto&     pass      = mPasses[passIndex];
 
-            using TPassData = PassData;
-            TPassData* data = new TPassData();
-            pass.mPassData = data;
+            using TPassData       = PassData;
+            TPassData* data       = new TPassData();
+            pass.mPassData        = data;
             pass.mDestroyPassData = &DestroyPassData<TPassData>;
 
-            using TExecute = typename AltinaEngine::TDecay<ExecuteFunc>::TType;
-            TExecute* exec = new TExecute(AltinaEngine::Forward<ExecuteFunc>(execute));
+            using TExecute        = typename AltinaEngine::TDecay<ExecuteFunc>::TType;
+            TExecute* exec        = new TExecute(AltinaEngine::Forward<ExecuteFunc>(execute));
             pass.mExecuteUserData = exec;
-            pass.mExecute = &ExecuteWithData<TPassData, TExecute>;
-            pass.mDestroyExecute = &DestroyExecute<TExecute>;
+            pass.mExecute         = &ExecuteWithData<TPassData, TExecute>;
+            pass.mDestroyExecute  = &DestroyExecute<TExecute>;
 
             FFrameGraphPassBuilder builder(*this, passIndex);
             if constexpr (requires { setup(builder, *data); }) {
@@ -222,111 +224,111 @@ namespace AltinaEngine::RenderCore {
 
         template <typename SetupFunc>
         void AddPass(const FFrameGraphPassDesc& desc, SetupFunc&& setup) {
-            const u32 passIndex = AllocatePass(desc);
+            const u32              passIndex = AllocatePass(desc);
             FFrameGraphPassBuilder builder(*this, passIndex);
             if constexpr (requires { setup(builder); }) {
                 AltinaEngine::Forward<SetupFunc>(setup)(builder);
             } else {
-                static_assert(sizeof(SetupFunc) == 0,
-                    "SetupFunc must accept (FFrameGraphPassBuilder&)");
+                static_assert(
+                    sizeof(SetupFunc) == 0, "SetupFunc must accept (FFrameGraphPassBuilder&)");
             }
         }
 
-        void Compile();
-        void Execute(Rhi::FRhiCmdContext& cmdContext);
+        void                  Compile();
+        void                  Execute(Rhi::FRhiCmdContext& cmdContext);
 
         FFrameGraphTextureRef ImportTexture(
             Rhi::FRhiTexture* external, Rhi::ERhiResourceState state);
-        FFrameGraphBufferRef ImportBuffer(
-            Rhi::FRhiBuffer* external, Rhi::ERhiResourceState state);
+        FFrameGraphBufferRef ImportBuffer(Rhi::FRhiBuffer* external, Rhi::ERhiResourceState state);
 
     private:
         friend class FFrameGraphPassResources;
         friend class FFrameGraphPassBuilder;
 
-        enum class EFrameGraphResourceType : u8 { Texture, Buffer };
+        enum class EFrameGraphResourceType : u8 {
+            Texture,
+            Buffer
+        };
 
         struct FRdgResourceAccess {
-            EFrameGraphResourceType       mType = EFrameGraphResourceType::Texture;
-            u32                    mResourceId = 0;
-            Rhi::ERhiResourceState mState = Rhi::ERhiResourceState::Unknown;
-            bool                   mIsWrite = false;
-            bool                   mHasRange = false;
+            EFrameGraphResourceType   mType       = EFrameGraphResourceType::Texture;
+            u32                       mResourceId = 0;
+            Rhi::ERhiResourceState    mState      = Rhi::ERhiResourceState::Unknown;
+            bool                      mIsWrite    = false;
+            bool                      mHasRange   = false;
             Rhi::FRhiTextureViewRange mRange;
         };
 
         struct FRdgTextureEntry {
             FFrameGraphTextureDesc mDesc;
             Rhi::FRhiTextureRef    mTexture;
-            Rhi::FRhiTexture*      mExternal = nullptr;
-            bool                   mIsExternal = false;
+            Rhi::FRhiTexture*      mExternal         = nullptr;
+            bool                   mIsExternal       = false;
             bool                   mIsExternalOutput = false;
-            Rhi::ERhiResourceState mFinalState = Rhi::ERhiResourceState::Unknown;
+            Rhi::ERhiResourceState mFinalState       = Rhi::ERhiResourceState::Unknown;
         };
 
         struct FRdgBufferEntry {
             FFrameGraphBufferDesc  mDesc;
             Rhi::FRhiBufferRef     mBuffer;
-            Rhi::FRhiBuffer*       mExternal = nullptr;
-            bool                   mIsExternal = false;
+            Rhi::FRhiBuffer*       mExternal         = nullptr;
+            bool                   mIsExternal       = false;
             bool                   mIsExternalOutput = false;
-            Rhi::ERhiResourceState mFinalState = Rhi::ERhiResourceState::Unknown;
+            Rhi::ERhiResourceState mFinalState       = Rhi::ERhiResourceState::Unknown;
         };
 
         struct FRdgSRVEntry {
-            bool mIsTexture = true;
-            u32  mResourceId = 0;
+            bool                            mIsTexture  = true;
+            u32                             mResourceId = 0;
             Rhi::FRhiShaderResourceViewDesc mDesc;
             Rhi::FRhiShaderResourceViewRef  mView;
         };
 
         struct FRdgUAVEntry {
-            bool mIsTexture = true;
-            u32  mResourceId = 0;
+            bool                             mIsTexture  = true;
+            u32                              mResourceId = 0;
             Rhi::FRhiUnorderedAccessViewDesc mDesc;
             Rhi::FRhiUnorderedAccessViewRef  mView;
         };
 
         struct FRdgRTVEntry {
-            u32 mResourceId = 0;
+            u32                           mResourceId = 0;
             Rhi::FRhiRenderTargetViewDesc mDesc;
             Rhi::FRhiRenderTargetViewRef  mView;
         };
 
         struct FRdgDSVEntry {
-            u32 mResourceId = 0;
+            u32                           mResourceId = 0;
             Rhi::FRhiDepthStencilViewDesc mDesc;
             Rhi::FRhiDepthStencilViewRef  mView;
         };
 
         struct FRdgPass {
-            FFrameGraphPassDesc mDesc;
-            TVector<FRdgResourceAccess>   mAccesses;
+            FFrameGraphPassDesc              mDesc;
+            TVector<FRdgResourceAccess>      mAccesses;
             TVector<FRdgRenderTargetBinding> mRenderTargets;
-            bool                 mHasDepthStencil = false;
-            FRdgDepthStencilBinding mDepthStencil;
-            bool                 mHasSideEffect = false;
+            bool                             mHasDepthStencil = false;
+            FRdgDepthStencilBinding          mDepthStencil;
+            bool                             mHasSideEffect = false;
 
-            void*                mPassData = nullptr;
-            void               (*mDestroyPassData)(void* data) = nullptr;
+            void*                            mPassData = nullptr;
+            void (*mDestroyPassData)(void* data)       = nullptr;
 
-            void*                mExecuteUserData = nullptr;
+            void* mExecuteUserData                       = nullptr;
             void (*mExecute)(Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& res,
                 const void* passData, void* executeData) = nullptr;
-            void (*mDestroyExecute)(void* executeData) = nullptr;
+            void (*mDestroyExecute)(void* executeData)   = nullptr;
 
             TVector<Rhi::FRhiRenderPassColorAttachment> mCompiledColorAttachments;
             Rhi::FRhiRenderPassDepthStencilAttachment   mCompiledDepthAttachment;
             bool                                        mHasCompiledDepth = false;
         };
 
-        template <typename PassData>
-        static void DestroyPassData(void* data) {
+        template <typename PassData> static void DestroyPassData(void* data) {
             delete static_cast<PassData*>(data); // NOLINT
         }
 
-        template <typename ExecuteFunc>
-        static void DestroyExecute(void* executeData) {
+        template <typename ExecuteFunc> static void DestroyExecute(void* executeData) {
             delete static_cast<ExecuteFunc*>(executeData); // NOLINT
         }
 
@@ -334,7 +336,9 @@ namespace AltinaEngine::RenderCore {
         static void ExecuteWithData(Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& res,
             const void* passData, void* executeData) {
             auto* exec = static_cast<ExecuteFunc*>(executeData);
-            if constexpr (requires { (*exec)(ctx, res, *static_cast<const PassData*>(passData)); }) {
+            if constexpr (requires {
+                              (*exec)(ctx, res, *static_cast<const PassData*>(passData));
+                          }) {
                 (*exec)(ctx, res, *static_cast<const PassData*>(passData));
             } else if constexpr (requires { (*exec)(ctx, res); }) {
                 (*exec)(ctx, res);
@@ -352,14 +356,14 @@ namespace AltinaEngine::RenderCore {
         auto CreateTextureInternal(const FFrameGraphTextureDesc& desc) -> FFrameGraphTextureRef;
         auto CreateBufferInternal(const FFrameGraphBufferDesc& desc) -> FFrameGraphBufferRef;
 
-        auto CreateSRVInternal(FFrameGraphTextureRef tex, const Rhi::FRhiShaderResourceViewDesc& desc)
-            -> FFrameGraphSRVRef;
-        auto CreateUAVInternal(FFrameGraphTextureRef tex, const Rhi::FRhiUnorderedAccessViewDesc& desc)
-            -> FFrameGraphUAVRef;
-        auto CreateSRVInternal(FFrameGraphBufferRef buf, const Rhi::FRhiShaderResourceViewDesc& desc)
-            -> FFrameGraphSRVRef;
-        auto CreateUAVInternal(FFrameGraphBufferRef buf, const Rhi::FRhiUnorderedAccessViewDesc& desc)
-            -> FFrameGraphUAVRef;
+        auto CreateSRVInternal(FFrameGraphTextureRef tex,
+            const Rhi::FRhiShaderResourceViewDesc&   desc) -> FFrameGraphSRVRef;
+        auto CreateUAVInternal(FFrameGraphTextureRef tex,
+            const Rhi::FRhiUnorderedAccessViewDesc&  desc) -> FFrameGraphUAVRef;
+        auto CreateSRVInternal(FFrameGraphBufferRef buf,
+            const Rhi::FRhiShaderResourceViewDesc&  desc) -> FFrameGraphSRVRef;
+        auto CreateUAVInternal(FFrameGraphBufferRef buf,
+            const Rhi::FRhiUnorderedAccessViewDesc& desc) -> FFrameGraphUAVRef;
         auto CreateRTVInternal(FFrameGraphTextureRef tex, const Rhi::FRhiRenderTargetViewDesc& desc)
             -> FFrameGraphRTVRef;
         auto CreateDSVInternal(FFrameGraphTextureRef tex, const Rhi::FRhiDepthStencilViewDesc& desc)
@@ -367,14 +371,14 @@ namespace AltinaEngine::RenderCore {
 
         void RegisterTextureAccess(u32 passIndex, FFrameGraphTextureRef tex,
             Rhi::ERhiResourceState state, bool isWrite, const Rhi::FRhiTextureViewRange* range);
-        void RegisterBufferAccess(u32 passIndex, FFrameGraphBufferRef buf,
-            Rhi::ERhiResourceState state, bool isWrite);
+        void RegisterBufferAccess(
+            u32 passIndex, FFrameGraphBufferRef buf, Rhi::ERhiResourceState state, bool isWrite);
 
         void SetRenderTargetsInternal(u32 passIndex, const FRdgRenderTargetBinding* RTVs,
             u32 RTVCount, const FRdgDepthStencilBinding* DSV);
         void SetExternalOutputInternal(
             u32 passIndex, FFrameGraphTextureRef tex, Rhi::ERhiResourceState finalState);
-        void SetSideEffectInternal(u32 passIndex);
+        void               SetSideEffectInternal(u32 passIndex);
 
         [[nodiscard]] auto ResolveTexture(FFrameGraphTextureRef ref) const -> Rhi::FRhiTexture*;
         [[nodiscard]] auto ResolveBuffer(FFrameGraphBufferRef ref) const -> Rhi::FRhiBuffer*;
@@ -384,10 +388,10 @@ namespace AltinaEngine::RenderCore {
         [[nodiscard]] auto ResolveDSV(FFrameGraphDSVRef ref) const -> Rhi::FRhiDepthStencilView*;
 
     private:
-        Rhi::FRhiDevice* mDevice = nullptr;
-        u64              mFrameIndex = 0;
-        bool             mInFrame = false;
-        bool             mCompiled = false;
+        Rhi::FRhiDevice*          mDevice     = nullptr;
+        u64                       mFrameIndex = 0;
+        bool                      mInFrame    = false;
+        bool                      mCompiled   = false;
 
         TVector<FRdgTextureEntry> mTextures;
         TVector<FRdgBufferEntry>  mBuffers;
@@ -399,5 +403,3 @@ namespace AltinaEngine::RenderCore {
     };
 
 } // namespace AltinaEngine::RenderCore
-
-

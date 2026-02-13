@@ -13,18 +13,19 @@
 #include "Rhi/RhiPipelineLayout.h"
 
 namespace {
+    namespace Container = AltinaEngine::Core::Container;
+    using AltinaEngine::Rhi::ERhiAdapterType;
+    using AltinaEngine::Rhi::ERhiBackend;
+    using AltinaEngine::Rhi::ERhiVendorId;
+    using AltinaEngine::Rhi::FRhiAdapterDesc;
+    using AltinaEngine::Rhi::FRhiInitDesc;
+    using AltinaEngine::Rhi::FRhiMockContext;
     using AltinaEngine::ShaderCompiler::EShaderSourceLanguage;
     using AltinaEngine::ShaderCompiler::EShaderStage;
     using AltinaEngine::ShaderCompiler::FShaderCompileRequest;
     using AltinaEngine::ShaderCompiler::FShaderCompileResult;
     using AltinaEngine::ShaderCompiler::GetShaderCompiler;
-    using AltinaEngine::Core::Container::FString;
-    using AltinaEngine::Rhi::ERhiBackend;
-    using AltinaEngine::Rhi::ERhiAdapterType;
-    using AltinaEngine::Rhi::ERhiVendorId;
-    using AltinaEngine::Rhi::FRhiAdapterDesc;
-    using AltinaEngine::Rhi::FRhiInitDesc;
-    using AltinaEngine::Rhi::FRhiMockContext;
+    using Container::FString;
 
     auto ToFString(const std::filesystem::path& path) -> FString {
         FString out;
@@ -80,11 +81,11 @@ namespace {
         return false;
     }
 
-    auto CreateMockDevice(FRhiMockContext& context) -> AltinaEngine::Core::Container::TShared<
-        AltinaEngine::Rhi::FRhiDevice> {
+    auto CreateMockDevice(FRhiMockContext& context)
+        -> Container::TShared<AltinaEngine::Rhi::FRhiDevice> {
         FRhiAdapterDesc adapter{};
         adapter.mName.Assign(TEXT("Mock GPU"));
-        adapter.mType    = ERhiAdapterType::Discrete;
+        adapter.mType     = ERhiAdapterType::Discrete;
         adapter.mVendorId = ERhiVendorId::Nvidia;
         context.AddAdapter(adapter);
         REQUIRE(context.Init(FRhiInitDesc{}));
@@ -93,10 +94,10 @@ namespace {
         return device;
     }
 
-    auto BuildPipelineLayoutFromResult(AltinaEngine::Rhi::FRhiDevice& device,
-        const FShaderCompileResult& result,
-        AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef>&
-            outLayouts) -> AltinaEngine::Rhi::FRhiPipelineLayoutRef {
+    auto BuildPipelineLayoutFromResult(AltinaEngine::Rhi::FRhiDevice&  device,
+        const FShaderCompileResult&                                    result,
+        Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef>& outLayouts)
+        -> AltinaEngine::Rhi::FRhiPipelineLayoutRef {
         auto pipelineDesc = result.mRhiLayout.mPipelineLayout;
         pipelineDesc.mBindGroupLayouts.Clear();
         pipelineDesc.mBindGroupLayouts.Reserve(result.mRhiLayout.mBindGroupLayouts.Size());
@@ -125,8 +126,9 @@ namespace {
         dir /= "ShaderCompileTests";
         std::filesystem::create_directories(dir, ec);
 
-        const auto id = counter.fetch_add(1, std::memory_order_relaxed);
-        std::filesystem::path path = dir / (std::string(prefix) + "_" + std::to_string(id) + ".hlsl");
+        const auto            id = counter.fetch_add(1, std::memory_order_relaxed);
+        std::filesystem::path path =
+            dir / (std::string(prefix) + "_" + std::to_string(id) + ".hlsl");
 
         std::ofstream file(path, std::ios::binary | std::ios::trunc);
         file.write(content, static_cast<std::streamsize>(std::strlen(content)));
@@ -134,18 +136,19 @@ namespace {
         return path;
     }
 
-    auto CompileShader(const char* source, const AltinaEngine::TChar* entryPoint, EShaderStage stage,
-        EShaderSourceLanguage language, ERhiBackend backend, const char* label) -> bool {
-        const auto shaderPath = WriteTempShaderFile(label, source);
+    auto CompileShader(const char* source, const AltinaEngine::TChar* entryPoint,
+        EShaderStage stage, EShaderSourceLanguage language, ERhiBackend backend, const char* label)
+        -> bool {
+        const auto            shaderPath = WriteTempShaderFile(label, source);
 
         FShaderCompileRequest request;
-        request.mSource.mPath       = ToFString(shaderPath);
-        request.mSource.mEntryPoint = FString(entryPoint);
-        request.mSource.mStage      = stage;
-        request.mSource.mLanguage   = language;
+        request.mSource.mPath           = ToFString(shaderPath);
+        request.mSource.mEntryPoint     = FString(entryPoint);
+        request.mSource.mStage          = stage;
+        request.mSource.mLanguage       = language;
         request.mOptions.mTargetBackend = backend;
 
-        const auto result = GetShaderCompiler().Compile(request);
+        const auto      result = GetShaderCompiler().Compile(request);
 
         std::error_code ec;
         std::filesystem::remove(shaderPath, ec);
@@ -199,7 +202,8 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
 }
 )";
 
-    constexpr const char* kAutoBindingGroupedShaderHlsl = R"(#include "Shader/Bindings/ShaderBindings.hlsli"
+    constexpr const char* kAutoBindingGroupedShaderHlsl =
+        R"(#include "Shader/Bindings/ShaderBindings.hlsli"
 
 AE_PER_FRAME_CBUFFER(PerFrame) {
     float4 mTint;
@@ -220,7 +224,8 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
 }
 )";
 
-    constexpr const char* kAutoBindingGroupedShaderSlang = R"(#include "Shader/Bindings/ShaderBindings.slang"
+    constexpr const char* kAutoBindingGroupedShaderSlang =
+        R"(#include "Shader/Bindings/ShaderBindings.slang"
 
 AE_PER_FRAME_CBUFFER(PerFrame) {
     float4 mTint;
@@ -241,7 +246,8 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
 }
 )";
 
-    constexpr const char* kCBufferMemberShaderHlsl = R"(#include "Shader/Bindings/ShaderBindings.hlsli"
+    constexpr const char* kCBufferMemberShaderHlsl =
+        R"(#include "Shader/Bindings/ShaderBindings.hlsli"
 
 struct FInner {
     float3 A;
@@ -290,22 +296,23 @@ TEST_CASE("ShaderCompiler.Slang.VS_PS_CS") {
 }
 
 TEST_CASE("ShaderCompiler.Slang.VulkanAutoBinding") {
-    const auto shaderPath = WriteTempShaderFile("Slang-AutoBinding", kAutoBindingGroupedShaderSlang);
+    const auto shaderPath =
+        WriteTempShaderFile("Slang-AutoBinding", kAutoBindingGroupedShaderSlang);
 
     FShaderCompileRequest request;
-    request.mSource.mPath       = ToFString(shaderPath);
-    request.mSource.mEntryPoint = FString(TEXT("CSMain"));
-    request.mSource.mStage      = EShaderStage::Compute;
-    request.mSource.mLanguage   = EShaderSourceLanguage::Slang;
+    request.mSource.mPath           = ToFString(shaderPath);
+    request.mSource.mEntryPoint     = FString(TEXT("CSMain"));
+    request.mSource.mStage          = EShaderStage::Compute;
+    request.mSource.mLanguage       = EShaderSourceLanguage::Slang;
     request.mOptions.mTargetBackend = ERhiBackend::Vulkan;
     AddShaderIncludeDir(request);
-    request.mOptions.mVulkanBinding.mEnableAutoShift = true;
+    request.mOptions.mVulkanBinding.mEnableAutoShift     = true;
     request.mOptions.mVulkanBinding.mConstantBufferShift = 0U;
     request.mOptions.mVulkanBinding.mTextureShift        = 100U;
     request.mOptions.mVulkanBinding.mSamplerShift        = 200U;
     request.mOptions.mVulkanBinding.mStorageShift        = 300U;
 
-    const auto result = GetShaderCompiler().Compile(request);
+    const auto      result = GetShaderCompiler().Compile(request);
 
     std::error_code ec;
     std::filesystem::remove(shaderPath, ec);
@@ -324,12 +331,12 @@ TEST_CASE("ShaderCompiler.Slang.VulkanAutoBinding") {
     REQUIRE(!result.mBytecode.IsEmpty());
 
     FRhiMockContext context;
-    auto device = CreateMockDevice(context);
-    AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
+    auto            device = CreateMockDevice(context);
+    Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
     BuildPipelineLayoutFromResult(*device, result, layouts);
 
-    auto FindResource = [&](const char* name)
-        -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
+    auto FindResource =
+        [&](const char* name) -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
         for (const auto& resource : result.mReflection.mResources) {
             if (ToAsciiString(resource.mName) == name) {
                 return &resource;
@@ -338,11 +345,11 @@ TEST_CASE("ShaderCompiler.Slang.VulkanAutoBinding") {
         return nullptr;
     };
 
-    const auto* cb  = FindResource("PerFrame");
+    const auto* cb     = FindResource("PerFrame");
     const auto* drawCb = FindResource("PerDraw");
-    const auto* tex = FindResource("gTex");
-    const auto* samp = FindResource("gSamp");
-    const auto* out = FindResource("gOut");
+    const auto* tex    = FindResource("gTex");
+    const auto* samp   = FindResource("gSamp");
+    const auto* out    = FindResource("gOut");
 
     REQUIRE(cb != nullptr);
     REQUIRE(drawCb != nullptr);
@@ -371,14 +378,14 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX12") {
     const auto shaderPath = WriteTempShaderFile("DXC-AutoBinding", kAutoBindingGroupedShaderHlsl);
 
     FShaderCompileRequest request;
-    request.mSource.mPath       = ToFString(shaderPath);
-    request.mSource.mEntryPoint = FString(TEXT("CSMain"));
-    request.mSource.mStage      = EShaderStage::Compute;
-    request.mSource.mLanguage   = EShaderSourceLanguage::Hlsl;
+    request.mSource.mPath           = ToFString(shaderPath);
+    request.mSource.mEntryPoint     = FString(TEXT("CSMain"));
+    request.mSource.mStage          = EShaderStage::Compute;
+    request.mSource.mLanguage       = EShaderSourceLanguage::Hlsl;
     request.mOptions.mTargetBackend = ERhiBackend::DirectX12;
     AddShaderIncludeDir(request);
 
-    const auto result = GetShaderCompiler().Compile(request);
+    const auto      result = GetShaderCompiler().Compile(request);
 
     std::error_code ec;
     std::filesystem::remove(shaderPath, ec);
@@ -397,12 +404,12 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX12") {
     REQUIRE(!result.mBytecode.IsEmpty());
 
     FRhiMockContext context;
-    auto device = CreateMockDevice(context);
-    AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
+    auto            device = CreateMockDevice(context);
+    Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
     BuildPipelineLayoutFromResult(*device, result, layouts);
 
-    auto FindResource = [&](const char* name)
-        -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
+    auto FindResource =
+        [&](const char* name) -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
         for (const auto& resource : result.mReflection.mResources) {
             if (ToAsciiString(resource.mName) == name) {
                 return &resource;
@@ -411,11 +418,11 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX12") {
         return nullptr;
     };
 
-    const auto* cb  = FindResource("PerFrame");
+    const auto* cb     = FindResource("PerFrame");
     const auto* drawCb = FindResource("PerDraw");
-    const auto* tex = FindResource("gTex");
-    const auto* samp = FindResource("gSamp");
-    const auto* out = FindResource("gOut");
+    const auto* tex    = FindResource("gTex");
+    const auto* samp   = FindResource("gSamp");
+    const auto* out    = FindResource("gOut");
 
     REQUIRE(cb != nullptr);
     REQUIRE(drawCb != nullptr);
@@ -445,14 +452,14 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX11") {
         WriteTempShaderFile("DXC-AutoBinding-DX11", kAutoBindingGroupedShaderHlsl);
 
     FShaderCompileRequest request;
-    request.mSource.mPath       = ToFString(shaderPath);
-    request.mSource.mEntryPoint = FString(TEXT("CSMain"));
-    request.mSource.mStage      = EShaderStage::Compute;
-    request.mSource.mLanguage   = EShaderSourceLanguage::Hlsl;
+    request.mSource.mPath           = ToFString(shaderPath);
+    request.mSource.mEntryPoint     = FString(TEXT("CSMain"));
+    request.mSource.mStage          = EShaderStage::Compute;
+    request.mSource.mLanguage       = EShaderSourceLanguage::Hlsl;
     request.mOptions.mTargetBackend = ERhiBackend::DirectX11;
     AddShaderIncludeDir(request);
 
-    const auto result = GetShaderCompiler().Compile(request);
+    const auto      result = GetShaderCompiler().Compile(request);
 
     std::error_code ec;
     std::filesystem::remove(shaderPath, ec);
@@ -471,12 +478,12 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX11") {
     REQUIRE(!result.mBytecode.IsEmpty());
 
     FRhiMockContext context;
-    auto device = CreateMockDevice(context);
-    AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
+    auto            device = CreateMockDevice(context);
+    Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
     BuildPipelineLayoutFromResult(*device, result, layouts);
 
-    auto FindResource = [&](const char* name)
-        -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
+    auto FindResource =
+        [&](const char* name) -> const AltinaEngine::ShaderCompiler::FShaderResourceBinding* {
         for (const auto& resource : result.mReflection.mResources) {
             if (ToAsciiString(resource.mName) == name) {
                 return &resource;
@@ -485,11 +492,11 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX11") {
         return nullptr;
     };
 
-    const auto* cb  = FindResource("PerFrame");
+    const auto* cb     = FindResource("PerFrame");
     const auto* drawCb = FindResource("PerDraw");
-    const auto* tex = FindResource("gTex");
-    const auto* samp = FindResource("gSamp");
-    const auto* out = FindResource("gOut");
+    const auto* tex    = FindResource("gTex");
+    const auto* samp   = FindResource("gSamp");
+    const auto* out    = FindResource("gOut");
 
     REQUIRE(cb != nullptr);
     REQUIRE(drawCb != nullptr);
@@ -518,14 +525,14 @@ TEST_CASE("ShaderCompiler.DXC.ConstantBufferMembers") {
     const auto shaderPath = WriteTempShaderFile("DXC-CBufferMembers", kCBufferMemberShaderHlsl);
 
     FShaderCompileRequest request;
-    request.mSource.mPath       = ToFString(shaderPath);
-    request.mSource.mEntryPoint = FString(TEXT("CSMain"));
-    request.mSource.mStage      = EShaderStage::Compute;
-    request.mSource.mLanguage   = EShaderSourceLanguage::Hlsl;
+    request.mSource.mPath           = ToFString(shaderPath);
+    request.mSource.mEntryPoint     = FString(TEXT("CSMain"));
+    request.mSource.mStage          = EShaderStage::Compute;
+    request.mSource.mLanguage       = EShaderSourceLanguage::Hlsl;
     request.mOptions.mTargetBackend = ERhiBackend::DirectX12;
     AddShaderIncludeDir(request);
 
-    const auto result = GetShaderCompiler().Compile(request);
+    const auto      result = GetShaderCompiler().Compile(request);
 
     std::error_code ec;
     std::filesystem::remove(shaderPath, ec);
@@ -543,8 +550,7 @@ TEST_CASE("ShaderCompiler.DXC.ConstantBufferMembers") {
     REQUIRE(result.mSucceeded);
     REQUIRE(!result.mReflection.mConstantBuffers.IsEmpty());
 
-    auto FindCBuffer = [&](const char* name)
-        -> const AltinaEngine::Shader::FShaderConstantBuffer* {
+    auto FindCBuffer = [&](const char* name) -> const AltinaEngine::Shader::FShaderConstantBuffer* {
         for (const auto& cb : result.mReflection.mConstantBuffers) {
             if (ToAsciiString(cb.mName) == name) {
                 return &cb;
@@ -553,8 +559,9 @@ TEST_CASE("ShaderCompiler.DXC.ConstantBufferMembers") {
         return nullptr;
     };
 
-    auto FindMember = [&](const AltinaEngine::Shader::FShaderConstantBuffer& cb, const char* name)
-        -> const AltinaEngine::Shader::FShaderConstantBufferMember* {
+    auto FindMember =
+        [&](const AltinaEngine::Shader::FShaderConstantBuffer& cb,
+            const char* name) -> const AltinaEngine::Shader::FShaderConstantBufferMember* {
         for (const auto& member : cb.mMembers) {
             if (ToAsciiString(member.mName) == name) {
                 return &member;
@@ -615,17 +622,17 @@ TEST_CASE("ShaderCompiler.DXC.ConstantBufferMembers") {
     REQUIRE(uvBiasMember->mSize == 8U);
 
     AltinaEngine::Shader::FShaderPropertyBag bag(*cb);
-    const float baseColorValue[4] = { 1.0f, 2.0f, 3.0f, 4.0f };
-    const float innerBValue = 5.0f;
-    const float uvBiasValue[2] = { 6.0f, 7.0f };
+    const float                              baseColorValue[4] = { 1.0f, 2.0f, 3.0f, 4.0f };
+    const float                              innerBValue       = 5.0f;
+    const float                              uvBiasValue[2]    = { 6.0f, 7.0f };
 
     REQUIRE(bag.SetRaw(TEXT("BaseColor"), baseColorValue, sizeof(baseColorValue)));
     REQUIRE(bag.Set(TEXT("Inner.B"), innerBValue));
     REQUIRE(bag.SetRaw(TEXT("UVBias"), uvBiasValue, sizeof(uvBiasValue)));
 
     float baseColorRead[4] = {};
-    float innerBRead = 0.0f;
-    float uvBiasRead[2] = {};
+    float innerBRead       = 0.0f;
+    float uvBiasRead[2]    = {};
 
     std::memcpy(baseColorRead, bag.GetData() + baseColorMember->mOffset, sizeof(baseColorRead));
     std::memcpy(&innerBRead, bag.GetData() + innerBMember->mOffset, sizeof(innerBRead));

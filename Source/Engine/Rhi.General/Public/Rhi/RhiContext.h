@@ -7,8 +7,9 @@
 #include "Types/NonCopyable.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::TShared;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TShared;
+    using Container::TVector;
 
     class FRhiDevice;
 
@@ -17,10 +18,10 @@ namespace AltinaEngine::Rhi {
         FRhiContext()           = default;
         ~FRhiContext() override = default;
 
-        FRhiContext(const FRhiContext&) = delete;
-        FRhiContext(FRhiContext&&) = delete;
-        auto operator=(const FRhiContext&) -> FRhiContext& = delete;
-        auto operator=(FRhiContext&&) -> FRhiContext& = delete;
+        FRhiContext(const FRhiContext&)                                  = delete;
+        FRhiContext(FRhiContext&&)                                       = delete;
+        auto               operator=(const FRhiContext&) -> FRhiContext& = delete;
+        auto               operator=(FRhiContext&&) -> FRhiContext&      = delete;
 
         auto               Init(const FRhiInitDesc& desc) -> bool;
         void               Shutdown();

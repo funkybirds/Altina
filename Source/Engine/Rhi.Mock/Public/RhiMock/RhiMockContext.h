@@ -6,29 +6,28 @@
 #include "Container/Vector.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::TShared;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TShared;
+    using Container::TVector;
 
     struct FRhiMockAdapterConfig {
-        FRhiAdapterDesc      mDesc;
+        FRhiAdapterDesc       mDesc;
         FRhiSupportedFeatures mFeatures;
-        FRhiSupportedLimits  mLimits;
+        FRhiSupportedLimits   mLimits;
     };
 
     struct FRhiMockCounters {
-        u32 mInitializeCalls     = 0U;
-        u32 mShutdownCalls       = 0U;
-        u32 mEnumerateCalls      = 0U;
-        u32 mCreateDeviceCalls   = 0U;
-        u32 mDeviceCreated       = 0U;
-        u32 mDeviceDestroyed     = 0U;
-        u32 mResourceCreated     = 0U;
-        u32 mResourceDestroyed   = 0U;
+        u32                mInitializeCalls   = 0U;
+        u32                mShutdownCalls     = 0U;
+        u32                mEnumerateCalls    = 0U;
+        u32                mCreateDeviceCalls = 0U;
+        u32                mDeviceCreated     = 0U;
+        u32                mDeviceDestroyed   = 0U;
+        u32                mResourceCreated   = 0U;
+        u32                mResourceDestroyed = 0U;
 
         [[nodiscard]] auto GetDeviceLiveCount() const noexcept -> u32 {
-            return (mDeviceCreated >= mDeviceDestroyed)
-                ? (mDeviceCreated - mDeviceDestroyed)
-                : 0U;
+            return (mDeviceCreated >= mDeviceDestroyed) ? (mDeviceCreated - mDeviceDestroyed) : 0U;
         }
 
         [[nodiscard]] auto GetResourceLiveCount() const noexcept -> u32 {
@@ -43,14 +42,14 @@ namespace AltinaEngine::Rhi {
         FRhiMockContext();
         ~FRhiMockContext() override;
 
-        void AddAdapter(const FRhiAdapterDesc& desc,
-            const FRhiSupportedFeatures& features = FRhiSupportedFeatures{},
-            const FRhiSupportedLimits& limits     = FRhiSupportedLimits{});
-        void AddAdapter(const FRhiMockAdapterConfig& config);
-        void SetAdapters(TVector<FRhiMockAdapterConfig> configs);
-        void ClearAdapters();
+        void               AddAdapter(const FRhiAdapterDesc& desc,
+                          const FRhiSupportedFeatures&       features = FRhiSupportedFeatures{},
+                          const FRhiSupportedLimits&         limits   = FRhiSupportedLimits{});
+        void               AddAdapter(const FRhiMockAdapterConfig& config);
+        void               SetAdapters(TVector<FRhiMockAdapterConfig> configs);
+        void               ClearAdapters();
 
-        void MarkAdaptersDirty();
+        void               MarkAdaptersDirty();
 
         [[nodiscard]] auto GetCounters() const noexcept -> const FRhiMockCounters&;
         [[nodiscard]] auto GetInitializeCallCount() const noexcept -> u32;
@@ -68,8 +67,7 @@ namespace AltinaEngine::Rhi {
         auto InitializeBackend(const FRhiInitDesc& desc) -> bool override;
         void ShutdownBackend() override;
         void EnumerateAdaptersInternal(TVector<TShared<FRhiAdapter>>& outAdapters) override;
-        auto CreateDeviceInternal(
-            const TShared<FRhiAdapter>& adapter, const FRhiDeviceDesc& desc)
+        auto CreateDeviceInternal(const TShared<FRhiAdapter>& adapter, const FRhiDeviceDesc& desc)
             -> TShared<FRhiDevice> override;
 
     private:

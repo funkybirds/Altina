@@ -29,7 +29,8 @@
 #include <type_traits>
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::MakeUnique;
+    namespace Container = Core::Container;
+    using Container::MakeUnique;
 #if AE_PLATFORM_WIN
     using Microsoft::WRL::ComPtr;
 
@@ -44,8 +45,8 @@ namespace AltinaEngine::Rhi {
     namespace {
         template <typename TBase, typename TDerived, typename... Args>
         auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
-            using TAllocatorType = Core::Container::TAllocator<TDerived>;
-            using Traits         = Core::Container::TAllocatorTraits<TAllocatorType>;
+            using TAllocatorType = Container::TAllocator<TDerived>;
+            using Traits         = Container::TAllocatorTraits<TAllocatorType>;
 
             static_assert(std::is_base_of_v<TBase, TDerived>,
                 "MakeSharedAs requires TDerived to derive from TBase.");
@@ -116,7 +117,7 @@ namespace AltinaEngine::Rhi {
                 return;
             }
 
-            Core::Container::TVector<char> buffer;
+            Container::TVector<char> buffer;
             buffer.Resize(static_cast<usize>(required));
             const int written = WideCharToMultiByte(
                 CP_UTF8, 0, name, -1, buffer.Data(), required, nullptr, nullptr);

@@ -11,8 +11,8 @@ namespace AltinaEngine::Input {
         explicit FInputMessageHandler(FInputSystem& InInputSystem);
         ~FInputMessageHandler() override = default;
 
-        void OnWindowResized(Application::FPlatformWindow*,
-            const Application::FWindowExtent& InExtent) override;
+        void OnWindowResized(
+            Application::FPlatformWindow*, const Application::FWindowExtent& InExtent) override;
         void OnWindowFocusGained(Application::FPlatformWindow*) override;
         void OnWindowFocusLost(Application::FPlatformWindow*) override;
 

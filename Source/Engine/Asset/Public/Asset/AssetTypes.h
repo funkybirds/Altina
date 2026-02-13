@@ -8,9 +8,10 @@
 #include "Utility/Uuid.h"
 
 namespace AltinaEngine::Asset {
-    using Core::Container::FString;
-    using Core::Container::FStringView;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::FString;
+    using Container::FStringView;
+    using Container::TVector;
 
     enum class EAssetType : u8 {
         Unknown = 0,
@@ -22,8 +23,8 @@ namespace AltinaEngine::Asset {
     };
 
     struct AE_ASSET_API FAssetHandle {
-        FUuid      Uuid;
-        EAssetType Type = EAssetType::Unknown;
+        FUuid                        Uuid;
+        EAssetType                   Type = EAssetType::Unknown;
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {
             return !Uuid.IsNil() && Type != EAssetType::Unknown;

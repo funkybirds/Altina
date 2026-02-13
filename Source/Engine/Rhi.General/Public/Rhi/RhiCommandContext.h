@@ -6,21 +6,24 @@
 #include "Container/StringView.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiCommandContext : public FRhiResource {
     public:
         explicit FRhiCommandContext(const FRhiCommandContextDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+            FRhiResourceDeleteQueue*                              deleteQueue = nullptr) noexcept;
 
         ~FRhiCommandContext() override;
 
-        FRhiCommandContext(const FRhiCommandContext&) = delete;
-        FRhiCommandContext(FRhiCommandContext&&) = delete;
-        auto operator=(const FRhiCommandContext&) -> FRhiCommandContext& = delete;
-        auto operator=(FRhiCommandContext&&) -> FRhiCommandContext& = delete;
+        FRhiCommandContext(const FRhiCommandContext&)                                  = delete;
+        FRhiCommandContext(FRhiCommandContext&&)                                       = delete;
+        auto               operator=(const FRhiCommandContext&) -> FRhiCommandContext& = delete;
+        auto               operator=(FRhiCommandContext&&) -> FRhiCommandContext&      = delete;
 
-        [[nodiscard]] auto GetDesc() const noexcept -> const FRhiCommandContextDesc& { return mDesc; }
+        [[nodiscard]] auto GetDesc() const noexcept -> const FRhiCommandContextDesc& {
+            return mDesc;
+        }
         [[nodiscard]] auto GetQueueType() const noexcept -> ERhiQueueType {
             return mDesc.mQueueType;
         }
@@ -37,8 +40,8 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        virtual void Begin() = 0;
-        virtual void End() = 0;
+        virtual void               Begin()                                             = 0;
+        virtual void               End()                                               = 0;
         [[nodiscard]] virtual auto GetCommandList() const noexcept -> FRhiCommandList* = 0;
 
     private:

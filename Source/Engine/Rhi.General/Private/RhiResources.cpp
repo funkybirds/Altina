@@ -16,74 +16,79 @@
 
 namespace AltinaEngine::Rhi {
 
-    FRhiBuffer::FRhiBuffer(const FRhiBufferDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiBuffer::FRhiBuffer(
+        const FRhiBufferDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiBuffer::~FRhiBuffer() = default;
 
-    auto FRhiBuffer::Lock(u64 /*offset*/, u64 /*size*/, ERhiBufferLockMode /*mode*/) -> FLockResult {
+    auto FRhiBuffer::Lock(u64 /*offset*/, u64 /*size*/, ERhiBufferLockMode /*mode*/)
+        -> FLockResult {
         return {};
     }
 
-    void FRhiBuffer::Unlock(FLockResult& lock) {
-        lock = {};
-    }
+    void FRhiBuffer::Unlock(FLockResult& lock) { lock = {}; }
 
-    FRhiTexture::FRhiTexture(const FRhiTextureDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiTexture::FRhiTexture(
+        const FRhiTextureDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiTexture::~FRhiTexture() = default;
 
-    FRhiViewport::FRhiViewport(const FRhiViewportDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiViewport::FRhiViewport(
+        const FRhiViewportDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiViewport::~FRhiViewport() = default;
 
-    FRhiSampler::FRhiSampler(const FRhiSamplerDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiSampler::FRhiSampler(
+        const FRhiSamplerDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiSampler::~FRhiSampler() = default;
 
-    FRhiShader::FRhiShader(const FRhiShaderDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiShader::FRhiShader(
+        const FRhiShaderDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiShader::~FRhiShader() = default;
 
-    FRhiPipeline::FRhiPipeline(const FRhiGraphicsPipelineDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiPipeline::FRhiPipeline(
+        const FRhiGraphicsPipelineDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mGraphicsDesc(desc), mIsGraphics(true) {}
 
-    FRhiPipeline::FRhiPipeline(const FRhiComputePipelineDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiPipeline::FRhiPipeline(
+        const FRhiComputePipelineDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mComputeDesc(desc), mIsGraphics(false) {}
 
     FRhiPipeline::~FRhiPipeline() = default;
 
-    FRhiPipelineLayout::FRhiPipelineLayout(const FRhiPipelineLayoutDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiPipelineLayout::FRhiPipelineLayout(
+        const FRhiPipelineLayoutDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiPipelineLayout::~FRhiPipelineLayout() = default;
 
-    FRhiBindGroupLayout::FRhiBindGroupLayout(const FRhiBindGroupLayoutDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiBindGroupLayout::FRhiBindGroupLayout(
+        const FRhiBindGroupLayoutDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiBindGroupLayout::~FRhiBindGroupLayout() = default;
 
-    FRhiBindGroup::FRhiBindGroup(const FRhiBindGroupDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiBindGroup::FRhiBindGroup(
+        const FRhiBindGroupDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiBindGroup::~FRhiBindGroup() = default;
 
-    FRhiResourceView::FRhiResourceView(ERhiResourceViewType type,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiResourceView::FRhiResourceView(
+        ERhiResourceViewType type, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mViewType(type) {}
 
     FRhiResourceView::~FRhiResourceView() = default;
 
-    FRhiShaderResourceView::FRhiShaderResourceView(const FRhiShaderResourceViewDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiShaderResourceView::FRhiShaderResourceView(
+        const FRhiShaderResourceViewDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResourceView(ERhiResourceViewType::ShaderResource, deleteQueue), mDesc(desc) {
         if (mDesc.mTexture) {
             mTexture.Reset(mDesc.mTexture);
@@ -95,8 +100,8 @@ namespace AltinaEngine::Rhi {
 
     FRhiShaderResourceView::~FRhiShaderResourceView() = default;
 
-    FRhiUnorderedAccessView::FRhiUnorderedAccessView(const FRhiUnorderedAccessViewDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiUnorderedAccessView::FRhiUnorderedAccessView(
+        const FRhiUnorderedAccessViewDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResourceView(ERhiResourceViewType::UnorderedAccess, deleteQueue), mDesc(desc) {
         if (mDesc.mTexture) {
             mTexture.Reset(mDesc.mTexture);
@@ -108,8 +113,8 @@ namespace AltinaEngine::Rhi {
 
     FRhiUnorderedAccessView::~FRhiUnorderedAccessView() = default;
 
-    FRhiRenderTargetView::FRhiRenderTargetView(const FRhiRenderTargetViewDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiRenderTargetView::FRhiRenderTargetView(
+        const FRhiRenderTargetViewDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResourceView(ERhiResourceViewType::RenderTarget, deleteQueue), mDesc(desc) {
         if (mDesc.mTexture) {
             mTexture.Reset(mDesc.mTexture);
@@ -118,8 +123,8 @@ namespace AltinaEngine::Rhi {
 
     FRhiRenderTargetView::~FRhiRenderTargetView() = default;
 
-    FRhiDepthStencilView::FRhiDepthStencilView(const FRhiDepthStencilViewDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiDepthStencilView::FRhiDepthStencilView(
+        const FRhiDepthStencilViewDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResourceView(ERhiResourceViewType::DepthStencil, deleteQueue), mDesc(desc) {
         if (mDesc.mTexture) {
             mTexture.Reset(mDesc.mTexture);
@@ -128,7 +133,8 @@ namespace AltinaEngine::Rhi {
 
     FRhiDepthStencilView::~FRhiDepthStencilView() = default;
 
-    FRhiFence::FRhiFence(FRhiResourceDeleteQueue* deleteQueue) noexcept : FRhiResource(deleteQueue) {}
+    FRhiFence::FRhiFence(FRhiResourceDeleteQueue* deleteQueue) noexcept
+        : FRhiResource(deleteQueue) {}
 
     FRhiFence::~FRhiFence() = default;
 
@@ -137,20 +143,20 @@ namespace AltinaEngine::Rhi {
 
     FRhiSemaphore::~FRhiSemaphore() = default;
 
-    FRhiCommandPool::FRhiCommandPool(const FRhiCommandPoolDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiCommandPool::FRhiCommandPool(
+        const FRhiCommandPoolDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiCommandPool::~FRhiCommandPool() = default;
 
-    FRhiCommandList::FRhiCommandList(const FRhiCommandListDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiCommandList::FRhiCommandList(
+        const FRhiCommandListDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiCommandList::~FRhiCommandList() = default;
 
-    FRhiCommandContext::FRhiCommandContext(const FRhiCommandContextDesc& desc,
-        FRhiResourceDeleteQueue* deleteQueue) noexcept
+    FRhiCommandContext::FRhiCommandContext(
+        const FRhiCommandContextDesc& desc, FRhiResourceDeleteQueue* deleteQueue) noexcept
         : FRhiResource(deleteQueue), mDesc(desc) {}
 
     FRhiCommandContext::~FRhiCommandContext() = default;

@@ -121,9 +121,7 @@ namespace AltinaEngine::Rhi {
         mResourceDeleteQueue.Process(completedSerial);
     }
 
-    void FRhiDevice::FlushResourceDeleteQueue() {
-        mResourceDeleteQueue.Flush();
-    }
+    void FRhiDevice::FlushResourceDeleteQueue() { mResourceDeleteQueue.Flush(); }
 
     void FRhiDevice::NormalizeDebugName() {
         if (!mDesc.mDebugName.IsEmptyString()) {

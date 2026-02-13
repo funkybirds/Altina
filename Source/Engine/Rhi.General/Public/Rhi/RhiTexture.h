@@ -5,19 +5,20 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiTexture : public FRhiResource {
     public:
-        explicit FRhiTexture(const FRhiTextureDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+        explicit FRhiTexture(
+            const FRhiTextureDesc& desc, FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
 
         ~FRhiTexture() override;
 
-        FRhiTexture(const FRhiTexture&) = delete;
-        FRhiTexture(FRhiTexture&&) = delete;
-        auto operator=(const FRhiTexture&) -> FRhiTexture& = delete;
-        auto operator=(FRhiTexture&&) -> FRhiTexture& = delete;
+        FRhiTexture(const FRhiTexture&)                                  = delete;
+        FRhiTexture(FRhiTexture&&)                                       = delete;
+        auto               operator=(const FRhiTexture&) -> FRhiTexture& = delete;
+        auto               operator=(FRhiTexture&&) -> FRhiTexture&      = delete;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiTextureDesc& { return mDesc; }
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {

@@ -6,9 +6,10 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::ShaderCompiler::Detail {
-    using Core::Container::FString;
-    using Core::Container::FNativeString;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::FNativeString;
+    using Container::FString;
+    using Container::TVector;
 
     enum class EAutoBindingGroup : u8 {
         PerFrame = 0,
@@ -28,7 +29,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
     struct FAutoBindingLayout {
         bool mGroupUsed[static_cast<u32>(EAutoBindingGroup::Count)] = {};
         u32  mCounts[static_cast<u32>(EAutoBindingGroup::Count)]
-            [static_cast<u32>(EAutoBindingResource::Count)] = {};
+                   [static_cast<u32>(EAutoBindingResource::Count)] = {};
     };
 
     struct FAutoBindingOutput {

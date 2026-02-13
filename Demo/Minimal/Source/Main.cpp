@@ -59,17 +59,17 @@ namespace {
 
         auto ToFString(const std::filesystem::path& path) -> Container::FString {
             Container::FString out;
-#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
             const auto wide = path.wstring();
             if (!wide.empty()) {
                 out.Append(wide.c_str(), wide.size());
             }
-#else
+    #else
             const auto narrow = path.string();
             if (!narrow.empty()) {
                 out.Append(narrow.c_str(), narrow.size());
             }
-#endif
+    #endif
             return out;
         }
 
@@ -142,7 +142,7 @@ namespace {
             }
 
             if (GetEnvPath("ProgramFiles(x86)", envPath) || GetEnvPath("ProgramFiles", envPath)) {
-                auto kitsRoot = envPath / "Windows Kits" / "10" / "bin";
+                auto            kitsRoot = envPath / "Windows Kits" / "10" / "bin";
                 std::error_code ec;
                 if (std::filesystem::exists(kitsRoot, ec)) {
                     std::filesystem::path bestPath;
@@ -188,8 +188,8 @@ namespace {
         }
 
         auto CompileD3D11ShaderFxc(const char* source, const char* entryPoint,
-            const char* targetProfile, Shader::FShaderBytecode& outBytecode,
-            std::string& outErrors) -> bool {
+            const char* targetProfile, Shader::FShaderBytecode& outBytecode, std::string& outErrors)
+            -> bool {
             if (!source || !entryPoint || !targetProfile) {
                 return false;
             }
@@ -197,8 +197,8 @@ namespace {
             ComPtr<ID3DBlob> bytecode;
             ComPtr<ID3DBlob> errors;
             const UINT       flags = D3DCOMPILE_ENABLE_STRICTNESS;
-            const HRESULT    hr    = D3DCompile(source, std::strlen(source), nullptr, nullptr,
-                      nullptr, entryPoint, targetProfile, flags, 0, &bytecode, &errors);
+            const HRESULT    hr = D3DCompile(source, std::strlen(source), nullptr, nullptr, nullptr,
+                   entryPoint, targetProfile, flags, 0, &bytecode, &errors);
 
             outErrors.clear();
             if (errors) {
@@ -239,7 +239,7 @@ namespace {
                 return {};
             }
 
-            const auto id = counter.fetch_add(1, std::memory_order_relaxed);
+            const auto            id = counter.fetch_add(1, std::memory_order_relaxed);
             std::filesystem::path path =
                 dir / (std::string(prefix) + "_" + std::to_string(id) + ".hlsl");
 
@@ -274,10 +274,10 @@ namespace {
             }
 
             ShaderCompiler::FShaderCompileRequest request;
-            request.mSource.mPath       = ToFString(shaderPath);
-            request.mSource.mEntryPoint = ToFStringAscii(entryPoint);
-            request.mSource.mStage      = stage;
-            request.mSource.mLanguage   = sourceLanguage;
+            request.mSource.mPath           = ToFString(shaderPath);
+            request.mSource.mEntryPoint     = ToFStringAscii(entryPoint);
+            request.mSource.mStage          = stage;
+            request.mSource.mLanguage       = sourceLanguage;
             request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
             if (targetProfile != nullptr && targetProfile[0] != '\0') {
                 request.mOptions.mTargetProfile = ToFStringAscii(targetProfile);
@@ -287,10 +287,10 @@ namespace {
             if ((!result.mSucceeded || result.mBytecode.IsEmpty())
                 && IsCompilerUnavailable(result.mDiagnostics)) {
                 std::filesystem::path compilerPath;
-                const bool resolved =
+                const bool            resolved =
                     (sourceLanguage == ShaderCompiler::EShaderSourceLanguage::Slang)
-                    ? TryResolveSlangcPath(compilerPath)
-                    : TryResolveDxcPath(compilerPath);
+                               ? TryResolveSlangcPath(compilerPath)
+                               : TryResolveDxcPath(compilerPath);
                 if (resolved) {
                     request.mOptions.mCompilerPathOverride = ToFString(compilerPath);
                     result = ShaderCompiler::GetShaderCompiler().Compile(request);
@@ -306,7 +306,7 @@ namespace {
             }
 
             outBytecode.mData = AltinaEngine::Move(result.mBytecode);
-            outReflection = AltinaEngine::Move(result.mReflection);
+            outReflection     = AltinaEngine::Move(result.mReflection);
             return true;
         }
 
@@ -377,18 +377,18 @@ float4 PSMain(VSOut input) : SV_Target0 {
             mCmdList.Reset();
 
             Rhi::FRhiRenderTargetViewDesc rtvDesc{};
-            rtvDesc.mTexture = backBuffer;
+            rtvDesc.mTexture   = backBuffer;
             auto backBufferRtv = device.CreateRenderTargetView(rtvDesc);
 
             Rhi::FRhiRenderPassColorAttachment colorAttachment{};
-            colorAttachment.mView = backBufferRtv.Get();
-            colorAttachment.mLoadOp = Rhi::ERhiLoadOp::Clear;
-            colorAttachment.mStoreOp = Rhi::ERhiStoreOp::Store;
+            colorAttachment.mView       = backBufferRtv.Get();
+            colorAttachment.mLoadOp     = Rhi::ERhiLoadOp::Clear;
+            colorAttachment.mStoreOp    = Rhi::ERhiStoreOp::Store;
             colorAttachment.mClearColor = Rhi::FRhiClearColor{ 0.08f, 0.08f, 0.12f, 1.0f };
 
             Rhi::FRhiRenderPassDesc passDesc{};
             passDesc.mColorAttachmentCount = 1U;
-            passDesc.mColorAttachments = &colorAttachment;
+            passDesc.mColorAttachments     = &colorAttachment;
             mCmdList.Emplace<Rhi::FRhiCmdBeginRenderPass>(passDesc);
             mCmdList.Emplace<Rhi::FRhiCmdSetPrimitiveTopology>(
                 Rhi::ERhiPrimitiveTopology::TriangleList);
@@ -436,18 +436,17 @@ float4 PSMain(VSOut input) : SV_Target0 {
         bool Initialize(Rhi::FRhiDevice& device) {
 #if AE_PLATFORM_WIN
             auto BuildShader = [&](const char* entryPoint, Shader::EShaderStage stage,
-                const char* targetProfile, const char* label, Rhi::FRhiShaderRef& outShader)
-                -> bool {
+                                   const char* targetProfile, const char* label,
+                                   Rhi::FRhiShaderRef& outShader) -> bool {
                 Shader::FShaderBytecode   bytecode;
                 Shader::FShaderReflection reflection;
                 std::string               errors;
 
-                if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(
-                        kTriangleShaderHlsl, entryPoint, stage,
-                        ShaderCompiler::EShaderSourceLanguage::Hlsl, bytecode, reflection, errors,
-                        targetProfile)) {
-                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(
-                        device, stage, AltinaEngine::Move(bytecode), AltinaEngine::Move(reflection));
+                if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(kTriangleShaderHlsl,
+                        entryPoint, stage, ShaderCompiler::EShaderSourceLanguage::Hlsl, bytecode,
+                        reflection, errors, targetProfile)) {
+                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(device, stage,
+                        AltinaEngine::Move(bytecode), AltinaEngine::Move(reflection));
                     if (outShader) {
                         return true;
                     }
@@ -459,12 +458,11 @@ float4 PSMain(VSOut input) : SV_Target0 {
                 }
 
                 errors.clear();
-                if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(
-                        kTriangleShaderHlsl, entryPoint, stage,
-                        ShaderCompiler::EShaderSourceLanguage::Slang, bytecode, reflection, errors,
-                        targetProfile)) {
-                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(
-                        device, stage, AltinaEngine::Move(bytecode), AltinaEngine::Move(reflection));
+                if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(kTriangleShaderHlsl,
+                        entryPoint, stage, ShaderCompiler::EShaderSourceLanguage::Slang, bytecode,
+                        reflection, errors, targetProfile)) {
+                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(device, stage,
+                        AltinaEngine::Move(bytecode), AltinaEngine::Move(reflection));
                     if (outShader) {
                         return true;
                     }
@@ -486,8 +484,7 @@ float4 PSMain(VSOut input) : SV_Target0 {
                                   << " created via D3DCompile fallback.\n";
                         return true;
                     }
-                    std::cerr << "[Triangle] " << label
-                              << " create failed after D3DCompile.\n";
+                    std::cerr << "[Triangle] " << label << " create failed after D3DCompile.\n";
                 }
 
                 if (!errors.empty()) {
@@ -497,13 +494,12 @@ float4 PSMain(VSOut input) : SV_Target0 {
                 return false;
             };
 
-            if (!BuildShader("VSMain", Shader::EShaderStage::Vertex, "vs_5_0", "VS",
-                    mVertexShader)) {
+            if (!BuildShader(
+                    "VSMain", Shader::EShaderStage::Vertex, "vs_5_0", "VS", mVertexShader)) {
                 return false;
             }
 
-            if (!BuildShader("PSMain", Shader::EShaderStage::Pixel, "ps_5_0", "PS",
-                    mPixelShader)) {
+            if (!BuildShader("PSMain", Shader::EShaderStage::Pixel, "ps_5_0", "PS", mPixelShader)) {
                 return false;
             }
 
@@ -594,12 +590,12 @@ int main(int argc, char** argv) {
         [&triangleRenderer](Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport, u32 width,
             u32 height) { triangleRenderer.Render(device, viewport, width, height); });
 
-    constexpr f32 kFixedDeltaTime = 1.0f / 60.0f;
+    constexpr f32 kFixedDeltaTime          = 1.0f / 60.0f;
     constexpr f32 kMoveSpeedUnitsPerSecond = 300.0f;
-    f32           positionX = 0.0f;
-    f32           positionY = 0.0f;
-    i32           lastMoveX = 0;
-    i32           lastMoveY = 0;
+    f32           positionX                = 0.0f;
+    f32           positionY                = 0.0f;
+    i32           lastMoveX                = 0;
+    i32           lastMoveY                = 0;
 
     for (i32 FrameIndex = 0; FrameIndex < 600; ++FrameIndex) {
         EngineLoop.Tick(kFixedDeltaTime);
@@ -622,15 +618,13 @@ int main(int argc, char** argv) {
             }
 
             if (moveX != 0 || moveY != 0) {
-                positionX += static_cast<f32>(moveX) * kMoveSpeedUnitsPerSecond *
-                    kFixedDeltaTime;
-                positionY += static_cast<f32>(moveY) * kMoveSpeedUnitsPerSecond *
-                    kFixedDeltaTime;
+                positionX += static_cast<f32>(moveX) * kMoveSpeedUnitsPerSecond * kFixedDeltaTime;
+                positionY += static_cast<f32>(moveY) * kMoveSpeedUnitsPerSecond * kFixedDeltaTime;
             }
 
             if (moveX != lastMoveX || moveY != lastMoveY) {
-                LogInfo(TEXT("Move input: ({}, {}), pos=({}, {})"),
-                    moveX, moveY, positionX, positionY);
+                LogInfo(
+                    TEXT("Move input: ({}, {}), pos=({}, {})"), moveX, moveY, positionX, positionY);
                 lastMoveX = moveX;
                 lastMoveY = moveY;
             }

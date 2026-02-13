@@ -6,10 +6,11 @@
 #include "Container/SmartPtr.h"
 
 namespace AltinaEngine::Application {
-    using Core::Container::TOwner;
-    using Core::Container::TPolymorphicDeleter;
-    using FWindowOwner =
-        TOwner<FPlatformWindow, TPolymorphicDeleter<FPlatformWindow>>; // NOLINT(*-identifier-naming)
+    namespace Container = Core::Container;
+    using Container::TOwner;
+    using Container::TPolymorphicDeleter;
+    using FWindowOwner = TOwner<FPlatformWindow,
+        TPolymorphicDeleter<FPlatformWindow>>; // NOLINT(*-identifier-naming)
 
     class AE_APPLICATION_API FApplication {
     public:
@@ -22,8 +23,8 @@ namespace AltinaEngine::Application {
 
         [[nodiscard]] auto IsRunning() const noexcept -> bool { return mIsRunning; }
 
-        void RegisterMessageHandler(IAppMessageHandler* InHandler);
-        void UnregisterMessageHandler(IAppMessageHandler* InHandler);
+        void               RegisterMessageHandler(IAppMessageHandler* InHandler);
+        void               UnregisterMessageHandler(IAppMessageHandler* InHandler);
 
         void               SetWindowProperties(const FPlatformWindowProperty& InProperties);
         [[nodiscard]] auto GetWindowProperties() const noexcept -> const FPlatformWindowProperty&;

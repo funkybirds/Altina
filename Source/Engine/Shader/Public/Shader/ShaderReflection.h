@@ -5,8 +5,9 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Shader {
-    using Core::Container::FString;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::FString;
+    using Container::TVector;
 
     enum class EShaderResourceType : u8 {
         ConstantBuffer = 0,
@@ -24,30 +25,30 @@ namespace AltinaEngine::Shader {
 
     struct FShaderConstantBufferMember {
         FString mName;
-        u32     mOffset = 0U;
-        u32     mSize   = 0U;
+        u32     mOffset        = 0U;
+        u32     mSize          = 0U;
         u32     mElementCount  = 0U;
         u32     mElementStride = 0U;
     };
 
     struct FShaderConstantBuffer {
-        FString                         mName;
-        u32                             mSizeBytes = 0U;
-        u32                             mSet      = 0U;
-        u32                             mBinding  = 0U;
-        u32                             mRegister = 0U;
-        u32                             mSpace    = 0U;
+        FString                              mName;
+        u32                                  mSizeBytes = 0U;
+        u32                                  mSet       = 0U;
+        u32                                  mBinding   = 0U;
+        u32                                  mRegister  = 0U;
+        u32                                  mSpace     = 0U;
         TVector<FShaderConstantBufferMember> mMembers;
     };
 
     struct FShaderResourceBinding {
         FString               mName;
-        EShaderResourceType   mType      = EShaderResourceType::Texture;
-        EShaderResourceAccess mAccess    = EShaderResourceAccess::ReadOnly;
-        u32                   mSet       = 0U;
-        u32                   mBinding   = 0U;
-        u32                   mRegister  = 0U;
-        u32                   mSpace     = 0U;
+        EShaderResourceType   mType     = EShaderResourceType::Texture;
+        EShaderResourceAccess mAccess   = EShaderResourceAccess::ReadOnly;
+        u32                   mSet      = 0U;
+        u32                   mBinding  = 0U;
+        u32                   mRegister = 0U;
+        u32                   mSpace    = 0U;
     };
 
     struct FShaderReflection {

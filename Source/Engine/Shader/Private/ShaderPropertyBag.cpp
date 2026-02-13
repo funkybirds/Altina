@@ -39,10 +39,10 @@ namespace AltinaEngine::Shader {
         mProperties.reserve(static_cast<size_t>(cbuffer.mMembers.Size()));
         for (const auto& member : cbuffer.mMembers) {
             FPropertyDesc desc{};
-            desc.mOffset        = member.mOffset;
-            desc.mSize          = member.mSize;
-            desc.mElementCount  = member.mElementCount;
-            desc.mElementStride = member.mElementStride;
+            desc.mOffset              = member.mOffset;
+            desc.mSize                = member.mSize;
+            desc.mElementCount        = member.mElementCount;
+            desc.mElementStride       = member.mElementStride;
             mProperties[member.mName] = desc;
         }
 

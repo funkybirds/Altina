@@ -4,10 +4,10 @@
 #include "RhiModule.h"
 
 namespace AltinaEngine::Application {
+    namespace Container = Core::Container;
     namespace {
         template <typename Func>
-        void ForEachHandler(
-            const Core::Container::TVector<IAppMessageHandler*>& handlers, Func&& fn) {
+        void ForEachHandler(const Container::TVector<IAppMessageHandler*>& handlers, Func&& fn) {
             for (auto* handler : handlers) {
                 if (handler != nullptr) {
                     fn(*handler);

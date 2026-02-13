@@ -30,13 +30,12 @@ namespace Test {
     };
 
     inline int run_all() {
-        int total_failures = 0;
-        const char* filter = std::getenv("ALTINA_TEST_FILTER");
-        const char* start  = std::getenv("ALTINA_TEST_START");
-        const char* stop   = std::getenv("ALTINA_TEST_STOP_AFTER");
-        const char* list   = std::getenv("ALTINA_TEST_LIST");
-        bool        started =
-            (start == nullptr) || (start[0] == '\0');
+        int         total_failures = 0;
+        const char* filter         = std::getenv("ALTINA_TEST_FILTER");
+        const char* start          = std::getenv("ALTINA_TEST_START");
+        const char* stop           = std::getenv("ALTINA_TEST_STOP_AFTER");
+        const char* list           = std::getenv("ALTINA_TEST_LIST");
+        bool        started        = (start == nullptr) || (start[0] == '\0');
         if ((list != nullptr) && (list[0] != '\0')) {
             for (auto& c : cases()) {
                 std::cout << c.name << std::endl;

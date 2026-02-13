@@ -17,15 +17,15 @@ namespace {
 
         if (KeyCode >= kVkA && KeyCode <= kVkZ) {
             const u32 offset = KeyCode - kVkA;
-            const u32 base = static_cast<u32>(AltinaEngine::Input::EKey::A);
-            OutKey = static_cast<AltinaEngine::Input::EKey>(base + offset);
+            const u32 base   = static_cast<u32>(AltinaEngine::Input::EKey::A);
+            OutKey           = static_cast<AltinaEngine::Input::EKey>(base + offset);
             return true;
         }
 
         if (KeyCode >= kVk0 && KeyCode <= kVk9) {
             const u32 offset = KeyCode - kVk0;
-            const u32 base = static_cast<u32>(AltinaEngine::Input::EKey::Num0);
-            OutKey = static_cast<AltinaEngine::Input::EKey>(base + offset);
+            const u32 base   = static_cast<u32>(AltinaEngine::Input::EKey::Num0);
+            OutKey           = static_cast<AltinaEngine::Input::EKey>(base + offset);
             return true;
         }
 

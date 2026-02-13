@@ -5,12 +5,13 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FStringView;
+    namespace Container = Core::Container;
+    using Container::FStringView;
 
     class AE_RHI_GENERAL_API FRhiCommandPool : public FRhiResource {
     public:
         explicit FRhiCommandPool(const FRhiCommandPoolDesc& desc,
-            FRhiResourceDeleteQueue* deleteQueue = nullptr) noexcept;
+            FRhiResourceDeleteQueue*                        deleteQueue = nullptr) noexcept;
 
         ~FRhiCommandPool() override;
 

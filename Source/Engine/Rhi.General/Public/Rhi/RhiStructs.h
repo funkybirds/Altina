@@ -9,9 +9,10 @@
 #include "Container/Vector.h"
 
 namespace AltinaEngine::Rhi {
-    using Core::Container::FString;
-    using Core::Container::FStringView;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::FString;
+    using Container::FStringView;
+    using Container::TVector;
     using Shader::EShaderStage;
     using Shader::FShaderBytecode;
     using Shader::FShaderReflection;
@@ -33,15 +34,15 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiAdapterDesc {
-        FString         mName;
-        ERhiVendorId    mVendorId                   = ERhiVendorId::Unknown;
-        u32             mDeviceId                   = 0U;
-        ERhiAdapterType mType                       = ERhiAdapterType::Unknown;
-        u64             mDedicatedVideoMemoryBytes  = kRhiUnknownMemoryBytes;
-        u64             mDedicatedSystemMemoryBytes = kRhiUnknownMemoryBytes;
-        u64             mSharedSystemMemoryBytes    = kRhiUnknownMemoryBytes;
-        u32             mDriverVersion              = 0U;
-        u32             mApiVersion                 = 0U;
+        FString            mName;
+        ERhiVendorId       mVendorId                   = ERhiVendorId::Unknown;
+        u32                mDeviceId                   = 0U;
+        ERhiAdapterType    mType                       = ERhiAdapterType::Unknown;
+        u64                mDedicatedVideoMemoryBytes  = kRhiUnknownMemoryBytes;
+        u64                mDedicatedSystemMemoryBytes = kRhiUnknownMemoryBytes;
+        u64                mSharedSystemMemoryBytes    = kRhiUnknownMemoryBytes;
+        u32                mDriverVersion              = 0U;
+        u32                mApiVersion                 = 0U;
 
         [[nodiscard]] auto GetName() const noexcept -> FStringView { return mName.ToView(); }
 
@@ -71,48 +72,48 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiSupportedFeatures {
-        bool mBindless            = false;
-        bool mRayTracing          = false;
-        bool mMeshShaders         = false;
-        bool mBarycentrics        = false;
-        bool mVariableRateShading = false;
-        bool mSamplerFeedback     = false;
-        bool mTimelineSemaphore   = false;
+        bool               mBindless            = false;
+        bool               mRayTracing          = false;
+        bool               mMeshShaders         = false;
+        bool               mBarycentrics        = false;
+        bool               mVariableRateShading = false;
+        bool               mSamplerFeedback     = false;
+        bool               mTimelineSemaphore   = false;
 
         [[nodiscard]] auto IsSupported(ERhiFeature feature) const noexcept -> bool {
             switch (feature) {
-            case ERhiFeature::Bindless:
-                return mBindless;
-            case ERhiFeature::RayTracing:
-                return mRayTracing;
-            case ERhiFeature::MeshShaders:
-                return mMeshShaders;
-            case ERhiFeature::Barycentrics:
-                return mBarycentrics;
-            case ERhiFeature::VariableRateShading:
-                return mVariableRateShading;
-            case ERhiFeature::SamplerFeedback:
-                return mSamplerFeedback;
-            case ERhiFeature::TimelineSemaphore:
-                return mTimelineSemaphore;
-            default:
-                return false;
+                case ERhiFeature::Bindless:
+                    return mBindless;
+                case ERhiFeature::RayTracing:
+                    return mRayTracing;
+                case ERhiFeature::MeshShaders:
+                    return mMeshShaders;
+                case ERhiFeature::Barycentrics:
+                    return mBarycentrics;
+                case ERhiFeature::VariableRateShading:
+                    return mVariableRateShading;
+                case ERhiFeature::SamplerFeedback:
+                    return mSamplerFeedback;
+                case ERhiFeature::TimelineSemaphore:
+                    return mTimelineSemaphore;
+                default:
+                    return false;
             }
         }
     };
 
     struct FRhiSupportedLimits {
-        u64 mMaxBufferSize                 = kRhiUnknownMemoryBytes;
-        u32 mMaxTextureDimension1D         = kRhiLimitUnknown;
-        u32 mMaxTextureDimension2D         = kRhiLimitUnknown;
-        u32 mMaxTextureDimension3D         = kRhiLimitUnknown;
-        u32 mMaxTextureArrayLayers         = kRhiLimitUnknown;
-        u32 mMaxSamplers                   = kRhiLimitUnknown;
-        u32 mMaxBindGroups                 = kRhiLimitUnknown;
-        u32 mMaxColorAttachments           = kRhiLimitUnknown;
-        u32 mMaxComputeWorkgroupSizeX      = kRhiLimitUnknown;
-        u32 mMaxComputeWorkgroupSizeY      = kRhiLimitUnknown;
-        u32 mMaxComputeWorkgroupSizeZ      = kRhiLimitUnknown;
+        u64 mMaxBufferSize                  = kRhiUnknownMemoryBytes;
+        u32 mMaxTextureDimension1D          = kRhiLimitUnknown;
+        u32 mMaxTextureDimension2D          = kRhiLimitUnknown;
+        u32 mMaxTextureDimension3D          = kRhiLimitUnknown;
+        u32 mMaxTextureArrayLayers          = kRhiLimitUnknown;
+        u32 mMaxSamplers                    = kRhiLimitUnknown;
+        u32 mMaxBindGroups                  = kRhiLimitUnknown;
+        u32 mMaxColorAttachments            = kRhiLimitUnknown;
+        u32 mMaxComputeWorkgroupSizeX       = kRhiLimitUnknown;
+        u32 mMaxComputeWorkgroupSizeY       = kRhiLimitUnknown;
+        u32 mMaxComputeWorkgroupSizeZ       = kRhiLimitUnknown;
         u32 mMaxComputeWorkgroupInvocations = kRhiLimitUnknown;
     };
 
@@ -126,39 +127,39 @@ namespace AltinaEngine::Rhi {
 
     struct FRhiDeviceDesc {
         FString mDebugName;
-        bool    mEnableDebugLayer     = false;
-        bool    mEnableGpuValidation  = false;
+        bool    mEnableDebugLayer       = false;
+        bool    mEnableGpuValidation    = false;
         bool    mEnableStablePowerState = false;
     };
 
     struct FRhiBufferDesc {
-        FString mDebugName;
-        u64     mSizeBytes = 0ULL;
+        FString             mDebugName;
+        u64                 mSizeBytes = 0ULL;
         ERhiResourceUsage   mUsage     = ERhiResourceUsage::Default;
         ERhiBufferBindFlags mBindFlags = ERhiBufferBindFlags::None;
         ERhiCpuAccess       mCpuAccess = ERhiCpuAccess::None;
     };
 
     struct FRhiTextureDesc {
-        FString mDebugName;
-        u32     mWidth     = 0U;
-        u32     mHeight    = 0U;
-        u32     mDepth     = 1U;
-        u32     mMipLevels = 1U;
-        u32     mArrayLayers = 1U;
-        u32     mSampleCount = 1U;
-        ERhiFormat          mFormat    = ERhiFormat::R8G8B8A8Unorm;
-        ERhiResourceUsage   mUsage     = ERhiResourceUsage::Default;
-        ERhiTextureBindFlags mBindFlags = ERhiTextureBindFlags::ShaderResource;
-        ERhiCpuAccess       mCpuAccess = ERhiCpuAccess::None;
+        FString              mDebugName;
+        u32                  mWidth       = 0U;
+        u32                  mHeight      = 0U;
+        u32                  mDepth       = 1U;
+        u32                  mMipLevels   = 1U;
+        u32                  mArrayLayers = 1U;
+        u32                  mSampleCount = 1U;
+        ERhiFormat           mFormat      = ERhiFormat::R8G8B8A8Unorm;
+        ERhiResourceUsage    mUsage       = ERhiResourceUsage::Default;
+        ERhiTextureBindFlags mBindFlags   = ERhiTextureBindFlags::ShaderResource;
+        ERhiCpuAccess        mCpuAccess   = ERhiCpuAccess::None;
     };
 
     struct FRhiTextureViewRange {
-        u32 mBaseMip        = 0U;
-        u32 mMipCount       = 0U;
-        u32 mBaseArrayLayer = 0U;
-        u32 mLayerCount     = 0U;
-        u32 mBaseDepthSlice = 0U;
+        u32 mBaseMip         = 0U;
+        u32 mMipCount        = 0U;
+        u32 mBaseArrayLayer  = 0U;
+        u32 mLayerCount      = 0U;
+        u32 mBaseDepthSlice  = 0U;
         u32 mDepthSliceCount = 0U;
     };
 
@@ -168,19 +169,19 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiShaderResourceViewDesc {
-        FString             mDebugName;
-        FRhiTexture*        mTexture = nullptr;
-        FRhiBuffer*         mBuffer  = nullptr;
-        ERhiFormat          mFormat  = ERhiFormat::Unknown;
+        FString              mDebugName;
+        FRhiTexture*         mTexture = nullptr;
+        FRhiBuffer*          mBuffer  = nullptr;
+        ERhiFormat           mFormat  = ERhiFormat::Unknown;
         FRhiTextureViewRange mTextureRange;
         FRhiBufferViewRange  mBufferRange;
     };
 
     struct FRhiUnorderedAccessViewDesc {
-        FString             mDebugName;
-        FRhiTexture*        mTexture = nullptr;
-        FRhiBuffer*         mBuffer  = nullptr;
-        ERhiFormat          mFormat  = ERhiFormat::Unknown;
+        FString              mDebugName;
+        FRhiTexture*         mTexture = nullptr;
+        FRhiBuffer*          mBuffer  = nullptr;
+        ERhiFormat           mFormat  = ERhiFormat::Unknown;
         FRhiTextureViewRange mTextureRange;
         FRhiBufferViewRange  mBufferRange;
     };
@@ -202,13 +203,13 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiViewportDesc {
-        FString   mDebugName;
-        u32       mWidth       = 0U;
-        u32       mHeight      = 0U;
-        ERhiFormat mFormat     = ERhiFormat::B8G8R8A8Unorm;
-        u32       mBufferCount = 2U;
-        bool      mAllowTearing = false;
-        void*     mNativeHandle = nullptr;
+        FString    mDebugName;
+        u32        mWidth        = 0U;
+        u32        mHeight       = 0U;
+        ERhiFormat mFormat       = ERhiFormat::B8G8R8A8Unorm;
+        u32        mBufferCount  = 2U;
+        bool       mAllowTearing = false;
+        void*      mNativeHandle = nullptr;
     };
 
     struct FRhiVertexBufferView {
@@ -218,9 +219,9 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiIndexBufferView {
-        FRhiBuffer*  mBuffer      = nullptr;
-        ERhiIndexType mIndexType  = ERhiIndexType::Uint32;
-        u32          mOffsetBytes = 0U;
+        FRhiBuffer*   mBuffer      = nullptr;
+        ERhiIndexType mIndexType   = ERhiIndexType::Uint32;
+        u32           mOffsetBytes = 0U;
     };
 
     struct FRhiViewportRect {
@@ -256,20 +257,20 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiShaderDesc {
-        FString mDebugName;
-        EShaderStage mStage = EShaderStage::Vertex;
-        FShaderBytecode mBytecode;
+        FString           mDebugName;
+        EShaderStage      mStage = EShaderStage::Vertex;
+        FShaderBytecode   mBytecode;
         FShaderReflection mReflection;
     };
 
     struct FRhiVertexAttributeDesc {
-        FString   mSemanticName;
-        u32       mSemanticIndex    = 0U;
-        ERhiFormat mFormat          = ERhiFormat::R32Float;
-        u32       mInputSlot        = 0U;
-        u32       mAlignedByteOffset = 0U;
-        bool      mPerInstance      = false;
-        u32       mInstanceStepRate = 0U;
+        FString    mSemanticName;
+        u32        mSemanticIndex     = 0U;
+        ERhiFormat mFormat            = ERhiFormat::R32Float;
+        u32        mInputSlot         = 0U;
+        u32        mAlignedByteOffset = 0U;
+        bool       mPerInstance       = false;
+        u32        mInstanceStepRate  = 0U;
     };
 
     struct FRhiVertexLayoutDesc {
@@ -277,65 +278,65 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiGraphicsPipelineDesc {
-        FString mDebugName;
-        FRhiPipelineLayout* mPipelineLayout = nullptr;
-        FRhiShader* mVertexShader = nullptr;
-        FRhiShader* mPixelShader  = nullptr;
-        FRhiShader* mGeometryShader = nullptr;
-        FRhiShader* mHullShader   = nullptr;
-        FRhiShader* mDomainShader = nullptr;
+        FString              mDebugName;
+        FRhiPipelineLayout*  mPipelineLayout = nullptr;
+        FRhiShader*          mVertexShader   = nullptr;
+        FRhiShader*          mPixelShader    = nullptr;
+        FRhiShader*          mGeometryShader = nullptr;
+        FRhiShader*          mHullShader     = nullptr;
+        FRhiShader*          mDomainShader   = nullptr;
         FRhiVertexLayoutDesc mVertexLayout;
     };
 
     struct FRhiComputePipelineDesc {
-        FString mDebugName;
+        FString             mDebugName;
         FRhiPipelineLayout* mPipelineLayout = nullptr;
-        FRhiShader* mComputeShader = nullptr;
+        FRhiShader*         mComputeShader  = nullptr;
     };
 
     struct FRhiPushConstantRange {
-        u32                 mOffset = 0U;
-        u32                 mSize   = 0U;
+        u32                  mOffset     = 0U;
+        u32                  mSize       = 0U;
         ERhiShaderStageFlags mVisibility = ERhiShaderStageFlags::All;
     };
 
     struct FRhiBindGroupLayoutEntry {
-        u32                  mBinding     = 0U;
-        ERhiBindingType      mType        = ERhiBindingType::ConstantBuffer;
-        ERhiShaderStageFlags mVisibility  = ERhiShaderStageFlags::All;
-        u32                  mArrayCount  = 1U;
+        u32                  mBinding          = 0U;
+        ERhiBindingType      mType             = ERhiBindingType::ConstantBuffer;
+        ERhiShaderStageFlags mVisibility       = ERhiShaderStageFlags::All;
+        u32                  mArrayCount       = 1U;
         bool                 mHasDynamicOffset = false;
     };
 
     struct FRhiBindGroupLayoutDesc {
-        FString                         mDebugName;
-        u32                             mSetIndex = 0U;
+        FString                           mDebugName;
+        u32                               mSetIndex = 0U;
         TVector<FRhiBindGroupLayoutEntry> mEntries;
-        u64                             mLayoutHash = 0ULL;
+        u64                               mLayoutHash = 0ULL;
     };
 
     struct FRhiBindGroupEntry {
         u32             mBinding    = 0U;
         ERhiBindingType mType       = ERhiBindingType::ConstantBuffer;
-        FRhiBuffer*     mBuffer = nullptr;
-        FRhiTexture*    mTexture = nullptr;
-        FRhiSampler*    mSampler = nullptr;
+        FRhiBuffer*     mBuffer     = nullptr;
+        FRhiTexture*    mTexture    = nullptr;
+        FRhiSampler*    mSampler    = nullptr;
         u64             mOffset     = 0ULL;
         u64             mSize       = 0ULL;
         u32             mArrayIndex = 0U;
     };
 
     struct FRhiBindGroupDesc {
-        FString        mDebugName;
-        FRhiBindGroupLayout* mLayout = nullptr;
+        FString                     mDebugName;
+        FRhiBindGroupLayout*        mLayout = nullptr;
         TVector<FRhiBindGroupEntry> mEntries;
     };
 
     struct FRhiPipelineLayoutDesc {
-        FString                         mDebugName;
-        TVector<FRhiBindGroupLayout*> mBindGroupLayouts;
-        TVector<FRhiPushConstantRange>  mPushConstants;
-        u64                             mLayoutHash = 0ULL;
+        FString                        mDebugName;
+        TVector<FRhiBindGroupLayout*>  mBindGroupLayouts;
+        TVector<FRhiPushConstantRange> mPushConstants;
+        u64                            mLayoutHash = 0ULL;
     };
 
     struct FRhiCommandPoolDesc {
@@ -344,14 +345,14 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiCommandListDesc {
-        FString            mDebugName;
-        ERhiQueueType      mQueueType = ERhiQueueType::Graphics;
+        FString             mDebugName;
+        ERhiQueueType       mQueueType = ERhiQueueType::Graphics;
         ERhiCommandListType mListType  = ERhiCommandListType::Direct;
     };
 
     struct FRhiCommandContextDesc {
-        FString            mDebugName;
-        ERhiQueueType      mQueueType = ERhiQueueType::Graphics;
+        FString             mDebugName;
+        ERhiQueueType       mQueueType = ERhiQueueType::Graphics;
         ERhiCommandListType mListType  = ERhiCommandListType::Direct;
     };
 
@@ -366,23 +367,23 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiSubmitInfo {
-        FRhiCommandList* const* mCommandLists = nullptr;
-        u32                      mCommandListCount = 0U;
+        FRhiCommandList* const* mCommandLists     = nullptr;
+        u32                     mCommandListCount = 0U;
 
-        const FRhiQueueWait*          mWaits = nullptr;
-        u32                           mWaitCount = 0U;
+        const FRhiQueueWait*    mWaits     = nullptr;
+        u32                     mWaitCount = 0U;
 
-        const FRhiQueueSignal*        mSignals = nullptr;
-        u32                           mSignalCount = 0U;
+        const FRhiQueueSignal*  mSignals     = nullptr;
+        u32                     mSignalCount = 0U;
 
-        FRhiFence*                    mFence = nullptr;
-        u64                           mFenceValue = 0ULL;
+        FRhiFence*              mFence      = nullptr;
+        u64                     mFenceValue = 0ULL;
     };
 
     struct FRhiPresentInfo {
-        FRhiViewport* mViewport = nullptr;
+        FRhiViewport* mViewport     = nullptr;
         u32           mSyncInterval = 1U;
-        u32           mFlags = 0U;
+        u32           mFlags        = 0U;
     };
 
     struct FRhiTransitionInfo {
@@ -394,25 +395,25 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiTransitionCreateInfo {
-        const FRhiTransitionInfo* mTransitions = nullptr;
+        const FRhiTransitionInfo* mTransitions     = nullptr;
         u32                       mTransitionCount = 0U;
-        ERhiQueueType             mSrcQueue = ERhiQueueType::Graphics;
-        ERhiQueueType             mDstQueue = ERhiQueueType::Graphics;
-        u32                       mFlags = 0U;
+        ERhiQueueType             mSrcQueue        = ERhiQueueType::Graphics;
+        ERhiQueueType             mDstQueue        = ERhiQueueType::Graphics;
+        u32                       mFlags           = 0U;
     };
 
     struct FRhiRenderPassColorAttachment {
-        FRhiRenderTargetView* mView = nullptr;
+        FRhiRenderTargetView* mView    = nullptr;
         ERhiLoadOp            mLoadOp  = ERhiLoadOp::Clear;
         ERhiStoreOp           mStoreOp = ERhiStoreOp::Store;
         FRhiClearColor        mClearColor;
     };
 
     struct FRhiRenderPassDepthStencilAttachment {
-        FRhiDepthStencilView* mView = nullptr;
-        ERhiLoadOp            mDepthLoadOp   = ERhiLoadOp::Clear;
-        ERhiStoreOp           mDepthStoreOp  = ERhiStoreOp::Store;
-        ERhiLoadOp            mStencilLoadOp = ERhiLoadOp::Clear;
+        FRhiDepthStencilView* mView           = nullptr;
+        ERhiLoadOp            mDepthLoadOp    = ERhiLoadOp::Clear;
+        ERhiStoreOp           mDepthStoreOp   = ERhiStoreOp::Store;
+        ERhiLoadOp            mStencilLoadOp  = ERhiLoadOp::Clear;
         ERhiStoreOp           mStencilStoreOp = ERhiStoreOp::Store;
         FRhiClearDepthStencil mClearDepthStencil;
         bool                  mReadOnlyDepth   = false;
@@ -420,9 +421,9 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiRenderPassDesc {
-        FString                               mDebugName;
-        u32                                   mColorAttachmentCount = 0U;
-        const FRhiRenderPassColorAttachment*  mColorAttachments      = nullptr;
+        FString                                     mDebugName;
+        u32                                         mColorAttachmentCount   = 0U;
+        const FRhiRenderPassColorAttachment*        mColorAttachments       = nullptr;
         const FRhiRenderPassDepthStencilAttachment* mDepthStencilAttachment = nullptr;
     };
 

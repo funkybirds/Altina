@@ -10,9 +10,10 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::ShaderCompiler {
-    using Core::Container::FString;
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
     using ::AltinaEngine::Shader::EShaderStage;
+    using Container::FString;
+    using Container::TVector;
 
     enum class EShaderSourceLanguage : u8 {
         Hlsl = 0,
@@ -27,8 +28,8 @@ namespace AltinaEngine::ShaderCompiler {
     };
 
     struct FVulkanBindingOptions {
-        bool mEnableAutoShift = true;
-        u32  mSpace           = 0U;
+        bool mEnableAutoShift     = true;
+        u32  mSpace               = 0U;
         u32  mConstantBufferShift = 0U;
         u32  mTextureShift        = 1000U;
         u32  mSamplerShift        = 2000U;
@@ -41,44 +42,44 @@ namespace AltinaEngine::ShaderCompiler {
     };
 
     struct FShaderSourceDesc {
-        FString              mPath;
-        FString              mEntryPoint;
-        EShaderStage         mStage     = EShaderStage::Vertex;
+        FString               mPath;
+        FString               mEntryPoint;
+        EShaderStage          mStage    = EShaderStage::Vertex;
         EShaderSourceLanguage mLanguage = EShaderSourceLanguage::Hlsl;
-        TVector<FString>     mIncludeDirs;
+        TVector<FString>      mIncludeDirs;
         TVector<FShaderMacro> mDefines;
     };
 
     struct FShaderCompileOptions {
-        Rhi::ERhiBackend     mTargetBackend      = Rhi::ERhiBackend::Unknown;
-        EShaderOptimization  mOptimization       = EShaderOptimization::Default;
-        bool                 mDebugInfo          = false;
-        bool                 mEnableBindless     = false;
+        Rhi::ERhiBackend      mTargetBackend  = Rhi::ERhiBackend::Unknown;
+        EShaderOptimization   mOptimization   = EShaderOptimization::Default;
+        bool                  mDebugInfo      = false;
+        bool                  mEnableBindless = false;
         FVulkanBindingOptions mVulkanBinding;
-        FString              mTargetProfile;
-        FString              mCompilerPathOverride;
-        FString              mShaderModelOverride;
+        FString               mTargetProfile;
+        FString               mCompilerPathOverride;
+        FString               mShaderModelOverride;
     };
 
     struct FShaderCompileRequest {
-        FShaderSourceDesc    mSource;
+        FShaderSourceDesc     mSource;
         FShaderCompileOptions mOptions;
-        FShaderPermutationId mPermutationId;
+        FShaderPermutationId  mPermutationId;
     };
 
     struct FRhiShaderBindingLayout {
-        Rhi::FRhiPipelineLayoutDesc          mPipelineLayout;
+        Rhi::FRhiPipelineLayoutDesc           mPipelineLayout;
         TVector<Rhi::FRhiBindGroupLayoutDesc> mBindGroupLayouts;
     };
 
     struct FShaderCompileResult {
-        bool                mSucceeded = false;
-        TVector<u8>         mBytecode;
-        EShaderStage        mStage = EShaderStage::Vertex;
-        FShaderReflection   mReflection;
+        bool                    mSucceeded = false;
+        TVector<u8>             mBytecode;
+        EShaderStage            mStage = EShaderStage::Vertex;
+        FShaderReflection       mReflection;
         FRhiShaderBindingLayout mRhiLayout;
-        FString             mDiagnostics;
-        FString             mOutputDebugPath;
+        FString                 mDiagnostics;
+        FString                 mOutputDebugPath;
     };
 
 } // namespace AltinaEngine::ShaderCompiler

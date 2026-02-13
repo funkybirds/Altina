@@ -11,21 +11,22 @@
 struct ID3D11DeviceContext;
 
 namespace AltinaEngine::Rhi {
+    namespace Container = Core::Container;
     class FRhiD3D11Device;
 
     struct FD3D11UploadAllocation {
-        FRhiBuffer* mBuffer = nullptr;
-        u64         mOffset = 0ULL;
-        u64         mSize   = 0ULL;
-        u64         mTag    = 0ULL;
+        FRhiBuffer*        mBuffer = nullptr;
+        u64                mOffset = 0ULL;
+        u64                mSize   = 0ULL;
+        u64                mTag    = 0ULL;
 
         [[nodiscard]] auto IsValid() const noexcept -> bool { return mBuffer != nullptr; }
     };
 
     struct FD3D11UploadBufferManagerDesc {
-        u64 mPageSizeBytes = 4ULL * 1024ULL * 1024ULL;
-        u32 mPageCount = 3U;
-        u64 mAlignmentBytes = 16ULL;
+        u64  mPageSizeBytes                    = 4ULL * 1024ULL * 1024ULL;
+        u32  mPageCount                        = 3U;
+        u64  mAlignmentBytes                   = 16ULL;
         bool mAllowConstantBufferSuballocation = false;
     };
 
@@ -33,11 +34,11 @@ namespace AltinaEngine::Rhi {
     public:
         FD3D11UploadBufferManager() = default;
 
-        void Init(FRhiD3D11Device* device, const FD3D11UploadBufferManagerDesc& desc);
-        void Reset();
+        void               Init(FRhiD3D11Device* device, const FD3D11UploadBufferManagerDesc& desc);
+        void               Reset();
 
-        void BeginFrame(u64 frameTag = 0ULL);
-        void EndFrame();
+        void               BeginFrame(u64 frameTag = 0ULL);
+        void               EndFrame();
 
         [[nodiscard]] auto SupportsConstantBufferSuballocation() const noexcept -> bool {
             return mSupportsConstantBufferSuballocation && mAllowConstantBufferSuballocation;
@@ -68,19 +69,19 @@ namespace AltinaEngine::Rhi {
         };
 
         auto GetCurrentPage() -> FPage*;
-        auto WriteToBuffer(FRhiBuffer* buffer, u64 bufferSizeBytes,
-            const void* data, u64 sizeBytes, u64 dstOffset) -> bool;
+        auto WriteToBuffer(FRhiBuffer* buffer, u64 bufferSizeBytes, const void* data, u64 sizeBytes,
+            u64 dstOffset) -> bool;
 
-        FRhiD3D11Device*        mDevice = nullptr;
-        ::ID3D11DeviceContext* mContext = nullptr;
-        Core::Container::TVector<FPage> mPages;
-        Core::Container::TVector<FConstantBufferSlot> mConstantPool;
-        u64 mPageSizeBytes = 0ULL;
-        u64 mAlignmentBytes = 16ULL;
-        u64 mFrameTag = 0ULL;
-        u32 mPageIndex = 0U;
-        bool mAllowConstantBufferSuballocation = false;
-        bool mSupportsConstantBufferSuballocation = false;
-        bool mPageSupportsConstant = false;
+        FRhiD3D11Device*                        mDevice  = nullptr;
+        ::ID3D11DeviceContext*                  mContext = nullptr;
+        Container::TVector<FPage>               mPages;
+        Container::TVector<FConstantBufferSlot> mConstantPool;
+        u64                                     mPageSizeBytes                       = 0ULL;
+        u64                                     mAlignmentBytes                      = 16ULL;
+        u64                                     mFrameTag                            = 0ULL;
+        u32                                     mPageIndex                           = 0U;
+        bool                                    mAllowConstantBufferSuballocation    = false;
+        bool                                    mSupportsConstantBufferSuballocation = false;
+        bool                                    mPageSupportsConstant                = false;
     };
 } // namespace AltinaEngine::Rhi

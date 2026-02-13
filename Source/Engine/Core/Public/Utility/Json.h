@@ -28,12 +28,12 @@ namespace AltinaEngine::Core::Utility::Json {
     };
 
     struct AE_CORE_API FJsonValue {
-        EJsonType          Type   = EJsonType::Null;
-        double             Number = 0.0;
-        bool               Bool   = false;
-        FNativeString      String;
+        EJsonType            Type   = EJsonType::Null;
+        double               Number = 0.0;
+        bool                 Bool   = false;
+        FNativeString        String;
         TVector<FJsonValue*> Array;
-        TVector<FJsonPair> Object;
+        TVector<FJsonPair>   Object;
     };
 
     class AE_CORE_API FJsonDocument {
@@ -41,11 +41,11 @@ namespace AltinaEngine::Core::Utility::Json {
         FJsonDocument() = default;
         ~FJsonDocument();
 
-        FJsonDocument(const FJsonDocument&) = delete;
+        FJsonDocument(const FJsonDocument&)                    = delete;
         auto operator=(const FJsonDocument&) -> FJsonDocument& = delete;
 
         FJsonDocument(FJsonDocument&& other) noexcept;
-        auto operator=(FJsonDocument&& other) noexcept -> FJsonDocument&;
+        auto               operator=(FJsonDocument&& other) noexcept -> FJsonDocument&;
 
         [[nodiscard]] auto Parse(FNativeStringView text) -> bool;
         void               Clear();
@@ -54,11 +54,11 @@ namespace AltinaEngine::Core::Utility::Json {
         [[nodiscard]] auto GetError() const noexcept -> FNativeStringView;
 
     private:
-        void DestroyValues();
+        void                 DestroyValues();
 
-        FJsonValue*            mRoot  = nullptr;
-        TVector<FJsonValue*>   mOwned;
-        FNativeString          mError;
+        FJsonValue*          mRoot = nullptr;
+        TVector<FJsonValue*> mOwned;
+        FNativeString        mError;
     };
 
     AE_CORE_API auto FindObjectValue(const FJsonValue& object, const char* key)

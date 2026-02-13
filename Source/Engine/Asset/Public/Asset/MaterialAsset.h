@@ -5,7 +5,8 @@
 #include "Container/Vector.h"
 
 namespace AltinaEngine::Asset {
-    using Core::Container::TVector;
+    namespace Container = Core::Container;
+    using Container::TVector;
 
     struct AE_ASSET_API FMaterialRuntimeDesc {
         u32 ShadingModel = 0;

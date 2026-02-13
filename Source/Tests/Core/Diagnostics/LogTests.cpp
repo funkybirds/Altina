@@ -6,8 +6,9 @@
 #include "Container/String.h"
 #include "Logging/Log.h"
 
-using AltinaEngine::Core::Container::FString;
-using AltinaEngine::Core::Container::FStringView;
+namespace Container = AltinaEngine::Core::Container;
+using Container::FString;
+using Container::FStringView;
 using namespace AltinaEngine::Core::Logging;
 
 namespace {

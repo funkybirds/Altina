@@ -6,7 +6,8 @@
 #include <string>
 #include <type_traits>
 
-using AltinaEngine::Core::Container::FStringView;
+namespace Container = AltinaEngine::Core::Container;
+using Container::FStringView;
 
 namespace AltinaEngine::Core::Logging {
     namespace {

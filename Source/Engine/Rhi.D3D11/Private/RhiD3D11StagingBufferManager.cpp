@@ -26,13 +26,13 @@ namespace AltinaEngine::Rhi {
     namespace {
         auto ToD3D11Map(ED3D11StagingMapMode mode) noexcept -> D3D11_MAP {
             switch (mode) {
-            case ED3D11StagingMapMode::Write:
-                return D3D11_MAP_WRITE;
-            case ED3D11StagingMapMode::ReadWrite:
-                return D3D11_MAP_READ_WRITE;
-            case ED3D11StagingMapMode::Read:
-            default:
-                return D3D11_MAP_READ;
+                case ED3D11StagingMapMode::Write:
+                    return D3D11_MAP_WRITE;
+                case ED3D11StagingMapMode::ReadWrite:
+                    return D3D11_MAP_READ_WRITE;
+                case ED3D11StagingMapMode::Read:
+                default:
+                    return D3D11_MAP_READ;
             }
         }
     } // namespace
@@ -49,12 +49,12 @@ namespace AltinaEngine::Rhi {
 
     void FD3D11StagingBufferManager::Reset() {
         mEntries.Clear();
-        mDevice = nullptr;
+        mDevice  = nullptr;
         mContext = nullptr;
     }
 
-    auto FD3D11StagingBufferManager::Acquire(
-        u64 sizeBytes, ERhiCpuAccess access) -> FD3D11StagingAllocation {
+    auto FD3D11StagingBufferManager::Acquire(u64 sizeBytes, ERhiCpuAccess access)
+        -> FD3D11StagingAllocation {
         if (mDevice == nullptr || sizeBytes == 0ULL || access == ERhiCpuAccess::None) {
             return {};
         }
@@ -72,8 +72,8 @@ namespace AltinaEngine::Rhi {
             }
             entry.mInUse = true;
             FD3D11StagingAllocation allocation{};
-            allocation.mBuffer = entry.mBuffer.Get();
-            allocation.mSize   = entry.mSizeBytes;
+            allocation.mBuffer    = entry.mBuffer.Get();
+            allocation.mSize      = entry.mSizeBytes;
             allocation.mPoolIndex = i;
             return allocation;
         }
@@ -90,16 +90,16 @@ namespace AltinaEngine::Rhi {
         }
 
         FStagingEntry entry{};
-        entry.mBuffer = buffer;
-        entry.mSizeBytes = sizeBytes;
-        entry.mCpuAccess = access;
-        entry.mInUse = true;
+        entry.mBuffer       = buffer;
+        entry.mSizeBytes    = sizeBytes;
+        entry.mCpuAccess    = access;
+        entry.mInUse        = true;
         const u32 poolIndex = static_cast<u32>(mEntries.Size());
         mEntries.PushBack(entry);
 
         FD3D11StagingAllocation allocation{};
-        allocation.mBuffer = buffer.Get();
-        allocation.mSize   = sizeBytes;
+        allocation.mBuffer    = buffer.Get();
+        allocation.mSize      = sizeBytes;
         allocation.mPoolIndex = poolIndex;
         return allocation;
     }
@@ -129,8 +129,7 @@ namespace AltinaEngine::Rhi {
             return nullptr;
         }
         D3D11_MAPPED_SUBRESOURCE mapped = {};
-        const HRESULT            hr =
-            mContext->Map(nativeBuffer, 0U, ToD3D11Map(mode), 0U, &mapped);
+        const HRESULT hr = mContext->Map(nativeBuffer, 0U, ToD3D11Map(mode), 0U, &mapped);
         if (FAILED(hr)) {
             return nullptr;
         }

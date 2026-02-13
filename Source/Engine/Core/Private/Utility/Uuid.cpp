@@ -3,6 +3,7 @@
 #include <random>
 
 namespace AltinaEngine {
+    namespace Container = Core::Container;
     namespace {
         template <typename CharT>
         constexpr auto HexToNibble(CharT value, u8& out) noexcept -> bool {
@@ -29,8 +30,7 @@ namespace AltinaEngine {
         }
 
         template <typename CharT>
-        auto TryParseImpl(Core::Container::TBasicStringView<CharT> text, FUuid& out) noexcept
-            -> bool {
+        auto TryParseImpl(Container::TBasicStringView<CharT> text, FUuid& out) noexcept -> bool {
             const auto length = text.Length();
             if (length != FUuid::kCompactStringLength && length != FUuid::kStringLength) {
                 return false;
@@ -39,8 +39,7 @@ namespace AltinaEngine {
             const bool hasHyphens = length == FUuid::kStringLength;
             if (hasHyphens) {
                 if (text[8] != static_cast<CharT>('-') || text[13] != static_cast<CharT>('-')
-                    || text[18] != static_cast<CharT>('-')
-                    || text[23] != static_cast<CharT>('-')) {
+                    || text[18] != static_cast<CharT>('-') || text[23] != static_cast<CharT>('-')) {
                     return false;
                 }
             }
@@ -76,16 +75,15 @@ namespace AltinaEngine {
             return true;
         }
 
-        template <typename CharT>
-        void AppendHex(Core::Container::TBasicString<CharT>& out, u8 value) {
+        template <typename CharT> void AppendHex(Container::TBasicString<CharT>& out, u8 value) {
             constexpr char kDigits[] = "0123456789abcdef";
             out.Append(static_cast<CharT>(kDigits[(value >> 4) & 0xF]));
             out.Append(static_cast<CharT>(kDigits[value & 0xF]));
         }
 
         template <typename CharT>
-        auto ToStringImpl(const FUuid& value) -> Core::Container::TBasicString<CharT> {
-            Core::Container::TBasicString<CharT> out;
+        auto ToStringImpl(const FUuid& value) -> Container::TBasicString<CharT> {
+            Container::TBasicString<CharT> out;
             out.Reserve(FUuid::kStringLength);
 
             const auto& bytes = value.GetBytes();
@@ -114,20 +112,18 @@ namespace AltinaEngine {
     }
 
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-    auto FUuid::TryParse(Core::Container::FStringView text, FUuid& out) noexcept -> bool {
+    auto FUuid::TryParse(Container::FStringView text, FUuid& out) noexcept -> bool {
         return TryParseImpl(text, out);
     }
 #endif
 
-    auto FUuid::TryParse(Core::Container::FNativeStringView text, FUuid& out) noexcept -> bool {
+    auto FUuid::TryParse(Container::FNativeStringView text, FUuid& out) noexcept -> bool {
         return TryParseImpl(text, out);
     }
 
-    auto FUuid::ToString() const -> Core::Container::FString {
-        return ToStringImpl<TChar>(*this);
-    }
+    auto FUuid::ToString() const -> Container::FString { return ToStringImpl<TChar>(*this); }
 
-    auto FUuid::ToNativeString() const -> Core::Container::FNativeString {
+    auto FUuid::ToNativeString() const -> Container::FNativeString {
         return ToStringImpl<char>(*this);
     }
 

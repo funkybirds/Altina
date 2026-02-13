@@ -25,9 +25,10 @@
 #endif
 
 namespace AltinaEngine::Core::Platform {
+    namespace Container = Core::Container;
     namespace {
         template <typename CharT>
-        auto ToWideStringImpl(const Core::Container::TBasicString<CharT>& value) -> std::wstring {
+        auto ToWideStringImpl(const Container::TBasicString<CharT>& value) -> std::wstring {
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 return std::wstring(value.GetData(), value.Length());
             } else {
@@ -35,14 +36,14 @@ namespace AltinaEngine::Core::Platform {
                 if (value.Length() == 0) {
                     return {};
                 }
-                int wideCount = MultiByteToWideChar(CP_UTF8, 0, value.GetData(),
-                    static_cast<int>(value.Length()), nullptr, 0);
+                int wideCount = MultiByteToWideChar(
+                    CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()), nullptr, 0);
                 if (wideCount <= 0) {
                     return {};
                 }
                 std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-                MultiByteToWideChar(CP_UTF8, 0, value.GetData(),
-                    static_cast<int>(value.Length()), wide.data(), wideCount);
+                MultiByteToWideChar(CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()),
+                    wide.data(), wideCount);
                 return wide;
 #else
                 return std::wstring(value.GetData(), value.GetData() + value.Length());
@@ -50,21 +51,18 @@ namespace AltinaEngine::Core::Platform {
             }
         }
 
-        auto ToWideString(const FString& value) -> std::wstring {
-            return ToWideStringImpl(value);
-        }
+        auto ToWideString(const FString& value) -> std::wstring { return ToWideStringImpl(value); }
 
         template <typename CharT>
-        auto FromUtf8Impl(const std::string& value) -> Core::Container::TBasicString<CharT> {
-            Core::Container::TBasicString<CharT> out;
+        auto FromUtf8Impl(const std::string& value) -> Container::TBasicString<CharT> {
+            Container::TBasicString<CharT> out;
             if (value.empty()) {
                 return out;
             }
             if constexpr (std::is_same_v<CharT, wchar_t>) {
 #if AE_PLATFORM_WIN
-                int wideCount =
-                    MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()),
-                        nullptr, 0);
+                int wideCount = MultiByteToWideChar(
+                    CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
                 if (wideCount <= 0) {
                     return out;
                 }
@@ -81,9 +79,7 @@ namespace AltinaEngine::Core::Platform {
             return out;
         }
 
-        auto FromUtf8(const std::string& value) -> FString {
-            return FromUtf8Impl<TChar>(value);
-        }
+        auto FromUtf8(const std::string& value) -> FString { return FromUtf8Impl<TChar>(value); }
 
         void AppendDiagnosticLine(FString& diagnostics, const TChar* line) {
             if ((line == nullptr) || (line[0] == static_cast<TChar>(0))) {
@@ -142,11 +138,11 @@ namespace AltinaEngine::Core::Platform {
         SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
 
         STARTUPINFOW startup{};
-        startup.cb          = sizeof(startup);
-        startup.dwFlags     = STARTF_USESTDHANDLES;
-        startup.hStdOutput  = writePipe;
-        startup.hStdError   = writePipe;
-        startup.hStdInput   = GetStdHandle(STD_INPUT_HANDLE);
+        startup.cb         = sizeof(startup);
+        startup.dwFlags    = STARTF_USESTDHANDLES;
+        startup.hStdOutput = writePipe;
+        startup.hStdError  = writePipe;
+        startup.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
 
         PROCESS_INFORMATION processInfo{};
         std::wstring        mutableCmd = commandLine;
@@ -180,8 +176,8 @@ namespace AltinaEngine::Core::Platform {
 #else
         (void)exePath;
         (void)args;
-        AppendDiagnosticLine(output.mOutput,
-            TEXT("Process execution not supported on this platform."));
+        AppendDiagnosticLine(
+            output.mOutput, TEXT("Process execution not supported on this platform."));
 #endif
         return output;
     }

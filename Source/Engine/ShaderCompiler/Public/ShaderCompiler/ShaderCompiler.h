@@ -5,7 +5,8 @@
 #include "Container/Function.h"
 
 namespace AltinaEngine::ShaderCompiler {
-    using Core::Container::TFunction;
+    namespace Container = Core::Container;
+    using Container::TFunction;
 
     using FOnShaderCompiled = TFunction<void(const FShaderCompileResult&)>;
 
@@ -15,8 +16,8 @@ namespace AltinaEngine::ShaderCompiler {
 
         virtual auto Compile(const FShaderCompileRequest& request) -> FShaderCompileResult = 0;
 
-        virtual void CompileAsync(const FShaderCompileRequest& request,
-            FOnShaderCompiled onCompleted) = 0;
+        virtual void CompileAsync(
+            const FShaderCompileRequest& request, FOnShaderCompiled onCompleted) = 0;
     };
 
     AE_SHADER_COMPILER_API auto GetShaderCompiler() -> IShaderCompiler&;

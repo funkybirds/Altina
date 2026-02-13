@@ -2,7 +2,5 @@
 #include <Logging/Log.h>
 
 namespace AltinaEngine::RenderCore {
-    void FRenderCoreModule::LogHelloWorld() {
-        LogInfo(TEXT("Hello from RenderCore!"));
-    }
+    void FRenderCoreModule::LogHelloWorld() { LogInfo(TEXT("Hello from RenderCore!")); }
 } // namespace AltinaEngine::RenderCore

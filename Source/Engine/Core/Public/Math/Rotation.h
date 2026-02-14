@@ -32,12 +32,12 @@ namespace AltinaEngine::Core::Math {
             const f32 halfYaw   = yaw * 0.5f;
             const f32 halfRoll  = roll * 0.5f;
 
-            const f32 sx = std::sin(halfPitch);
-            const f32 cx = std::cos(halfPitch);
-            const f32 sy = std::sin(halfYaw);
-            const f32 cy = std::cos(halfYaw);
-            const f32 sz = std::sin(halfRoll);
-            const f32 cz = std::cos(halfRoll);
+            const f32 sx = Sin(halfPitch);
+            const f32 cx = Cos(halfPitch);
+            const f32 sy = Sin(halfYaw);
+            const f32 cy = Cos(halfYaw);
+            const f32 sz = Sin(halfRoll);
+            const f32 cz = Cos(halfRoll);
 
             return FQuaternion(cy * sx * cz + sy * cx * sz,
                 sy * cx * cz - cy * sx * sz,
@@ -61,16 +61,16 @@ namespace AltinaEngine::Core::Math {
                 const f32 r11   = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
                 const f32 r12   = 2.0f * (q.x * q.y - q.z * q.w);
                 const f32 yaw =
-                    (sinPitch >= 0.0f) ? std::atan2(r12, r11) : std::atan2(-r12, r11);
+                    (sinPitch >= 0.0f) ? Atan2(r12, r11) : Atan2(-r12, r11);
                 const f32 roll = 0.0f;
                 return FEulerRotator(pitch, yaw, roll);
             }
 
-            const f32 pitch = std::asin(sinPitch);
+            const f32 pitch = Asin(sinPitch);
             const f32 yaw =
-                std::atan2(2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.x * q.x + q.y * q.y));
+                Atan2(2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.x * q.x + q.y * q.y));
             const f32 roll =
-                std::atan2(2.0f * (q.w * q.z + q.x * q.y), 1.0f - 2.0f * (q.x * q.x + q.z * q.z));
+                Atan2(2.0f * (q.w * q.z + q.x * q.y), 1.0f - 2.0f * (q.x * q.x + q.z * q.z));
 
             return FEulerRotator(pitch, yaw, roll);
         }

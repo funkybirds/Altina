@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Types/Aliases.h"
+#include "Common.h"
 #include "Vector.h"
-#include <cmath>
 
 namespace AltinaEngine::Core::Math {
 
@@ -28,7 +28,7 @@ namespace AltinaEngine::Core::Math {
         static FQuaternion FromAxisAngle(const FVector3f& axis, f32 angleRad) noexcept {
             // normalize axis
             FVector3f a   = axis;
-            f32       len = std::sqrt(a.X() * a.X() + a.Y() * a.Y() + a.Z() * a.Z());
+            f32       len = Sqrt(a.X() * a.X() + a.Y() * a.Y() + a.Z() * a.Z());
             if (len <= 0.0f)
                 return Identity();
             a.X() /= len;
@@ -36,12 +36,12 @@ namespace AltinaEngine::Core::Math {
             a.Z() /= len;
 
             const f32 half = angleRad * 0.5f;
-            const f32 s    = std::sin(half);
-            return FQuaternion(a.X() * s, a.Y() * s, a.Z() * s, std::cos(half));
+            const f32 s    = Sin(half);
+            return FQuaternion(a.X() * s, a.Y() * s, a.Z() * s, Cos(half));
         }
 
         [[nodiscard]] f32 Length() const noexcept {
-            return std::sqrt(x * x + y * y + z * z + w * w);
+            return Sqrt(x * x + y * y + z * z + w * w);
         }
 
         [[nodiscard]] FQuaternion Normalized() const noexcept {

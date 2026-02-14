@@ -13,6 +13,14 @@ namespace AltinaEngine::Core::Math {
         AE_CORE_API auto SinD(f64 radians) noexcept -> f64;
         AE_CORE_API auto CosF(f32 radians) noexcept -> f32;
         AE_CORE_API auto CosD(f64 radians) noexcept -> f64;
+        AE_CORE_API auto AsinF(f32 radians) noexcept -> f32;
+        AE_CORE_API auto AsinD(f64 radians) noexcept -> f64;
+        AE_CORE_API auto AcosF(f32 radians) noexcept -> f32;
+        AE_CORE_API auto AcosD(f64 radians) noexcept -> f64;
+        AE_CORE_API auto AtanF(f32 radians) noexcept -> f32;
+        AE_CORE_API auto AtanD(f64 radians) noexcept -> f64;
+        AE_CORE_API auto Atan2F(f32 y, f32 x) noexcept -> f32;
+        AE_CORE_API auto Atan2D(f64 y, f64 x) noexcept -> f64;
         AE_CORE_API auto SqrtF(f32 value) noexcept -> f32;
         AE_CORE_API auto SqrtD(f64 value) noexcept -> f64;
     } // namespace Details
@@ -151,6 +159,39 @@ namespace AltinaEngine::Core::Math {
 
     template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Tan(T radians) noexcept -> T {
         return Sin(radians) / Cos(radians);
+    }
+
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Asin(T radians) noexcept -> T {
+        if constexpr (CSameAs<T, f32>) {
+            return Details::AsinF(radians);
+        } else {
+            return static_cast<T>(Details::AsinD(static_cast<f64>(radians)));
+        }
+    }
+
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Acos(T radians) noexcept -> T {
+        if constexpr (CSameAs<T, f32>) {
+            return Details::AcosF(radians);
+        } else {
+            return static_cast<T>(Details::AcosD(static_cast<f64>(radians)));
+        }
+    }
+
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Atan(T radians) noexcept -> T {
+        if constexpr (CSameAs<T, f32>) {
+            return Details::AtanF(radians);
+        } else {
+            return static_cast<T>(Details::AtanD(static_cast<f64>(radians)));
+        }
+    }
+
+    template <CFloatingPoint T>
+    [[nodiscard]] AE_FORCEINLINE auto Atan2(T y, T x) noexcept -> T {
+        if constexpr (CSameAs<T, f32>) {
+            return Details::Atan2F(y, x);
+        } else {
+            return static_cast<T>(Details::Atan2D(static_cast<f64>(y), static_cast<f64>(x)));
+        }
     }
 
     // Sqrt (floating-point)

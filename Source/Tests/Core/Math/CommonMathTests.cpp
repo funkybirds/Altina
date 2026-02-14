@@ -82,6 +82,44 @@ TEST_CASE("Math Common - Sin/Cos") {
     REQUIRE_CLOSE(Cos<f64>(kPiD), -1.0, 1e-12);
 }
 
+TEST_CASE("Math Common - Asin/Acos/Atan/Atan2") {
+    // f32 checks
+    REQUIRE_CLOSE(Asin<f32>(0.0F), 0.0F, 1e-6F);
+    REQUIRE_CLOSE(Asin<f32>(1.0F), kHalfPiF, 1e-6F);
+    REQUIRE_CLOSE(Asin<f32>(-1.0F), -kHalfPiF, 1e-6F);
+
+    REQUIRE_CLOSE(Acos<f32>(1.0F), 0.0F, 1e-6F);
+    REQUIRE_CLOSE(Acos<f32>(0.0F), kHalfPiF, 1e-6F);
+    REQUIRE_CLOSE(Acos<f32>(-1.0F), kPiF, 1e-6F);
+
+    REQUIRE_CLOSE(Atan<f32>(0.0F), 0.0F, 1e-6F);
+    REQUIRE_CLOSE(Atan<f32>(1.0F), kPiF * 0.25F, 1e-6F);
+    REQUIRE_CLOSE(Atan<f32>(-1.0F), -kPiF * 0.25F, 1e-6F);
+
+    REQUIRE_CLOSE(Atan2<f32>(0.0F, 1.0F), 0.0F, 1e-6F);
+    REQUIRE_CLOSE(Atan2<f32>(1.0F, 0.0F), kHalfPiF, 1e-6F);
+    REQUIRE_CLOSE(Atan2<f32>(-1.0F, 0.0F), -kHalfPiF, 1e-6F);
+    REQUIRE_CLOSE(Atan2<f32>(1.0F, -1.0F), kPiF * 0.75F, 1e-6F);
+
+    // f64 checks
+    REQUIRE_CLOSE(Asin<f64>(0.0), 0.0, 1e-12);
+    REQUIRE_CLOSE(Asin<f64>(1.0), kHalfPiD, 1e-12);
+    REQUIRE_CLOSE(Asin<f64>(-1.0), -kHalfPiD, 1e-12);
+
+    REQUIRE_CLOSE(Acos<f64>(1.0), 0.0, 1e-12);
+    REQUIRE_CLOSE(Acos<f64>(0.0), kHalfPiD, 1e-12);
+    REQUIRE_CLOSE(Acos<f64>(-1.0), kPiD, 1e-12);
+
+    REQUIRE_CLOSE(Atan<f64>(0.0), 0.0, 1e-12);
+    REQUIRE_CLOSE(Atan<f64>(1.0), kPiD * 0.25, 1e-12);
+    REQUIRE_CLOSE(Atan<f64>(-1.0), -kPiD * 0.25, 1e-12);
+
+    REQUIRE_CLOSE(Atan2<f64>(0.0, 1.0), 0.0, 1e-12);
+    REQUIRE_CLOSE(Atan2<f64>(1.0, 0.0), kHalfPiD, 1e-12);
+    REQUIRE_CLOSE(Atan2<f64>(-1.0, 0.0), -kHalfPiD, 1e-12);
+    REQUIRE_CLOSE(Atan2<f64>(1.0, -1.0), kPiD * 0.75, 1e-12);
+}
+
 TEST_CASE("Math Common - Hammersley2d") {
     const u32 N = 4;
 

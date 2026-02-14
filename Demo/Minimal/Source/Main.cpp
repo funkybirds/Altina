@@ -1,4 +1,5 @@
 #include "Base/AltinaBase.h"
+#include "Gameplay/GameplayModule.h"
 #include "Launch/EngineLoop.h"
 #include "Input/InputSystem.h"
 #include "Input/Keys.h"
@@ -570,6 +571,8 @@ int main(int argc, char** argv) {
     LogError(TEXT("Neko mNya value after reflection set: {}"), p.mNya);
 
     LogWarning(TEXT("Address for &(p.Nya) and &nyaRef: {}, {}"), (u64) & (p.mNya), (u64)&nyaRef);
+
+    Gameplay::FGameplayModule::ValidateReflection();
 
     FStartupParameters StartupParams{};
     if (argc > 1) {

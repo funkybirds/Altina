@@ -95,3 +95,5 @@ set_target_properties(${TargetName}
         OUTPUT_NAME AltinaEngineInput
         FOLDER "Engine/Input"
 )
+
+ae_add_reflection_codegen(TARGET ${TargetName})

@@ -66,3 +66,5 @@ set_target_properties(${TargetName} PROPERTIES
     OUTPUT_NAME AltinaEngineRhiMock
     FOLDER "Engine/Rhi.Mock"
 )
+
+ae_add_reflection_codegen(TARGET ${TargetName})

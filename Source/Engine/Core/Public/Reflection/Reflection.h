@@ -25,9 +25,58 @@ namespace AltinaEngine::Core::Reflection {
             R (T::*f)(Args...), T& obj, TSpan<FObject> vec, TIndexSequence<I...>) -> R {
             return (obj.*f)(vec[I].template As<Args>()...); // NOLINT
         }
+        template <typename T, typename R, typename... Args, usize... I>
+        auto MemberFunctorInvokerWrapperImpl(
+            R (T::*f)(Args...) const, const T& obj, TSpan<FObject> vec, TIndexSequence<I...>) -> R {
+            return (obj.*f)(vec[I].template As<Args>()...); // NOLINT
+        }
+        template <typename T, typename R, typename... Args, usize... I>
+        auto MemberFunctorInvokerWrapperImpl(
+            R (T::*f)(Args...) noexcept, T& obj, TSpan<FObject> vec, TIndexSequence<I...>) -> R {
+            return (obj.*f)(vec[I].template As<Args>()...); // NOLINT
+        }
+        template <typename T, typename R, typename... Args, usize... I>
+        auto MemberFunctorInvokerWrapperImpl(
+            R (T::*f)(Args...) const noexcept, const T& obj, TSpan<FObject> vec,
+            TIndexSequence<I...>) -> R {
+            return (obj.*f)(vec[I].template As<Args>()...); // NOLINT
+        }
 
         template <typename T, typename R, typename... Args>
         auto MemberFunctorInvokerWrapper(R (T::*f)(Args...), T& obj, TSpan<FObject> vec) -> R {
+            if (ReflectionAssert(vec.Size() == sizeof...(Args),
+                    EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
+                [[likely]] {
+                return MemberFunctorInvokerWrapperImpl(
+                    f, obj, vec, Container::TIndexSequenceFor<Args...>{});
+            }
+            Utility::CompilerHint::Unreachable();
+        }
+        template <typename T, typename R, typename... Args>
+        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) const, const T& obj,
+            TSpan<FObject> vec) -> R {
+            if (ReflectionAssert(vec.Size() == sizeof...(Args),
+                    EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
+                [[likely]] {
+                return MemberFunctorInvokerWrapperImpl(
+                    f, obj, vec, Container::TIndexSequenceFor<Args...>{});
+            }
+            Utility::CompilerHint::Unreachable();
+        }
+        template <typename T, typename R, typename... Args>
+        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) noexcept, T& obj,
+            TSpan<FObject> vec) -> R {
+            if (ReflectionAssert(vec.Size() == sizeof...(Args),
+                    EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
+                [[likely]] {
+                return MemberFunctorInvokerWrapperImpl(
+                    f, obj, vec, Container::TIndexSequenceFor<Args...>{});
+            }
+            Utility::CompilerHint::Unreachable();
+        }
+        template <typename T, typename R, typename... Args>
+        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) const noexcept, const T& obj,
+            TSpan<FObject> vec) -> R {
             if (ReflectionAssert(vec.Size() == sizeof...(Args),
                     EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
                 [[likely]] {

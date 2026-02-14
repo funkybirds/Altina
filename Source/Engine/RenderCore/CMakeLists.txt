@@ -88,3 +88,5 @@ set_target_properties(${TargetName}
         OUTPUT_NAME AltinaEngineRenderCore
         FOLDER "Engine/RenderCore"
 )
+
+ae_add_reflection_codegen(TARGET ${TargetName})

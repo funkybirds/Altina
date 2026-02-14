@@ -83,3 +83,5 @@ set_target_properties(${TargetName} PROPERTIES
     OUTPUT_NAME AltinaEngineRhiD3D11
     FOLDER "Engine/Rhi.D3D11"
 )
+
+ae_add_reflection_codegen(TARGET ${TargetName})

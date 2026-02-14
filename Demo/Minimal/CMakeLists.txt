@@ -15,6 +15,7 @@ target_link_libraries(${TargetName}
     PRIVATE
         AltinaEngine::Launch
         AltinaEngine::ShaderCompiler
+        AltinaEngine::Gameplay
 )
 
 if(WIN32)

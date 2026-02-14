@@ -72,4 +72,6 @@ set_target_properties(${TargetName} PROPERTIES
     FOLDER "Engine/Rhi.General"
 )
 
+ae_add_reflection_codegen(TARGET ${TargetName})
+
 

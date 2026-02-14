@@ -106,3 +106,5 @@ set_target_properties(${TargetName}
         OUTPUT_NAME AltinaEngineShaderCompiler
         FOLDER "Engine/ShaderCompiler"
 )
+
+ae_add_reflection_codegen(TARGET ${TargetName})

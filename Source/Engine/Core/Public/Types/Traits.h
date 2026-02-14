@@ -223,6 +223,26 @@ namespace AltinaEngine {
     template <typename T> struct TTypeIsCopyConstructible : TTypeIsConstructible<T, const T&> {};
     template <typename T> struct TTypeIsMoveConstructible : TTypeIsConstructible<T, T&&> {};
 
+    template <> struct TTypeIsDefaultConstructible<void> : TFalseType {};
+    template <> struct TTypeIsDefaultConstructible<const void> : TFalseType {};
+    template <> struct TTypeIsDefaultConstructible<volatile void> : TFalseType {};
+    template <> struct TTypeIsDefaultConstructible<const volatile void> : TFalseType {};
+
+    template <> struct TTypeIsTriviallyConstructible<void> : TFalseType {};
+    template <> struct TTypeIsTriviallyConstructible<const void> : TFalseType {};
+    template <> struct TTypeIsTriviallyConstructible<volatile void> : TFalseType {};
+    template <> struct TTypeIsTriviallyConstructible<const volatile void> : TFalseType {};
+
+    template <> struct TTypeIsCopyConstructible<void> : TFalseType {};
+    template <> struct TTypeIsCopyConstructible<const void> : TFalseType {};
+    template <> struct TTypeIsCopyConstructible<volatile void> : TFalseType {};
+    template <> struct TTypeIsCopyConstructible<const volatile void> : TFalseType {};
+
+    template <> struct TTypeIsMoveConstructible<void> : TFalseType {};
+    template <> struct TTypeIsMoveConstructible<const void> : TFalseType {};
+    template <> struct TTypeIsMoveConstructible<volatile void> : TFalseType {};
+    template <> struct TTypeIsMoveConstructible<const volatile void> : TFalseType {};
+
     template <typename T>
     concept CDefaultConstructible = TTypeIsDefaultConstructible<T>::Value;
     template <typename T>
@@ -261,6 +281,24 @@ namespace AltinaEngine {
 
     template <typename R, typename C, typename... Args>
     struct TMemberFunctionTrait<R (C::*)(Args...)> : TFalseType {
+        using TReturnType = R;
+        using TClassType  = C;
+        using TArgsTuple  = Container::TTuple<Args...>;
+    };
+    template <typename R, typename C, typename... Args>
+    struct TMemberFunctionTrait<R (C::*)(Args...) const> : TFalseType {
+        using TReturnType = R;
+        using TClassType  = C;
+        using TArgsTuple  = Container::TTuple<Args...>;
+    };
+    template <typename R, typename C, typename... Args>
+    struct TMemberFunctionTrait<R (C::*)(Args...) noexcept> : TFalseType {
+        using TReturnType = R;
+        using TClassType  = C;
+        using TArgsTuple  = Container::TTuple<Args...>;
+    };
+    template <typename R, typename C, typename... Args>
+    struct TMemberFunctionTrait<R (C::*)(Args...) const noexcept> : TFalseType {
         using TReturnType = R;
         using TClassType  = C;
         using TArgsTuple  = Container::TTuple<Args...>;

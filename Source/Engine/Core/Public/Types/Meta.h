@@ -88,15 +88,15 @@ namespace AltinaEngine::Core::TypeMeta {
         template <typename T> consteval static auto GetActualClassNameArray() {
             using namespace Core::Algorithm;
             constexpr auto kFunctionSignature = GetFuncNameToArray<T>();
-            constexpr u64  kFirstPos =
+            constexpr usize  kFirstPos =
                 Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(
                     kFunctionSignature, '<', 0)
                 + 1;
-            constexpr u64 kLastPos =
+            constexpr usize kLastPos =
                 Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(
                     kFunctionSignature, '>')
                 + 1;
-            constexpr int  kFinalOffset = kFirstPos + 0 + 0;
+            constexpr usize  kFinalOffset = kFirstPos + 0 + 0;
             constexpr auto kSubArray =
                 GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(
                     kFunctionSignature);
@@ -106,15 +106,15 @@ namespace AltinaEngine::Core::TypeMeta {
         template <auto T> consteval static auto GetActualVarNameArray() {
             using namespace Core::Algorithm;
             constexpr auto kFunctionSignature = GetVarNameToArray<T>();
-            constexpr u64  kFirstPos =
+            constexpr usize  kFirstPos =
                 Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(
                     kFunctionSignature, '<', 0)
                 + 1;
-            constexpr u64 kLastPos =
+            constexpr usize kLastPos =
                 Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(
                     kFunctionSignature, '>')
                 + 1;
-            constexpr int  kFinalOffset = kFirstPos + 0 + 0;
+            constexpr usize  kFinalOffset = kFirstPos + 0 + 0;
             constexpr auto kSubArray =
                 GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(
                     kFunctionSignature);
@@ -150,14 +150,19 @@ namespace AltinaEngine::Core::TypeMeta {
                 delete static_cast<T*>(p); // NOLINT
         }
         static auto InvokeCopyCtor(void* p) -> void* {
-            if constexpr (kCopyConstructible)
+            if constexpr (kCopyConstructible) {
                 return static_cast<void*>(new T(*static_cast<T*>(p)));
-            return nullptr;
+            } else {
+                (void)p;
+                return nullptr;
+            }
         }
         static auto InvokeDefaultCtor() -> void* {
-            if constexpr (kDefaultConstructible)
+            if constexpr (kDefaultConstructible) {
                 return static_cast<void*>(new T());
-            return nullptr;
+            } else {
+                return nullptr;
+            }
         }
     };
 
@@ -210,6 +215,9 @@ namespace AltinaEngine::Core::TypeMeta {
         [[nodiscard]] auto GetName() const noexcept -> FNativeStringView { return mName; }
         [[nodiscard]] auto GetTypeInfo() const noexcept -> FTypeInfo const& {
             return mGetTypeInfo();
+        }
+        [[nodiscard]] auto IsDefaultConstructible() const noexcept -> bool {
+            return mDefaultConstructible;
         }
         [[nodiscard]] auto IsCopyConstructible() const noexcept -> bool {
             return mCopyConstructible;

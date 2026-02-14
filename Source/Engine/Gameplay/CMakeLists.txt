@@ -1,7 +1,7 @@
-set(TargetName AltinaEngineImaging)
+set(TargetName AltinaEngineGameplay)
 
 add_library(${TargetName} SHARED)
-add_library(AltinaEngine::Imaging ALIAS ${TargetName})
+add_library(AltinaEngine::Gameplay ALIAS ${TargetName})
 
 file(GLOB_RECURSE Target_Public_Headers
     CONFIGURE_DEPENDS
@@ -32,7 +32,7 @@ target_sources(${TargetName}
 target_include_directories(${TargetName}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Public>
-        $<INSTALL_INTERFACE:include/AltinaEngine/Imaging>
+        $<INSTALL_INTERFACE:include/AltinaEngine/Gameplay>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/Private
 )
@@ -42,13 +42,9 @@ target_link_libraries(${TargetName}
         AltinaEngine::Core
 )
 
-if(WIN32)
-    target_link_libraries(${TargetName} PRIVATE windowscodecs ole32)
-endif()
-
 target_compile_definitions(${TargetName}
     PRIVATE
-        AE_IMAGING_BUILD
+        AE_GAMEPLAY_BUILD
 )
 
 set_target_properties(${TargetName} PROPERTIES
@@ -85,9 +81,10 @@ add_custom_command(
     COMMENT "Copying ${TargetName} to consumer binaries"
 )
 
-set_target_properties(${TargetName} PROPERTIES
-    OUTPUT_NAME AltinaEngineImaging
-    FOLDER "Engine/Imaging"
+set_target_properties(${TargetName}
+    PROPERTIES
+        OUTPUT_NAME AltinaEngineGameplay
+        FOLDER "Engine/Gameplay"
 )
 
 ae_add_reflection_codegen(TARGET ${TargetName})

@@ -110,3 +110,5 @@ set_target_properties(${TargetName}
         OUTPUT_NAME AltinaEngineLaunch
         FOLDER "Engine/Launch"
 )
+
+ae_add_reflection_codegen(TARGET ${TargetName})

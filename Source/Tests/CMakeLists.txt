@@ -135,3 +135,14 @@ if(TARGET AltinaEngineAssetTool)
 
     add_dependencies(AltinaEngineTestsAsset AltinaEngineAssetTool)
 endif()
+
+file(GLOB_RECURSE AE_TEST_GAMEPLAY_SOURCES
+    CONFIGURE_DEPENDS
+    ${AE_TESTS_ROOT}/Gameplay/*.cpp
+)
+
+ae_add_test_target(AltinaEngineTestsGameplay
+    FOLDER "Gameplay"
+    SOURCES ${AE_TEST_GAMEPLAY_SOURCES}
+    LIBS AltinaEngine::Gameplay
+)

@@ -9,7 +9,9 @@ AltinaEngine follows Unreal Engine inspired naming and layout conventions. Keep 
 - **Enums**: Prefix with `E` (e.g., `EColorSpace`). Enumerators use `CamelCase`.
 - **Structs & Plain Classes**: Prefix with `F` (e.g., `FTransform`).
 - **Interfaces** (abstract base classes with virtual functions): Prefix with `I` (e.g., `ISerializer`, `IDrawable`). This distinguishes runtime polymorphic interfaces from compile-time concepts (`C` prefix).
-- **Type Aliases**: Prefix with `T` and keep `CamelCase` (e.g., `TSeconds`).
+- **Type Aliases**: 
+  - If it's template, then prefix with `T` and keep `CamelCase` (e.g., `TBasicString<T>`).
+  - Otherwise, make prefix with `F` and keep `CamelCase` (e.g. `FVector3f`)
 - **Globals**: Prefix variables with `g` (`gEngineConfig`).
 - **Constants / constexpr**: Prefix with `k` (`kDefaultWindowWidth`).
 - **Member Variables**: Prefix with `m` (`mRenderDevicePtr`). Append `Ptr` or `Ref` to clarify ownership when valuable.
@@ -17,11 +19,15 @@ AltinaEngine follows Unreal Engine inspired naming and layout conventions. Keep 
   - **Namespace rules**: wrap engine code in `AltinaEngine::` sub-namespaces per module; avoid `using namespace` in
   headers.
 - **Namespaces**: `CamelCase` under the root `AltinaEngine` namespace (e.g., `AltinaEngine::Rendering`).
-  - Avoid redundant `AltinaEngine` prefixes on type names inside engine modules (e.g., do not repeat the top-level
-  identifier in type names). Public API stays under `AltinaEngine::` sub-namespaces, but type identifiers, aliases and
-  traits should not include an extra `AltinaEngine` textual prefix.
 - **Basic Types**: Use aliases like `u32`, `f64`, `String`, instead of `unsigned int`, `long long`, `int32_t`,
   `std::string`.
+
+## Using Namespaces
+- Avoid redundant `AltinaEngine` prefixes on type names inside engine modules (e.g., do not repeat the top-level identifier in type names). Public API stays under `AltinaEngine::` sub-namespaces, but type identifiers, aliases and traits should not include an extra `AltinaEngine` textual prefix.
+
+## Minimize STL Usage
+- Use internal type traits and containers. 
+  - `TShared<T>`, `TOwner<T>` for smart pointers 
 
 ## Files & Includes
 
@@ -52,7 +58,6 @@ AltinaEngine follows Unreal Engine inspired naming and layout conventions. Keep 
 - Keep implementation-only headers in `Private/` free of export macros; prefer forward declarations in `Public/` to minimise exported surface area.
 
 ## Tooling
-
 - Run `clang-format` using the profile at `config/clang-format` before committing.
 - Enable `clang-tidy` with the configuration at `config/clang-tidy`; it enforces prefix rules via `readability-identifier-naming`.
 - Prefer additional static analysis (sanitizers, MSVC /analyze) in CI for safety-critical modules.

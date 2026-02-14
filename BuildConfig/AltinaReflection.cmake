@@ -88,6 +88,18 @@ function(ae_add_reflection_codegen)
         list(APPEND scan_args --file "${src}")
     endforeach()
 
+    set(modmap_files "")
+    set(modmap_dirs "")
+    file(RELATIVE_PATH module_rel "${CMAKE_SOURCE_DIR}" "${AE_REFL_MODULE_ROOT}")
+    foreach(src IN LISTS abs_sources)
+        file(RELATIVE_PATH src_rel "${AE_REFL_MODULE_ROOT}" "${src}")
+        set(modmap "${CMAKE_BINARY_DIR}/${module_rel}/CMakeFiles/${AE_REFL_TARGET}.dir/${src_rel}.obj.modmap")
+        list(APPEND modmap_files "${modmap}")
+        get_filename_component(modmap_dir "${modmap}" DIRECTORY)
+        list(APPEND modmap_dirs "${modmap_dir}")
+    endforeach()
+    list(REMOVE_DUPLICATES modmap_dirs)
+
     set(gen_dir "${CMAKE_BINARY_DIR}/Generated/${AE_REFL_MODULE_NAME}")
     set(gen_cpp "${gen_dir}/Reflection.gen.cpp")
     set(compile_commands_root "${CMAKE_BINARY_DIR}")
@@ -100,6 +112,9 @@ function(ae_add_reflection_codegen)
                 continue()
             endif()
             file(READ "${header}" header_text)
+            string(REGEX REPLACE "#[ \t]*define[ \t]+ACLASS[^\r\n]*" "" header_text "${header_text}")
+            string(REGEX REPLACE "#[ \t]*define[ \t]+APROPERTY[^\r\n]*" "" header_text "${header_text}")
+            string(REGEX REPLACE "#[ \t]*define[ \t]+AFUNCTION[^\r\n]*" "" header_text "${header_text}")
             if (header_text MATCHES "ACLASS[ \t\r\n]*\\("
                 OR header_text MATCHES "APROPERTY[ \t\r\n]*\\("
                 OR header_text MATCHES "AFUNCTION[ \t\r\n]*\\("
@@ -156,6 +171,8 @@ function(ae_add_reflection_codegen)
         add_custom_command(
             OUTPUT "${stamp}"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${gen_dir}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${modmap_dirs}
+            COMMAND ${CMAKE_COMMAND} -E touch ${modmap_files}
             COMMAND $<TARGET_FILE:AltinaEngineReflectionScanner>
                 --compile-commands "${compile_commands_root}"
                 --include-headers
@@ -186,6 +203,8 @@ function(ae_add_reflection_codegen)
     add_custom_command(
         OUTPUT "${gen_cpp}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${gen_dir}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${modmap_dirs}
+        COMMAND ${CMAKE_COMMAND} -E touch ${modmap_files}
         COMMAND $<TARGET_FILE:AltinaEngineReflectionScanner>
             --compile-commands "${compile_commands_root}"
             --include-headers

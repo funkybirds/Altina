@@ -54,6 +54,14 @@ namespace AltinaEngine::Core::Jobs {
         Audio      = 1u << 3,
     };
 
+    // Named thread registration helpers. These are intended for threads that manually
+    // pump job queues (e.g. rendering thread). Do not add methods to FJobSystem for this.
+    AE_CORE_API void RegisterNamedThread(ENamedThread thread, const char* name) noexcept;
+    AE_CORE_API void UnregisterNamedThread(ENamedThread thread) noexcept;
+    AE_CORE_API void ProcessNamedThreadJobs(ENamedThread thread) noexcept;
+    AE_CORE_API auto WaitForNamedThreadJobs(ENamedThread thread,
+        u64 timeoutMs = static_cast<u64>(Threading::kInfiniteWait)) noexcept -> bool;
+
     // Forward declare the pool type so the JobSystem API can reference it.
     class FWorkerPool;
 

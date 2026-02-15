@@ -3,7 +3,9 @@
 #include "Input/InputMessageHandler.h"
 #include "Input/InputSystem.h"
 
+#include "Console/ConsoleVariable.h"
 #include "Logging/Log.h"
+#include "Threading/RenderingThread.h"
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiStructs.h"
 
@@ -16,12 +18,25 @@
 
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
+    namespace {
+        auto GetRenderThreadLagFrames() noexcept -> u32 {
+            auto* cvar = RenderCore::gRenderingThreadLagFrames;
+            if (!cvar)
+                return 0U;
+            int value = cvar->GetInt();
+            if (value < 0)
+                value = 0;
+            return static_cast<u32>(value);
+        }
+    } // namespace
+
     FEngineLoop::FEngineLoop(const FStartupParameters& InStartupParameters)
         : mStartupParameters(InStartupParameters) {}
 
     FEngineLoop::~FEngineLoop() = default;
 
     auto FEngineLoop::PreInit() -> bool {
+        Core::Jobs::FJobSystem::RegisterGameThread();
         if (mApplication) {
             return true;
         }
@@ -125,6 +140,13 @@ namespace AltinaEngine::Launch {
         mViewportWidth  = extent.mWidth;
         mViewportHeight = extent.mHeight;
 
+        if (!mRenderingThread) {
+            mRenderingThread = Container::MakeUnique<RenderCore::FRenderingThread>();
+        }
+        if (mRenderingThread && !mRenderingThread->IsRunning()) {
+            mRenderingThread->Start();
+        }
+
         return true;
     }
 
@@ -132,6 +154,8 @@ namespace AltinaEngine::Launch {
         if (!mIsRunning) {
             return;
         }
+
+        Core::Jobs::FJobSystem::ProcessGameThreadJobs();
 
         if (mInputSystem) {
             mInputSystem->ClearFrameState();
@@ -148,40 +172,76 @@ namespace AltinaEngine::Launch {
             return;
         }
 
-        mRhiDevice->BeginFrame(++mFrameIndex);
+        u32  width        = 0U;
+        u32  height       = 0U;
+        bool shouldResize = false;
 
-        if (mMainViewport && mApplication) {
+        if (mApplication) {
             auto* window = mApplication->GetMainWindow();
             if (window != nullptr) {
                 const auto extent = window->GetSize();
-                if (extent.mWidth > 0U && extent.mHeight > 0U) {
-                    if (extent.mWidth != mViewportWidth || extent.mHeight != mViewportHeight) {
-                        mMainViewport->Resize(extent.mWidth, extent.mHeight);
-                        mViewportWidth  = extent.mWidth;
-                        mViewportHeight = extent.mHeight;
-                    }
-
-                    if (mRenderCallback && mMainViewport && mRhiDevice) {
-                        mRenderCallback(
-                            *mRhiDevice, *mMainViewport, mViewportWidth, mViewportHeight);
-                    }
-
-                    const auto queue = mRhiDevice->GetQueue(Rhi::ERhiQueueType::Graphics);
-                    if (queue) {
-                        Rhi::FRhiPresentInfo presentInfo{};
-                        presentInfo.mViewport     = mMainViewport.Get();
-                        presentInfo.mSyncInterval = 1U;
-                        queue->Present(presentInfo);
+                width             = extent.mWidth;
+                height            = extent.mHeight;
+                if (width > 0U && height > 0U) {
+                    if (width != mViewportWidth || height != mViewportHeight) {
+                        mViewportWidth  = width;
+                        mViewportHeight = height;
+                        shouldResize    = true;
                     }
                 }
             }
         }
 
-        mRhiDevice->EndFrame();
+        const u64 frameIndex = ++mFrameIndex;
+        auto      device     = mRhiDevice;
+        auto      viewport   = mMainViewport;
+        auto      callback   = mRenderCallback;
+
+        Core::Jobs::FJobDescriptor desc{};
+        desc.AffinityMask = static_cast<u32>(Core::Jobs::ENamedThread::Rendering);
+        desc.Callback     = [device, viewport, callback, frameIndex, width, height,
+                             shouldResize]() mutable -> void {
+            if (!device)
+                return;
+
+            device->BeginFrame(frameIndex);
+
+            if (viewport && width > 0U && height > 0U) {
+                if (shouldResize) {
+                    viewport->Resize(width, height);
+                }
+
+                if (callback) {
+                    callback(*device, *viewport, width, height);
+                }
+
+                const auto queue = device->GetQueue(Rhi::ERhiQueueType::Graphics);
+                if (queue) {
+                    Rhi::FRhiPresentInfo presentInfo{};
+                    presentInfo.mViewport     = viewport.Get();
+                    presentInfo.mSyncInterval = 1U;
+                    queue->Present(presentInfo);
+                }
+            }
+
+            device->EndFrame();
+        };
+
+        auto handle = Core::Jobs::FJobSystem::Submit(AltinaEngine::Move(desc));
+        if (handle.IsValid()) {
+            mPendingRenderFrames.Push(handle);
+            EnforceRenderLag(GetRenderThreadLagFrames());
+        }
     }
 
     void FEngineLoop::Exit() {
         mIsRunning = false;
+
+        FlushRenderFrames();
+        if (mRenderingThread) {
+            mRenderingThread->Stop();
+            mRenderingThread.Reset();
+        }
 
         if (mAssetReady) {
             mAssetManager.ClearCache();
@@ -225,10 +285,27 @@ namespace AltinaEngine::Launch {
     }
 
     void FEngineLoop::SetRenderCallback(FRenderCallback callback) {
+        FlushRenderFrames();
         mRenderCallback = AltinaEngine::Move(callback);
     }
 
     auto FEngineLoop::GetInputSystem() const noexcept -> const Input::FInputSystem* {
         return mInputSystem.Get();
+    }
+
+    void FEngineLoop::FlushRenderFrames() {
+        while (!mPendingRenderFrames.IsEmpty()) {
+            auto handle = mPendingRenderFrames.Front();
+            mPendingRenderFrames.Pop();
+            Core::Jobs::FJobSystem::Wait(handle);
+        }
+    }
+
+    void FEngineLoop::EnforceRenderLag(u32 maxLagFrames) {
+        while (mPendingRenderFrames.Size() > maxLagFrames) {
+            auto handle = mPendingRenderFrames.Front();
+            mPendingRenderFrames.Pop();
+            Core::Jobs::FJobSystem::Wait(handle);
+        }
     }
 } // namespace AltinaEngine::Launch

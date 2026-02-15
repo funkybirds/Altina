@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "Container/SmartPtr.h"
 #include "Container/Function.h"
+#include "Container/Queue.h"
 #include "Application/Application.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
@@ -11,10 +12,15 @@
 #include "Asset/MaterialLoader.h"
 #include "Asset/MeshLoader.h"
 #include "Asset/Texture2DLoader.h"
+#include "Jobs/JobSystem.h"
 #include "Rhi/RhiContext.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiRefs.h"
 #include "Rhi/RhiViewport.h"
+
+namespace AltinaEngine::RenderCore {
+    class FRenderingThread;
+} // namespace AltinaEngine::RenderCore
 
 namespace AltinaEngine::Input {
     class FInputMessageHandler;
@@ -41,6 +47,9 @@ namespace AltinaEngine::Launch {
         [[nodiscard]] auto GetInputSystem() const noexcept -> const Input::FInputSystem*;
 
     private:
+        void               FlushRenderFrames();
+        void               EnforceRenderLag(u32 maxLagFrames);
+
         Container::TOwner<Input::FInputSystem>         mInputSystem;
         Container::TOwner<Input::FInputMessageHandler> mAppMessageHandler;
         Container::TOwner<Application::FApplication,
@@ -63,5 +72,7 @@ namespace AltinaEngine::Launch {
         Asset::FMaterialLoader              mMaterialLoader;
         Asset::FMeshLoader                  mMeshLoader;
         Asset::FTexture2DLoader             mTexture2DLoader;
+        Container::TOwner<RenderCore::FRenderingThread> mRenderingThread;
+        Container::TQueue<Core::Jobs::FJobHandle>        mPendingRenderFrames;
     };
 } // namespace AltinaEngine::Launch

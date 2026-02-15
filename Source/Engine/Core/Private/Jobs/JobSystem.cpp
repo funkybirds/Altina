@@ -168,12 +168,62 @@ namespace AltinaEngine::Core::Jobs {
     using Container::THashSet;
     using Container::TShared;
     static THashMap<u64, TShared<JobState>>                          gJobs;
-    static FWorkerPool*                                              gDefaultPool = nullptr;
-    // Queue for jobs submitted to the GameThread (main thread). Consumers
-    // must call `FJobSystem::ProcessGameThreadJobs()` on the registered
-    // game thread to execute these tasks.
-    static Container::TThreadSafeQueue<Container::TFunction<void()>> gGameThreadQueue;
-    static Threading::TAtomic<i32>                                   gGameThreadRegistered{ 0 };
+    static FWorkerPool* gDefaultPool = nullptr;
+
+    struct NamedThreadState {
+        Container::TThreadSafeQueue<Container::TFunction<void()>> mQueue;
+        Threading::FEvent mWakeEvent{ false, Threading::EEventResetMode::Auto };
+        Threading::TAtomic<i32> mRegistered{ 0 };
+    };
+
+    constexpr usize kNamedThreadCount = 4;
+    static NamedThreadState gNamedThreads[kNamedThreadCount];
+
+    static auto GetNamedThreadIndex(ENamedThread thread) noexcept -> i32 {
+        switch (thread) {
+        case ENamedThread::GameThread:
+            return 0;
+        case ENamedThread::RHI:
+            return 1;
+        case ENamedThread::Rendering:
+            return 2;
+        case ENamedThread::Audio:
+            return 3;
+        default:
+            return -1;
+        }
+    }
+
+    static auto GetNamedThreadState(ENamedThread thread) noexcept -> NamedThreadState* {
+        const i32 idx = GetNamedThreadIndex(thread);
+        if (idx < 0 || static_cast<usize>(idx) >= kNamedThreadCount)
+            return nullptr;
+        return &gNamedThreads[idx];
+    }
+
+    static auto TryEnqueueNamedThread(u32 affinityMask, Container::TFunction<void()>& job) noexcept
+        -> bool {
+        if (affinityMask == 0U)
+            return false;
+
+        constexpr ENamedThread kOrder[] = { ENamedThread::GameThread, ENamedThread::Rendering,
+            ENamedThread::RHI, ENamedThread::Audio };
+
+        for (auto thread : kOrder) {
+            if ((affinityMask & static_cast<AltinaEngine::u32>(thread)) == 0U)
+                continue;
+
+            auto* state = GetNamedThreadState(thread);
+            if (!state || state->mRegistered.Load() == 0)
+                continue;
+
+            state->mQueue.Push(Move(job));
+            state->mWakeEvent.Set();
+            return true;
+        }
+
+        return false;
+    }
 
     // Helper to ensure a default pool exists
     static auto EnsureDefaultPool() -> FWorkerPool* {
@@ -239,38 +289,6 @@ namespace AltinaEngine::Core::Jobs {
             gJobs.emplace(id, state);
         }
 
-        // If affinity targets a named thread, route accordingly. For now
-        // we treat ENamedThread::GameThread specially and enqueue to the
-        // game-thread queue; otherwise use the default worker pool.
-        if ((desc.AffinityMask & static_cast<AltinaEngine::u32>(ENamedThread::GameThread)) != 0) {
-            // Wrap the user's callback as before but push into game queue
-            TShared<TFunction<void()>> cbptr =
-                MakeShared<Container::TFunction<void()>>(Move(desc.Callback));
-            TVector<FJobHandle>          prereqHandles = Move(desc.Prerequisites);
-
-            Container::TFunction<void()> wrapper = [cbptr, prereqHandles, state]() mutable -> void {
-                for (usize i = 0; i < prereqHandles.Size(); ++i) {
-                    Wait(prereqHandles[i]);
-                }
-                try {
-                    if (cbptr && static_cast<bool>(*cbptr))
-                        (*cbptr)();
-                } catch (...) {}
-
-                {
-                    Threading::FScopedLock lg(state->mtx);
-                    state->completed = true;
-                }
-                state->cv.NotifyAll();
-            };
-
-            gGameThreadQueue.Push(Move(wrapper));
-            return FJobHandle(id);
-        }
-
-        // Ensure pool
-        FWorkerPool*               pool = EnsureDefaultPool();
-
         // Wrap the user's callback to mark completion.
         // Allocate the callback on the heap to keep the runtime lambda small
         // (TFunction uses a fixed small-buffer optimization without heap fallback).
@@ -296,6 +314,12 @@ namespace AltinaEngine::Core::Jobs {
             state->cv.NotifyAll();
         };
 
+        if (TryEnqueueNamedThread(desc.AffinityMask, wrapper)) {
+            return FJobHandle(id);
+        }
+
+        // Ensure pool
+        FWorkerPool* pool = EnsureDefaultPool();
         pool->Submit(Move(wrapper));
         return FJobHandle(id);
     }
@@ -309,36 +333,6 @@ namespace AltinaEngine::Core::Jobs {
             Threading::FScopedLock lg(gJobsMutex);
             gJobs.emplace(id, state);
         }
-
-        // Route to game-thread if requested
-        if ((desc.AffinityMask & static_cast<AltinaEngine::u32>(ENamedThread::GameThread)) != 0) {
-            TShared<TFunction<void()>> cbptr = MakeShared<TFunction<void()>>(Move(desc.Callback));
-            TVector<FJobHandle>        prereqHandles2 = Move(desc.Prerequisites);
-
-            TFunction<void()>          wrapper = [cbptr, state, &outFence,
-                                            prereqHandles2]() mutable -> void {
-                for (usize i = 0; i < prereqHandles2.Size(); ++i) {
-                    Wait(prereqHandles2[i]);
-                }
-
-                try {
-                    if (cbptr && static_cast<bool>(*cbptr))
-                        (*cbptr)();
-                } catch (...) {}
-
-                {
-                    Threading::FScopedLock lg(state->mtx);
-                    state->completed = true;
-                }
-                state->cv.NotifyAll();
-                outFence.Signal();
-            };
-
-            gGameThreadQueue.Push(Move(wrapper));
-            return FJobHandle(id);
-        }
-
-        FWorkerPool*               pool = EnsureDefaultPool();
 
         TShared<TFunction<void()>> cbptr = MakeShared<TFunction<void()>>(Move(desc.Callback));
         TVector<FJobHandle>        prereqHandles2 = Move(desc.Prerequisites);
@@ -361,27 +355,63 @@ namespace AltinaEngine::Core::Jobs {
             outFence.Signal();
         };
 
+        if (TryEnqueueNamedThread(desc.AffinityMask, wrapper)) {
+            return FJobHandle(id);
+        }
+
+        FWorkerPool* pool = EnsureDefaultPool();
         pool->Submit(Move(wrapper));
         return FJobHandle(id);
     }
 
-    void FJobSystem::RegisterGameThread() noexcept {
-        // Mark registered and set thread name for instrumentation
-        gGameThreadRegistered.Store(1);
-        AltinaEngine::Core::Instrumentation::SetCurrentThreadName("GameThread");
+    void RegisterNamedThread(ENamedThread thread, const char* name) noexcept {
+        auto* state = GetNamedThreadState(thread);
+        if (!state)
+            return;
+        state->mRegistered.Store(1);
+        if (name != nullptr)
+            AltinaEngine::Core::Instrumentation::SetCurrentThreadName(name);
     }
 
-    void FJobSystem::ProcessGameThreadJobs() noexcept {
-        // Only the registered game thread should call this; we don't enforce that
-        // but it's the intended usage. Drain and execute queued jobs.
-        while (!gGameThreadQueue.IsEmpty()) {
-            auto job = gGameThreadQueue.Front();
-            gGameThreadQueue.Pop();
+    void UnregisterNamedThread(ENamedThread thread) noexcept {
+        auto* state = GetNamedThreadState(thread);
+        if (!state)
+            return;
+        state->mRegistered.Store(0);
+        state->mWakeEvent.Set();
+    }
+
+    void ProcessNamedThreadJobs(ENamedThread thread) noexcept {
+        auto* state = GetNamedThreadState(thread);
+        if (!state)
+            return;
+
+        while (!state->mQueue.IsEmpty()) {
+            auto job = state->mQueue.Front();
+            state->mQueue.Pop();
             try {
                 if (job && static_cast<bool>(job))
                     job();
             } catch (...) {}
         }
+    }
+
+    auto WaitForNamedThreadJobs(ENamedThread thread, u64 timeoutMs) noexcept -> bool {
+        auto* state = GetNamedThreadState(thread);
+        if (!state)
+            return false;
+        return state->mWakeEvent.Wait(static_cast<unsigned long>(timeoutMs));
+    }
+
+    void FJobSystem::RegisterGameThread() noexcept {
+        // Mark registered and set thread name for instrumentation
+        RegisterNamedThread(ENamedThread::GameThread, "GameThread");
+    }
+
+    void FJobSystem::ProcessGameThreadJobs() noexcept {
+        // Only the registered game thread should call this; we don't enforce that
+        // but it's the intended usage. Drain and execute queued jobs.
+        ProcessNamedThreadJobs(ENamedThread::GameThread);
     }
 
     void FJobSystem::Wait(FJobHandle h) noexcept {

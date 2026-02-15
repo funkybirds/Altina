@@ -222,6 +222,11 @@ namespace AltinaEngine::Rhi {
         mState.Reset();
     }
 
+    auto FRhiD3D11Context::AdjustProjectionMatrix(
+        const Core::Math::FMatrix4x4f& matrix) const noexcept -> Core::Math::FMatrix4x4f {
+        return matrix;
+    }
+
     auto FRhiD3D11Context::InitializeBackend(const FRhiInitDesc& desc) -> bool {
 #if AE_PLATFORM_WIN
         if (!mState) {

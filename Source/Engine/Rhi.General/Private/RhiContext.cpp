@@ -124,6 +124,11 @@ namespace AltinaEngine::Rhi {
         return CreateDeviceInternal(adapter, deviceDesc);
     }
 
+    auto FRhiContext::AdjustProjectionMatrix(const Core::Math::FMatrix4x4f& matrix) const noexcept
+        -> Core::Math::FMatrix4x4f {
+        return matrix;
+    }
+
     void FRhiContext::RefreshAdapters() {
         TVector<TShared<FRhiAdapter>> adapters;
         EnumerateAdaptersInternal(adapters);

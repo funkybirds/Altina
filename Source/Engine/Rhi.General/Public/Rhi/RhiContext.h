@@ -4,6 +4,7 @@
 #include "Rhi/RhiAdapter.h"
 #include "Container/SmartPtr.h"
 #include "Container/Vector.h"
+#include "Math/Matrix.h"
 #include "Types/NonCopyable.h"
 
 namespace AltinaEngine::Rhi {
@@ -36,6 +37,11 @@ namespace AltinaEngine::Rhi {
 
         auto CreateDevice(u32 adapterIndex, const FRhiDeviceDesc& deviceDesc = FRhiDeviceDesc{})
             -> TShared<FRhiDevice>;
+
+        // Adjust projection matrix from engine default (Y up, X right, NDC Y+ is up, Z in [0,1])
+        // to the current RHI's clip-space convention.
+        [[nodiscard]] virtual auto AdjustProjectionMatrix(
+            const Core::Math::FMatrix4x4f& matrix) const noexcept -> Core::Math::FMatrix4x4f;
 
     protected:
         virtual auto InitializeBackend(const FRhiInitDesc& desc) -> bool                   = 0;

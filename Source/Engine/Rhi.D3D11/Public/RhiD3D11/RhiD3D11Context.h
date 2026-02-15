@@ -17,6 +17,10 @@ namespace AltinaEngine::Rhi {
         FRhiD3D11Context();
         ~FRhiD3D11Context() override;
 
+        [[nodiscard]] auto AdjustProjectionMatrix(
+            const Core::Math::FMatrix4x4f& matrix) const noexcept
+            -> Core::Math::FMatrix4x4f override;
+
     protected:
         auto InitializeBackend(const FRhiInitDesc& desc) -> bool override;
         void ShutdownBackend() override;

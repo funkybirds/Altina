@@ -70,6 +70,11 @@ namespace AltinaEngine::GameScene {
         void               SetGameObjectActive(FGameObjectId id, bool active);
         [[nodiscard]] auto IsGameObjectActive(FGameObjectId id) const -> bool;
 
+        [[nodiscard]] auto GetActiveCameraComponents() const noexcept
+            -> const TVector<FComponentId>&;
+        [[nodiscard]] auto GetActiveStaticMeshComponents() const noexcept
+            -> const TVector<FComponentId>&;
+
     private:
         struct FGameObjectSlot {
             Core::Memory::TObjectPoolHandle<FGameObject> Handle{};
@@ -116,6 +121,7 @@ namespace AltinaEngine::GameScene {
                 }
 
                 world.LinkComponentToOwner(owner, id);
+                world.OnComponentCreated(id, owner);
                 return id;
             }
 
@@ -135,6 +141,7 @@ namespace AltinaEngine::GameScene {
                     component->OnDestroy();
                 }
 
+                world.OnComponentDestroyed(id, owner);
                 mPool.Deallocate(Move(slot.Handle));
                 slot.Owner = {};
                 slot.Alive = false;
@@ -205,11 +212,20 @@ namespace AltinaEngine::GameScene {
         using FComponentStoragePtr =
             TOwner<FComponentStorageBase, TPolymorphicDeleter<FComponentStorageBase>>;
 
+        friend class FComponent;
         template <typename T> friend class TComponentStorage;
 
         void InitializeComponent(FComponent& component, FComponentId id, FGameObjectId owner) {
-            component.Initialize(id, owner);
+            component.Initialize(this, id, owner);
         }
+
+        void OnComponentCreated(FComponentId id, FGameObjectId owner);
+        void OnComponentDestroyed(FComponentId id, FGameObjectId owner);
+        void OnComponentEnabledChanged(FComponentId id, FGameObjectId owner, bool enabled);
+        void OnGameObjectActiveChanged(FGameObjectId owner, bool active);
+
+        void AddActiveComponent(TVector<FComponentId>& list, FComponentId id);
+        void RemoveActiveComponent(TVector<FComponentId>& list, FComponentId id);
 
         void               LinkComponentToOwner(FGameObjectId owner, FComponentId id);
         void               UnlinkComponentFromOwner(FGameObjectId owner, FComponentId id);
@@ -231,6 +247,8 @@ namespace AltinaEngine::GameScene {
         TVector<FGameObjectSlot>                           mGameObjects{};
         TVector<u32>                                       mFreeGameObjects{};
         THashMap<FComponentTypeHash, FComponentStoragePtr> mComponentStorage{};
+        TVector<FComponentId>                              mActiveCameraComponents{};
+        TVector<FComponentId>                              mActiveStaticMeshComponents{};
     };
 
     namespace Detail {

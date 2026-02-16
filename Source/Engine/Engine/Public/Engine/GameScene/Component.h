@@ -31,26 +31,15 @@ namespace AltinaEngine::GameScene {
     private:
         friend class FWorld;
 
-        void Initialize(FComponentId id, FGameObjectId owner) noexcept {
+        void Initialize(FWorld* world, FComponentId id, FGameObjectId owner) noexcept {
+            mWorld = world;
             mId    = id;
             mOwner = owner;
         }
 
         FComponentId  mId{};
         FGameObjectId mOwner{};
+        FWorld*       mWorld = nullptr;
         bool          mEnabled = true;
     };
-
-    inline void FComponent::SetEnabled(bool enabled) noexcept {
-        if (mEnabled == enabled) {
-            return;
-        }
-
-        mEnabled = enabled;
-        if (mEnabled) {
-            OnEnable();
-        } else {
-            OnDisable();
-        }
-    }
 } // namespace AltinaEngine::GameScene

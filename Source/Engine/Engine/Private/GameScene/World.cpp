@@ -1,5 +1,8 @@
 #include "Engine/GameScene/World.h"
 
+#include "Engine/GameScene/CameraComponent.h"
+#include "Engine/GameScene/StaticMeshFilterComponent.h"
+
 using AltinaEngine::Move;
 using AltinaEngine::Core::Container::FStringView;
 namespace AltinaEngine::GameScene {
@@ -7,6 +10,11 @@ namespace AltinaEngine::GameScene {
         Core::Threading::TAtomic<u32> gNextWorldId(1);
 
         auto                          AcquireWorldId() -> u32 { return gNextWorldId.FetchAdd(1); }
+
+        const FComponentTypeHash      kCameraComponentType =
+            GetComponentTypeHash<FCameraComponent>();
+        const FComponentTypeHash      kStaticMeshComponentType =
+            GetComponentTypeHash<FStaticMeshFilterComponent>();
     } // namespace
 
     FWorld::FWorld() : mWorldId(AcquireWorldId()) {}
@@ -148,7 +156,12 @@ namespace AltinaEngine::GameScene {
         if (obj == nullptr) {
             return;
         }
+        const bool wasActive = obj->IsActive();
+        if (wasActive == active) {
+            return;
+        }
         obj->SetActive(active);
+        OnGameObjectActiveChanged(id, active);
     }
 
     auto FWorld::IsGameObjectActive(FGameObjectId id) const -> bool {
@@ -157,6 +170,120 @@ namespace AltinaEngine::GameScene {
             return false;
         }
         return obj->IsActive();
+    }
+
+    auto FWorld::GetActiveCameraComponents() const noexcept -> const TVector<FComponentId>& {
+        return mActiveCameraComponents;
+    }
+
+    auto FWorld::GetActiveStaticMeshComponents() const noexcept -> const TVector<FComponentId>& {
+        return mActiveStaticMeshComponents;
+    }
+
+    void FWorld::AddActiveComponent(TVector<FComponentId>& list, FComponentId id) {
+        const auto count = static_cast<u32>(list.Size());
+        for (u32 index = 0; index < count; ++index) {
+            if (list[index] == id) {
+                return;
+            }
+        }
+        list.PushBack(id);
+    }
+
+    void FWorld::RemoveActiveComponent(TVector<FComponentId>& list, FComponentId id) {
+        const auto count = static_cast<u32>(list.Size());
+        for (u32 index = 0; index < count; ++index) {
+            if (list[index] == id) {
+                if (index != count - 1) {
+                    list[index] = list[count - 1];
+                }
+                list.PopBack();
+                return;
+            }
+        }
+    }
+
+    void FWorld::OnComponentCreated(FComponentId id, FGameObjectId owner) {
+        if (!IsAlive(id) || !IsGameObjectActive(owner)) {
+            return;
+        }
+
+        if (id.Type == kCameraComponentType) {
+            const auto& component = ResolveComponent<FCameraComponent>(id);
+            if (component.IsEnabled()) {
+                AddActiveComponent(mActiveCameraComponents, id);
+            }
+            return;
+        }
+
+        if (id.Type == kStaticMeshComponentType) {
+            const auto& component = ResolveComponent<FStaticMeshFilterComponent>(id);
+            if (component.IsEnabled()) {
+                AddActiveComponent(mActiveStaticMeshComponents, id);
+            }
+        }
+    }
+
+    void FWorld::OnComponentDestroyed(FComponentId id, FGameObjectId /*owner*/) {
+        if (id.Type == kCameraComponentType) {
+            RemoveActiveComponent(mActiveCameraComponents, id);
+            return;
+        }
+
+        if (id.Type == kStaticMeshComponentType) {
+            RemoveActiveComponent(mActiveStaticMeshComponents, id);
+        }
+    }
+
+    void FWorld::OnComponentEnabledChanged(
+        FComponentId id, FGameObjectId owner, bool enabled) {
+        if (id.Type == kCameraComponentType) {
+            if (enabled && IsGameObjectActive(owner)) {
+                AddActiveComponent(mActiveCameraComponents, id);
+            } else {
+                RemoveActiveComponent(mActiveCameraComponents, id);
+            }
+            return;
+        }
+
+        if (id.Type == kStaticMeshComponentType) {
+            if (enabled && IsGameObjectActive(owner)) {
+                AddActiveComponent(mActiveStaticMeshComponents, id);
+            } else {
+                RemoveActiveComponent(mActiveStaticMeshComponents, id);
+            }
+        }
+    }
+
+    void FWorld::OnGameObjectActiveChanged(FGameObjectId owner, bool active) {
+        auto* obj = ResolveGameObject(owner);
+        if (obj == nullptr) {
+            return;
+        }
+
+        const auto components = obj->GetAllComponents();
+        for (const auto& id : components) {
+            if (!IsAlive(id)) {
+                continue;
+            }
+
+            if (id.Type == kCameraComponentType) {
+                if (active && ResolveComponent<FCameraComponent>(id).IsEnabled()) {
+                    AddActiveComponent(mActiveCameraComponents, id);
+                } else {
+                    RemoveActiveComponent(mActiveCameraComponents, id);
+                }
+                continue;
+            }
+
+            if (id.Type == kStaticMeshComponentType) {
+                if (active && ResolveComponent<FStaticMeshFilterComponent>(id).IsEnabled()) {
+                    AddActiveComponent(mActiveStaticMeshComponents, id);
+                } else {
+                    RemoveActiveComponent(mActiveStaticMeshComponents, id);
+                }
+            }
+        }
     }
 
     void FWorld::LinkComponentToOwner(FGameObjectId owner, FComponentId id) {

@@ -17,8 +17,8 @@ namespace AltinaEngine::RenderCore::Geometry {
     struct AE_RENDER_CORE_API FStaticMeshBounds3f {
         // Core::Math::TVector declares custom constructors, so it has no implicit default ctor.
         // Initialize to an invalid bounds by default so IsValid() works as expected.
-        Math::FVector3f              Min{std::numeric_limits<f32>::max()};
-        Math::FVector3f              Max{-std::numeric_limits<f32>::max()};
+        Math::FVector3f              Min{ std::numeric_limits<f32>::max() };
+        Math::FVector3f              Max{ -std::numeric_limits<f32>::max() };
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {
             return (Min[0] <= Max[0]) && (Min[1] <= Max[1]) && (Min[2] <= Max[2]);

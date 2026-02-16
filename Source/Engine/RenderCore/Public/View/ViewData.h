@@ -16,8 +16,8 @@ namespace AltinaEngine::RenderCore::View {
     namespace LinAlg = Core::Math::LinAlg;
 
     struct AE_RENDER_CORE_API FRenderTargetExtent2D {
-        u32 Width  = 0U;
-        u32 Height = 0U;
+        u32                          Width  = 0U;
+        u32                          Height = 0U;
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {
             return Width > 0U && Height > 0U;
@@ -25,10 +25,10 @@ namespace AltinaEngine::RenderCore::View {
     };
 
     struct AE_RENDER_CORE_API FViewRect {
-        i32 X      = 0;
-        i32 Y      = 0;
-        u32 Width  = 0U;
-        u32 Height = 0U;
+        i32                          X      = 0;
+        i32                          Y      = 0;
+        u32                          Width  = 0U;
+        u32                          Height = 0U;
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {
             return Width > 0U && Height > 0U;
@@ -36,21 +36,21 @@ namespace AltinaEngine::RenderCore::View {
     };
 
     struct AE_RENDER_CORE_API FViewMatrixInfo {
-        Math::FMatrix4x4f View            = Math::FMatrix4x4f(0.0f);
-        Math::FMatrix4x4f ProjUnjittered  = Math::FMatrix4x4f(0.0f);
-        Math::FMatrix4x4f ProjJittered    = Math::FMatrix4x4f(0.0f);
-        Math::FMatrix4x4f ViewProj        = Math::FMatrix4x4f(0.0f);
+        Math::FMatrix4x4f View             = Math::FMatrix4x4f(0.0f);
+        Math::FMatrix4x4f ProjUnjittered   = Math::FMatrix4x4f(0.0f);
+        Math::FMatrix4x4f ProjJittered     = Math::FMatrix4x4f(0.0f);
+        Math::FMatrix4x4f ViewProj         = Math::FMatrix4x4f(0.0f);
         Math::FMatrix4x4f ViewProjJittered = Math::FMatrix4x4f(0.0f);
 
-        Math::FMatrix4x4f InvView         = Math::FMatrix4x4f(0.0f);
-        Math::FMatrix4x4f InvProjUnjittered = Math::FMatrix4x4f(0.0f);
-        Math::FMatrix4x4f InvProjJittered = Math::FMatrix4x4f(0.0f);
-        Math::FMatrix4x4f InvViewProj     = Math::FMatrix4x4f(0.0f);
+        Math::FMatrix4x4f InvView             = Math::FMatrix4x4f(0.0f);
+        Math::FMatrix4x4f InvProjUnjittered   = Math::FMatrix4x4f(0.0f);
+        Math::FMatrix4x4f InvProjJittered     = Math::FMatrix4x4f(0.0f);
+        Math::FMatrix4x4f InvViewProj         = Math::FMatrix4x4f(0.0f);
         Math::FMatrix4x4f InvViewProjJittered = Math::FMatrix4x4f(0.0f);
 
-        Math::FVector2f JitterNdc = Math::FVector2f(0.0f);
+        Math::FVector2f   JitterNdc = Math::FVector2f(0.0f);
 
-        static auto MakeIdentity() noexcept -> FViewMatrixInfo {
+        static auto       MakeIdentity() noexcept -> FViewMatrixInfo {
             FViewMatrixInfo out{};
             out.View             = LinAlg::Identity<f32, 4>();
             out.ProjUnjittered   = LinAlg::Identity<f32, 4>();
@@ -67,9 +67,8 @@ namespace AltinaEngine::RenderCore::View {
             return out;
         }
 
-        [[nodiscard]] static constexpr auto ApplyJitterToProjection(
-            const Math::FMatrix4x4f& proj, const Math::FVector2f& jitterNdc) noexcept
-            -> Math::FMatrix4x4f {
+        [[nodiscard]] static constexpr auto ApplyJitterToProjection(const Math::FMatrix4x4f& proj,
+            const Math::FVector2f& jitterNdc) noexcept -> Math::FMatrix4x4f {
             Math::FMatrix4x4f out = proj;
             out(0, 2) += jitterNdc[0];
             out(1, 2) += jitterNdc[1];
@@ -113,8 +112,8 @@ namespace AltinaEngine::RenderCore::View {
             JitterNdc = jitterNdc;
 
             const Math::FMatrix4x4f cameraWorld = camera.Transform.ToMatrix();
-            View                               = LinAlg::Inverse(cameraWorld);
-            InvView                            = cameraWorld;
+            View                                = LinAlg::Inverse(cameraWorld);
+            InvView                             = cameraWorld;
 
             const f32 viewX = static_cast<f32>(viewRect.Width);
             const f32 viewY = static_cast<f32>(viewRect.Height);
@@ -129,10 +128,10 @@ namespace AltinaEngine::RenderCore::View {
                 }
             } else {
                 ProjUnjittered = bReverseZ
-                    ? MakeOrthoProjReversedZ(camera.OrthoWidth, camera.OrthoHeight, camera.NearPlane,
-                          camera.FarPlane)
-                    : MakeOrthoProj(camera.OrthoWidth, camera.OrthoHeight, camera.NearPlane,
-                          camera.FarPlane);
+                    ? MakeOrthoProjReversedZ(
+                          camera.OrthoWidth, camera.OrthoHeight, camera.NearPlane, camera.FarPlane)
+                    : MakeOrthoProj(
+                          camera.OrthoWidth, camera.OrthoHeight, camera.NearPlane, camera.FarPlane);
             }
 
             ProjJittered = ApplyJitterToProjection(ProjUnjittered, jitterNdc);
@@ -148,38 +147,38 @@ namespace AltinaEngine::RenderCore::View {
     };
 
     struct AE_RENDER_CORE_API FPreviousViewData {
-        bool bHasValidHistory = false;
-        bool bCameraCut       = false;
+        bool            bHasValidHistory = false;
+        bool            bCameraCut       = false;
 
-        u64 FrameIndex          = 0ULL;
-        u32 TemporalSampleIndex = 0U;
-        f32 DeltaTimeSeconds    = 0.0f;
+        u64             FrameIndex          = 0ULL;
+        u32             TemporalSampleIndex = 0U;
+        f32             DeltaTimeSeconds    = 0.0f;
 
         Math::FVector3f ViewOrigin = Math::FVector3f(0.0f);
         FViewMatrixInfo Matrices   = FViewMatrixInfo::MakeIdentity();
 
-        void Invalidate() noexcept {
+        void            Invalidate() noexcept {
             bHasValidHistory = false;
             bCameraCut       = true;
         }
     };
 
     struct AE_RENDER_CORE_API FViewData {
-        FCameraData Camera;
+        FCameraData           Camera;
 
         FViewRect             ViewRect;
         FRenderTargetExtent2D RenderTargetExtent;
 
-        bool bReverseZ = true;
+        bool                  bReverseZ = true;
 
-        u64 FrameIndex          = 0ULL;
-        u32 TemporalSampleIndex = 0U;
-        f32 DeltaTimeSeconds    = 0.0f;
+        u64                   FrameIndex          = 0ULL;
+        u32                   TemporalSampleIndex = 0U;
+        f32                   DeltaTimeSeconds    = 0.0f;
 
-        Math::FVector3f ViewOrigin = Math::FVector3f(0.0f);
-        FViewMatrixInfo Matrices   = FViewMatrixInfo::MakeIdentity();
+        Math::FVector3f       ViewOrigin = Math::FVector3f(0.0f);
+        FViewMatrixInfo       Matrices   = FViewMatrixInfo::MakeIdentity();
 
-        FPreviousViewData Previous;
+        FPreviousViewData     Previous;
 
         void UpdateMatrices(const Math::FVector2f& jitterNdc = Math::FVector2f(0.0f)) noexcept {
             ViewOrigin = Camera.GetPosition();
@@ -195,13 +194,13 @@ namespace AltinaEngine::RenderCore::View {
         }
 
         void EndFrame() noexcept {
-            Previous.bHasValidHistory   = true;
-            Previous.bCameraCut         = Camera.bCameraCut;
-            Previous.FrameIndex         = FrameIndex;
+            Previous.bHasValidHistory    = true;
+            Previous.bCameraCut          = Camera.bCameraCut;
+            Previous.FrameIndex          = FrameIndex;
             Previous.TemporalSampleIndex = TemporalSampleIndex;
-            Previous.DeltaTimeSeconds   = DeltaTimeSeconds;
-            Previous.ViewOrigin         = ViewOrigin;
-            Previous.Matrices           = Matrices;
+            Previous.DeltaTimeSeconds    = DeltaTimeSeconds;
+            Previous.ViewOrigin          = ViewOrigin;
+            Previous.Matrices            = Matrices;
         }
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {

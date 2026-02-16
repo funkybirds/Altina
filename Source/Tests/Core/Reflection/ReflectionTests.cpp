@@ -1,4 +1,4 @@
-﻿#include "TestHarness.h"
+#include "TestHarness.h"
 #include "ReflectionTestCommon.h"
 
 // All test types are defined in ReflectionTestCommon.h

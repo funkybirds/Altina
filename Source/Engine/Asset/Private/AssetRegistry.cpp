@@ -1,4 +1,4 @@
-﻿#include "Asset/AssetRegistry.h"
+#include "Asset/AssetRegistry.h"
 
 #include "Algorithm/CStringUtils.h"
 #include "Platform/PlatformFileSystem.h"
@@ -30,6 +30,7 @@
     #endif
 #endif
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Asset {
     namespace {
         using Core::Utility::Json::EJsonType;
@@ -365,7 +366,7 @@ namespace AltinaEngine::Asset {
                 }
 
                 desc.VirtualPath.ToLower();
-                outAssets.PushBack(AltinaEngine::Move(desc));
+                outAssets.PushBack(Move(desc));
             }
 
             const FJsonValue* redirectorsValue = FindObjectValueInsensitive(root, "Redirectors");
@@ -406,7 +407,7 @@ namespace AltinaEngine::Asset {
                     redirector.NewUuid        = newUuid;
                     redirector.OldVirtualPath = FromUtf8(oldPathText);
                     redirector.OldVirtualPath.ToLower();
-                    outRedirectors.PushBack(AltinaEngine::Move(redirector));
+                    outRedirectors.PushBack(Move(redirector));
                 }
             }
 
@@ -457,8 +458,8 @@ namespace AltinaEngine::Asset {
             return false;
         }
 
-        mAssets      = AltinaEngine::Move(assets);
-        mRedirectors = AltinaEngine::Move(redirectors);
+        mAssets      = Move(assets);
+        mRedirectors = Move(redirectors);
         return true;
     }
 
@@ -468,12 +469,12 @@ namespace AltinaEngine::Asset {
 
     void FAssetRegistry::AddAsset(FAssetDesc desc) {
         desc.VirtualPath.ToLower();
-        mAssets.PushBack(AltinaEngine::Move(desc));
+        mAssets.PushBack(Move(desc));
     }
 
     void FAssetRegistry::AddRedirector(FAssetRedirector redirector) {
         redirector.OldVirtualPath.ToLower();
-        mRedirectors.PushBack(AltinaEngine::Move(redirector));
+        mRedirectors.PushBack(Move(redirector));
     }
 
     auto FAssetRegistry::FindByPath(FStringView path) const noexcept -> FAssetHandle {

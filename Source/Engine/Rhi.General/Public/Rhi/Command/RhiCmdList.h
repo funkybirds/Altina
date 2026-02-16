@@ -9,6 +9,8 @@
 #include "Types/Traits.h"
 #include <new>
 
+using AltinaEngine::CClassBaseOf;
+using AltinaEngine::Forward;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::TAllocator;
@@ -36,13 +38,13 @@ namespace AltinaEngine::Rhi {
         }
 
         template <typename TCmd, typename... Args>
-            requires AltinaEngine::CClassBaseOf<FRhiCmd, TCmd>
+            requires CClassBaseOf<FRhiCmd, TCmd>
         auto Emplace(Args&&... args) -> TCmd* {
             void* memory = Allocate(sizeof(TCmd), alignof(TCmd));
             if (!memory) {
                 return nullptr;
             }
-            auto*         command = ::new (memory) TCmd(AltinaEngine::Forward<Args>(args)...);
+            auto*         command = ::new (memory) TCmd(Forward<Args>(args)...);
             FCommandEntry entry{};
             entry.mCommand = command;
             entry.mDestroy = &DestroyCommand<TCmd>;

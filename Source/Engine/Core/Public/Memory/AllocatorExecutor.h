@@ -4,6 +4,7 @@
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
 
+using AltinaEngine::Forward;
 namespace AltinaEngine::Core::Memory {
     struct FMemoryBufferBacking {
         u8* mData      = nullptr;
@@ -86,7 +87,7 @@ namespace AltinaEngine::Core::Memory {
         }
 
         template <typename... Args> auto Allocate(Args&&... args) {
-            return mPolicy.Allocate(AltinaEngine::Forward<Args>(args)...);
+            return mPolicy.Allocate(Forward<Args>(args)...);
         }
 
         template <typename TAllocation>

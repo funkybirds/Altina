@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "../Container/String.h"
@@ -11,6 +10,14 @@
 #include <cstdlib>
 #include <climits>
 
+using AltinaEngine::CFloatingPoint;
+using AltinaEngine::Forward;
+using AltinaEngine::Move;
+using AltinaEngine::TDecay;
+using AltinaEngine::TTypeIsAnyOf;
+using AltinaEngine::TTypeSameAs;
+using AltinaEngine::TTypeSet;
+using AltinaEngine::Core::Container::TVariant;
 namespace AltinaEngine::Core::Console {
 
     using Container::FString;
@@ -28,26 +35,26 @@ namespace AltinaEngine::Core::Console {
     #define AE_CVAR_CHAR8_LIST(X)
 #endif
 
-    #define AE_CVAR_SCALAR_LIST(X)                                                \
-        X(bool)                                                                   \
-        X(char)                                                                   \
-        X(signed char)                                                            \
-        X(unsigned char)                                                          \
-        X(short)                                                                  \
-        X(unsigned short)                                                         \
-        X(int)                                                                    \
-        X(unsigned int)                                                           \
-        X(long)                                                                   \
-        X(unsigned long)                                                          \
-        X(long long)                                                              \
-        X(unsigned long long)                                                     \
-        AE_CVAR_CHAR8_LIST(X)                                                     \
-        X(char16_t)                                                               \
-        X(char32_t)                                                               \
-        X(wchar_t)                                                                \
-        X(float)                                                                  \
-        X(double)                                                                 \
-        X(long double)
+#define AE_CVAR_SCALAR_LIST(X) \
+    X(bool)                    \
+    X(char)                    \
+    X(signed char)             \
+    X(unsigned char)           \
+    X(short)                   \
+    X(unsigned short)          \
+    X(int)                     \
+    X(unsigned int)            \
+    X(long)                    \
+    X(unsigned long)           \
+    X(long long)               \
+    X(unsigned long long)      \
+    AE_CVAR_CHAR8_LIST(X)      \
+    X(char16_t)                \
+    X(char32_t)                \
+    X(wchar_t)                 \
+    X(float)                   \
+    X(double)                  \
+    X(long double)
 
     class AE_CORE_API FConsoleVariable {
     public:
@@ -58,87 +65,40 @@ namespace AltinaEngine::Core::Console {
             Bool,
         };
 
-        using FConsoleValue = Container::TVariant<bool,
-            char,
-            signed char,
-            unsigned char,
-            short,
-            unsigned short,
-            int,
-            unsigned int,
-            long,
-            unsigned long,
-            long long,
-            unsigned long long,
-            AE_CVAR_CHAR8_TYPE char16_t,
-            char32_t,
-            wchar_t,
-            float,
-            double,
-            long double,
-            FString>;
+        using FConsoleValue = TVariant<bool, char, signed char, unsigned char, short,
+            unsigned short, int, unsigned int, long, unsigned long, long long, unsigned long long,
+            AE_CVAR_CHAR8_TYPE char16_t, char32_t, wchar_t, float, double, long double, FString>;
 
-        using FConsoleValueTypes = AltinaEngine::TTypeSet<bool,
-            char,
-            signed char,
-            unsigned char,
-            short,
-            unsigned short,
-            int,
-            unsigned int,
-            long,
-            unsigned long,
-            long long,
-            unsigned long long,
-            AE_CVAR_CHAR8_TYPE char16_t,
-            char32_t,
-            wchar_t,
-            float,
-            double,
-            long double,
-            FString>;
+        using FConsoleValueTypes = TTypeSet<bool, char, signed char, unsigned char, short,
+            unsigned short, int, unsigned int, long, unsigned long, long long, unsigned long long,
+            AE_CVAR_CHAR8_TYPE char16_t, char32_t, wchar_t, float, double, long double, FString>;
 
         template <typename T>
         static constexpr bool CConsoleValueType =
-            AltinaEngine::TTypeIsAnyOf<typename AltinaEngine::TDecay<T>::TType,
-                FConsoleValueTypes>::Value;
+            TTypeIsAnyOf<typename TDecay<T>::TType, FConsoleValueTypes>::Value;
 
         FConsoleVariable(const FString& name, FConsoleValue value, EType type);
 
-        const FString&           GetName() const noexcept;
+        const FString& GetName() const noexcept;
 
-        FString                  GetString() const noexcept;
+        FString        GetString() const noexcept;
 
-        int                      GetInt() const noexcept;
-
-        long long                GetInt64() const noexcept;
-
-        unsigned long long       GetUInt64() const noexcept;
-
-        float                    GetFloat() const noexcept;
-
-        double                   GetDouble() const noexcept;
-
-        bool                     GetBool() const noexcept;
-
-        void                     SetFromString(const FString& v) noexcept;
-
-        void                     SetFromString(const TChar* v) noexcept;
+        void           SetFromString(const FString& v) noexcept;
 
         template <typename T>
             requires CConsoleValueType<T>
         void Set(T&& value) noexcept {
             FScopedLock lock(mMutex);
-            using TDecayed = typename AltinaEngine::TDecay<T>::TType;
-            mValue.Emplace<TDecayed>(AltinaEngine::Forward<T>(value));
+            using TDecayed = typename TDecay<T>::TType;
+            mValue.Emplace<TDecayed>(Forward<T>(value));
             mType = TypeFrom<TDecayed>();
         }
 
         template <typename T>
             requires CConsoleValueType<T>
-        auto GetValue() const noexcept -> typename AltinaEngine::TDecay<T>::TType {
-            using TDecayed = typename AltinaEngine::TDecay<T>::TType;
-            if constexpr (AltinaEngine::TTypeSameAs<TDecayed, FString>::Value) {
+        auto GetValue() const noexcept -> typename TDecay<T>::TType {
+            using TDecayed = typename TDecay<T>::TType;
+            if constexpr (TTypeSameAs<TDecayed, FString>::Value) {
                 return GetString();
             }
             FScopedLock lock(mMutex);
@@ -152,59 +112,52 @@ namespace AltinaEngine::Core::Console {
             return out;
         }
 
-        EType                    GetType() const noexcept { return mType; }
+        EType GetType() const noexcept { return mType; }
 
         // Registry helpers (header-only convenience API)
         template <typename T>
             requires CConsoleValueType<T>
-                 && !AltinaEngine::TTypeSameAs<typename AltinaEngine::TDecay<T>::TType,
-                        FString>::Value
         static FConsoleVariable* Register(const TChar* name, T&& defaultValue) noexcept {
             if (name == nullptr || name[0] == static_cast<TChar>(0)) {
                 return nullptr;
             }
-            FString nameStr(name);
+            FString       nameStr(name);
             FConsoleValue value;
-            using TDecayed = typename AltinaEngine::TDecay<T>::TType;
-            value.Emplace<TDecayed>(AltinaEngine::Forward<T>(defaultValue));
-            return RegisterInternal(nameStr, AltinaEngine::Move(value), TypeFrom<TDecayed>());
+            using TDecayed = typename TDecay<T>::TType;
+            value.Emplace<TDecayed>(Forward<T>(defaultValue));
+            return RegisterInternal(nameStr, Move(value), TypeFrom<TDecayed>());
         }
 
-        static FConsoleVariable* Register(const TChar* name, const TChar* defaultValue) noexcept;
-
-        static FConsoleVariable* Find(const TChar* name) noexcept;
+        static FConsoleVariable* Find(const FString& name) noexcept;
 
         static void              ForEach(TFunction<void(const FConsoleVariable&)> fn) noexcept;
 
     private:
         template <typename T> static constexpr auto TypeFrom() noexcept -> EType {
-            if constexpr (AltinaEngine::TTypeSameAs<T, FString>::Value) {
+            if constexpr (TTypeSameAs<T, FString>::Value) {
                 return EType::String;
-            } else if constexpr (AltinaEngine::TTypeSameAs<T, bool>::Value) {
+            } else if constexpr (TTypeSameAs<T, bool>::Value) {
                 return EType::Bool;
-            } else if constexpr (AltinaEngine::CFloatingPoint<T>) {
+            } else if constexpr (CFloatingPoint<T>) {
                 return EType::Float;
             } else {
                 return EType::Int;
             }
         }
 
-        static auto    GuessType(const FString& v) noexcept -> EType;
-        static auto    ParseBool(const FString& v) noexcept -> bool;
+        static auto                                 GuessType(const FString& v) noexcept -> EType;
+        static auto                                 ParseBool(const FString& v) noexcept -> bool;
 
-        template <typename T>
-        static constexpr auto IsSignedIntegral() noexcept -> bool {
-            using TDecayed = typename AltinaEngine::TDecay<T>::TType;
-            if constexpr (AltinaEngine::TTypeSameAs<TDecayed, signed char>::Value
-                || AltinaEngine::TTypeSameAs<TDecayed, short>::Value
-                || AltinaEngine::TTypeSameAs<TDecayed, int>::Value
-                || AltinaEngine::TTypeSameAs<TDecayed, long>::Value
-                || AltinaEngine::TTypeSameAs<TDecayed, long long>::Value
+        template <typename T> static constexpr auto IsSignedIntegral() noexcept -> bool {
+            using TDecayed = typename TDecay<T>::TType;
+            if constexpr (TTypeSameAs<TDecayed, signed char>::Value
+                || TTypeSameAs<TDecayed, short>::Value || TTypeSameAs<TDecayed, int>::Value
+                || TTypeSameAs<TDecayed, long>::Value || TTypeSameAs<TDecayed, long long>::Value
 #if CHAR_MIN < 0
-                || AltinaEngine::TTypeSameAs<TDecayed, char>::Value
+                || TTypeSameAs<TDecayed, char>::Value
 #endif
 #if defined(WCHAR_MIN) && (WCHAR_MIN < 0)
-                || AltinaEngine::TTypeSameAs<TDecayed, wchar_t>::Value
+                || TTypeSameAs<TDecayed, wchar_t>::Value
 #endif
             ) {
                 return true;
@@ -213,8 +166,7 @@ namespace AltinaEngine::Core::Console {
             }
         }
 
-        template <typename T>
-        static auto ParseIntegral(const FString& v) noexcept -> T {
+        template <typename T> static auto ParseIntegral(const FString& v) noexcept -> T {
             bool  neg = false;
             usize idx = 0;
             if (v.Length() > 0 && (v[0] == '+' || v[0] == '-')) {
@@ -243,11 +195,10 @@ namespace AltinaEngine::Core::Console {
             }
         }
 
-        template <typename T>
-        static auto ParseFloat(const FString& v) noexcept -> T {
-            auto view = v.ToView();
-            const usize n = view.Length();
-            char* buf = new char[n + 1];
+        template <typename T> static auto ParseFloat(const FString& v) noexcept -> T {
+            auto        view = v.ToView();
+            const usize n    = view.Length();
+            char*       buf  = new char[n + 1];
             for (usize i = 0; i < n; ++i) {
                 buf[i] = static_cast<char>(view.Data()[i]);
             }
@@ -263,11 +214,10 @@ namespace AltinaEngine::Core::Console {
             return static_cast<T>(value);
         }
 
-        template <typename T>
-        static auto ParseScalar(const FString& v) noexcept -> T {
-            if constexpr (AltinaEngine::TTypeSameAs<T, bool>::Value) {
+        template <typename T> static auto ParseScalar(const FString& v) noexcept -> T {
+            if constexpr (TTypeSameAs<T, bool>::Value) {
                 return ParseBool(v);
-            } else if constexpr (AltinaEngine::CFloatingPoint<T>) {
+            } else if constexpr (CFloatingPoint<T>) {
                 return ParseFloat<T>(v);
             } else {
                 return ParseIntegral<T>(v);
@@ -281,14 +231,14 @@ namespace AltinaEngine::Core::Console {
                 return true;
             }
 
-            #define AE_CVAR_TRY_TYPE(Type)                           \
-                if (auto v = value.TryGet<Type>()) {                 \
-                    out = static_cast<T>(*v);                        \
-                    return true;                                     \
-                }
+#define AE_CVAR_TRY_TYPE(Type)           \
+    if (auto v = value.TryGet<Type>()) { \
+        out = static_cast<T>(*v);        \
+        return true;                     \
+    }
 
             AE_CVAR_SCALAR_LIST(AE_CVAR_TRY_TYPE)
-            #undef AE_CVAR_TRY_TYPE
+#undef AE_CVAR_TRY_TYPE
             return false;
         }
 
@@ -317,16 +267,14 @@ namespace AltinaEngine::Core::Console {
 
     template <typename T>
         requires FConsoleVariable::CConsoleValueType<T>
-              && !AltinaEngine::TTypeSameAs<typename AltinaEngine::TDecay<T>::TType,
-                     FString>::Value
     class TConsoleVariable {
     public:
-        using TValue = typename AltinaEngine::TDecay<T>::TType;
+        using TValue = typename TDecay<T>::TType;
 
         TConsoleVariable() noexcept = default;
 
         explicit TConsoleVariable(const TChar* name, T&& defaultValue) noexcept {
-            mVariable = FConsoleVariable::Register(name, AltinaEngine::Forward<T>(defaultValue));
+            mVariable = FConsoleVariable::Register(name, Forward<T>(defaultValue));
         }
 
         auto Get() const noexcept -> TValue {
@@ -335,7 +283,7 @@ namespace AltinaEngine::Core::Console {
 
         void Set(TValue value) noexcept {
             if (mVariable) {
-                mVariable->Set<TValue>(AltinaEngine::Move(value));
+                mVariable->Set<TValue>(Move(value));
             }
         }
 
@@ -345,8 +293,8 @@ namespace AltinaEngine::Core::Console {
         FConsoleVariable* mVariable = nullptr;
     };
 
-    #undef AE_CVAR_SCALAR_LIST
-    #undef AE_CVAR_CHAR8_LIST
-    #undef AE_CVAR_CHAR8_TYPE
+#undef AE_CVAR_SCALAR_LIST
+#undef AE_CVAR_CHAR8_LIST
+#undef AE_CVAR_CHAR8_TYPE
 
 } // namespace AltinaEngine::Core::Console

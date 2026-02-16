@@ -39,16 +39,14 @@ namespace AltinaEngine::Core::Math {
             const f32 sz = Sin(halfRoll);
             const f32 cz = Cos(halfRoll);
 
-            return FQuaternion(cy * sx * cz + sy * cx * sz,
-                sy * cx * cz - cy * sx * sz,
-                cy * cx * sz - sy * sx * cz,
-                cy * cx * cz + sy * sx * sz);
+            return FQuaternion(cy * sx * cz + sy * cx * sz, sy * cx * cz - cy * sx * sz,
+                cy * cx * sz - sy * sx * cz, cy * cx * cz + sy * sx * sz);
         }
 
         static FEulerRotator FromQuaternion(const FQuaternion& quat) noexcept {
             const FQuaternion q = quat.Normalized();
 
-            f32 sinPitch = 2.0f * (q.w * q.x - q.y * q.z);
+            f32               sinPitch = 2.0f * (q.w * q.x - q.y * q.z);
             if (sinPitch > 1.0f) {
                 sinPitch = 1.0f;
             } else if (sinPitch < -1.0f) {
@@ -60,9 +58,8 @@ namespace AltinaEngine::Core::Math {
                 const f32 pitch = (sinPitch >= 0.0f) ? kHalfPiF : -kHalfPiF;
                 const f32 r11   = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
                 const f32 r12   = 2.0f * (q.x * q.y - q.z * q.w);
-                const f32 yaw =
-                    (sinPitch >= 0.0f) ? Atan2(r12, r11) : Atan2(-r12, r11);
-                const f32 roll = 0.0f;
+                const f32 yaw   = (sinPitch >= 0.0f) ? Atan2(r12, r11) : Atan2(-r12, r11);
+                const f32 roll  = 0.0f;
                 return FEulerRotator(pitch, yaw, roll);
             }
 

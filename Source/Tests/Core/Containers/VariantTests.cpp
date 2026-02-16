@@ -2,6 +2,8 @@
 
 #include "Container/Variant.h"
 
+using AltinaEngine::Move;
+
 using namespace AltinaEngine;
 using namespace AltinaEngine::Core::Container;
 
@@ -12,7 +14,7 @@ namespace {
         static int copyCount;
         static int moveCount;
 
-        int value = 0;
+        int        value = 0;
 
         FTracker() : value(0) { ++ctorCount; }
         explicit FTracker(int v) : value(v) { ++ctorCount; }
@@ -24,10 +26,10 @@ namespace {
         ~FTracker() { ++dtorCount; }
     };
 
-    int FTracker::ctorCount = 0;
-    int FTracker::dtorCount = 0;
-    int FTracker::copyCount = 0;
-    int FTracker::moveCount = 0;
+    int  FTracker::ctorCount = 0;
+    int  FTracker::dtorCount = 0;
+    int  FTracker::copyCount = 0;
+    int  FTracker::moveCount = 0;
 
     void ResetTrackerCounts() {
         FTracker::ctorCount = 0;
@@ -76,7 +78,7 @@ TEST_CASE("Variant copy and move") {
         REQUIRE_EQ(copy.Get<FTracker>().value, 7);
         REQUIRE_EQ(FTracker::copyCount, 1);
 
-        TTrackedVar moved(AltinaEngine::Move(v));
+        TTrackedVar moved(Move(v));
         REQUIRE(moved.Is<FTracker>());
         REQUIRE_EQ(moved.Get<FTracker>().value, 7);
         REQUIRE(!v.HasValue());
@@ -86,7 +88,6 @@ TEST_CASE("Variant copy and move") {
         REQUIRE_EQ(FTracker::dtorCount, 2);
     }
 
-    const int totalConstructs =
-        FTracker::ctorCount + FTracker::copyCount + FTracker::moveCount;
+    const int totalConstructs = FTracker::ctorCount + FTracker::copyCount + FTracker::moveCount;
     REQUIRE_EQ(FTracker::dtorCount, totalConstructs);
 }

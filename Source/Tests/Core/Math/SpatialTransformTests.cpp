@@ -7,10 +7,11 @@
 #include "Math/Quaternion.h"
 #include "Math/Vector.h"
 
-using namespace AltinaEngine::Core::Math;
-using namespace AltinaEngine::Core::Math::LinAlg;
 using AltinaEngine::f32;
 using AltinaEngine::u32;
+
+using namespace AltinaEngine::Core::Math;
+using namespace AltinaEngine::Core::Math::LinAlg;
 
 namespace {
 

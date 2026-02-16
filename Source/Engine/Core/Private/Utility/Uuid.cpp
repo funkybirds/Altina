@@ -2,6 +2,12 @@
 
 #include <random>
 
+using AltinaEngine::Core::Container::FNativeString;
+using AltinaEngine::Core::Container::FNativeStringView;
+using AltinaEngine::Core::Container::FString;
+using AltinaEngine::Core::Container::FStringView;
+using AltinaEngine::Core::Container::TBasicString;
+using AltinaEngine::Core::Container::TBasicStringView;
 namespace AltinaEngine {
     namespace Container = Core::Container;
     namespace {
@@ -30,7 +36,7 @@ namespace AltinaEngine {
         }
 
         template <typename CharT>
-        auto TryParseImpl(Container::TBasicStringView<CharT> text, FUuid& out) noexcept -> bool {
+        auto TryParseImpl(TBasicStringView<CharT> text, FUuid& out) noexcept -> bool {
             const auto length = text.Length();
             if (length != FUuid::kCompactStringLength && length != FUuid::kStringLength) {
                 return false;
@@ -75,15 +81,14 @@ namespace AltinaEngine {
             return true;
         }
 
-        template <typename CharT> void AppendHex(Container::TBasicString<CharT>& out, u8 value) {
+        template <typename CharT> void AppendHex(TBasicString<CharT>& out, u8 value) {
             constexpr char kDigits[] = "0123456789abcdef";
             out.Append(static_cast<CharT>(kDigits[(value >> 4) & 0xF]));
             out.Append(static_cast<CharT>(kDigits[value & 0xF]));
         }
 
-        template <typename CharT>
-        auto ToStringImpl(const FUuid& value) -> Container::TBasicString<CharT> {
-            Container::TBasicString<CharT> out;
+        template <typename CharT> auto ToStringImpl(const FUuid& value) -> TBasicString<CharT> {
+            TBasicString<CharT> out;
             out.Reserve(FUuid::kStringLength);
 
             const auto& bytes = value.GetBytes();
@@ -112,19 +117,17 @@ namespace AltinaEngine {
     }
 
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-    auto FUuid::TryParse(Container::FStringView text, FUuid& out) noexcept -> bool {
+    auto FUuid::TryParse(FStringView text, FUuid& out) noexcept -> bool {
         return TryParseImpl(text, out);
     }
 #endif
 
-    auto FUuid::TryParse(Container::FNativeStringView text, FUuid& out) noexcept -> bool {
+    auto FUuid::TryParse(FNativeStringView text, FUuid& out) noexcept -> bool {
         return TryParseImpl(text, out);
     }
 
-    auto FUuid::ToString() const -> Container::FString { return ToStringImpl<TChar>(*this); }
+    auto FUuid::ToString() const -> FString { return ToStringImpl<TChar>(*this); }
 
-    auto FUuid::ToNativeString() const -> Container::FNativeString {
-        return ToStringImpl<char>(*this);
-    }
+    auto FUuid::ToNativeString() const -> FNativeString { return ToStringImpl<char>(*this); }
 
 } // namespace AltinaEngine

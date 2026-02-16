@@ -3,6 +3,7 @@
 #include "Container/Vector.h"
 #include "Types/Aliases.h"
 
+using AltinaEngine::Core::Container::TVector;
 namespace AltinaEngine::Core::Memory {
     namespace Container = Core::Container;
     struct FBuddyAllocation {
@@ -169,12 +170,12 @@ namespace AltinaEngine::Core::Memory {
             return false;
         }
 
-        u64                                         mTotalSize    = 0ULL;
-        u64                                         mMinBlockSize = 0ULL;
-        u32                                         mMaxOrder     = 0U;
-        Container::TVector<Container::TVector<u64>> mFreeLists;
+        u64                                 mTotalSize    = 0ULL;
+        u64                                 mMinBlockSize = 0ULL;
+        u32                                 mMaxOrder     = 0U;
+        TVector<TVector<u64>>               mFreeLists;
 
-        [[nodiscard]] static constexpr auto         Max(u64 a, u64 b) noexcept -> u64 {
+        [[nodiscard]] static constexpr auto Max(u64 a, u64 b) noexcept -> u64 {
             return (a > b) ? a : b;
         }
 

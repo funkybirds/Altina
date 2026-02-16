@@ -77,7 +77,7 @@ namespace AltinaEngine::Core::Container {
 
         [[nodiscard]] operator FStringView() const noexcept { return ToView(); }
 
-        void ToLower() {
+        void          ToLower() {
             TransformCharacters(
                 [](TValueType Character) -> TValueType { return LowerChar(Character); });
         }

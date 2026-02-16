@@ -12,6 +12,10 @@
 #include "Threading/Atomic.h"
 #include "Types/Traits.h"
 
+using AltinaEngine::CClassBaseOf;
+using AltinaEngine::Move;
+using AltinaEngine::Core::Container::FStringView;
+using AltinaEngine::Core::Container::MakeUniqueAs;
 namespace AltinaEngine::GameScene {
     namespace Container = Core::Container;
     using Container::THashMap;
@@ -28,26 +32,27 @@ namespace AltinaEngine::GameScene {
         explicit FWorld(u32 worldId);
         ~FWorld();
 
-        FWorld(const FWorld&)                    = delete;
-        auto operator=(const FWorld&) -> FWorld& = delete;
-        FWorld(FWorld&&)                         = delete;
-        auto operator=(FWorld&&) -> FWorld&      = delete;
+        FWorld(const FWorld&)                             = delete;
+        auto operator=(const FWorld&) -> FWorld&          = delete;
+        FWorld(FWorld&&)                                  = delete;
+        auto               operator=(FWorld&&) -> FWorld& = delete;
 
         [[nodiscard]] auto GetWorldId() const noexcept -> u32 { return mWorldId; }
 
-        [[nodiscard]] auto CreateGameObject(Container::FStringView name = {}) -> FGameObjectId;
+        [[nodiscard]] auto CreateGameObject(FStringView name = {}) -> FGameObjectId;
         void               DestroyGameObject(FGameObjectId id);
         [[nodiscard]] auto IsAlive(FGameObjectId id) const noexcept -> bool;
 
-        template <typename T> [[nodiscard]] auto CreateComponent(FGameObjectId owner) -> FComponentId;
+        template <typename T>
+        [[nodiscard]] auto CreateComponent(FGameObjectId owner) -> FComponentId;
         [[nodiscard]] auto CreateComponent(FGameObjectId owner, FComponentTypeHash type)
             -> FComponentId;
-        void DestroyComponent(FComponentId id);
-        [[nodiscard]] auto IsAlive(FComponentId id) const noexcept -> bool;
+        void                                     DestroyComponent(FComponentId id);
+        [[nodiscard]] auto                       IsAlive(FComponentId id) const noexcept -> bool;
 
         template <typename T> [[nodiscard]] auto HasComponent(FGameObjectId owner) const -> bool;
-        template <typename T> [[nodiscard]] auto GetComponent(FGameObjectId owner) const
-            -> FComponentId;
+        template <typename T>
+        [[nodiscard]] auto GetComponent(FGameObjectId owner) const -> FComponentId;
         [[nodiscard]] auto GetAllComponents(FGameObjectId owner) const -> TVector<FComponentId>;
 
         /**
@@ -55,8 +60,8 @@ namespace AltinaEngine::GameScene {
          * @note Caller must ensure the ID is valid and matches the requested type.
          */
         template <typename T> [[nodiscard]] auto ResolveComponent(FComponentId id) -> T&;
-        template <typename T> [[nodiscard]] auto ResolveComponent(FComponentId id) const
-            -> const T&;
+        template <typename T>
+        [[nodiscard]] auto ResolveComponent(FComponentId id) const -> const T&;
 
         [[nodiscard]] auto Object(FGameObjectId id) -> FGameObjectView {
             return FGameObjectView(this, id);
@@ -76,9 +81,9 @@ namespace AltinaEngine::GameScene {
         public:
             virtual ~FComponentStorageBase() = default;
 
-            virtual void Destroy(FWorld& world, FComponentId id) = 0;
-            [[nodiscard]] virtual auto IsAlive(FComponentId id) const -> bool = 0;
-            virtual void DestroyAll(FWorld& world) = 0;
+            virtual void               Destroy(FWorld& world, FComponentId id) = 0;
+            [[nodiscard]] virtual auto IsAlive(FComponentId id) const -> bool  = 0;
+            virtual void               DestroyAll(FWorld& world)               = 0;
         };
 
         template <typename T> class TComponentStorage final : public FComponentStorageBase {
@@ -91,7 +96,7 @@ namespace AltinaEngine::GameScene {
 
                 const u32 index = AcquireSlot();
                 auto&     slot  = mSlots[index];
-                slot.Handle     = AltinaEngine::Move(handle);
+                slot.Handle     = Move(handle);
                 slot.Alive      = true;
                 if (slot.Generation == 0) {
                     slot.Generation = 1;
@@ -119,7 +124,7 @@ namespace AltinaEngine::GameScene {
                     return;
                 }
 
-                auto& slot = mSlots[id.Index];
+                auto& slot  = mSlots[id.Index];
                 auto  owner = slot.Owner;
 
                 if (slot.Handle) {
@@ -130,7 +135,7 @@ namespace AltinaEngine::GameScene {
                     component->OnDestroy();
                 }
 
-                mPool.Deallocate(AltinaEngine::Move(slot.Handle));
+                mPool.Deallocate(Move(slot.Handle));
                 slot.Owner = {};
                 slot.Alive = false;
                 slot.Generation++;
@@ -166,7 +171,9 @@ namespace AltinaEngine::GameScene {
                 }
             }
 
-            [[nodiscard]] auto Resolve(FComponentId id) -> T& { return *mSlots[id.Index].Handle.Get(); }
+            [[nodiscard]] auto Resolve(FComponentId id) -> T& {
+                return *mSlots[id.Index].Handle.Get();
+            }
             [[nodiscard]] auto Resolve(FComponentId id) const -> const T& {
                 return *mSlots[id.Index].Handle.Get();
             }
@@ -204,8 +211,8 @@ namespace AltinaEngine::GameScene {
             component.Initialize(id, owner);
         }
 
-        void LinkComponentToOwner(FGameObjectId owner, FComponentId id);
-        void UnlinkComponentFromOwner(FGameObjectId owner, FComponentId id);
+        void               LinkComponentToOwner(FGameObjectId owner, FComponentId id);
+        void               UnlinkComponentFromOwner(FGameObjectId owner, FComponentId id);
 
         [[nodiscard]] auto ResolveGameObject(FGameObjectId id) -> FGameObject*;
         [[nodiscard]] auto ResolveGameObject(FGameObjectId id) const -> const FGameObject*;
@@ -214,18 +221,21 @@ namespace AltinaEngine::GameScene {
             -> FComponentStorageBase*;
 
         template <typename T> void EnsureComponentRegistration();
-        template <typename T> [[nodiscard]] auto FindComponentStorage() const -> TComponentStorage<T>*;
-        template <typename T> [[nodiscard]] auto GetOrCreateComponentStorage() -> TComponentStorage<T>&;
+        template <typename T>
+        [[nodiscard]] auto FindComponentStorage() const -> TComponentStorage<T>*;
+        template <typename T>
+        [[nodiscard]] auto GetOrCreateComponentStorage() -> TComponentStorage<T>&;
 
-        u32                        mWorldId = 0;
-        Core::Memory::TThreadSafeObjectPool<FGameObject> mGameObjectPool{};
-        TVector<FGameObjectSlot>   mGameObjects{};
-        TVector<u32>               mFreeGameObjects{};
+        u32                mWorldId = 0;
+        Core::Memory::TThreadSafeObjectPool<FGameObject>   mGameObjectPool{};
+        TVector<FGameObjectSlot>                           mGameObjects{};
+        TVector<u32>                                       mFreeGameObjects{};
         THashMap<FComponentTypeHash, FComponentStoragePtr> mComponentStorage{};
     };
 
     namespace Detail {
-        template <typename T> auto CreateComponentThunk(FComponentCreateContext& ctx) -> FComponentId {
+        template <typename T>
+        auto CreateComponentThunk(FComponentCreateContext& ctx) -> FComponentId {
             if (ctx.World == nullptr) {
                 return {};
             }
@@ -238,10 +248,8 @@ namespace AltinaEngine::GameScene {
     } // namespace Detail
 
     // FWorld template methods
-    template <typename T>
-    inline auto FWorld::CreateComponent(FGameObjectId owner) -> FComponentId {
-        static_assert(AltinaEngine::CClassBaseOf<FComponent, T>,
-            "Component types must derive from FComponent.");
+    template <typename T> inline auto FWorld::CreateComponent(FGameObjectId owner) -> FComponentId {
+        static_assert(CClassBaseOf<FComponent, T>, "Component types must derive from FComponent.");
 
         if (!IsAlive(owner)) {
             return {};
@@ -252,8 +260,7 @@ namespace AltinaEngine::GameScene {
         return storage.Create(*this, owner);
     }
 
-    template <typename T>
-    inline auto FWorld::HasComponent(FGameObjectId owner) const -> bool {
+    template <typename T> inline auto FWorld::HasComponent(FGameObjectId owner) const -> bool {
         return GetComponent<T>(owner).IsValid();
     }
 
@@ -273,21 +280,19 @@ namespace AltinaEngine::GameScene {
         return {};
     }
 
-    template <typename T>
-    inline auto FWorld::ResolveComponent(FComponentId id) -> T& {
+    template <typename T> inline auto FWorld::ResolveComponent(FComponentId id) -> T& {
         auto* storage = FindComponentStorage<T>();
         return storage->Resolve(id);
     }
 
-    template <typename T>
-    inline auto FWorld::ResolveComponent(FComponentId id) const -> const T& {
+    template <typename T> inline auto FWorld::ResolveComponent(FComponentId id) const -> const T& {
         auto* storage = FindComponentStorage<T>();
         return storage->Resolve(id);
     }
 
     template <typename T> inline void FWorld::EnsureComponentRegistration() {
         const FComponentTypeHash typeHash = GetComponentTypeHash<T>();
-        auto& registry = GetComponentRegistry();
+        auto&                    registry = GetComponentRegistry();
         if (!registry.Has(typeHash)) {
             registry.Register(BuildComponentTypeEntry<T>());
         }
@@ -310,10 +315,9 @@ namespace AltinaEngine::GameScene {
         }
 
         const FComponentTypeHash typeHash = GetComponentTypeHash<T>();
-        auto                     storagePtr =
-            Container::MakeUniqueAs<FComponentStorageBase, TComponentStorage<T>>();
-        auto* rawPtr = static_cast<TComponentStorage<T>*>(storagePtr.Get());
-        mComponentStorage.emplace(typeHash, AltinaEngine::Move(storagePtr));
+        auto  storagePtr = MakeUniqueAs<FComponentStorageBase, TComponentStorage<T>>();
+        auto* rawPtr     = static_cast<TComponentStorage<T>*>(storagePtr.Get());
+        mComponentStorage.emplace(typeHash, Move(storagePtr));
         return *rawPtr;
     }
 
@@ -383,8 +387,3 @@ namespace AltinaEngine::GameScene {
         return mWorld->ResolveComponent<T>(mId);
     }
 } // namespace AltinaEngine::GameScene
-
-
-
-
-

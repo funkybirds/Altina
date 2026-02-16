@@ -5,11 +5,12 @@
 #include <string>
 #include <type_traits>
 
+using AltinaEngine::Core::Container::TBasicString;
 namespace AltinaEngine::Core::Platform {
     namespace Container = Core::Container;
     namespace {
         template <typename CharT>
-        auto ToPathImpl(const Container::TBasicString<CharT>& value) -> std::filesystem::path {
+        auto ToPathImpl(const TBasicString<CharT>& value) -> std::filesystem::path {
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 return std::filesystem::path(std::wstring(value.GetData(), value.Length()));
             } else {

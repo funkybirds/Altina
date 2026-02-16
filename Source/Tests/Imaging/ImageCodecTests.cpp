@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 
+using AltinaEngine::Core::Container::TSpan;
 namespace AltinaEngine::Imaging {
     namespace Container = Core::Container;
     using Container::TVector;
@@ -171,7 +172,7 @@ namespace AltinaEngine::Imaging {
 
         FPngImageReader reader;
         FImage          decoded;
-        if (!reader.Read(Container::TSpan<u8>(bytes), decoded)) {
+        if (!reader.Read(TSpan<u8>(bytes), decoded)) {
             REQUIRE(false);
             return;
         }
@@ -194,7 +195,7 @@ namespace AltinaEngine::Imaging {
 
         FJpegImageReader reader;
         FImage           decoded;
-        if (!reader.Read(Container::TSpan<u8>(bytes), decoded)) {
+        if (!reader.Read(TSpan<u8>(bytes), decoded)) {
             REQUIRE(false);
             return;
         }
@@ -264,7 +265,7 @@ namespace AltinaEngine::Imaging {
         }
         FPngImageReader pngReader;
         FImage          pngImage;
-        if (!pngReader.Read(Container::TSpan<u8>(pngFileBytes), pngImage)) {
+        if (!pngReader.Read(TSpan<u8>(pngFileBytes), pngImage)) {
             REQUIRE(false);
             return;
         }
@@ -279,7 +280,7 @@ namespace AltinaEngine::Imaging {
         }
         FJpegImageReader jpegReader;
         FImage           jpegImage;
-        if (!jpegReader.Read(Container::TSpan<u8>(jpegFileBytes), jpegImage)) {
+        if (!jpegReader.Read(TSpan<u8>(jpegFileBytes), jpegImage)) {
             REQUIRE(false);
             return;
         }

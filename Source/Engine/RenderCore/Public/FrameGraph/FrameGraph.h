@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "RenderCoreAPI.h"
 
@@ -8,6 +8,8 @@
 #include "Rhi/RhiRefs.h"
 #include "Rhi/RhiStructs.h"
 
+using AltinaEngine::Forward;
+using AltinaEngine::TDecay;
 namespace AltinaEngine::RenderCore {
     namespace Container = Core::Container;
     using Container::TVector;
@@ -205,17 +207,17 @@ namespace AltinaEngine::RenderCore {
             pass.mPassData        = data;
             pass.mDestroyPassData = &DestroyPassData<TPassData>;
 
-            using TExecute        = typename AltinaEngine::TDecay<ExecuteFunc>::TType;
-            TExecute* exec        = new TExecute(AltinaEngine::Forward<ExecuteFunc>(execute));
+            using TExecute        = typename TDecay<ExecuteFunc>::TType;
+            TExecute* exec        = new TExecute(Forward<ExecuteFunc>(execute));
             pass.mExecuteUserData = exec;
             pass.mExecute         = &ExecuteWithData<TPassData, TExecute>;
             pass.mDestroyExecute  = &DestroyExecute<TExecute>;
 
             FFrameGraphPassBuilder builder(*this, passIndex);
             if constexpr (requires { setup(builder, *data); }) {
-                AltinaEngine::Forward<SetupFunc>(setup)(builder, *data);
+                Forward<SetupFunc>(setup)(builder, *data);
             } else if constexpr (requires { setup(builder); }) {
-                AltinaEngine::Forward<SetupFunc>(setup)(builder);
+                Forward<SetupFunc>(setup)(builder);
             } else {
                 static_assert(sizeof(SetupFunc) == 0,
                     "SetupFunc must accept (FFrameGraphPassBuilder&) or (FFrameGraphPassBuilder&, PassData&)");
@@ -227,7 +229,7 @@ namespace AltinaEngine::RenderCore {
             const u32              passIndex = AllocatePass(desc);
             FFrameGraphPassBuilder builder(*this, passIndex);
             if constexpr (requires { setup(builder); }) {
-                AltinaEngine::Forward<SetupFunc>(setup)(builder);
+                Forward<SetupFunc>(setup)(builder);
             } else {
                 static_assert(
                     sizeof(SetupFunc) == 0, "SetupFunc must accept (FFrameGraphPassBuilder&)");

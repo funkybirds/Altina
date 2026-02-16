@@ -17,6 +17,9 @@
     #include "RhiMock/RhiMockContext.h"
 #endif
 
+using AltinaEngine::Move;
+using AltinaEngine::Core::Container::MakeUnique;
+using AltinaEngine::Core::Container::MakeUniqueAs;
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
     namespace {
@@ -40,17 +43,16 @@ namespace AltinaEngine::Launch {
         }
 
         if (!mInputSystem) {
-            mInputSystem = Container::MakeUnique<Input::FInputSystem>();
+            mInputSystem = MakeUnique<Input::FInputSystem>();
         }
 
         if (!mAppMessageHandler && mInputSystem) {
-            mAppMessageHandler = Container::MakeUnique<Input::FInputMessageHandler>(*mInputSystem);
+            mAppMessageHandler = MakeUnique<Input::FInputMessageHandler>(*mInputSystem);
         }
 
 #if AE_PLATFORM_WIN
-        mApplication =
-            Container::MakeUniqueAs<Application::FApplication, Application::FWindowsApplication>(
-                mStartupParameters);
+        mApplication = MakeUniqueAs<Application::FApplication, Application::FWindowsApplication>(
+            mStartupParameters);
 #else
         LogError(TEXT("FEngineLoop PreInit failed: no platform application available."));
         return false;
@@ -95,9 +97,9 @@ namespace AltinaEngine::Launch {
         }
 
 #if AE_PLATFORM_WIN
-        mRhiContext = Container::MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiD3D11Context>();
+        mRhiContext = MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiD3D11Context>();
 #else
-        mRhiContext = Container::MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiMockContext>();
+        mRhiContext = MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiMockContext>();
 #endif
 
         if (!mRhiContext) {
@@ -139,7 +141,7 @@ namespace AltinaEngine::Launch {
         mViewportHeight = extent.mHeight;
 
         if (!mRenderingThread) {
-            mRenderingThread = Container::MakeUnique<RenderCore::FRenderingThread>();
+            mRenderingThread = MakeUnique<RenderCore::FRenderingThread>();
         }
         if (mRenderingThread && !mRenderingThread->IsRunning()) {
             mRenderingThread->Start();
@@ -197,10 +199,8 @@ namespace AltinaEngine::Launch {
 
         LogInfo(TEXT("GameThread Frame {}"), frameIndex);
 
-        Core::Jobs::FJobDescriptor desc{};
-        desc.AffinityMask = static_cast<u32>(Core::Jobs::ENamedThread::Rendering);
-        desc.Callback     = [device, viewport, callback, frameIndex, width, height,
-                             shouldResize]() mutable -> void {
+        auto handle = RenderCore::EnqueueRenderTask([device, viewport, callback, frameIndex, width,
+                                                        height, shouldResize]() mutable -> void {
             if (!device)
                 return;
 
@@ -228,9 +228,7 @@ namespace AltinaEngine::Launch {
 
             LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
             Core::Platform::Generic::PlatformSleepMilliseconds(2000);
-        };
-
-        auto handle = Core::Jobs::FJobSystem::Submit(AltinaEngine::Move(desc));
+        });
         if (handle.IsValid()) {
             mPendingRenderFrames.Push(handle);
             EnforceRenderLag(GetRenderThreadLagFrames());
@@ -291,7 +289,7 @@ namespace AltinaEngine::Launch {
 
     void FEngineLoop::SetRenderCallback(FRenderCallback callback) {
         FlushRenderFrames();
-        mRenderCallback = AltinaEngine::Move(callback);
+        mRenderCallback = Move(callback);
     }
 
     auto FEngineLoop::GetInputSystem() const noexcept -> const Input::FInputSystem* {

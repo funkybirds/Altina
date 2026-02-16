@@ -3,6 +3,7 @@
 #include "Types/Concepts.h"
 #include "Types/Traits.h"
 
+using AltinaEngine::TLess;
 namespace AltinaEngine::Core::Algorithm {
     template <CForwardRange R, typename Comp = TLess<>>
     [[nodiscard]] constexpr auto MaxElement(R&& range, Comp comp = Comp{}) {
@@ -19,7 +20,7 @@ namespace AltinaEngine::Core::Algorithm {
         return best;
     }
 
-    template <CForwardRange R, typename Comp = AltinaEngine::TLess<>>
+    template <CForwardRange R, typename Comp = TLess<>>
     [[nodiscard]] constexpr auto MinElement(R&& range, Comp comp = Comp{}) {
         auto it = range.begin();
         if (it == range.end())

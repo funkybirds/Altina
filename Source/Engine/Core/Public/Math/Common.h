@@ -185,8 +185,7 @@ namespace AltinaEngine::Core::Math {
         }
     }
 
-    template <CFloatingPoint T>
-    [[nodiscard]] AE_FORCEINLINE auto Atan2(T y, T x) noexcept -> T {
+    template <CFloatingPoint T> [[nodiscard]] AE_FORCEINLINE auto Atan2(T y, T x) noexcept -> T {
         if constexpr (CSameAs<T, f32>) {
             return Details::Atan2F(y, x);
         } else {

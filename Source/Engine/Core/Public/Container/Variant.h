@@ -3,6 +3,10 @@
 #include "../Types/Aliases.h"
 #include "../Types/Traits.h"
 
+using AltinaEngine::CCopyConstructible;
+using AltinaEngine::CMoveConstructible;
+using AltinaEngine::Forward;
+using AltinaEngine::Move;
 namespace AltinaEngine::Core::Container {
     using AltinaEngine::usize;
 
@@ -58,25 +62,25 @@ namespace AltinaEngine::Core::Container {
         template <typename T>
             requires TTypeIsAnyOf<typename TDecay<T>::TType, TTypeSet<TArgs...>>::Value
         explicit TVariant(T&& value) : mStorage{}, mIndex(kInvalidIndex) {
-            Emplace<typename TDecay<T>::TType>(AltinaEngine::Forward<T>(value));
+            Emplace<typename TDecay<T>::TType>(Forward<T>(value));
         }
 
         TVariant(const TVariant& other) : mStorage{}, mIndex(kInvalidIndex) {
-            static_assert((AltinaEngine::CCopyConstructible<TArgs> && ...),
+            static_assert((CCopyConstructible<TArgs> && ...),
                 "TVariant copy requires all alternatives to be copy-constructible.");
             CopyFrom(other);
         }
 
         TVariant(TVariant&& other) noexcept : mStorage{}, mIndex(kInvalidIndex) {
-            static_assert((AltinaEngine::CMoveConstructible<TArgs> && ...),
+            static_assert((CMoveConstructible<TArgs> && ...),
                 "TVariant move requires all alternatives to be move-constructible.");
-            MoveFrom(AltinaEngine::Move(other));
+            MoveFrom(Move(other));
         }
 
         ~TVariant() { Destroy(); }
 
         auto operator=(const TVariant& other) -> TVariant& {
-            static_assert((AltinaEngine::CCopyConstructible<TArgs> && ...),
+            static_assert((CCopyConstructible<TArgs> && ...),
                 "TVariant copy requires all alternatives to be copy-constructible.");
             if (this != &other) {
                 Destroy();
@@ -86,11 +90,11 @@ namespace AltinaEngine::Core::Container {
         }
 
         auto operator=(TVariant&& other) noexcept -> TVariant& {
-            static_assert((AltinaEngine::CMoveConstructible<TArgs> && ...),
+            static_assert((CMoveConstructible<TArgs> && ...),
                 "TVariant move requires all alternatives to be move-constructible.");
             if (this != &other) {
                 Destroy();
-                MoveFrom(AltinaEngine::Move(other));
+                MoveFrom(Move(other));
             }
             return *this;
         }
@@ -98,7 +102,7 @@ namespace AltinaEngine::Core::Container {
         template <typename T>
             requires TTypeIsAnyOf<typename TDecay<T>::TType, TTypeSet<TArgs...>>::Value
         auto operator=(T&& value) -> TVariant& {
-            Emplace<typename TDecay<T>::TType>(AltinaEngine::Forward<T>(value));
+            Emplace<typename TDecay<T>::TType>(Forward<T>(value));
             return *this;
         }
 
@@ -116,7 +120,7 @@ namespace AltinaEngine::Core::Container {
             static_assert(TTypeIsAnyOf<TDecayed, TTypeSet<TArgs...>>::Value,
                 "TVariant::Emplace type must be one of the variant alternatives.");
             Destroy();
-            new (mStorage) TDecayed(AltinaEngine::Forward<Args>(args)...);
+            new (mStorage) TDecayed(Forward<Args>(args)...);
             mIndex = IndexOf<TDecayed>();
             return *reinterpret_cast<TDecayed*>(mStorage);
         }
@@ -192,18 +196,18 @@ namespace AltinaEngine::Core::Container {
                 mIndex = kInvalidIndex;
                 return;
             }
-            MoveAt(other.mIndex, AltinaEngine::Move(other));
+            MoveAt(other.mIndex, Move(other));
         }
 
         template <usize I = 0> void MoveAt(usize index, TVariant&& other) noexcept {
             if constexpr (I < sizeof...(TArgs)) {
                 if (index == I) {
                     using T = Detail::TVariantTypeAt<I, TArgs...>::Type;
-                    new (mStorage) T(AltinaEngine::Move(*reinterpret_cast<T*>(other.mStorage)));
+                    new (mStorage) T(Move(*reinterpret_cast<T*>(other.mStorage)));
                     mIndex = I;
                     other.Destroy();
                 } else {
-                    MoveAt<I + 1>(index, AltinaEngine::Move(other));
+                    MoveAt<I + 1>(index, Move(other));
                 }
             }
         }

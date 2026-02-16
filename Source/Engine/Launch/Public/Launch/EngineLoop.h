@@ -18,6 +18,11 @@
 #include "Rhi/RhiRefs.h"
 #include "Rhi/RhiViewport.h"
 
+using AltinaEngine::Core::Container::TFunction;
+using AltinaEngine::Core::Container::TOwner;
+using AltinaEngine::Core::Container::TPolymorphicDeleter;
+using AltinaEngine::Core::Container::TQueue;
+using AltinaEngine::Core::Container::TShared;
 namespace AltinaEngine::RenderCore {
     class FRenderingThread;
 } // namespace AltinaEngine::RenderCore
@@ -32,8 +37,7 @@ namespace AltinaEngine::Launch {
 
     class AE_LAUNCH_API FEngineLoop final {
     public:
-        using FRenderCallback =
-            Container::TFunction<void(Rhi::FRhiDevice&, Rhi::FRhiViewport&, u32, u32)>;
+        using FRenderCallback = TFunction<void(Rhi::FRhiDevice&, Rhi::FRhiViewport&, u32, u32)>;
 
         FEngineLoop() = default;
         explicit FEngineLoop(const FStartupParameters& InStartupParameters);
@@ -47,32 +51,30 @@ namespace AltinaEngine::Launch {
         [[nodiscard]] auto GetInputSystem() const noexcept -> const Input::FInputSystem*;
 
     private:
-        void               FlushRenderFrames();
-        void               EnforceRenderLag(u32 maxLagFrames);
+        void                                FlushRenderFrames();
+        void                                EnforceRenderLag(u32 maxLagFrames);
 
-        Container::TOwner<Input::FInputSystem>         mInputSystem;
-        Container::TOwner<Input::FInputMessageHandler> mAppMessageHandler;
-        Container::TOwner<Application::FApplication,
-            Container::TPolymorphicDeleter<Application::FApplication>>
-            mApplication;
-        Container::TOwner<Rhi::FRhiContext, Container::TPolymorphicDeleter<Rhi::FRhiContext>>
-                                            mRhiContext;
-        Container::TShared<Rhi::FRhiDevice> mRhiDevice;
-        Rhi::FRhiViewportRef                mMainViewport;
-        u32                                 mViewportWidth  = 0U;
-        u32                                 mViewportHeight = 0U;
-        u64                                 mFrameIndex     = 0ULL;
-        FRenderCallback                     mRenderCallback;
-        FStartupParameters                  mStartupParameters{};
-        bool                                mIsRunning  = false;
-        bool                                mAssetReady = false;
-        Asset::FAssetRegistry               mAssetRegistry;
-        Asset::FAssetManager                mAssetManager;
-        Asset::FAudioLoader                 mAudioLoader;
-        Asset::FMaterialLoader              mMaterialLoader;
-        Asset::FMeshLoader                  mMeshLoader;
-        Asset::FTexture2DLoader             mTexture2DLoader;
-        Container::TOwner<RenderCore::FRenderingThread> mRenderingThread;
-        Container::TQueue<Core::Jobs::FJobHandle>        mPendingRenderFrames;
+        TOwner<Input::FInputSystem>         mInputSystem;
+        TOwner<Input::FInputMessageHandler> mAppMessageHandler;
+        TOwner<Application::FApplication, TPolymorphicDeleter<Application::FApplication>>
+                                                                        mApplication;
+        TOwner<Rhi::FRhiContext, TPolymorphicDeleter<Rhi::FRhiContext>> mRhiContext;
+        TShared<Rhi::FRhiDevice>                                        mRhiDevice;
+        Rhi::FRhiViewportRef                                            mMainViewport;
+        u32                                                             mViewportWidth  = 0U;
+        u32                                                             mViewportHeight = 0U;
+        u64                                                             mFrameIndex     = 0ULL;
+        FRenderCallback                                                 mRenderCallback;
+        FStartupParameters                                              mStartupParameters{};
+        bool                                                            mIsRunning  = false;
+        bool                                                            mAssetReady = false;
+        Asset::FAssetRegistry                                           mAssetRegistry;
+        Asset::FAssetManager                                            mAssetManager;
+        Asset::FAudioLoader                                             mAudioLoader;
+        Asset::FMaterialLoader                                          mMaterialLoader;
+        Asset::FMeshLoader                                              mMeshLoader;
+        Asset::FTexture2DLoader                                         mTexture2DLoader;
+        TOwner<RenderCore::FRenderingThread>                            mRenderingThread;
+        TQueue<Core::Jobs::FJobHandle>                                  mPendingRenderFrames;
     };
 } // namespace AltinaEngine::Launch

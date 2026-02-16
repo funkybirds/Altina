@@ -2,12 +2,13 @@
 
 #include "Types/Traits.h"
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Asset {
     FMaterialAsset::FMaterialAsset(FMaterialRuntimeDesc desc, TVector<FMaterialScalarParam> scalars,
         TVector<FMaterialVectorParam> vectors, TVector<FMaterialTextureParam> textures)
         : mDesc(desc)
-        , mScalars(AltinaEngine::Move(scalars))
-        , mVectors(AltinaEngine::Move(vectors))
-        , mTextures(AltinaEngine::Move(textures)) {}
+        , mScalars(Move(scalars))
+        , mVectors(Move(vectors))
+        , mTextures(Move(textures)) {}
 
 } // namespace AltinaEngine::Asset

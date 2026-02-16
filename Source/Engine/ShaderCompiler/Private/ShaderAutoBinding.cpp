@@ -10,6 +10,7 @@
 #include <string>
 #include <type_traits>
 
+using AltinaEngine::Core::Container::TBasicString;
 namespace AltinaEngine::ShaderCompiler::Detail {
     namespace Container = Core::Container;
     namespace {
@@ -21,7 +22,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         constexpr u32 kDx11UavBase[kGroupCount]     = { 0U, 4U, 8U };
 
         template <typename CharT>
-        auto ToPathImpl(const Container::TBasicString<CharT>& value) -> std::filesystem::path {
+        auto ToPathImpl(const TBasicString<CharT>& value) -> std::filesystem::path {
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 return std::filesystem::path(std::wstring(value.GetData(), value.Length()));
             } else {
@@ -32,8 +33,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         auto ToPath(const FString& value) -> std::filesystem::path { return ToPathImpl(value); }
 
         template <typename CharT>
-        auto FromPathImpl(const std::filesystem::path& path) -> Container::TBasicString<CharT> {
-            Container::TBasicString<CharT> out;
+        auto FromPathImpl(const std::filesystem::path& path) -> TBasicString<CharT> {
+            TBasicString<CharT> out;
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 const auto native = path.wstring();
                 out.Append(native.c_str(), native.size());

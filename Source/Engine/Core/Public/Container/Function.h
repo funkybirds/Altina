@@ -7,6 +7,9 @@
 #include "../Types/Traits.h"
 #include "../Platform/Generic/GenericPlatformDecl.h"
 
+using AltinaEngine::Forward;
+using AltinaEngine::Move;
+
 namespace AltinaEngine::Core::Container {
 
     template <typename> class TFunction;
@@ -22,7 +25,7 @@ namespace AltinaEngine::Core::Container {
             requires(!CSameAs<typename TDecay<F>::TType, TFunction>)
         TFunction(F&& f) noexcept {
             using TDecayF = typename TRemoveReference<F>::TType;
-            Init<TDecayF>(AltinaEngine::Move(f));
+            Init<TDecayF>(Move(f));
         }
 
         TFunction(const TFunction& other) : mVTable(nullptr) {
@@ -78,7 +81,7 @@ namespace AltinaEngine::Core::Container {
         auto operator=(F&& f) noexcept -> TFunction& {
             Reset();
             using TDecayF = typename TRemoveReference<F>::TType;
-            Init<TDecayF>(AltinaEngine::Move(f));
+            Init<TDecayF>(Move(f));
             return *this;
         }
 
@@ -87,7 +90,7 @@ namespace AltinaEngine::Core::Container {
         explicit operator bool() const noexcept { return mVTable != nullptr; }
 
         auto     operator()(Args... args) -> R {
-            return mVTable->mInvoke(&mStorage, AltinaEngine::Forward<Args>(args)...);
+            return mVTable->mInvoke(&mStorage, Forward<Args>(args)...);
         }
 
         void Reset() noexcept {
@@ -128,12 +131,12 @@ namespace AltinaEngine::Core::Container {
         }
 
         template <typename F> static void MoveImpl(void* src, void* dst) noexcept {
-            new (dst) F(AltinaEngine::Move(*reinterpret_cast<F*>(src)));
+            new (dst) F(Move(*reinterpret_cast<F*>(src)));
             reinterpret_cast<F*>(src)->~F();
         }
 
         template <typename F> static auto InvokeImpl(void* storage, Args... args) -> R {
-            return (*reinterpret_cast<F*>(storage))(AltinaEngine::Forward<Args>(args)...);
+            return (*reinterpret_cast<F*>(storage))(Forward<Args>(args)...);
         }
 
         // Heap-backed helpers: when callable is too large for small-buffer, store pointer to heap
@@ -159,7 +162,7 @@ namespace AltinaEngine::Core::Container {
 
         template <typename F> static auto InvokeHeapImpl(void* storage, Args... args) -> R {
             F* ptr = *reinterpret_cast<F**>(storage);
-            return (*ptr)(AltinaEngine::Forward<Args>(args)...);
+            return (*ptr)(Forward<Args>(args)...);
         }
 
         template <typename F> void Init(F&& f) noexcept {
@@ -171,7 +174,7 @@ namespace AltinaEngine::Core::Container {
                     &InvokeImpl<T> };
 
                 // Placement new into storage
-                new (&mStorage) T(AltinaEngine::Move(f));
+                new (&mStorage) T(Move(f));
                 mVTable = &vt;
             } else {
                 static const VTable vt = { &DestroyHeapImpl<T>,
@@ -179,7 +182,7 @@ namespace AltinaEngine::Core::Container {
                     &InvokeHeapImpl<T> };
 
                 // allocate on heap and store pointer in storage
-                T*                  heapObj       = new T(AltinaEngine::Move(f));
+                T*                  heapObj       = new T(Move(f));
                 *reinterpret_cast<T**>(&mStorage) = heapObj;
                 mVTable                           = &vt;
             }

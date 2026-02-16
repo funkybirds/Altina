@@ -49,6 +49,7 @@
     #include <wrl/client.h>
 #endif
 
+using AltinaEngine::Move;
 namespace {
     using AltinaEngine::u32;
     using AltinaEngine::Rhi::ERhiQueueType;
@@ -179,7 +180,7 @@ TEST_CASE("RhiD3D11.DeviceCreation") {
 
     FRhiShaderDesc shaderDesc;
     shaderDesc.mStage    = AltinaEngine::Shader::EShaderStage::Vertex;
-    shaderDesc.mBytecode = AltinaEngine::Move(bytecode);
+    shaderDesc.mBytecode = Move(bytecode);
 
     const auto shader = device->CreateShader(shaderDesc);
     REQUIRE(shader);
@@ -315,7 +316,7 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
 
     FRhiShaderDesc shaderDesc;
     shaderDesc.mStage    = AltinaEngine::Shader::EShaderStage::Compute;
-    shaderDesc.mBytecode = AltinaEngine::Move(bytecode);
+    shaderDesc.mBytecode = Move(bytecode);
 
     const auto shader = device->CreateShader(shaderDesc);
     REQUIRE(shader);
@@ -486,11 +487,11 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
 
     FRhiShaderDesc vsDesc;
     vsDesc.mStage    = EShaderStage::Vertex;
-    vsDesc.mBytecode = AltinaEngine::Move(vsBytecode);
+    vsDesc.mBytecode = Move(vsBytecode);
 
     FRhiShaderDesc psDesc;
     psDesc.mStage    = EShaderStage::Pixel;
-    psDesc.mBytecode = AltinaEngine::Move(psBytecode);
+    psDesc.mBytecode = Move(psBytecode);
 
     FShaderResourceBinding uavBinding;
     uavBinding.mType     = EShaderResourceType::StorageTexture;

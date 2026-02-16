@@ -1,4 +1,3 @@
-﻿
 #include "Asset/AssetBinary.h"
 #include "Asset/AssetBundle.h"
 #include "Asset/AssetTypes.h"
@@ -26,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Tools::AssetPipeline {
     namespace Container = Core::Container;
     namespace {
@@ -1592,7 +1592,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
                 outCookKeyBytes.insert(
                     outCookKeyBytes.end(), bufferBytes.begin(), bufferBytes.end());
-                buffers.push_back(AltinaEngine::Move(bufferBytes));
+                buffers.push_back(Move(bufferBytes));
             }
 
             const auto* bufferViewsValue = GetGltfArray(*root, "bufferViews");
@@ -1956,7 +1956,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     continue;
                 }
 
-                outAssets.push_back(AltinaEngine::Move(asset));
+                outAssets.push_back(Move(asset));
             }
 
             return !outAssets.empty();

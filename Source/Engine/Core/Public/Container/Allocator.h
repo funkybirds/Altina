@@ -5,6 +5,7 @@
 #include "../Types/Traits.h"
 #include "ContainerConfig.h"
 
+using AltinaEngine::Forward;
 namespace AltinaEngine::Core::Container {
 
     /**
@@ -86,7 +87,7 @@ namespace AltinaEngine::Core::Container {
         static void Deallocate(Alloc& a, TPointer p, TSizeType n) { a.Deallocate(p, n); }
 
         template <typename... Args> static void Construct(Alloc& a, TPointer p, Args&&... args) {
-            a.Construct(p, AltinaEngine::Forward<Args>(args)...);
+            a.Construct(p, Forward<Args>(args)...);
         }
 
         static void Destroy(Alloc& a, TPointer p) { a.Destroy(p); }

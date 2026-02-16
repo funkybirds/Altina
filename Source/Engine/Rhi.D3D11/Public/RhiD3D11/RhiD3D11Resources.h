@@ -6,6 +6,8 @@
 #include "Rhi/RhiTexture.h"
 #include "Container/SmartPtr.h"
 
+using AltinaEngine::Core::Container::TOwner;
+
 struct ID3D11Buffer;
 struct ID3D11Resource;
 struct ID3D11SamplerState;
@@ -38,7 +40,7 @@ namespace AltinaEngine::Rhi {
 
     private:
         struct FState;
-        Container::TOwner<FState> mState;
+        TOwner<FState> mState;
     };
 
     class AE_RHI_D3D11_API FRhiD3D11Texture final : public FRhiTexture {
@@ -63,7 +65,7 @@ namespace AltinaEngine::Rhi {
 
     private:
         struct FState;
-        Container::TOwner<FState> mState;
+        TOwner<FState> mState;
     };
 
     class AE_RHI_D3D11_API FRhiD3D11Sampler final : public FRhiSampler {
@@ -81,6 +83,6 @@ namespace AltinaEngine::Rhi {
 
     private:
         struct FState;
-        Container::TOwner<FState> mState;
+        TOwner<FState> mState;
     };
 } // namespace AltinaEngine::Rhi

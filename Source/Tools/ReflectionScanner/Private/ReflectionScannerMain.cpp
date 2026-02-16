@@ -37,9 +37,9 @@ namespace {
     using AltinaEngine::Core::Container::FNativeString;
     using AltinaEngine::Core::Container::FNativeStringView;
     using AltinaEngine::Core::Utility::Json::EJsonType;
+    using AltinaEngine::Core::Utility::Json::FindObjectValue;
     using AltinaEngine::Core::Utility::Json::FJsonDocument;
     using AltinaEngine::Core::Utility::Json::FJsonValue;
-    using AltinaEngine::Core::Utility::Json::FindObjectValue;
     using AltinaEngine::Core::Utility::Json::GetBoolValue;
     using AltinaEngine::Core::Utility::Json::GetNumberValue;
     using AltinaEngine::Core::Utility::Json::GetStringValue;
@@ -86,10 +86,10 @@ namespace {
     };
 
     struct ClassRecord {
-        std::string              QualifiedName;
-        std::string              Include;
-        Loc                      Location;
-        bool                     HasClassAnnotation = false;
+        std::string                  QualifiedName;
+        std::string                  Include;
+        Loc                          Location;
+        bool                         HasClassAnnotation = false;
         std::vector<AnnotationEntry> Properties;
         std::vector<AnnotationEntry> Methods;
     };
@@ -106,8 +106,8 @@ namespace {
         std::string              ModuleRoot;
         std::string              GenCpp;
         bool                     ForbidAnnotations = false;
-        bool                     Strict         = false;
-        bool                     Verbose        = false;
+        bool                     Strict            = false;
+        bool                     Verbose           = false;
     };
 
     struct CompileCommand {
@@ -165,14 +165,13 @@ namespace {
     }
 
     static auto NormalizePath(const std::string& path) -> std::string {
-        std::error_code ec;
+        std::error_code       ec;
         std::filesystem::path p(path);
-        auto abs  = std::filesystem::absolute(p, ec);
-        auto norm = ec ? p.lexically_normal() : abs.lexically_normal();
-        std::string result = norm.string();
-        std::transform(result.begin(), result.end(), result.begin(), [](unsigned char ch) {
-            return static_cast<char>(std::tolower(ch));
-        });
+        auto                  abs    = std::filesystem::absolute(p, ec);
+        auto                  norm   = ec ? p.lexically_normal() : abs.lexically_normal();
+        std::string           result = norm.string();
+        std::transform(result.begin(), result.end(), result.begin(),
+            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
         return result;
     }
 
@@ -193,9 +192,8 @@ namespace {
 
     static auto IsHeaderExtension(const std::filesystem::path& path) -> bool {
         std::string ext = path.extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char ch) {
-            return static_cast<char>(std::tolower(ch));
-        });
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
         return ext == ".h" || ext == ".hpp" || ext == ".hh" || ext == ".hxx" || ext == ".inl";
     }
 
@@ -213,15 +211,14 @@ namespace {
         }
 
         std::string generic = p.generic_string();
-        std::string lower = generic;
-        std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char ch) {
-            return static_cast<char>(std::tolower(ch));
-        });
+        std::string lower   = generic;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
 
-        const char* publicTag = "/public/";
+        const char* publicTag  = "/public/";
         const char* privateTag = "/private/";
-        size_t pos = lower.find(publicTag);
-        size_t baseLen = 0;
+        size_t      pos        = lower.find(publicTag);
+        size_t      baseLen    = 0;
         if (pos != std::string::npos) {
             baseLen = std::strlen(publicTag);
         } else {
@@ -306,14 +303,14 @@ namespace {
         if (value.empty()) {
             return std::wstring();
         }
-        int size = MultiByteToWideChar(CP_UTF8, 0, value.data(),
-            static_cast<int>(value.size()), nullptr, 0);
+        int size = MultiByteToWideChar(
+            CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
         if (size <= 0) {
             return std::wstring();
         }
         std::wstring out(static_cast<size_t>(size), L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), out.data(),
-            size);
+        MultiByteToWideChar(
+            CP_UTF8, 0, value.data(), static_cast<int>(value.size()), out.data(), size);
         return out;
     }
 
@@ -321,8 +318,8 @@ namespace {
         if (value.empty()) {
             return std::string();
         }
-        int size = WideCharToMultiByte(CP_UTF8, 0, value.data(),
-            static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+        int size = WideCharToMultiByte(
+            CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
         if (size <= 0) {
             return std::string();
         }
@@ -381,15 +378,15 @@ namespace {
     }
 
     static auto RunProcess(const std::vector<std::string>& args,
-        const std::filesystem::path& workingDir) -> ProcessResult {
-        ProcessResult result;
+        const std::filesystem::path&                       workingDir) -> ProcessResult {
+        ProcessResult       result;
 
-        SECURITY_ATTRIBUTES sa = {};
-        sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-        sa.bInheritHandle = TRUE;
+        SECURITY_ATTRIBUTES sa  = {};
+        sa.nLength              = sizeof(SECURITY_ATTRIBUTES);
+        sa.bInheritHandle       = TRUE;
         sa.lpSecurityDescriptor = nullptr;
 
-        HANDLE readPipe = nullptr;
+        HANDLE readPipe  = nullptr;
         HANDLE writePipe = nullptr;
 
         if (!CreatePipe(&readPipe, &writePipe, &sa, 0)) {
@@ -402,25 +399,16 @@ namespace {
         std::wstring workDir = Utf8ToWide(workingDir.string());
 
         STARTUPINFOW si = {};
-        si.cb = sizeof(STARTUPINFOW);
-        si.dwFlags = STARTF_USESTDHANDLES;
-        si.hStdOutput = writePipe;
-        si.hStdError = writePipe;
-        si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        si.cb           = sizeof(STARTUPINFOW);
+        si.dwFlags      = STARTF_USESTDHANDLES;
+        si.hStdOutput   = writePipe;
+        si.hStdError    = writePipe;
+        si.hStdInput    = GetStdHandle(STD_INPUT_HANDLE);
 
         PROCESS_INFORMATION pi = {};
 
-        BOOL ok = CreateProcessW(
-            nullptr,
-            cmdLine.data(),
-            nullptr,
-            nullptr,
-            TRUE,
-            CREATE_NO_WINDOW,
-            nullptr,
-            workDir.empty() ? nullptr : workDir.c_str(),
-            &si,
-            &pi);
+        BOOL ok = CreateProcessW(nullptr, cmdLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
+            nullptr, workDir.empty() ? nullptr : workDir.c_str(), &si, &pi);
 
         if (!ok) {
             CloseHandle(readPipe);
@@ -431,10 +419,10 @@ namespace {
 
         CloseHandle(writePipe);
 
-        std::string output;
+        std::string     output;
         constexpr DWORD kBufferSize = 4096;
-        char buffer[kBufferSize];
-        DWORD bytesRead = 0;
+        char            buffer[kBufferSize];
+        DWORD           bytesRead = 0;
 
         while (ReadFile(readPipe, buffer, kBufferSize, &bytesRead, nullptr) && bytesRead > 0) {
             output.append(buffer, buffer + bytesRead);
@@ -449,8 +437,8 @@ namespace {
         CloseHandle(readPipe);
 
         result.ExitCode = static_cast<int>(exitCode);
-        result.Output = output;
-        result.Ran = true;
+        result.Output   = output;
+        result.Ran      = true;
         return result;
     }
 
@@ -461,8 +449,8 @@ namespace {
         }
 
         std::wstring wcmd = Utf8ToWide(command);
-        int argc = 0;
-        LPWSTR* argv = CommandLineToArgvW(wcmd.c_str(), &argc);
+        int          argc = 0;
+        LPWSTR*      argv = CommandLineToArgvW(wcmd.c_str(), &argc);
         if (!argv) {
             return args;
         }
@@ -476,7 +464,7 @@ namespace {
     }
 #else
     static auto RunProcess(const std::vector<std::string>& args,
-        const std::filesystem::path& workingDir) -> ProcessResult {
+        const std::filesystem::path&                       workingDir) -> ProcessResult {
         ProcessResult result;
         result.Error = "Process execution not implemented on this platform";
         return result;
@@ -484,8 +472,8 @@ namespace {
 
     static auto SplitCommandLine(const std::string& command) -> std::vector<std::string> {
         std::vector<std::string> args;
-        std::istringstream iss(command);
-        std::string token;
+        std::istringstream       iss(command);
+        std::string              token;
         while (iss >> token) {
             args.push_back(token);
         }
@@ -518,7 +506,8 @@ namespace {
         return input.string();
     }
 
-    static auto GetStringField(const FJsonValue& object, const char* key, std::string& out) -> bool {
+    static auto GetStringField(const FJsonValue& object, const char* key, std::string& out)
+        -> bool {
         const FJsonValue* value = FindObjectValue(object, key);
         if (value == nullptr || value->Type != EJsonType::String) {
             return false;
@@ -552,8 +541,8 @@ namespace {
         return value;
     }
 
-    static auto ParseCompileCommands(const std::string& text, std::vector<CompileCommand>& out,
-        std::string& error) -> bool {
+    static auto ParseCompileCommands(
+        const std::string& text, std::vector<CompileCommand>& out, std::string& error) -> bool {
         FJsonDocument doc;
         if (!doc.Parse(FNativeStringView(text.data(), text.size()))) {
             error = "Failed to parse compile_commands.json: " + ToStdString(doc.GetError());
@@ -600,11 +589,11 @@ namespace {
         return true;
     }
 
-    static auto StripOutputArgs(const std::vector<std::string>& args,
-        const std::string& sourceFile) -> std::vector<std::string> {
+    static auto StripOutputArgs(const std::vector<std::string>& args, const std::string& sourceFile)
+        -> std::vector<std::string> {
         std::vector<std::string> out;
-        bool skipNext = false;
-        std::string sourceNorm = NormalizePath(sourceFile);
+        bool                     skipNext   = false;
+        std::string              sourceNorm = NormalizePath(sourceFile);
 
         for (const auto& arg : args) {
             if (skipNext) {
@@ -653,9 +642,8 @@ namespace {
 
     static auto CompilerMode(const std::string& compiler) -> std::string {
         std::string base = std::filesystem::path(compiler).filename().string();
-        std::transform(base.begin(), base.end(), base.begin(), [](unsigned char ch) {
-            return static_cast<char>(std::tolower(ch));
-        });
+        std::transform(base.begin(), base.end(), base.begin(),
+            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
         if (base.find("clang-cl") != std::string::npos) {
             return "clang-cl";
         }
@@ -669,12 +657,11 @@ namespace {
             return {};
         }
 
-        std::string compiler = ResolveCompiler(options);
-        std::string baseName = std::filesystem::path(compiler).filename().string();
+        std::string compiler  = ResolveCompiler(options);
+        std::string baseName  = std::filesystem::path(compiler).filename().string();
         std::string lowerName = baseName;
-        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), [](unsigned char ch) {
-            return static_cast<char>(std::tolower(ch));
-        });
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
         if (lowerName.find("clang") == std::string::npos) {
             error = "Compiler is not clang/clang-cl. Pass --compiler clang-cl.";
             return {};
@@ -720,13 +707,13 @@ namespace {
             return false;
         }
 
-        char* end = nullptr;
+        char*     end      = nullptr;
         long long intValue = std::strtoll(token.c_str(), &end, 10);
         if (end != token.c_str() && *end == '\0') {
             return static_cast<int64_t>(intValue);
         }
 
-        end = nullptr;
+        end               = nullptr;
         double floatValue = std::strtod(token.c_str(), &end);
         if (end != token.c_str() && *end == '\0') {
             return floatValue;
@@ -737,10 +724,10 @@ namespace {
 
     static auto ParseArgs(const std::string& text, std::vector<ArgPair>& outArgs,
         std::vector<std::string>& errors) -> void {
-        size_t i = 0;
+        size_t       i = 0;
         const size_t n = text.size();
 
-        auto skipWs = [&]() {
+        auto         skipWs = [&]() {
             while (i < n && std::isspace(static_cast<unsigned char>(text[i]))) {
                 ++i;
             }
@@ -752,8 +739,7 @@ namespace {
             }
             size_t start = i;
             ++i;
-            while (i < n
-                && (std::isalnum(static_cast<unsigned char>(text[i])) || text[i] == '_')) {
+            while (i < n && (std::isalnum(static_cast<unsigned char>(text[i])) || text[i] == '_')) {
                 ++i;
             }
             return text.substr(start, i - start);
@@ -825,7 +811,7 @@ namespace {
                 ArgValue value;
                 if (text[i] == '\'' || text[i] == '\"') {
                     char quote = text[i];
-                    value = parseString(quote);
+                    value      = parseString(quote);
                 } else {
                     size_t start = i;
                     while (i < n && text[i] != ',' && text[i] != ')') {
@@ -854,8 +840,8 @@ namespace {
                 ++i;
                 continue;
             }
-            errors.push_back("Unexpected character '" + std::string(1, text[i])
-                + "' at position " + std::to_string(i));
+            errors.push_back("Unexpected character '" + std::string(1, text[i]) + "' at position "
+                + std::to_string(i));
             break;
         }
     }
@@ -866,8 +852,8 @@ namespace {
             return std::nullopt;
         }
 
-        size_t lparen = trimmed.find('(');
-        size_t rparen = trimmed.rfind(')');
+        size_t         lparen = trimmed.find('(');
+        size_t         rparen = trimmed.rfind(')');
         AnnotationInfo info;
         info.Raw = std::string(trimmed);
 
@@ -974,8 +960,8 @@ namespace {
 
     static auto GetFileTextCached(const std::string& path, std::string& out) -> bool {
         static std::unordered_map<std::string, std::string> cache;
-        std::string key = NormalizePath(path);
-        auto it = cache.find(key);
+        std::string                                         key = NormalizePath(path);
+        auto                                                it  = cache.find(key);
         if (it != cache.end()) {
             out = it->second;
             return true;
@@ -993,7 +979,7 @@ namespace {
             return std::nullopt;
         }
         size_t currentLine = 1;
-        size_t offset = 0;
+        size_t offset      = 0;
         while (offset < text.size() && currentLine < static_cast<size_t>(line)) {
             if (text[offset] == '\n') {
                 ++currentLine;
@@ -1004,7 +990,7 @@ namespace {
             return std::nullopt;
         }
         size_t lineStart = offset;
-        size_t pos = lineStart + static_cast<size_t>(col - 1);
+        size_t pos       = lineStart + static_cast<size_t>(col - 1);
         if (pos > text.size()) {
             return std::nullopt;
         }
@@ -1019,8 +1005,8 @@ namespace {
         return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
     }
 
-    static auto TryExtractMacroInvocation(const std::string& text, size_t offset,
-        std::string& macro, std::string& args) -> bool {
+    static auto TryExtractMacroInvocation(
+        const std::string& text, size_t offset, std::string& macro, std::string& args) -> bool {
         size_t i = offset;
         while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) {
             if (text[i] == '\n') {
@@ -1044,9 +1030,9 @@ namespace {
             return false;
         }
         size_t argsStart = i + 1;
-        int depth = 1;
-        bool inString = false;
-        char quote = '\0';
+        int    depth     = 1;
+        bool   inString  = false;
+        char   quote     = '\0';
         for (i = argsStart; i < text.size(); ++i) {
             char ch = text[i];
             if (inString) {
@@ -1061,7 +1047,7 @@ namespace {
             }
             if (ch == '"' || ch == '\'') {
                 inString = true;
-                quote = ch;
+                quote    = ch;
                 continue;
             }
             if (ch == '(') {
@@ -1079,8 +1065,7 @@ namespace {
         return false;
     }
 
-    static auto GetAnnotationTextFromMacro(const FJsonValue& attr)
-        -> std::optional<std::string> {
+    static auto GetAnnotationTextFromMacro(const FJsonValue& attr) -> std::optional<std::string> {
         Loc loc = GetAttrExpansionLoc(attr);
         if (loc.File.empty() || loc.Line <= 0 || loc.Col <= 0) {
             return std::nullopt;
@@ -1144,7 +1129,7 @@ namespace {
     }
 
     static auto GetLoc(const FJsonValue& node) -> Loc {
-        Loc loc;
+        Loc               loc;
         const FJsonValue* locValue = FindObjectValue(node, "loc");
         if (locValue == nullptr || locValue->Type != EJsonType::Object) {
             return loc;
@@ -1165,8 +1150,8 @@ namespace {
         return loc;
     }
 
-    static auto ShouldIncludeNode(const FJsonValue& node, const std::string& currentFile,
-        bool includeHeaders) -> bool {
+    static auto ShouldIncludeNode(
+        const FJsonValue& node, const std::string& currentFile, bool includeHeaders) -> bool {
         bool implicit = false;
         if (GetBoolField(node, "implicit", implicit) && implicit) {
             return false;
@@ -1226,8 +1211,8 @@ namespace {
         }
     }
 
-    static auto WalkAst(const FJsonValue& node, const std::string& currentFile,
-        bool includeHeaders, std::vector<AnnotationEntry>& out, std::vector<std::string>& errors,
+    static auto WalkAst(const FJsonValue& node, const std::string& currentFile, bool includeHeaders,
+        std::vector<AnnotationEntry>& out, std::vector<std::string>& errors,
         const std::string& currentOwnerName, const std::string& currentOwnerQualified,
         const std::string& currentNamespaceQualified) -> void {
         if (node.Type != EJsonType::Object) {
@@ -1238,8 +1223,8 @@ namespace {
         GetStringField(node, "kind", kind);
         std::string declKind = MapDeclKind(kind);
 
-        std::string nextOwnerName = currentOwnerName;
-        std::string nextOwnerQualified = currentOwnerQualified;
+        std::string nextOwnerName          = currentOwnerName;
+        std::string nextOwnerQualified     = currentOwnerQualified;
         std::string nextNamespaceQualified = currentNamespaceQualified;
 
         if (kind == "NamespaceDecl") {
@@ -1303,7 +1288,7 @@ namespace {
                     }
 
                     AnnotationEntry entry;
-                    entry.DeclKind = declKind;
+                    entry.DeclKind     = declKind;
                     entry.DeclNodeKind = kind;
                     GetStringField(node, "name", entry.DeclName);
                     GetStringField(node, "qualifiedName", entry.QualifiedName);
@@ -1315,19 +1300,17 @@ namespace {
                         entry.QualifiedName = currentNamespaceQualified + "::" + entry.DeclName;
                     }
                     if (declKind == "class") {
-                        entry.OwnerName = entry.DeclName;
+                        entry.OwnerName          = entry.DeclName;
                         entry.OwnerQualifiedName = entry.QualifiedName;
                     } else {
-                        entry.OwnerName = currentOwnerName;
+                        entry.OwnerName          = currentOwnerName;
                         entry.OwnerQualifiedName = currentOwnerQualified;
                         if (entry.OwnerQualifiedName.empty()) {
                             entry.Errors.push_back("Missing owning class for annotated member");
                         }
                     }
-                    if (!entry.OwnerQualifiedName.empty()
-                        && !entry.DeclName.empty()
-                        && (entry.QualifiedName.empty()
-                            || entry.QualifiedName == entry.DeclName)) {
+                    if (!entry.OwnerQualifiedName.empty() && !entry.DeclName.empty()
+                        && (entry.QualifiedName.empty() || entry.QualifiedName == entry.DeclName)) {
                         entry.QualifiedName = entry.OwnerQualifiedName + "::" + entry.DeclName;
                     }
                     entry.Location = GetLoc(node);
@@ -1338,17 +1321,17 @@ namespace {
                         }
                     }
                     entry.Annotation = parsed->Raw;
-                    entry.Tag = parsed->Tag;
-                    entry.Args = parsed->Args;
-                    entry.Errors = parsed->Errors;
+                    entry.Tag        = parsed->Tag;
+                    entry.Args       = parsed->Args;
+                    entry.Errors     = parsed->Errors;
 
                     if (!parsed->Tag.empty()) {
                         std::string expected = parsed->Tag;
                         std::transform(expected.begin(), expected.end(), expected.begin(),
                             [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
                         if (expected != declKind) {
-                            entry.Errors.push_back("Annotation kind mismatch: " + parsed->Tag
-                                + " on " + kind);
+                            entry.Errors.push_back(
+                                "Annotation kind mismatch: " + parsed->Tag + " on " + kind);
                         }
                     }
 
@@ -1373,7 +1356,7 @@ namespace {
 
         std::string mode;
         std::string error;
-        auto command = BuildCompilerCommand(entry, options, mode, error);
+        auto        command = BuildCompilerCommand(entry, options, mode, error);
         result.CompilerMode = mode;
 
         if (command.empty()) {
@@ -1393,7 +1376,7 @@ namespace {
             ? std::filesystem::current_path()
             : std::filesystem::path(entry.Directory);
 
-        ProcessResult proc = RunProcess(command, workDir);
+        ProcessResult         proc = RunProcess(command, workDir);
         if (!proc.Ran) {
             result.Errors.push_back(proc.Error);
             return result;
@@ -1437,8 +1420,8 @@ namespace {
         return oss.str();
     }
 
-    static auto AppendError(std::vector<std::string>& errors, const std::string& message,
-        const Loc& loc) -> void {
+    static auto AppendError(
+        std::vector<std::string>& errors, const std::string& message, const Loc& loc) -> void {
         std::string locText = FormatLoc(loc);
         if (!locText.empty()) {
             errors.push_back(message + " (" + locText + ")");
@@ -1452,32 +1435,32 @@ namespace {
         out.reserve(value.size());
         for (unsigned char ch : value) {
             switch (ch) {
-            case '\\':
-                out += "\\\\";
-                break;
-            case '"':
-                out += "\\\"";
-                break;
-            case '\n':
-                out += "\\n";
-                break;
-            case '\r':
-                out += "\\r";
-                break;
-            case '\t':
-                out += "\\t";
-                break;
-            default:
-                if (ch < 0x20) {
-                    const char* hex = "0123456789ABCDEF";
-                    out.push_back('\\');
-                    out.push_back('x');
-                    out.push_back(hex[(ch >> 4) & 0xF]);
-                    out.push_back(hex[ch & 0xF]);
-                } else {
-                    out.push_back(static_cast<char>(ch));
-                }
-                break;
+                case '\\':
+                    out += "\\\\";
+                    break;
+                case '"':
+                    out += "\\\"";
+                    break;
+                case '\n':
+                    out += "\\n";
+                    break;
+                case '\r':
+                    out += "\\r";
+                    break;
+                case '\t':
+                    out += "\\t";
+                    break;
+                default:
+                    if (ch < 0x20) {
+                        const char* hex = "0123456789ABCDEF";
+                        out.push_back('\\');
+                        out.push_back('x');
+                        out.push_back(hex[(ch >> 4) & 0xF]);
+                        out.push_back(hex[ch & 0xF]);
+                    } else {
+                        out.push_back(static_cast<char>(ch));
+                    }
+                    break;
             }
         }
         return out;
@@ -1531,8 +1514,8 @@ namespace {
 
                 if (!options.ModuleRoot.empty()) {
                     if (entry.Location.File.empty()) {
-                        AppendError(outErrors, "Missing source location for annotation",
-                            entry.Location);
+                        AppendError(
+                            outErrors, "Missing source location for annotation", entry.Location);
                         continue;
                     }
                     if (!IsUnderRoot(entry.Location.File, options.ModuleRoot)) {
@@ -1542,8 +1525,8 @@ namespace {
 
                 if (entry.DeclKind == "class") {
                     if (entry.QualifiedName.empty()) {
-                        AppendError(outErrors, "Annotated class has empty qualified name",
-                            entry.Location);
+                        AppendError(
+                            outErrors, "Annotated class has empty qualified name", entry.Location);
                         continue;
                     }
                     auto& record = classes[entry.QualifiedName];
@@ -1551,26 +1534,27 @@ namespace {
                         record.QualifiedName = entry.QualifiedName;
                     }
                     if (record.HasClassAnnotation) {
-                        AppendError(outErrors, "Duplicate class annotation for "
-                            + entry.QualifiedName, entry.Location);
+                        AppendError(outErrors,
+                            "Duplicate class annotation for " + entry.QualifiedName,
+                            entry.Location);
                         continue;
                     }
                     record.HasClassAnnotation = true;
-                    record.Location = entry.Location;
+                    record.Location           = entry.Location;
 
                     std::string include;
                     std::string includeError;
-                    if (!MakeIncludePath(entry.Location.File, options.ModuleRoot, include,
-                            includeError)) {
-                        AppendError(outErrors, includeError + ": " + entry.QualifiedName,
-                            entry.Location);
+                    if (!MakeIncludePath(
+                            entry.Location.File, options.ModuleRoot, include, includeError)) {
+                        AppendError(
+                            outErrors, includeError + ": " + entry.QualifiedName, entry.Location);
                     } else {
                         record.Include = include;
                     }
                 } else if (entry.DeclKind == "property" || entry.DeclKind == "function") {
                     if (entry.OwnerQualifiedName.empty()) {
-                        AppendError(outErrors, "Annotated member missing owning class",
-                            entry.Location);
+                        AppendError(
+                            outErrors, "Annotated member missing owning class", entry.Location);
                         continue;
                     }
                     auto& record = classes[entry.OwnerQualifiedName];
@@ -1593,7 +1577,7 @@ namespace {
             }
         }
 
-        std::set<std::string> includeSet;
+        std::set<std::string>     includeSet;
         std::vector<ClassRecord*> ordered;
         for (auto& pair : classes) {
             ClassRecord& record = pair.second;
@@ -1605,8 +1589,9 @@ namespace {
                     } else if (!record.Methods.empty()) {
                         loc = &record.Methods.front().Location;
                     }
-                    AppendError(outErrors, "Annotated members belong to class without ACLASS: "
-                        + record.QualifiedName, loc ? *loc : record.Location);
+                    AppendError(outErrors,
+                        "Annotated members belong to class without ACLASS: " + record.QualifiedName,
+                        loc ? *loc : record.Location);
                 }
                 continue;
             }
@@ -1620,12 +1605,12 @@ namespace {
         }
 
         std::filesystem::path outPath(options.GenCpp);
-        std::error_code ec;
+        std::error_code       ec;
         if (outPath.has_parent_path()) {
             std::filesystem::create_directories(outPath.parent_path(), ec);
             if (ec) {
-                outErrors.push_back("Failed to create output directory: "
-                    + outPath.parent_path().string());
+                outErrors.push_back(
+                    "Failed to create output directory: " + outPath.parent_path().string());
                 return false;
             }
         }
@@ -1661,12 +1646,14 @@ namespace {
             std::unordered_set<std::string> propNames;
             for (const auto& prop : record->Properties) {
                 if (!propNames.insert(prop.DeclName).second) {
-                    AppendError(outErrors, "Duplicate property annotation for "
-                        + record->QualifiedName + "::" + prop.DeclName, prop.Location);
+                    AppendError(outErrors,
+                        "Duplicate property annotation for " + record->QualifiedName
+                            + "::" + prop.DeclName,
+                        prop.Location);
                     continue;
                 }
                 outFile << "    RegisterPropertyField<&" << typeName << "::" << prop.DeclName
-                    << ">(\"" << EscapeCppString(prop.DeclName) << "\");\n";
+                        << ">(\"" << EscapeCppString(prop.DeclName) << "\");\n";
             }
 
             std::sort(record->Methods.begin(), record->Methods.end(),
@@ -1676,13 +1663,15 @@ namespace {
             std::unordered_set<std::string> methodNames;
             for (const auto& method : record->Methods) {
                 if (!methodNames.insert(method.DeclName).second) {
-                    AppendError(outErrors, "Overloaded or duplicate method annotations "
-                        "are not supported: " + record->QualifiedName + "::" + method.DeclName,
+                    AppendError(outErrors,
+                        "Overloaded or duplicate method annotations "
+                        "are not supported: "
+                            + record->QualifiedName + "::" + method.DeclName,
                         method.Location);
                     continue;
                 }
                 outFile << "    RegisterMethodField<&" << typeName << "::" << method.DeclName
-                    << ">(\"" << EscapeCppString(method.DeclName) << "\");\n";
+                        << ">(\"" << EscapeCppString(method.DeclName) << "\");\n";
             }
         }
 
@@ -1719,8 +1708,7 @@ namespace {
                 if (name.empty()) {
                     name = entry.Annotation;
                 }
-                AppendError(outErrors, "Forbidden reflection annotation: " + name,
-                    entry.Location);
+                AppendError(outErrors, "Forbidden reflection annotation: " + name, entry.Location);
                 ok = false;
             }
         }
@@ -1731,35 +1719,35 @@ namespace {
         os << '"';
         for (unsigned char ch : value) {
             switch (ch) {
-            case '"':
-                os << "\\\"";
-                break;
-            case '\\':
-                os << "\\\\";
-                break;
-            case '\b':
-                os << "\\b";
-                break;
-            case '\f':
-                os << "\\f";
-                break;
-            case '\n':
-                os << "\\n";
-                break;
-            case '\r':
-                os << "\\r";
-                break;
-            case '\t':
-                os << "\\t";
-                break;
-            default:
-                if (ch < 0x20) {
-                    const char* hex = "0123456789ABCDEF";
-                    os << "\\u00" << hex[(ch >> 4) & 0xF] << hex[ch & 0xF];
-                } else {
-                    os << ch;
-                }
-                break;
+                case '"':
+                    os << "\\\"";
+                    break;
+                case '\\':
+                    os << "\\\\";
+                    break;
+                case '\b':
+                    os << "\\b";
+                    break;
+                case '\f':
+                    os << "\\f";
+                    break;
+                case '\n':
+                    os << "\\n";
+                    break;
+                case '\r':
+                    os << "\\r";
+                    break;
+                case '\t':
+                    os << "\\t";
+                    break;
+                default:
+                    if (ch < 0x20) {
+                        const char* hex = "0123456789ABCDEF";
+                        os << "\\u00" << hex[(ch >> 4) & 0xF] << hex[ch & 0xF];
+                    } else {
+                        os << ch;
+                    }
+                    break;
             }
         }
         os << '"';
@@ -1783,8 +1771,8 @@ namespace {
         }
     }
 
-    static auto WriteStringArray(std::ostream& os, const std::vector<std::string>& values,
-        int indent) -> void {
+    static auto WriteStringArray(
+        std::ostream& os, const std::vector<std::string>& values, int indent) -> void {
         os << '[';
         if (!values.empty()) {
             os << '\n';
@@ -2060,7 +2048,7 @@ int main(int argc, char** argv) {
     }
 
     std::vector<CompileCommand> commands;
-    std::string error;
+    std::string                 error;
     if (!ParseCompileCommands(ccText, commands, error)) {
         std::cerr << error << "\n";
         return 1;
@@ -2112,7 +2100,7 @@ int main(int argc, char** argv) {
     }
 
     std::vector<std::string> genErrors;
-    bool genOk = GenerateCpp(options, results, genErrors);
+    bool                     genOk = GenerateCpp(options, results, genErrors);
     if (!genErrors.empty()) {
         for (const auto& err : genErrors) {
             std::cerr << "[refl-gen] " << err << "\n";
@@ -2120,7 +2108,7 @@ int main(int argc, char** argv) {
     }
 
     std::vector<std::string> forbidErrors;
-    bool forbidOk = CheckForbiddenAnnotations(options, results, forbidErrors);
+    bool                     forbidOk = CheckForbiddenAnnotations(options, results, forbidErrors);
     if (!forbidErrors.empty()) {
         for (const auto& err : forbidErrors) {
             std::cerr << "[refl-forbid] " << err << "\n";

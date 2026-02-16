@@ -8,6 +8,7 @@
 #include "Container/Vector.h"
 #include "Types/Aliases.h"
 
+using AltinaEngine::Core::Container::THashMap;
 namespace AltinaEngine::Shader {
     namespace Container = Core::Container;
     class AE_SHADER_API FShaderPropertyBag {
@@ -76,7 +77,7 @@ namespace AltinaEngine::Shader {
             auto operator()(const FString& a, const FString& b) const noexcept -> bool;
         };
 
-        using FPropertyMap = Container::THashMap<FString, FPropertyDesc, FStringHash, FStringEqual>;
+        using FPropertyMap = THashMap<FString, FPropertyDesc, FStringHash, FStringEqual>;
 
         FString      mName;
         u32          mSizeBytes = 0U;

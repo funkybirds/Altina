@@ -6,6 +6,9 @@
 
 #include <limits>
 
+using AltinaEngine::Forward;
+using AltinaEngine::Move;
+using AltinaEngine::Core::Container::DestroyPolymorphic;
 namespace AltinaEngine::Asset {
     namespace Container = Core::Container;
     namespace {
@@ -83,17 +86,17 @@ namespace AltinaEngine::Asset {
 
                 try {
                     TAllocatorTraits<TAllocator<TDerived>>::Construct(
-                        allocator, ptr, AltinaEngine::Forward<Args>(args)...);
+                        allocator, ptr, Forward<Args>(args)...);
                 } catch (...) {
                     TAllocatorTraits<TAllocator<TDerived>>::Deallocate(allocator, ptr, 1);
                     return {};
                 }
             } else {
-                ptr = new TDerived(AltinaEngine::Forward<Args>(args)...); // NOLINT
+                ptr = new TDerived(Forward<Args>(args)...); // NOLINT
             }
 
             return TShared<IAsset>(
-                ptr, TPolymorphicDeleter<IAsset>(&Container::DestroyPolymorphic<IAsset, TDerived>));
+                ptr, TPolymorphicDeleter<IAsset>(&DestroyPolymorphic<IAsset, TDerived>));
         }
     } // namespace
 
@@ -205,8 +208,8 @@ namespace AltinaEngine::Asset {
         runtimeDesc.Flags        = blobDesc.Flags;
         runtimeDesc.AlphaCutoff  = blobDesc.AlphaCutoff;
 
-        return MakeSharedAsset<FMaterialAsset>(runtimeDesc, AltinaEngine::Move(scalars),
-            AltinaEngine::Move(vectors), AltinaEngine::Move(textures));
+        return MakeSharedAsset<FMaterialAsset>(
+            runtimeDesc, Move(scalars), Move(vectors), Move(textures));
     }
 
 } // namespace AltinaEngine::Asset

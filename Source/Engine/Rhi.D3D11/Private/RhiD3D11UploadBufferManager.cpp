@@ -23,6 +23,7 @@
     #include <wrl/client.h>
 #endif
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
     namespace {
         constexpr u64      kConstantBufferAlign    = 16ULL;
@@ -103,7 +104,7 @@ namespace AltinaEngine::Rhi {
                  FD3D11BufferBacking>(FD3D11BufferBacking(nativeBuffer, mContext, mPageSizeBytes));
             page.mExecutor.InitPolicyFromBacking();
 
-            mPages[i] = AltinaEngine::Move(page);
+            mPages[i] = Move(page);
         }
     }
 

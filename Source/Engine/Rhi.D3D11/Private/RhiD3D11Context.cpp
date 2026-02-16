@@ -28,6 +28,11 @@
 
 #include <type_traits>
 
+using AltinaEngine::Forward;
+using AltinaEngine::Move;
+using AltinaEngine::Core::Container::TAllocator;
+using AltinaEngine::Core::Container::TAllocatorTraits;
+using AltinaEngine::Core::Container::TVector;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::MakeUnique;
@@ -45,8 +50,8 @@ namespace AltinaEngine::Rhi {
     namespace {
         template <typename TBase, typename TDerived, typename... Args>
         auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
-            using TAllocatorType = Container::TAllocator<TDerived>;
-            using Traits         = Container::TAllocatorTraits<TAllocatorType>;
+            using TAllocatorType = TAllocator<TDerived>;
+            using Traits         = TAllocatorTraits<TAllocatorType>;
 
             static_assert(std::is_base_of_v<TBase, TDerived>,
                 "MakeSharedAs requires TDerived to derive from TBase.");
@@ -54,7 +59,7 @@ namespace AltinaEngine::Rhi {
             TAllocatorType allocator;
             TDerived*      ptr = Traits::Allocate(allocator, 1);
             try {
-                Traits::Construct(allocator, ptr, AltinaEngine::Forward<Args>(args)...);
+                Traits::Construct(allocator, ptr, Forward<Args>(args)...);
             } catch (...) {
                 Traits::Deallocate(allocator, ptr, 1);
                 throw;
@@ -117,7 +122,7 @@ namespace AltinaEngine::Rhi {
                 return;
             }
 
-            Container::TVector<char> buffer;
+            TVector<char> buffer;
             buffer.Resize(static_cast<usize>(required));
             const int written = WideCharToMultiByte(
                 CP_UTF8, 0, name, -1, buffer.Data(), required, nullptr, nullptr);
@@ -193,7 +198,7 @@ namespace AltinaEngine::Rhi {
         class FRhiD3D11Adapter final : public FRhiAdapter {
         public:
             FRhiD3D11Adapter(const FRhiAdapterDesc& desc, ComPtr<IDXGIAdapter1> adapter)
-                : FRhiAdapter(desc), mAdapter(AltinaEngine::Move(adapter)) {}
+                : FRhiAdapter(desc), mAdapter(Move(adapter)) {}
 
             [[nodiscard]] auto GetAdapter() const noexcept -> IDXGIAdapter1* {
                 return mAdapter.Get();

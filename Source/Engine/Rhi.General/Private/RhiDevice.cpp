@@ -4,6 +4,7 @@
 
 #include "Types/Traits.h"
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
 
     FRhiDevice::FRhiDevice(const FRhiDeviceDesc& desc, const FRhiAdapterDesc& adapterDesc)
@@ -106,15 +107,15 @@ namespace AltinaEngine::Rhi {
     void FRhiDevice::RegisterQueue(ERhiQueueType type, FRhiQueueRef queue) {
         for (auto& entry : mQueues) {
             if (entry.mType == type) {
-                entry.mQueue = AltinaEngine::Move(queue);
+                entry.mQueue = Move(queue);
                 return;
             }
         }
 
         FRhiQueueEntry entry;
         entry.mType  = type;
-        entry.mQueue = AltinaEngine::Move(queue);
-        mQueues.PushBack(AltinaEngine::Move(entry));
+        entry.mQueue = Move(queue);
+        mQueues.PushBack(Move(entry));
     }
 
     void FRhiDevice::ProcessResourceDeleteQueue(u64 completedSerial) {

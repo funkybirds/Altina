@@ -5,8 +5,9 @@
 
 #include <cmath>
 
-using namespace AltinaEngine::Core::Math;
 using AltinaEngine::f32;
+
+using namespace AltinaEngine::Core::Math;
 
 namespace {
 
@@ -19,10 +20,9 @@ namespace {
     }
 
     bool QuatEquivalent(const FQuaternion& a, const FQuaternion& b, f32 eps) {
-        const FQuaternion na = a.Normalized();
-        const FQuaternion nb = b.Normalized();
-        const f32         dot =
-            na.x * nb.x + na.y * nb.y + na.z * nb.z + na.w * nb.w;
+        const FQuaternion na  = a.Normalized();
+        const FQuaternion nb  = b.Normalized();
+        const f32         dot = na.x * nb.x + na.y * nb.y + na.z * nb.z + na.w * nb.w;
         return std::fabs(1.0f - std::fabs(dot)) <= eps;
     }
 
@@ -48,14 +48,13 @@ TEST_CASE("Math Rotation - Euler round-trip extremes") {
         FEulerRotator(kHalfPiF, 1.0f, -0.5f),
         FEulerRotator(-kHalfPiF, -1.0f, 0.5f),
         FEulerRotator(kPiF - 1e-3f, kPiF, -kPiF + 2e-3f),
-        FEulerRotator(kTwoPiF * 3.0f + 0.25f, -kTwoPiF * 2.0f - 0.75f,
-            kTwoPiF * 4.0f + 1.0f),
+        FEulerRotator(kTwoPiF * 3.0f + 0.25f, -kTwoPiF * 2.0f - 0.75f, kTwoPiF * 4.0f + 1.0f),
     };
 
     for (const auto& input : cases) {
-        const FQuaternion  q = input.ToQuaternion();
+        const FQuaternion   q      = input.ToQuaternion();
         const FEulerRotator output = FEulerRotator::FromQuaternion(q);
-        const FQuaternion  q2 = output.ToQuaternion();
+        const FQuaternion   q2     = output.ToQuaternion();
         REQUIRE(QuatEquivalent(q, q2, 1e-4f));
 
         REQUIRE(std::isfinite(output.pitch));

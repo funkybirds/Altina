@@ -23,16 +23,11 @@ namespace AltinaEngine::GameScene {
         template <typename T> [[nodiscard]] auto Get() const -> TComponentRef<T>;
         template <typename T> void               Remove();
 
-        void               SetActive(bool active);
-        [[nodiscard]] auto IsActive() const -> bool;
+        void                                     SetActive(bool active);
+        [[nodiscard]] auto                       IsActive() const -> bool;
 
     private:
         FWorld*       mWorld = nullptr;
         FGameObjectId mId{};
     };
 } // namespace AltinaEngine::GameScene
-
-
-
-
-

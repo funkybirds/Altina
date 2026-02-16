@@ -9,6 +9,7 @@
 #include "Types/NonCopyable.h"
 #include "Types/Traits.h"
 
+using AltinaEngine::Forward;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::FStringView;
@@ -93,7 +94,7 @@ namespace AltinaEngine::Rhi {
 
         template <typename TResource, typename... Args>
         auto MakeResource(Args&&... args) -> TCountRef<TResource> {
-            return AdoptResource(new TResource(AltinaEngine::Forward<Args>(args)...));
+            return AdoptResource(new TResource(Forward<Args>(args)...));
         }
 
     private:

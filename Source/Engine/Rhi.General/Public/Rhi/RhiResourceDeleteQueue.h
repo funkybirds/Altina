@@ -4,6 +4,7 @@
 #include "Container/Vector.h"
 #include "Types/NonCopyable.h"
 
+using AltinaEngine::Core::Container::TVector;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     class FRhiResource;
@@ -22,7 +23,7 @@ namespace AltinaEngine::Rhi {
             u64           mSerial   = 0ULL;
         };
 
-        Container::TVector<FEntry> mEntries;
+        TVector<FEntry> mEntries;
     };
 
 } // namespace AltinaEngine::Rhi

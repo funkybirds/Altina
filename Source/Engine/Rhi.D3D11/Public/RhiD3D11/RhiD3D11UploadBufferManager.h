@@ -8,6 +8,8 @@
 #include "Memory/RingAllocatorPolicy.h"
 #include "RhiD3D11/RhiD3D11BufferBacking.h"
 
+using AltinaEngine::Core::Container::TVector;
+
 struct ID3D11DeviceContext;
 
 namespace AltinaEngine::Rhi {
@@ -72,16 +74,16 @@ namespace AltinaEngine::Rhi {
         auto WriteToBuffer(FRhiBuffer* buffer, u64 bufferSizeBytes, const void* data, u64 sizeBytes,
             u64 dstOffset) -> bool;
 
-        FRhiD3D11Device*                        mDevice  = nullptr;
-        ::ID3D11DeviceContext*                  mContext = nullptr;
-        Container::TVector<FPage>               mPages;
-        Container::TVector<FConstantBufferSlot> mConstantPool;
-        u64                                     mPageSizeBytes                       = 0ULL;
-        u64                                     mAlignmentBytes                      = 16ULL;
-        u64                                     mFrameTag                            = 0ULL;
-        u32                                     mPageIndex                           = 0U;
-        bool                                    mAllowConstantBufferSuballocation    = false;
-        bool                                    mSupportsConstantBufferSuballocation = false;
-        bool                                    mPageSupportsConstant                = false;
+        FRhiD3D11Device*             mDevice  = nullptr;
+        ::ID3D11DeviceContext*       mContext = nullptr;
+        TVector<FPage>               mPages;
+        TVector<FConstantBufferSlot> mConstantPool;
+        u64                          mPageSizeBytes                       = 0ULL;
+        u64                          mAlignmentBytes                      = 16ULL;
+        u64                          mFrameTag                            = 0ULL;
+        u32                          mPageIndex                           = 0U;
+        bool                         mAllowConstantBufferSuballocation    = false;
+        bool                         mSupportsConstantBufferSuballocation = false;
+        bool                         mPageSupportsConstant                = false;
     };
 } // namespace AltinaEngine::Rhi

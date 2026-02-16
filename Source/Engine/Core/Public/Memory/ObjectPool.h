@@ -7,6 +7,9 @@
 
 #include <new>
 
+using AltinaEngine::Forward;
+using AltinaEngine::Core::Container::TAllocator;
+using AltinaEngine::Core::Container::TAllocatorTraits;
 namespace AltinaEngine::Core::Memory {
     namespace Container = Core::Container;
     namespace Detail {
@@ -61,7 +64,7 @@ namespace AltinaEngine::Core::Memory {
         template <typename, template <typename, typename> class, typename> friend class TObjectPool;
     };
 
-    template <typename T, typename TAllocator = Container::TAllocator<T>>
+    template <typename T, typename TAllocator = TAllocator<T>>
     class TSingleThreadedObjectPoolPolicy {
     public:
         using TValueType = T;
@@ -148,7 +151,7 @@ namespace AltinaEngine::Core::Memory {
         };
 
         using FChunkAllocator       = typename FAllocator::template Rebind<FChunk>::TOther;
-        using FChunkAllocatorTraits = Container::TAllocatorTraits<FChunkAllocator>;
+        using FChunkAllocatorTraits = TAllocatorTraits<FChunkAllocator>;
 
         [[nodiscard]] auto AddChunk() -> bool {
             FChunk* chunk = FChunkAllocatorTraits::Allocate(mChunkAllocator, 1);
@@ -184,8 +187,7 @@ namespace AltinaEngine::Core::Memory {
         FChunkAllocator mChunkAllocator{};
     };
 
-    template <typename T, typename TAllocator = Container::TAllocator<T>>
-    class TThreadSafeObjectPoolPolicy {
+    template <typename T, typename TAllocator = TAllocator<T>> class TThreadSafeObjectPoolPolicy {
     public:
         using TValueType   = T;
         using FAllocator   = TAllocator;
@@ -230,7 +232,7 @@ namespace AltinaEngine::Core::Memory {
     };
 
     template <typename T, template <typename, typename> class TPolicy = TThreadSafeObjectPoolPolicy,
-        typename TAllocator = Container::TAllocator<T>>
+        typename TAllocator = TAllocator<T>>
     class TObjectPool {
     public:
         using TValueType = T;
@@ -255,7 +257,7 @@ namespace AltinaEngine::Core::Memory {
                 return {};
             }
 
-            T* obj = new (mem) T(AltinaEngine::Forward<Args>(args)...);
+            T* obj = new (mem) T(Forward<Args>(args)...);
             return FHandle(obj);
         }
 
@@ -280,9 +282,9 @@ namespace AltinaEngine::Core::Memory {
         FPolicy mPolicy{};
     };
 
-    template <typename T, typename TAllocator = Container::TAllocator<T>>
+    template <typename T, typename TAllocator = TAllocator<T>>
     using TThreadSafeObjectPool = TObjectPool<T, TThreadSafeObjectPoolPolicy, TAllocator>;
 
-    template <typename T, typename TAllocator = Container::TAllocator<T>>
+    template <typename T, typename TAllocator = TAllocator<T>>
     using TSingleThreadedObjectPool = TObjectPool<T, TSingleThreadedObjectPoolPolicy, TAllocator>;
 } // namespace AltinaEngine::Core::Memory

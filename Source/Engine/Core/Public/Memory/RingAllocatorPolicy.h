@@ -3,6 +3,7 @@
 #include "Container/Deque.h"
 #include "Types/Aliases.h"
 
+using AltinaEngine::Core::Container::TDeque;
 namespace AltinaEngine::Core::Memory {
     namespace Container = Core::Container;
     struct FRingAllocation {
@@ -104,9 +105,9 @@ namespace AltinaEngine::Core::Memory {
             return allocation;
         }
 
-        u64                            mCapacity = 0ULL;
-        u64                            mHead     = 0ULL;
-        u64                            mTail     = 0ULL;
-        Container::TDeque<FQueueEntry> mQueue;
+        u64                 mCapacity = 0ULL;
+        u64                 mHead     = 0ULL;
+        u64                 mTail     = 0ULL;
+        TDeque<FQueueEntry> mQueue;
     };
 } // namespace AltinaEngine::Core::Memory

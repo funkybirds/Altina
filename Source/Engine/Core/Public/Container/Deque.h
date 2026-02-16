@@ -2,6 +2,8 @@
 
 #include "Allocator.h"
 
+using AltinaEngine::Forward;
+using AltinaEngine::Move;
 namespace AltinaEngine::Core::Container {
 
     /**
@@ -81,7 +83,7 @@ namespace AltinaEngine::Core::Container {
             EnsureCapacityForOneMore();
             TSizeType idx = (mHead + mSize) % mCapacity;
             TAllocatorTraits<TAllocatorType>::Construct(
-                mAllocator, mData + idx, AltinaEngine::Forward<TValueType>(v));
+                mAllocator, mData + idx, Forward<TValueType>(v));
             ++mSize;
         }
 
@@ -96,7 +98,7 @@ namespace AltinaEngine::Core::Container {
             EnsureCapacityForOneMore();
             mHead = (mHead + mCapacity - 1) % mCapacity;
             TAllocatorTraits<TAllocatorType>::Construct(
-                mAllocator, mData + mHead, AltinaEngine::Forward<TValueType>(v));
+                mAllocator, mData + mHead, Forward<TValueType>(v));
             ++mSize;
         }
 
@@ -155,7 +157,7 @@ namespace AltinaEngine::Core::Container {
             for (TSizeType i = 0; i < mSize; ++i) {
                 TSizeType oldIdx = (mHead + i) % (mCapacity == 0 ? 1 : mCapacity);
                 TAllocatorTraits<TAllocatorType>::Construct(
-                    mAllocator, newData + i, AltinaEngine::Move(*(mData + oldIdx)));
+                    mAllocator, newData + i, Move(*(mData + oldIdx)));
                 if (mData)
                     TAllocatorTraits<TAllocatorType>::Destroy(mAllocator, mData + oldIdx);
             }

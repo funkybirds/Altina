@@ -4,6 +4,8 @@
 #include "Rhi/RhiShader.h"
 #include "Container/SmartPtr.h"
 
+using AltinaEngine::Core::Container::TOwner;
+
 struct ID3D11DeviceChild;
 struct ID3D11VertexShader;
 struct ID3D11PixelShader;
@@ -35,7 +37,7 @@ namespace AltinaEngine::Rhi {
 
     private:
         struct FState;
-        Container::TOwner<FState> mState;
+        TOwner<FState> mState;
     };
 
 } // namespace AltinaEngine::Rhi

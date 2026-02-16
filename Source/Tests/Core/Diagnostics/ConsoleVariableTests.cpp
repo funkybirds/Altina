@@ -10,31 +10,31 @@ TEST_CASE("ConsoleVariable: basic register and parsing") {
     REQUIRE(v);
 
     // Lookup should return same pointer
-    FConsoleVariable* f = FConsoleVariable::Find(TEXT("test.int"));
+    FConsoleVariable* f = FConsoleVariable::Find(FString(TEXT("test.int")));
     REQUIRE(f == v);
 
     // Parsing
-    REQUIRE_EQ(v->GetInt(), 123);
-    REQUIRE_CLOSE(v->GetFloat(), 123.0f, 0.001f);
-    v->SetFromString(TEXT("456"));
-    REQUIRE_EQ(v->GetInt(), 456);
+    REQUIRE_EQ(v->GetValue<int>(), 123);
+    REQUIRE_CLOSE(v->GetValue<float>(), 123.0f, 0.001f);
+    v->SetFromString(FString(TEXT("456")));
+    REQUIRE_EQ(v->GetValue<int>(), 456);
 
     // Float parsing
     FConsoleVariable* fvar = FConsoleVariable::Register(TEXT("test.float"), 1.0f);
     REQUIRE(fvar);
-    fvar->SetFromString(TEXT("3.14"));
-    REQUIRE_CLOSE(fvar->GetFloat(), 3.14f, 0.01f);
+    fvar->SetFromString(FString(TEXT("3.14")));
+    REQUIRE_CLOSE(fvar->GetValue<float>(), 3.14f, 0.01f);
 
     // Boolean parsing
     FConsoleVariable* bvar = FConsoleVariable::Register(TEXT("test.bool"), false);
     REQUIRE(bvar);
-    bvar->SetFromString(TEXT("true"));
-    REQUIRE(bvar->GetBool());
-    bvar->SetFromString(TEXT("no"));
-    REQUIRE(!bvar->GetBool());
+    bvar->SetFromString(FString(TEXT("true")));
+    REQUIRE(bvar->GetValue<bool>());
+    bvar->SetFromString(FString(TEXT("no")));
+    REQUIRE(!bvar->GetValue<bool>());
 
     // String parsing
-    FConsoleVariable* svar = FConsoleVariable::Register(TEXT("test.str"), TEXT("hello"));
+    FConsoleVariable* svar = FConsoleVariable::Register(TEXT("test.str"), FString(TEXT("hello")));
     REQUIRE(svar);
     auto view = svar->GetString().ToView();
     REQUIRE_EQ(view.Length(), 5U);

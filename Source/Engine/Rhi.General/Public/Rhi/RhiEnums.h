@@ -3,6 +3,7 @@
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
 
+using AltinaEngine::CEnum;
 namespace AltinaEngine::Rhi {
 
     enum class ERhiBackend : u8 {
@@ -254,7 +255,7 @@ namespace AltinaEngine::Rhi {
     }
 
     template <typename T>
-        requires AltinaEngine::CEnum<T>
+        requires CEnum<T>
     [[nodiscard]] constexpr auto HasAnyFlags(T value, T flags) noexcept -> bool {
         return (ToUnderlying(value) & ToUnderlying(flags)) != 0;
     }

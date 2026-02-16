@@ -54,8 +54,3 @@ namespace AltinaEngine::GameScene {
         }
     }
 } // namespace AltinaEngine::GameScene
-
-
-
-
-

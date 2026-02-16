@@ -5,6 +5,7 @@
 #include "Container/SmartPtr.h"
 #include "Container/Vector.h"
 
+using AltinaEngine::Core::Container::TOwner;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::TShared;
@@ -29,7 +30,7 @@ namespace AltinaEngine::Rhi {
             -> TShared<FRhiDevice> override;
 
     private:
-        Container::TOwner<FRhiD3D11ContextState> mState;
+        TOwner<FRhiD3D11ContextState> mState;
     };
 
 } // namespace AltinaEngine::Rhi

@@ -12,6 +12,8 @@
 #include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiPipelineLayout.h"
 
+using AltinaEngine::Core::Container::TShared;
+using AltinaEngine::Core::Container::TVector;
 namespace {
     namespace Container = AltinaEngine::Core::Container;
     using AltinaEngine::Rhi::ERhiAdapterType;
@@ -81,8 +83,7 @@ namespace {
         return false;
     }
 
-    auto CreateMockDevice(FRhiMockContext& context)
-        -> Container::TShared<AltinaEngine::Rhi::FRhiDevice> {
+    auto CreateMockDevice(FRhiMockContext& context) -> TShared<AltinaEngine::Rhi::FRhiDevice> {
         FRhiAdapterDesc adapter{};
         adapter.mName.Assign(TEXT("Mock GPU"));
         adapter.mType     = ERhiAdapterType::Discrete;
@@ -94,9 +95,9 @@ namespace {
         return device;
     }
 
-    auto BuildPipelineLayoutFromResult(AltinaEngine::Rhi::FRhiDevice&  device,
-        const FShaderCompileResult&                                    result,
-        Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef>& outLayouts)
+    auto BuildPipelineLayoutFromResult(AltinaEngine::Rhi::FRhiDevice& device,
+        const FShaderCompileResult&                                   result,
+        TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef>&           outLayouts)
         -> AltinaEngine::Rhi::FRhiPipelineLayoutRef {
         auto pipelineDesc = result.mRhiLayout.mPipelineLayout;
         pipelineDesc.mBindGroupLayouts.Clear();
@@ -330,9 +331,9 @@ TEST_CASE("ShaderCompiler.Slang.VulkanAutoBinding") {
     REQUIRE(result.mSucceeded);
     REQUIRE(!result.mBytecode.IsEmpty());
 
-    FRhiMockContext context;
-    auto            device = CreateMockDevice(context);
-    Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
+    FRhiMockContext                                    context;
+    auto                                               device = CreateMockDevice(context);
+    TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
     BuildPipelineLayoutFromResult(*device, result, layouts);
 
     auto FindResource =
@@ -403,9 +404,9 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX12") {
     REQUIRE(result.mSucceeded);
     REQUIRE(!result.mBytecode.IsEmpty());
 
-    FRhiMockContext context;
-    auto            device = CreateMockDevice(context);
-    Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
+    FRhiMockContext                                    context;
+    auto                                               device = CreateMockDevice(context);
+    TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
     BuildPipelineLayoutFromResult(*device, result, layouts);
 
     auto FindResource =
@@ -477,9 +478,9 @@ TEST_CASE("ShaderCompiler.DXC.AutoBindingDX11") {
     REQUIRE(result.mSucceeded);
     REQUIRE(!result.mBytecode.IsEmpty());
 
-    FRhiMockContext context;
-    auto            device = CreateMockDevice(context);
-    Container::TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
+    FRhiMockContext                                    context;
+    auto                                               device = CreateMockDevice(context);
+    TVector<AltinaEngine::Rhi::FRhiBindGroupLayoutRef> layouts;
     BuildPipelineLayoutFromResult(*device, result, layouts);
 
     auto FindResource =

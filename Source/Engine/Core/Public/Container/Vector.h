@@ -8,6 +8,7 @@
 #include "../Types/Aliases.h"
 #include "Allocator.h"
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Core::Container {
 
     // Dynamic array similar to std::vector, using the engine allocator.
@@ -75,7 +76,7 @@ namespace AltinaEngine::Core::Container {
             : mData(other.mData)
             , mSize(other.mSize)
             , mCapacity(other.mCapacity)
-            , mAllocator(AltinaEngine::Move(other.mAllocator)) {
+            , mAllocator(Move(other.mAllocator)) {
             other.mData     = nullptr;
             other.mSize     = 0;
             other.mCapacity = 0;
@@ -113,7 +114,7 @@ namespace AltinaEngine::Core::Container {
             mData      = other.mData;
             mSize      = other.mSize;
             mCapacity  = other.mCapacity;
-            mAllocator = AltinaEngine::Move(other.mAllocator);
+            mAllocator = Move(other.mAllocator);
 
             other.mData     = nullptr;
             other.mSize     = 0;
@@ -184,7 +185,7 @@ namespace AltinaEngine::Core::Container {
                 mAllocator.Allocate(static_cast<typename TAllocatorType::TSizeType>(newCapacity));
 
             for (TSizeType i = 0; i < mSize; ++i) {
-                mAllocator.Construct(newData + i, AltinaEngine::Move(mData[i]));
+                mAllocator.Construct(newData + i, Move(mData[i]));
                 mAllocator.Destroy(mData + i);
             }
 
@@ -233,7 +234,7 @@ namespace AltinaEngine::Core::Container {
 
         void PushBack(TValueType&& value) {
             EnsureCapacityForOneMore();
-            mAllocator.Construct(mData + mSize, AltinaEngine::Move(value));
+            mAllocator.Construct(mData + mSize, Move(value));
             ++mSize;
         }
 

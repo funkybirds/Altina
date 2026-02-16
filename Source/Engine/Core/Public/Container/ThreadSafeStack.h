@@ -3,6 +3,7 @@
 #include "Stack.h"
 #include "../Threading/Mutex.h"
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Core::Container {
 
     template <typename T, typename C = TDeque<T>> class TThreadSafeStack {
@@ -27,7 +28,7 @@ namespace AltinaEngine::Core::Container {
 
         void Push(TValueType&& v) {
             Threading::FScopedLock lock(mMutex);
-            mStack.Push(AltinaEngine::Move(v));
+            mStack.Push(Move(v));
         }
 
         void Pop() {

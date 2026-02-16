@@ -3,13 +3,13 @@
 #include "Engine/GameScene/World.h"
 
 namespace {
+    using AltinaEngine::u32;
+    using AltinaEngine::GameScene::FComponent;
     using AltinaEngine::GameScene::FComponentId;
     using AltinaEngine::GameScene::FComponentTypeHash;
     using AltinaEngine::GameScene::FGameObjectId;
     using AltinaEngine::GameScene::FWorld;
     using AltinaEngine::GameScene::GetComponentTypeHash;
-    using AltinaEngine::GameScene::FComponent;
-    using AltinaEngine::u32;
 
     struct FTestComponent final : public FComponent {
         static int sCreateCount;
@@ -17,12 +17,12 @@ namespace {
 
         int        mValue = 0;
 
-        void OnCreate() override { ++sCreateCount; }
-        void OnDestroy() override { ++sDestroyCount; }
+        void       OnCreate() override { ++sCreateCount; }
+        void       OnDestroy() override { ++sDestroyCount; }
     };
 
-    int FTestComponent::sCreateCount  = 0;
-    int FTestComponent::sDestroyCount = 0;
+    int  FTestComponent::sCreateCount  = 0;
+    int  FTestComponent::sDestroyCount = 0;
 
     void ResetCounters() {
         FTestComponent::sCreateCount  = 0;
@@ -31,7 +31,7 @@ namespace {
 } // namespace
 
 TEST_CASE("GameScene.World.GameObjectId.GenerationAndReuse") {
-    FWorld world;
+    FWorld              world;
 
     const FGameObjectId first = world.CreateGameObject();
     REQUIRE(first.IsValid());
@@ -104,7 +104,3 @@ TEST_CASE("GameScene.World.DestroyGameObjectDestroysComponents") {
     REQUIRE(!world.IsAlive(compId));
     REQUIRE_EQ(FTestComponent::sDestroyCount, 1);
 }
-
-
-
-

@@ -46,6 +46,7 @@
 #include <type_traits>
 #include <limits>
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::TVector;
@@ -130,7 +131,7 @@ namespace AltinaEngine::Rhi {
 
     FRhiD3D11CommandContext::FRhiD3D11CommandContext(
         const FRhiCommandContextDesc& desc, ID3D11Device* device, FRhiCommandListRef commandList)
-        : FRhiCommandContext(desc), mCommandList(AltinaEngine::Move(commandList)) {
+        : FRhiCommandContext(desc), mCommandList(Move(commandList)) {
         mState = new FState{};
 #if AE_PLATFORM_WIN
         if (mState && (device != nullptr)) {
@@ -155,7 +156,7 @@ namespace AltinaEngine::Rhi {
         if (!mState->mDeferredContext) {
             ComPtr<ID3D11DeviceContext> deferred;
             if (SUCCEEDED(mState->mDevice->CreateDeferredContext(0, &deferred))) {
-                mState->mDeferredContext = AltinaEngine::Move(deferred);
+                mState->mDeferredContext = Move(deferred);
             }
         }
 
@@ -1401,7 +1402,7 @@ namespace AltinaEngine::Rhi {
                         queryOk = false;
                         break;
                     }
-                    mState->mFrameQueries[i] = AltinaEngine::Move(query);
+                    mState->mFrameQueries[i] = Move(query);
                 }
 
                 if (!queryOk) {
@@ -1612,8 +1613,7 @@ namespace AltinaEngine::Rhi {
         listDesc.mQueueType = desc.mQueueType;
         listDesc.mListType  = desc.mListType;
         auto commandList    = MakeResource<FRhiD3D11CommandList>(listDesc);
-        return MakeResource<FRhiD3D11CommandContext>(
-            desc, GetNativeDevice(), AltinaEngine::Move(commandList));
+        return MakeResource<FRhiD3D11CommandContext>(desc, GetNativeDevice(), Move(commandList));
     }
 
     void FRhiD3D11Device::BeginFrame(u64 frameIndex) {

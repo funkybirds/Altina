@@ -3,6 +3,7 @@
 #include "Queue.h"
 #include "../Threading/Mutex.h"
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Core::Container {
 
     template <typename T, typename C = TDeque<T>> class TThreadSafeQueue {
@@ -27,7 +28,7 @@ namespace AltinaEngine::Core::Container {
 
         void Push(TValueType&& v) {
             Threading::FScopedLock lock(mMutex);
-            mQueue.Push(AltinaEngine::Move(v));
+            mQueue.Push(Move(v));
         }
 
         void Pop() {

@@ -13,26 +13,32 @@
     #define AE_CVAR_CHAR8_LIST(X)
 #endif
 
-#define AE_CVAR_SCALAR_LIST(X)                                                \
-    X(bool)                                                                   \
-    X(char)                                                                   \
-    X(signed char)                                                            \
-    X(unsigned char)                                                          \
-    X(short)                                                                  \
-    X(unsigned short)                                                         \
-    X(int)                                                                    \
-    X(unsigned int)                                                           \
-    X(long)                                                                   \
-    X(unsigned long)                                                          \
-    X(long long)                                                              \
-    X(unsigned long long)                                                     \
-    AE_CVAR_CHAR8_LIST(X)                                                     \
-    X(char16_t)                                                               \
-    X(char32_t)                                                               \
-    X(wchar_t)                                                                \
-    X(float)                                                                  \
-    X(double)                                                                 \
+#define AE_CVAR_SCALAR_LIST(X) \
+    X(bool)                    \
+    X(char)                    \
+    X(signed char)             \
+    X(unsigned char)           \
+    X(short)                   \
+    X(unsigned short)          \
+    X(int)                     \
+    X(unsigned int)            \
+    X(long)                    \
+    X(unsigned long)           \
+    X(long long)               \
+    X(unsigned long long)      \
+    AE_CVAR_CHAR8_LIST(X)      \
+    X(char16_t)                \
+    X(char32_t)                \
+    X(wchar_t)                 \
+    X(float)                   \
+    X(double)                  \
     X(long double)
+
+using AltinaEngine::CFloatingPoint;
+using AltinaEngine::CIntegral;
+using AltinaEngine::Move;
+using AltinaEngine::TTypeSameAs;
+using AltinaEngine::Core::Container::MakeShared;
 
 namespace AltinaEngine::Core::Console {
     namespace {
@@ -60,19 +66,18 @@ namespace AltinaEngine::Core::Console {
             return out;
         }
 
-        template <typename T>
-        auto ToFStringScalar(T value) -> FString {
-            if constexpr (AltinaEngine::TTypeSameAs<T, bool>::Value) {
+        template <typename T> auto ToFStringScalar(T value) -> FString {
+            if constexpr (TTypeSameAs<T, bool>::Value) {
                 return MakeFStringFromCString(value ? "true" : "false");
-            } else if constexpr (AltinaEngine::CFloatingPoint<T>) {
+            } else if constexpr (CFloatingPoint<T>) {
                 char buf[64] = {};
-                if constexpr (AltinaEngine::TTypeSameAs<T, long double>::Value) {
+                if constexpr (TTypeSameAs<T, long double>::Value) {
                     std::snprintf(buf, sizeof(buf), "%Lg", value);
                 } else {
                     std::snprintf(buf, sizeof(buf), "%g", static_cast<double>(value));
                 }
                 return MakeFStringFromCString(buf);
-            } else if constexpr (AltinaEngine::CIntegral<T>) {
+            } else if constexpr (CIntegral<T>) {
                 char buf[64] = {};
                 if constexpr (!TConsoleIsUnsigned<T>::Value) {
                     std::snprintf(buf, sizeof(buf), "%lld", static_cast<long long>(value));
@@ -87,11 +92,11 @@ namespace AltinaEngine::Core::Console {
     } // namespace
 
     FConsoleVariable::FConsoleVariable(const FString& name, FConsoleValue value, EType type)
-        : mName(name), mValue(AltinaEngine::Move(value)), mType(type) {}
+        : mName(name), mValue(Move(value)), mType(type) {}
 
     const FString& FConsoleVariable::GetName() const noexcept { return mName; }
 
-    FString FConsoleVariable::GetString() const noexcept {
+    FString        FConsoleVariable::GetString() const noexcept {
         FScopedLock lock(mMutex);
         if (auto s = mValue.TryGet<FString>()) {
             return *s;
@@ -100,29 +105,15 @@ namespace AltinaEngine::Core::Console {
             return ToFStringScalar(*b);
         }
 
-        #define AE_CVAR_TRY_STRING(Type)                 \
-            if (auto v = mValue.TryGet<Type>()) {        \
-                return ToFStringScalar(*v);              \
-            }
+#define AE_CVAR_TRY_STRING(Type)          \
+    if (auto v = mValue.TryGet<Type>()) { \
+        return ToFStringScalar(*v);       \
+    }
 
         AE_CVAR_SCALAR_LIST(AE_CVAR_TRY_STRING)
-        #undef AE_CVAR_TRY_STRING
+#undef AE_CVAR_TRY_STRING
         return FString();
     }
-
-    int FConsoleVariable::GetInt() const noexcept { return GetValue<int>(); }
-
-    long long FConsoleVariable::GetInt64() const noexcept { return GetValue<long long>(); }
-
-    unsigned long long FConsoleVariable::GetUInt64() const noexcept {
-        return GetValue<unsigned long long>();
-    }
-
-    float FConsoleVariable::GetFloat() const noexcept { return GetValue<float>(); }
-
-    double FConsoleVariable::GetDouble() const noexcept { return GetValue<double>(); }
-
-    bool FConsoleVariable::GetBool() const noexcept { return GetValue<bool>(); }
 
     void FConsoleVariable::SetFromString(const FString& v) noexcept {
         FScopedLock lock(mMutex);
@@ -130,19 +121,19 @@ namespace AltinaEngine::Core::Console {
         if (!mValue.HasValue()) {
             mType = GuessType(v);
             switch (mType) {
-            case EType::Bool:
-                mValue.Emplace<bool>(ParseBool(v));
-                return;
-            case EType::Float:
-                mValue.Emplace<float>(ParseFloat<float>(v));
-                return;
-            case EType::Int:
-                mValue.Emplace<int>(ParseIntegral<int>(v));
-                return;
-            case EType::String:
-            default:
-                mValue.Emplace<FString>(v);
-                return;
+                case EType::Bool:
+                    mValue.Emplace<bool>(ParseBool(v));
+                    return;
+                case EType::Float:
+                    mValue.Emplace<float>(ParseFloat<float>(v));
+                    return;
+                case EType::Int:
+                    mValue.Emplace<int>(ParseIntegral<int>(v));
+                    return;
+                case EType::String:
+                default:
+                    mValue.Emplace<FString>(v);
+                    return;
             }
         }
 
@@ -174,12 +165,12 @@ namespace AltinaEngine::Core::Console {
             return;
         }
 
-        #define AE_CVAR_SET_INT(Type)                        \
-            if (mValue.Is<Type>()) {                         \
-                mValue.Emplace<Type>(ParseIntegral<Type>(v)); \
-                mType = EType::Int;                          \
-                return;                                      \
-            }
+#define AE_CVAR_SET_INT(Type)                         \
+    if (mValue.Is<Type>()) {                          \
+        mValue.Emplace<Type>(ParseIntegral<Type>(v)); \
+        mType = EType::Int;                           \
+        return;                                       \
+    }
 
         AE_CVAR_SET_INT(char)
         AE_CVAR_SET_INT(signed char)
@@ -192,53 +183,30 @@ namespace AltinaEngine::Core::Console {
         AE_CVAR_SET_INT(unsigned long)
         AE_CVAR_SET_INT(long long)
         AE_CVAR_SET_INT(unsigned long long)
-    #if defined(__cpp_char8_t)
+#if defined(__cpp_char8_t)
         AE_CVAR_SET_INT(char8_t)
-    #endif
+#endif
         AE_CVAR_SET_INT(char16_t)
         AE_CVAR_SET_INT(char32_t)
         AE_CVAR_SET_INT(wchar_t)
-        #undef AE_CVAR_SET_INT
+#undef AE_CVAR_SET_INT
 
         mType = GuessType(v);
         switch (mType) {
-        case EType::Bool:
-            mValue.Emplace<bool>(ParseBool(v));
-            break;
-        case EType::Float:
-            mValue.Emplace<float>(ParseFloat<float>(v));
-            break;
-        case EType::Int:
-            mValue.Emplace<int>(ParseIntegral<int>(v));
-            break;
-        case EType::String:
-        default:
-            mValue.Emplace<FString>(v);
-            break;
+            case EType::Bool:
+                mValue.Emplace<bool>(ParseBool(v));
+                break;
+            case EType::Float:
+                mValue.Emplace<float>(ParseFloat<float>(v));
+                break;
+            case EType::Int:
+                mValue.Emplace<int>(ParseIntegral<int>(v));
+                break;
+            case EType::String:
+            default:
+                mValue.Emplace<FString>(v);
+                break;
         }
-    }
-
-    void FConsoleVariable::SetFromString(const TChar* v) noexcept {
-        if (v == nullptr) {
-            SetFromString(FString());
-            return;
-        }
-        SetFromString(FString(v));
-    }
-
-    FConsoleVariable* FConsoleVariable::Register(
-        const TChar* name, const TChar* defaultValue) noexcept {
-        if (name == nullptr || name[0] == static_cast<TChar>(0)) {
-            return nullptr;
-        }
-        FString nameStr(name);
-        FString valueStr;
-        if (defaultValue != nullptr) {
-            valueStr.Assign(defaultValue);
-        }
-        FConsoleValue value;
-        value.Emplace<FString>(AltinaEngine::Move(valueStr));
-        return RegisterInternal(nameStr, AltinaEngine::Move(value), EType::String);
     }
 
     FConsoleVariable* FConsoleVariable::RegisterInternal(
@@ -247,18 +215,17 @@ namespace AltinaEngine::Core::Console {
         auto        it = gRegistry.find(name);
         if (it != gRegistry.end())
             return it->second.Get();
-        auto var = Container::MakeShared<FConsoleVariable>(name, AltinaEngine::Move(value), type);
-        gRegistry.emplace(name, AltinaEngine::Move(var));
+        auto var = MakeShared<FConsoleVariable>(name, Move(value), type);
+        gRegistry.emplace(name, Move(var));
         return gRegistry.find(name)->second.Get();
     }
 
-    FConsoleVariable* FConsoleVariable::Find(const TChar* name) noexcept {
-        if (name == nullptr || name[0] == static_cast<TChar>(0)) {
+    FConsoleVariable* FConsoleVariable::Find(const FString& name) noexcept {
+        if (name.IsEmptyString()) {
             return nullptr;
         }
-        FString nameStr(name);
         FScopedLock lock(gRegistryMutex);
-        auto        it = gRegistry.find(nameStr);
+        auto        it = gRegistry.find(name);
         return it != gRegistry.end() ? it->second.Get() : nullptr;
     }
 

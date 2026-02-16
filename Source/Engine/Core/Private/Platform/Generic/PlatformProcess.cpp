@@ -24,11 +24,12 @@
     #endif
 #endif
 
+using AltinaEngine::Core::Container::TBasicString;
 namespace AltinaEngine::Core::Platform {
     namespace Container = Core::Container;
     namespace {
         template <typename CharT>
-        auto ToWideStringImpl(const Container::TBasicString<CharT>& value) -> std::wstring {
+        auto ToWideStringImpl(const TBasicString<CharT>& value) -> std::wstring {
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 return std::wstring(value.GetData(), value.Length());
             } else {
@@ -54,8 +55,8 @@ namespace AltinaEngine::Core::Platform {
         auto ToWideString(const FString& value) -> std::wstring { return ToWideStringImpl(value); }
 
         template <typename CharT>
-        auto FromUtf8Impl(const std::string& value) -> Container::TBasicString<CharT> {
-            Container::TBasicString<CharT> out;
+        auto FromUtf8Impl(const std::string& value) -> TBasicString<CharT> {
+            TBasicString<CharT> out;
             if (value.empty()) {
                 return out;
             }

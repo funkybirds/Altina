@@ -5,12 +5,13 @@
 #include "Rhi/RhiCommandContext.h"
 #include "Types/Traits.h"
 
+using AltinaEngine::CClassBaseOf;
 namespace AltinaEngine::Rhi {
     class FRhiCmdContextAdapter final : public FRhiCmdContext {
     public:
         template <typename TContext>
-            requires AltinaEngine::CClassBaseOf<FRhiCommandContext, TContext>
-                         && AltinaEngine::CClassBaseOf<IRhiCmdContextOps, TContext>
+            requires CClassBaseOf<FRhiCommandContext, TContext>
+                         && CClassBaseOf<IRhiCmdContextOps, TContext>
         explicit FRhiCmdContextAdapter(TContext& context) : mContext(&context), mOps(&context) {}
 
         FRhiCmdContextAdapter(FRhiCommandContext& context, IRhiCmdContextOps& ops)

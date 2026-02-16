@@ -21,13 +21,18 @@
 #include "Types/Traits.h"
 #include <type_traits>
 
+using AltinaEngine::Forward;
+using AltinaEngine::Move;
+using AltinaEngine::Core::Container::MakeShared;
+using AltinaEngine::Core::Container::TAllocator;
+using AltinaEngine::Core::Container::TAllocatorTraits;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     namespace {
         template <typename TBase, typename TDerived, typename... Args>
         auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
-            using AllocatorType = Container::TAllocator<TDerived>;
-            using Traits        = Container::TAllocatorTraits<AllocatorType>;
+            using AllocatorType = TAllocator<TDerived>;
+            using Traits        = TAllocatorTraits<AllocatorType>;
 
             static_assert(std::is_base_of_v<TBase, TDerived>,
                 "MakeSharedAs requires TDerived to derive from TBase.");
@@ -35,7 +40,7 @@ namespace AltinaEngine::Rhi {
             AllocatorType allocator;
             TDerived*     ptr = Traits::Allocate(allocator, 1);
             try {
-                Traits::Construct(allocator, ptr, AltinaEngine::Forward<Args>(args)...);
+                Traits::Construct(allocator, ptr, Forward<Args>(args)...);
             } catch (...) {
                 Traits::Deallocate(allocator, ptr, 1);
                 throw;
@@ -78,7 +83,7 @@ namespace AltinaEngine::Rhi {
         class FRhiMockBuffer final : public FRhiBuffer {
         public:
             FRhiMockBuffer(const FRhiBufferDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiBuffer(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiBuffer(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -97,7 +102,7 @@ namespace AltinaEngine::Rhi {
         class FRhiMockTexture final : public FRhiTexture {
         public:
             FRhiMockTexture(const FRhiTextureDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiTexture(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiTexture(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -116,7 +121,7 @@ namespace AltinaEngine::Rhi {
         class FRhiMockViewport final : public FRhiViewport {
         public:
             FRhiMockViewport(const FRhiViewportDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiViewport(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiViewport(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -161,7 +166,7 @@ namespace AltinaEngine::Rhi {
         class FRhiMockSampler final : public FRhiSampler {
         public:
             FRhiMockSampler(const FRhiSamplerDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiSampler(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiSampler(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -180,7 +185,7 @@ namespace AltinaEngine::Rhi {
         class FRhiMockShader final : public FRhiShader {
         public:
             FRhiMockShader(const FRhiShaderDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiShader(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiShader(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -200,7 +205,7 @@ namespace AltinaEngine::Rhi {
         public:
             FRhiMockGraphicsPipeline(
                 const FRhiGraphicsPipelineDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiPipeline(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiPipeline(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -220,7 +225,7 @@ namespace AltinaEngine::Rhi {
         public:
             FRhiMockComputePipeline(
                 const FRhiComputePipelineDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiPipeline(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiPipeline(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -240,7 +245,7 @@ namespace AltinaEngine::Rhi {
         public:
             FRhiMockPipelineLayout(
                 const FRhiPipelineLayoutDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiPipelineLayout(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiPipelineLayout(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -260,7 +265,7 @@ namespace AltinaEngine::Rhi {
         public:
             FRhiMockBindGroupLayout(
                 const FRhiBindGroupLayoutDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiBindGroupLayout(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiBindGroupLayout(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -279,7 +284,7 @@ namespace AltinaEngine::Rhi {
         class FRhiMockBindGroup final : public FRhiBindGroup {
         public:
             FRhiMockBindGroup(const FRhiBindGroupDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiBindGroup(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiBindGroup(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -298,7 +303,7 @@ namespace AltinaEngine::Rhi {
         class FRhiMockFence final : public FRhiFence {
         public:
             FRhiMockFence(u64 initialValue, TShared<FRhiMockCounters> counters)
-                : FRhiFence(), mValue(initialValue), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiFence(), mValue(initialValue), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -326,7 +331,7 @@ namespace AltinaEngine::Rhi {
                 : FRhiSemaphore()
                 , mIsTimeline(timeline)
                 , mValue(initialValue)
-                , mCounters(AltinaEngine::Move(counters)) {
+                , mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -355,7 +360,7 @@ namespace AltinaEngine::Rhi {
         class FRhiMockCommandPool final : public FRhiCommandPool {
         public:
             FRhiMockCommandPool(const FRhiCommandPoolDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiCommandPool(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiCommandPool(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -376,7 +381,7 @@ namespace AltinaEngine::Rhi {
         class FRhiMockCommandList final : public FRhiCommandList {
         public:
             FRhiMockCommandList(const FRhiCommandListDesc& desc, TShared<FRhiMockCounters> counters)
-                : FRhiCommandList(desc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiCommandList(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -400,8 +405,8 @@ namespace AltinaEngine::Rhi {
             FRhiMockCommandContext(const FRhiCommandContextDesc& desc,
                 FRhiCommandListRef commandList, TShared<FRhiMockCounters> counters)
                 : FRhiCommandContext(desc)
-                , mCommandList(AltinaEngine::Move(commandList))
-                , mCounters(AltinaEngine::Move(counters)) {
+                , mCommandList(Move(commandList))
+                , mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -497,7 +502,7 @@ namespace AltinaEngine::Rhi {
             FRhiMockDevice(const FRhiDeviceDesc& desc, const FRhiAdapterDesc& adapterDesc,
                 const FRhiSupportedFeatures& features, const FRhiSupportedLimits& limits,
                 TShared<FRhiMockCounters> counters)
-                : FRhiDevice(desc, adapterDesc), mCounters(AltinaEngine::Move(counters)) {
+                : FRhiDevice(desc, adapterDesc), mCounters(Move(counters)) {
                 SetSupportedFeatures(features);
                 SetSupportedLimits(limits);
                 FRhiQueueCapabilities queueCaps;
@@ -583,8 +588,7 @@ namespace AltinaEngine::Rhi {
                 listDesc.mQueueType = desc.mQueueType;
                 listDesc.mListType  = desc.mListType;
                 auto commandList    = MakeResource<FRhiMockCommandList>(listDesc, mCounters);
-                return MakeResource<FRhiMockCommandContext>(
-                    desc, AltinaEngine::Move(commandList), mCounters);
+                return MakeResource<FRhiMockCommandContext>(desc, Move(commandList), mCounters);
             }
 
         private:
@@ -592,7 +596,7 @@ namespace AltinaEngine::Rhi {
         };
     } // namespace
 
-    FRhiMockContext::FRhiMockContext() : mCounters(Container::MakeShared<FRhiMockCounters>()) {}
+    FRhiMockContext::FRhiMockContext() : mCounters(MakeShared<FRhiMockCounters>()) {}
 
     FRhiMockContext::~FRhiMockContext() { Shutdown(); }
 
@@ -602,7 +606,7 @@ namespace AltinaEngine::Rhi {
         config.mDesc     = desc;
         config.mFeatures = features;
         config.mLimits   = limits;
-        mAdapterConfigs.PushBack(AltinaEngine::Move(config));
+        mAdapterConfigs.PushBack(Move(config));
         InvalidateAdapterCache();
     }
 
@@ -612,7 +616,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiMockContext::SetAdapters(TVector<FRhiMockAdapterConfig> configs) {
-        mAdapterConfigs = AltinaEngine::Move(configs);
+        mAdapterConfigs = Move(configs);
         InvalidateAdapterCache();
     }
 

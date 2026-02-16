@@ -7,6 +7,10 @@
 #include <thread>
 #include <iostream>
 #include "../../Public/Instrumentation/Instrumentation.h"
+
+using AltinaEngine::Core::Container::TFunction;
+using AltinaEngine::Core::Container::TThreadSafeQueue;
+
 // Use engine public mutex header already included above (relative include present)
 #include "../../Public/Threading/ConditionVariable.h"
 #include "../../Public/Container/SmartPtr.h"
@@ -167,30 +171,30 @@ namespace AltinaEngine::Core::Jobs {
     using Container::THashMap;
     using Container::THashSet;
     using Container::TShared;
-    static THashMap<u64, TShared<JobState>>                          gJobs;
-    static FWorkerPool* gDefaultPool = nullptr;
+    static THashMap<u64, TShared<JobState>> gJobs;
+    static FWorkerPool*                     gDefaultPool = nullptr;
 
     struct NamedThreadState {
-        Container::TThreadSafeQueue<Container::TFunction<void()>> mQueue;
-        Threading::FEvent mWakeEvent{ false, Threading::EEventResetMode::Auto };
-        Threading::TAtomic<i32> mRegistered{ 0 };
+        TThreadSafeQueue<TFunction<void()>> mQueue;
+        Threading::FEvent                   mWakeEvent{ false, Threading::EEventResetMode::Auto };
+        Threading::TAtomic<i32>             mRegistered{ 0 };
     };
 
-    constexpr usize kNamedThreadCount = 4;
+    constexpr usize         kNamedThreadCount = 4;
     static NamedThreadState gNamedThreads[kNamedThreadCount];
 
-    static auto GetNamedThreadIndex(ENamedThread thread) noexcept -> i32 {
+    static auto             GetNamedThreadIndex(ENamedThread thread) noexcept -> i32 {
         switch (thread) {
-        case ENamedThread::GameThread:
-            return 0;
-        case ENamedThread::RHI:
-            return 1;
-        case ENamedThread::Rendering:
-            return 2;
-        case ENamedThread::Audio:
-            return 3;
-        default:
-            return -1;
+            case ENamedThread::GameThread:
+                return 0;
+            case ENamedThread::RHI:
+                return 1;
+            case ENamedThread::Rendering:
+                return 2;
+            case ENamedThread::Audio:
+                return 3;
+            default:
+                return -1;
         }
     }
 
@@ -201,8 +205,7 @@ namespace AltinaEngine::Core::Jobs {
         return &gNamedThreads[idx];
     }
 
-    static auto TryEnqueueNamedThread(u32 affinityMask, Container::TFunction<void()>& job) noexcept
-        -> bool {
+    static auto TryEnqueueNamedThread(u32 affinityMask, TFunction<void()>& job) noexcept -> bool {
         if (affinityMask == 0U)
             return false;
 
@@ -292,11 +295,10 @@ namespace AltinaEngine::Core::Jobs {
         // Wrap the user's callback to mark completion.
         // Allocate the callback on the heap to keep the runtime lambda small
         // (TFunction uses a fixed small-buffer optimization without heap fallback).
-        TShared<TFunction<void()>> cbptr =
-            MakeShared<Container::TFunction<void()>>(Move(desc.Callback));
-        TVector<FJobHandle>          prereqHandles = Move(desc.Prerequisites);
+        TShared<TFunction<void()>> cbptr = MakeShared<TFunction<void()>>(Move(desc.Callback));
+        TVector<FJobHandle>        prereqHandles = Move(desc.Prerequisites);
 
-        Container::TFunction<void()> wrapper = [cbptr, id, state, prereqHandles]() mutable -> void {
+        TFunction<void()>          wrapper = [cbptr, id, state, prereqHandles]() mutable -> void {
             // Wait for declared prerequisites
             for (usize i = 0; i < prereqHandles.Size(); ++i) {
                 Wait(prereqHandles[i]);

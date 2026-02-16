@@ -1,4 +1,3 @@
-
 // Minimal event wrapper (manual-reset/auto-reset) using Win32 Event.
 #pragma once
 #include "Types/Traits.h"

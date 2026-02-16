@@ -4,6 +4,7 @@
 #include "Container/String.h"
 #include "Types/NonCopyable.h"
 
+using AltinaEngine::Core::Container::FStringView;
 namespace AltinaEngine::Core::Reflection {
     class FArchive;
     class FObject;
@@ -27,15 +28,13 @@ namespace AltinaEngine::Core::Reflection {
         virtual void WriteFloat(f32 value) { WriteBytes(&value, sizeof(value)); }
         virtual void WriteDouble(f64 value) { WriteBytes(&value, sizeof(value)); }
         virtual void WriteBool(bool value) { WriteBytes(&value, sizeof(value)); }
-        virtual void WriteString(Container::FStringView value) {
-            WriteBytes(value.Data(), value.Length());
-        }
+        virtual void WriteString(FStringView value) { WriteBytes(value.Data(), value.Length()); }
 
-        virtual void              BeginObject(Container::FStringView /*name*/) {}
-        virtual void              EndObject() {}
-        virtual void              BeginArray(usize /*size*/) {}
-        virtual void              EndArray() {}
-        virtual void              WriteFieldName(Container::FStringView /*name*/) {}
+        virtual void BeginObject(FStringView /*name*/) {}
+        virtual void EndObject() {}
+        virtual void BeginArray(usize /*size*/) {}
+        virtual void EndArray() {}
+        virtual void WriteFieldName(FStringView /*name*/) {}
 
         template <CScalar T> void Write(const T& value) {
             if constexpr (CSameAs<T, i8>)
@@ -148,9 +147,7 @@ namespace AltinaEngine::Core::Reflection {
         virtual void EndObject() {}
         virtual void BeginArray(usize& outSize) { outSize = 0; }
         virtual void EndArray() {}
-        virtual auto TryReadFieldName(Container::FStringView /*expectedName*/) -> bool {
-            return true;
-        }
+        virtual auto TryReadFieldName(FStringView /*expectedName*/) -> bool { return true; }
 
         template <CScalar T> auto Read() -> T {
             if constexpr (CSameAs<T, i8>)

@@ -5,11 +5,12 @@
 #include "Container/Ref.h"
 #include "Types/Meta.h"
 
+using AltinaEngine::u64;
+
 using namespace AltinaEngine::Core;
 using namespace AltinaEngine::Core::Reflection;
 using namespace AltinaEngine::Core::Container;
 using namespace AltinaEngine::Core::TypeMeta;
-using AltinaEngine::u64;
 
 // Test type definitions - shared across all reflection tests
 struct FSimpleTestStruct {

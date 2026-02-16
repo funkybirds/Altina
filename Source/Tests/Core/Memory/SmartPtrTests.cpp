@@ -4,6 +4,8 @@
 
 #include "Container/SmartPtr.h"
 
+using AltinaEngine::Move;
+
 using namespace AltinaEngine::Core::Container;
 
 TEST_CASE("TOwner release and reset") {
@@ -111,7 +113,7 @@ TEST_CASE("TShared move and reset semantics") {
     TShared<int> Copy   = Shared;
     REQUIRE_EQ(Shared.UseCount(), 2U);
 
-    TShared<int> Moved(AltinaEngine::Move(Shared));
+    TShared<int> Moved(Move(Shared));
     REQUIRE(!Shared);
     REQUIRE_EQ(Moved.UseCount(), 2U);
 

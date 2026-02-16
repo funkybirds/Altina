@@ -5,12 +5,13 @@
 #include <string>
 #include <type_traits>
 
+using AltinaEngine::Core::Container::TBasicString;
 namespace AltinaEngine::ShaderCompiler::Detail {
     namespace Container = Core::Container;
     namespace {
         template <typename CharT>
-        auto FromPathImpl(const std::filesystem::path& path) -> Container::TBasicString<CharT> {
-            Container::TBasicString<CharT> out;
+        auto FromPathImpl(const std::filesystem::path& path) -> TBasicString<CharT> {
+            TBasicString<CharT> out;
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 const auto native = path.wstring();
                 out.Append(native.c_str(), native.size());
@@ -26,7 +27,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         template <typename CharT>
-        auto ToPathImpl(const Container::TBasicString<CharT>& value) -> std::filesystem::path {
+        auto ToPathImpl(const TBasicString<CharT>& value) -> std::filesystem::path {
             if constexpr (std::is_same_v<CharT, wchar_t>) {
                 return std::filesystem::path(std::wstring(value.GetData(), value.Length()));
             } else {

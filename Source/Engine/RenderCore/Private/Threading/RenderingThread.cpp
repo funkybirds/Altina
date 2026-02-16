@@ -5,10 +5,20 @@
 
 #include <thread>
 
+using AltinaEngine::Core::Container::TFunction;
+using AltinaEngine::Move;
 namespace AltinaEngine::RenderCore {
     Core::Console::TConsoleVariable<i32> gRenderingThreadLagFrames(
         TEXT("gRenderingThreadLagFrames"),
         1);
+
+    auto EnqueueRenderTask(TFunction<void()> task) noexcept
+        -> Core::Jobs::FJobHandle {
+        Core::Jobs::FJobDescriptor desc{};
+        desc.AffinityMask = static_cast<u32>(Core::Jobs::ENamedThread::Rendering);
+        desc.Callback     = Move(task);
+        return Core::Jobs::FJobSystem::Submit(Move(desc));
+    }
 
     FRenderingThread::FRenderingThread() noexcept = default;
 
@@ -59,3 +69,13 @@ namespace AltinaEngine::RenderCore {
         Core::Jobs::UnregisterNamedThread(Core::Jobs::ENamedThread::Rendering);
     }
 } // namespace AltinaEngine::RenderCore
+
+
+
+
+
+
+
+
+
+

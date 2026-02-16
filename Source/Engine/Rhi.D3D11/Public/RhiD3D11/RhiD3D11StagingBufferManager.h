@@ -6,6 +6,8 @@
 #include "Types/Aliases.h"
 #include "Container/Vector.h"
 
+using AltinaEngine::Core::Container::TVector;
+
 struct ID3D11DeviceContext;
 
 namespace AltinaEngine::Rhi {
@@ -47,8 +49,8 @@ namespace AltinaEngine::Rhi {
             bool          mInUse     = false;
         };
 
-        FRhiD3D11Device*                  mDevice  = nullptr;
-        ::ID3D11DeviceContext*            mContext = nullptr;
-        Container::TVector<FStagingEntry> mEntries;
+        FRhiD3D11Device*       mDevice  = nullptr;
+        ::ID3D11DeviceContext* mContext = nullptr;
+        TVector<FStagingEntry> mEntries;
     };
 } // namespace AltinaEngine::Rhi

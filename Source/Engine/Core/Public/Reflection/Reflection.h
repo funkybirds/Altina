@@ -6,6 +6,8 @@
 #include "Container/Vector.h"
 #include "Container/String.h"
 
+using AltinaEngine::Core::Container::MakeRef;
+using AltinaEngine::Core::Container::TIndexSequenceFor;
 namespace AltinaEngine::Core::Reflection {
     using Container::FString;
     using Container::TVector;
@@ -36,9 +38,8 @@ namespace AltinaEngine::Core::Reflection {
             return (obj.*f)(vec[I].template As<Args>()...); // NOLINT
         }
         template <typename T, typename R, typename... Args, usize... I>
-        auto MemberFunctorInvokerWrapperImpl(
-            R (T::*f)(Args...) const noexcept, const T& obj, TSpan<FObject> vec,
-            TIndexSequence<I...>) -> R {
+        auto MemberFunctorInvokerWrapperImpl(R (T::*f)(Args...) const noexcept, const T& obj,
+            TSpan<FObject> vec, TIndexSequence<I...>) -> R {
             return (obj.*f)(vec[I].template As<Args>()...); // NOLINT
         }
 
@@ -47,41 +48,37 @@ namespace AltinaEngine::Core::Reflection {
             if (ReflectionAssert(vec.Size() == sizeof...(Args),
                     EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
                 [[likely]] {
-                return MemberFunctorInvokerWrapperImpl(
-                    f, obj, vec, Container::TIndexSequenceFor<Args...>{});
+                return MemberFunctorInvokerWrapperImpl(f, obj, vec, TIndexSequenceFor<Args...>{});
             }
             Utility::CompilerHint::Unreachable();
         }
         template <typename T, typename R, typename... Args>
-        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) const, const T& obj,
-            TSpan<FObject> vec) -> R {
+        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) const, const T& obj, TSpan<FObject> vec)
+            -> R {
             if (ReflectionAssert(vec.Size() == sizeof...(Args),
                     EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
                 [[likely]] {
-                return MemberFunctorInvokerWrapperImpl(
-                    f, obj, vec, Container::TIndexSequenceFor<Args...>{});
+                return MemberFunctorInvokerWrapperImpl(f, obj, vec, TIndexSequenceFor<Args...>{});
             }
             Utility::CompilerHint::Unreachable();
         }
         template <typename T, typename R, typename... Args>
-        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) noexcept, T& obj,
-            TSpan<FObject> vec) -> R {
+        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) noexcept, T& obj, TSpan<FObject> vec)
+            -> R {
             if (ReflectionAssert(vec.Size() == sizeof...(Args),
                     EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
                 [[likely]] {
-                return MemberFunctorInvokerWrapperImpl(
-                    f, obj, vec, Container::TIndexSequenceFor<Args...>{});
+                return MemberFunctorInvokerWrapperImpl(f, obj, vec, TIndexSequenceFor<Args...>{});
             }
             Utility::CompilerHint::Unreachable();
         }
         template <typename T, typename R, typename... Args>
-        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) const noexcept, const T& obj,
-            TSpan<FObject> vec) -> R {
+        auto MemberFunctorInvokerWrapper(
+            R (T::*f)(Args...) const noexcept, const T& obj, TSpan<FObject> vec) -> R {
             if (ReflectionAssert(vec.Size() == sizeof...(Args),
                     EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
                 [[likely]] {
-                return MemberFunctorInvokerWrapperImpl(
-                    f, obj, vec, Container::TIndexSequenceFor<Args...>{});
+                return MemberFunctorInvokerWrapperImpl(f, obj, vec, TIndexSequenceFor<Args...>{});
             }
             Utility::CompilerHint::Unreachable();
         }
@@ -97,7 +94,7 @@ namespace AltinaEngine::Core::Reflection {
             static auto GetAccessor() -> TFnMemberPropertyAccessor {
                 return [](FObject& obj) -> FObject {
                     auto& classObject = obj.As<typename TSuper::TClassType>();
-                    return FObject::CreateClone(Container::MakeRef(Get(classObject)));
+                    return FObject::CreateClone(MakeRef(Get(classObject)));
                 };
             }
         };

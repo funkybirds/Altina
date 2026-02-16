@@ -4,6 +4,10 @@
 #include "../Threading/Atomic.h"
 #include "../Types/Traits.h"
 
+using AltinaEngine::CClassBaseOf;
+using AltinaEngine::Forward;
+using AltinaEngine::Move;
+
 using AltinaEngine::Core::Threading::EMemoryOrder;
 using AltinaEngine::Core::Threading::TAtomic;
 
@@ -21,15 +25,15 @@ namespace AltinaEngine::Core::Container {
         explicit TOwner(TPointer p) noexcept : mPtr(p) {}
 
         TOwner(TPointer p, const D& d) noexcept : mPtr(p), mDeleter(d) {}
-        TOwner(TPointer p, D&& d) noexcept : mPtr(p), mDeleter(AltinaEngine::Move(d)) {}
+        TOwner(TPointer p, D&& d) noexcept : mPtr(p), mDeleter(Move(d)) {}
 
         TOwner(TOwner&& Other) noexcept
-            : mPtr(Other.Release()), mDeleter(AltinaEngine::Forward<D>(Other.GetDeleter())) {}
+            : mPtr(Other.Release()), mDeleter(Forward<D>(Other.GetDeleter())) {}
 
         auto operator=(TOwner&& Other) noexcept -> TOwner& {
             if (this != &Other) {
                 Reset(Other.Release());
-                mDeleter = AltinaEngine::Move(Other.GetDeleter());
+                mDeleter = Move(Other.GetDeleter());
             }
             return *this;
         }
@@ -62,9 +66,9 @@ namespace AltinaEngine::Core::Container {
             mPtr            = Other.mPtr;
             Other.mPtr      = tmpPtr;
 
-            D tmpDeleter   = AltinaEngine::Move(mDeleter);
-            mDeleter       = AltinaEngine::Move(Other.mDeleter);
-            Other.mDeleter = AltinaEngine::Move(tmpDeleter);
+            D tmpDeleter   = Move(mDeleter);
+            mDeleter       = Move(Other.mDeleter);
+            Other.mDeleter = Move(tmpDeleter);
         }
 
         auto     Get() const noexcept -> TPointer { return mPtr; }
@@ -92,15 +96,15 @@ namespace AltinaEngine::Core::Container {
         explicit TOwner(TPointer p) noexcept : mPtr(p) {}
 
         TOwner(TPointer p, const D& d) noexcept : mPtr(p), mDeleter(d) {}
-        TOwner(TPointer p, D&& d) noexcept : mPtr(p), mDeleter(AltinaEngine::Move(d)) {}
+        TOwner(TPointer p, D&& d) noexcept : mPtr(p), mDeleter(Move(d)) {}
 
         TOwner(TOwner&& Other) noexcept
-            : mPtr(Other.Release()), mDeleter(AltinaEngine::Forward<D>(Other.GetDeleter())) {}
+            : mPtr(Other.Release()), mDeleter(Forward<D>(Other.GetDeleter())) {}
 
         auto operator=(TOwner&& Other) noexcept -> TOwner& {
             if (this != &Other) {
                 Reset(Other.Release());
-                mDeleter = AltinaEngine::Move(Other.GetDeleter());
+                mDeleter = Move(Other.GetDeleter());
             }
             return *this;
         }
@@ -144,11 +148,10 @@ namespace AltinaEngine::Core::Container {
         if constexpr (kSmartPtrUseManagedAllocator) {
             TAllocator<T> allocator;
             T*            ptr = TAllocatorTraits<TAllocator<T>>::Allocate(allocator, 1);
-            TAllocatorTraits<TAllocator<T>>::Construct(
-                allocator, ptr, AltinaEngine::Forward<Args>(args)...);
+            TAllocatorTraits<TAllocator<T>>::Construct(allocator, ptr, Forward<Args>(args)...);
             return TOwner<T>(ptr);
         } else {
-            return TOwner<T>(new T(AltinaEngine::Forward<Args>(args)...));
+            return TOwner<T>(new T(Forward<Args>(args)...));
         }
     }
 
@@ -170,7 +173,7 @@ namespace AltinaEngine::Core::Container {
     };
 
     template <typename TBase, typename TDerived>
-        requires AltinaEngine::CClassBaseOf<TBase, TDerived>
+        requires CClassBaseOf<TBase, TDerived>
     inline void DestroyPolymorphic(TBase* basePtr) noexcept {
         if (!basePtr) {
             return;
@@ -187,7 +190,7 @@ namespace AltinaEngine::Core::Container {
     }
 
     template <typename TBase, typename TDerived, typename... Args>
-        requires AltinaEngine::CClassBaseOf<TBase, TDerived>
+        requires CClassBaseOf<TBase, TDerived>
     auto MakeUniqueAs(Args&&... args) -> TOwner<TBase, TPolymorphicDeleter<TBase>> {
         TDerived* ptr = nullptr;
         if constexpr (kSmartPtrUseManagedAllocator) {
@@ -196,14 +199,14 @@ namespace AltinaEngine::Core::Container {
             if (ptr != nullptr) {
                 try {
                     TAllocatorTraits<TAllocator<TDerived>>::Construct(
-                        allocator, ptr, AltinaEngine::Forward<Args>(args)...);
+                        allocator, ptr, Forward<Args>(args)...);
                 } catch (...) {
                     TAllocatorTraits<TAllocator<TDerived>>::Deallocate(allocator, ptr, 1);
                     throw;
                 }
             }
         } else {
-            ptr = new TDerived(AltinaEngine::Forward<Args>(args)...); // NOLINT
+            ptr = new TDerived(Forward<Args>(args)...); // NOLINT
         }
 
         return TOwner<TBase, TPolymorphicDeleter<TBase>>(
@@ -226,7 +229,7 @@ namespace AltinaEngine::Core::Container {
     template <typename T, typename Alloc, typename... Args>
     auto AllocateUnique(Alloc& alloc, Args&&... args) -> TOwner<T, TAllocatorDeleter<T, Alloc>> {
         T* ptr = TAllocatorTraits<Alloc>::Allocate(alloc, 1);
-        TAllocatorTraits<Alloc>::Construct(alloc, ptr, AltinaEngine::Forward<Args>(args)...);
+        TAllocatorTraits<Alloc>::Construct(alloc, ptr, Forward<Args>(args)...);
         return TOwner<T, TAllocatorDeleter<T, Alloc>>(ptr, TAllocatorDeleter<T, Alloc>(alloc));
     }
 
@@ -255,8 +258,7 @@ namespace AltinaEngine::Core::Container {
     template <typename T, typename Deleter>
     class TSharedControlBlock final : public FSharedControlBlock {
     public:
-        TSharedControlBlock(T* ptr, Deleter deleter)
-            : mPointer(ptr), mDeleter(AltinaEngine::Move(deleter)) {}
+        TSharedControlBlock(T* ptr, Deleter deleter) : mPointer(ptr), mDeleter(Move(deleter)) {}
 
         void DestroyManaged() noexcept override {
             if (mPointer) {
@@ -295,7 +297,7 @@ namespace AltinaEngine::Core::Container {
         template <typename D>
         explicit TShared(TPointer InPtr, D&& InDeleter) : mPtr(InPtr), mControl(nullptr) {
             if (mPtr) {
-                InitializeControlBlock(AltinaEngine::Forward<D>(InDeleter));
+                InitializeControlBlock(Forward<D>(InDeleter));
             }
         }
 
@@ -333,7 +335,7 @@ namespace AltinaEngine::Core::Container {
             mPtr     = InPtr;
             mControl = nullptr;
             if (mPtr) {
-                InitializeControlBlock(AltinaEngine::Forward<D>(InDeleter));
+                InitializeControlBlock(Forward<D>(InDeleter));
             }
         }
 
@@ -363,7 +365,7 @@ namespace AltinaEngine::Core::Container {
             using TStorageType = TDecayDeleter<D>;
             using TControlType = TSharedControlBlock<TElementType, TStorageType>;
 
-            TStorageType safeDeleter(AltinaEngine::Forward<D>(InDeleter));
+            TStorageType safeDeleter(Forward<D>(InDeleter));
             try {
                 mControl = new TControlType(mPtr, safeDeleter);
             } catch (...) {
@@ -394,8 +396,7 @@ namespace AltinaEngine::Core::Container {
             TAllocator<T> allocator;
             T*            ptr = TAllocatorTraits<TAllocator<T>>::Allocate(allocator, 1);
             try {
-                TAllocatorTraits<TAllocator<T>>::Construct(
-                    allocator, ptr, AltinaEngine::Forward<Args>(args)...);
+                TAllocatorTraits<TAllocator<T>>::Construct(allocator, ptr, Forward<Args>(args)...);
             } catch (...) {
                 TAllocatorTraits<TAllocator<T>>::Deallocate(allocator, ptr, 1);
                 throw;
@@ -407,7 +408,7 @@ namespace AltinaEngine::Core::Container {
             owner.Release();
             return result;
         } else {
-            TOwner<T>  Owner(new T(AltinaEngine::Forward<Args>(args)...));
+            TOwner<T>  Owner(new T(Forward<Args>(args)...));
             TShared<T> Result(Owner.Get(), Owner.GetDeleter());
             Owner.Release();
             return Result;
@@ -418,7 +419,7 @@ namespace AltinaEngine::Core::Container {
     auto AllocateShared(Alloc& alloc, Args&&... args) -> TShared<T> {
         T* ptr = TAllocatorTraits<Alloc>::Allocate(alloc, 1);
         try {
-            TAllocatorTraits<Alloc>::Construct(alloc, ptr, AltinaEngine::Forward<Args>(args)...);
+            TAllocatorTraits<Alloc>::Construct(alloc, ptr, Forward<Args>(args)...);
         } catch (...) {
             TAllocatorTraits<Alloc>::Deallocate(alloc, ptr, 1);
             throw;

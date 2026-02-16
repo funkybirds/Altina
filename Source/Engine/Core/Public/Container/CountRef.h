@@ -11,7 +11,9 @@ namespace AltinaEngine::Core::Container {
         constexpr TCountRef() noexcept = default;
         constexpr TCountRef(decltype(nullptr)) noexcept : mPtr(nullptr) {}
 
-        static auto Adopt(TPointer ptr) noexcept -> TCountRef { return TCountRef(ptr, EMode::Adopt); }
+        static auto Adopt(TPointer ptr) noexcept -> TCountRef {
+            return TCountRef(ptr, EMode::Adopt);
+        }
 
         explicit TCountRef(TPointer ptr) noexcept : mPtr(ptr) { AddRef(); }
 
@@ -82,7 +84,10 @@ namespace AltinaEngine::Core::Container {
     private:
         template <typename U> friend class TCountRef;
 
-        enum class EMode : u8 { AddRef, Adopt };
+        enum class EMode : u8 {
+            AddRef,
+            Adopt
+        };
 
         explicit TCountRef(TPointer ptr, EMode mode) noexcept : mPtr(ptr) {
             if (mPtr && mode == EMode::AddRef) {

@@ -1,10 +1,12 @@
 #include "Engine/GameScene/World.h"
 
+using AltinaEngine::Move;
+using AltinaEngine::Core::Container::FStringView;
 namespace AltinaEngine::GameScene {
     namespace {
         Core::Threading::TAtomic<u32> gNextWorldId(1);
 
-        auto AcquireWorldId() -> u32 { return gNextWorldId.FetchAdd(1); }
+        auto                          AcquireWorldId() -> u32 { return gNextWorldId.FetchAdd(1); }
     } // namespace
 
     FWorld::FWorld() : mWorldId(AcquireWorldId()) {}
@@ -34,7 +36,7 @@ namespace AltinaEngine::GameScene {
         mFreeGameObjects.Clear();
     }
 
-    auto FWorld::CreateGameObject(Container::FStringView name) -> FGameObjectId {
+    auto FWorld::CreateGameObject(FStringView name) -> FGameObjectId {
         u32 index = 0;
         if (!mFreeGameObjects.IsEmpty()) {
             index = mFreeGameObjects.Back();
@@ -51,7 +53,7 @@ namespace AltinaEngine::GameScene {
         }
 
         auto& slot  = mGameObjects[index];
-        slot.Handle = AltinaEngine::Move(handle);
+        slot.Handle = Move(handle);
         slot.Alive  = true;
         if (slot.Generation == 0) {
             slot.Generation = 1;
@@ -82,7 +84,7 @@ namespace AltinaEngine::GameScene {
         }
 
         auto& slot = mGameObjects[id.Index];
-        mGameObjectPool.Deallocate(AltinaEngine::Move(slot.Handle));
+        mGameObjectPool.Deallocate(Move(slot.Handle));
         slot.Alive = false;
         slot.Generation++;
         if (slot.Generation == 0) {
@@ -195,9 +197,7 @@ namespace AltinaEngine::GameScene {
         return it->second.Get();
     }
 
-    void FGameObject::SetName(FStringView name) {
-        mName = FString(name);
-    }
+    void FGameObject::SetName(FStringView name) { mName = FString(name); }
 
     auto FGameObject::AddComponentByType(FComponentTypeHash type) -> FComponentId {
         if (mWorld == nullptr) {
@@ -213,13 +213,9 @@ namespace AltinaEngine::GameScene {
         mWorld->DestroyComponent(id);
     }
 
-    auto FGameObject::GetAllComponents() const -> TVector<FComponentId> {
-        return mComponents;
-    }
+    auto FGameObject::GetAllComponents() const -> TVector<FComponentId> { return mComponents; }
 
-    void FGameObject::AddComponentId(FComponentId id) {
-        mComponents.PushBack(id);
-    }
+    void FGameObject::AddComponentId(FComponentId id) { mComponents.PushBack(id); }
 
     void FGameObject::RemoveComponentId(FComponentId id) {
         const auto count = static_cast<u32>(mComponents.Size());
@@ -249,8 +245,3 @@ namespace AltinaEngine::GameScene {
         return mWorld != nullptr && mWorld->IsGameObjectActive(mId);
     }
 } // namespace AltinaEngine::GameScene
-
-
-
-
-

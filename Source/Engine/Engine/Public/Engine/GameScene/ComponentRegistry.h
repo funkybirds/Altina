@@ -7,6 +7,7 @@
 #include "Reflection/Serializer.h"
 #include "Types/Traits.h"
 
+using AltinaEngine::CClassBaseOf;
 namespace AltinaEngine::GameScene {
     namespace Container = Core::Container;
     using Container::THashMap;
@@ -30,10 +31,10 @@ namespace AltinaEngine::GameScene {
      * @brief Registry entry describing a component type.
      */
     struct FComponentTypeEntry {
-        FComponentTypeHash TypeHash   = 0;
-        FnCreate           Create     = nullptr;
-        FnDestroy          Destroy    = nullptr;
-        FnSerialize        Serialize  = nullptr;
+        FComponentTypeHash TypeHash    = 0;
+        FnCreate           Create      = nullptr;
+        FnDestroy          Destroy     = nullptr;
+        FnSerialize        Serialize   = nullptr;
         FnDeserialize      Deserialize = nullptr;
     };
 
@@ -42,7 +43,7 @@ namespace AltinaEngine::GameScene {
      */
     class AE_ENGINE_API FComponentRegistry {
     public:
-        void Register(const FComponentTypeEntry& entry);
+        void               Register(const FComponentTypeEntry& entry);
 
         [[nodiscard]] auto Has(FComponentTypeHash type) const -> bool;
         [[nodiscard]] auto Find(FComponentTypeHash type) const -> const FComponentTypeEntry*;
@@ -60,13 +61,14 @@ namespace AltinaEngine::GameScene {
     AE_ENGINE_API auto GetComponentRegistry() -> FComponentRegistry&;
 
     namespace Detail {
-        template <typename T> auto CreateComponentThunk(FComponentCreateContext& ctx) -> FComponentId;
+        template <typename T>
+        auto CreateComponentThunk(FComponentCreateContext& ctx) -> FComponentId;
         template <typename T> void DestroyComponentThunk(FWorld& world, FComponentId id);
     } // namespace Detail
 
-    template <typename T> [[nodiscard]] inline auto BuildComponentTypeEntry() -> FComponentTypeEntry {
-        static_assert(AltinaEngine::CClassBaseOf<FComponent, T>,
-            "Component types must derive from FComponent.");
+    template <typename T>
+    [[nodiscard]] inline auto BuildComponentTypeEntry() -> FComponentTypeEntry {
+        static_assert(CClassBaseOf<FComponent, T>, "Component types must derive from FComponent.");
 
         FComponentTypeEntry entry{};
         entry.TypeHash = GetComponentTypeHash<T>();
@@ -79,8 +81,3 @@ namespace AltinaEngine::GameScene {
         GetComponentRegistry().Register(BuildComponentTypeEntry<T>());
     }
 } // namespace AltinaEngine::GameScene
-
-
-
-
-

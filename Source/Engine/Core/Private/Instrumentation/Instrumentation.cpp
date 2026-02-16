@@ -6,6 +6,8 @@
 #include "../../Public/Container/SmartPtr.h"
 #include <chrono>
 
+using AltinaEngine::Move;
+
 using namespace AltinaEngine;
 using namespace AltinaEngine::Core;
 
@@ -41,7 +43,7 @@ namespace AltinaEngine::Core::Instrumentation {
         Threading::FScopedLock lk(gMutex);
         string                 key(name);
         if (gCounters.find(key) == gCounters.end()) {
-            gCounters.emplace(AltinaEngine::Move(key), MakeShared<FCounter>());
+            gCounters.emplace(Move(key), MakeShared<FCounter>());
         }
     }
 
@@ -56,7 +58,7 @@ namespace AltinaEngine::Core::Instrumentation {
         if (it == gCounters.end()) {
             auto shared = MakeShared<FCounter>();
             shared->mValue.FetchAdd(static_cast<long long>(delta));
-            gCounters.emplace(AltinaEngine::Move(key), shared);
+            gCounters.emplace(Move(key), shared);
             return;
         }
         it->second->mValue.FetchAdd(static_cast<long long>(delta));
@@ -83,7 +85,7 @@ namespace AltinaEngine::Core::Instrumentation {
             auto shared = MakeShared<FTiming>();
             shared->mTotalMs.FetchAdd(ms);
             shared->mCount.FetchAdd(1);
-            gTimings.emplace(AltinaEngine::Move(key), shared);
+            gTimings.emplace(Move(key), shared);
             return;
         }
         it->second->mTotalMs.FetchAdd(ms);

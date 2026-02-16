@@ -32,25 +32,20 @@ namespace AltinaEngine::GameScene {
 
         template <typename T> [[nodiscard]] auto HasComponent() const -> bool;
         template <typename T> [[nodiscard]] auto GetComponent() const -> FComponentId;
-        [[nodiscard]] auto GetAllComponents() const -> TVector<FComponentId>;
+        [[nodiscard]] auto                       GetAllComponents() const -> TVector<FComponentId>;
 
     private:
         friend class FWorld;
 
-        void SetWorld(FWorld* world) noexcept { mWorld = world; }
-        void SetId(FGameObjectId id) noexcept { mId = id; }
-        void AddComponentId(FComponentId id);
-        void RemoveComponentId(FComponentId id);
+        void                  SetWorld(FWorld* world) noexcept { mWorld = world; }
+        void                  SetId(FGameObjectId id) noexcept { mId = id; }
+        void                  AddComponentId(FComponentId id);
+        void                  RemoveComponentId(FComponentId id);
 
-        FWorld*         mWorld = nullptr;
-        FGameObjectId   mId{};
-        FString         mName{};
-        bool            mActive = true;
+        FWorld*               mWorld = nullptr;
+        FGameObjectId         mId{};
+        FString               mName{};
+        bool                  mActive = true;
         TVector<FComponentId> mComponents{};
     };
 } // namespace AltinaEngine::GameScene
-
-
-
-
-

@@ -8,6 +8,7 @@
 #include <cstring>
 #include <string>
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Core::Utility::Json {
     namespace {
         class FJsonReader {
@@ -138,7 +139,7 @@ namespace AltinaEngine::Core::Utility::Json {
                         return false;
                     }
                     pair.Value = value;
-                    out.Object.PushBack(AltinaEngine::Move(pair));
+                    out.Object.PushBack(Move(pair));
 
                     SkipWhitespace();
                     if (Peek() == ',') {
@@ -366,9 +367,7 @@ namespace AltinaEngine::Core::Utility::Json {
     FJsonDocument::~FJsonDocument() { DestroyValues(); }
 
     FJsonDocument::FJsonDocument(FJsonDocument&& other) noexcept
-        : mRoot(other.mRoot)
-        , mOwned(AltinaEngine::Move(other.mOwned))
-        , mError(AltinaEngine::Move(other.mError)) {
+        : mRoot(other.mRoot), mOwned(Move(other.mOwned)), mError(Move(other.mError)) {
         other.mRoot = nullptr;
     }
 
@@ -376,8 +375,8 @@ namespace AltinaEngine::Core::Utility::Json {
         if (this != &other) {
             DestroyValues();
             mRoot       = other.mRoot;
-            mOwned      = AltinaEngine::Move(other.mOwned);
-            mError      = AltinaEngine::Move(other.mError);
+            mOwned      = Move(other.mOwned);
+            mError      = Move(other.mError);
             other.mRoot = nullptr;
         }
         return *this;

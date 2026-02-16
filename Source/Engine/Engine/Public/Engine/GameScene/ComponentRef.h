@@ -26,8 +26,3 @@ namespace AltinaEngine::GameScene {
         FComponentId mId{};
     };
 } // namespace AltinaEngine::GameScene
-
-
-
-
-

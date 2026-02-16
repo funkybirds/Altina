@@ -2,6 +2,7 @@
 
 #include "Types/Traits.h"
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
     namespace {
         auto NormalizeInitDesc(FRhiInitDesc desc) -> FRhiInitDesc {
@@ -132,7 +133,7 @@ namespace AltinaEngine::Rhi {
     void FRhiContext::RefreshAdapters() {
         TVector<TShared<FRhiAdapter>> adapters;
         EnumerateAdaptersInternal(adapters);
-        mAdapters      = AltinaEngine::Move(adapters);
+        mAdapters      = Move(adapters);
         mAdaptersDirty = false;
     }
 

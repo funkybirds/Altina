@@ -6,6 +6,11 @@
 #include "Container/StringView.h"
 #include "Types/Aliases.h"
 
+using AltinaEngine::Core::Container::FNativeString;
+using AltinaEngine::Core::Container::FNativeStringView;
+using AltinaEngine::Core::Container::FString;
+using AltinaEngine::Core::Container::FStringView;
+using AltinaEngine::Core::Container::TArray;
 namespace AltinaEngine {
     namespace Container = Core::Container;
 
@@ -14,7 +19,7 @@ namespace AltinaEngine {
         static constexpr usize kCompactStringLength = 32;
         static constexpr usize kStringLength        = 36;
 
-        using FBytes = Container::TArray<u8, kByteCount>;
+        using FBytes = TArray<u8, kByteCount>;
 
         constexpr FUuid() = default;
         constexpr explicit FUuid(const FBytes& bytes) noexcept : mBytes(bytes) {}
@@ -22,11 +27,9 @@ namespace AltinaEngine {
         [[nodiscard]] static auto           New() -> FUuid;
         [[nodiscard]] static constexpr auto Nil() noexcept -> FUuid { return FUuid{}; }
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-        [[nodiscard]] static auto TryParse(Container::FStringView text, FUuid& out) noexcept
-            -> bool;
+        [[nodiscard]] static auto TryParse(FStringView text, FUuid& out) noexcept -> bool;
 #endif
-        [[nodiscard]] static auto TryParse(Container::FNativeStringView text, FUuid& out) noexcept
-            -> bool;
+        [[nodiscard]] static auto    TryParse(FNativeStringView text, FUuid& out) noexcept -> bool;
 
         [[nodiscard]] constexpr auto IsNil() const noexcept -> bool {
             for (usize i = 0; i < kByteCount; ++i) {
@@ -40,8 +43,8 @@ namespace AltinaEngine {
         [[nodiscard]] constexpr auto GetBytes() const noexcept -> const FBytes& { return mBytes; }
         [[nodiscard]] constexpr auto Data() const noexcept -> const u8* { return mBytes.Data(); }
 
-        [[nodiscard]] auto           ToString() const -> Container::FString;
-        [[nodiscard]] auto           ToNativeString() const -> Container::FNativeString;
+        [[nodiscard]] auto           ToString() const -> FString;
+        [[nodiscard]] auto           ToNativeString() const -> FNativeString;
 
         [[nodiscard]] constexpr auto operator==(const FUuid& other) const noexcept -> bool {
             for (usize i = 0; i < kByteCount; ++i) {

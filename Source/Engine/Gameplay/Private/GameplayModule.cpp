@@ -4,14 +4,13 @@
 #include "Logging/Log.h"
 #include "Reflection/Reflection.h"
 
+using AltinaEngine::Core::Container::TRef;
 namespace AltinaEngine::Core::Reflection {
     void RegisterReflection_AltinaEngineGameplay();
 }
 
 namespace AltinaEngine::Gameplay {
-    void FGameplayModule::LogHelloWorld() {
-        LogInfo(TEXT("Hello from Gameplay!"));
-    }
+    void FGameplayModule::LogHelloWorld() { LogInfo(TEXT("Hello from Gameplay!")); }
 
     void FGameplayModule::ValidateReflection() {
         Core::Reflection::RegisterReflection_AltinaEngineGameplay();
@@ -23,11 +22,11 @@ namespace AltinaEngine::Gameplay {
         auto speedMeta =
             Core::TypeMeta::FMetaPropertyInfo::Create<&FGameplayReflectionTest::mSpeed>();
 
-        auto healthProp = Core::Reflection::GetProperty(obj, healthMeta);
-        auto speedProp  = Core::Reflection::GetProperty(obj, speedMeta);
+        auto  healthProp = Core::Reflection::GetProperty(obj, healthMeta);
+        auto  speedProp  = Core::Reflection::GetProperty(obj, speedMeta);
 
-        auto& healthRef = healthProp.As<Core::Container::TRef<i32>>().Get();
-        auto& speedRef  = speedProp.As<Core::Container::TRef<f32>>().Get();
+        auto& healthRef = healthProp.As<TRef<i32>>().Get();
+        auto& speedRef  = speedProp.As<TRef<f32>>().Get();
         healthRef       = 123;
         speedRef        = 2.5f;
 

@@ -12,7 +12,7 @@ namespace AltinaEngine::GameScene {
             return;
         }
 
-        const bool existed = mEntries.HasKey(entry.TypeHash);
+        const bool existed       = mEntries.HasKey(entry.TypeHash);
         mEntries[entry.TypeHash] = entry;
 
         if (existed) {
@@ -69,8 +69,3 @@ namespace AltinaEngine::GameScene {
 
     auto GetComponentRegistry() -> FComponentRegistry& { return gComponentRegistry; }
 } // namespace AltinaEngine::GameScene
-
-
-
-
-

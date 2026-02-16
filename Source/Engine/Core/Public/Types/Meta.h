@@ -87,8 +87,8 @@ namespace AltinaEngine::Core::TypeMeta {
         }
         template <typename T> consteval static auto GetActualClassNameArray() {
             using namespace Core::Algorithm;
-            constexpr auto kFunctionSignature = GetFuncNameToArray<T>();
-            constexpr usize  kFirstPos =
+            constexpr auto  kFunctionSignature = GetFuncNameToArray<T>();
+            constexpr usize kFirstPos =
                 Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(
                     kFunctionSignature, '<', 0)
                 + 1;
@@ -96,8 +96,8 @@ namespace AltinaEngine::Core::TypeMeta {
                 Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(
                     kFunctionSignature, '>')
                 + 1;
-            constexpr usize  kFinalOffset = kFirstPos + 0 + 0;
-            constexpr auto kSubArray =
+            constexpr usize kFinalOffset = kFirstPos + 0 + 0;
+            constexpr auto  kSubArray =
                 GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(
                     kFunctionSignature);
             return kSubArray;
@@ -105,8 +105,8 @@ namespace AltinaEngine::Core::TypeMeta {
 
         template <auto T> consteval static auto GetActualVarNameArray() {
             using namespace Core::Algorithm;
-            constexpr auto kFunctionSignature = GetVarNameToArray<T>();
-            constexpr usize  kFirstPos =
+            constexpr auto  kFunctionSignature = GetVarNameToArray<T>();
+            constexpr usize kFirstPos =
                 Algorithm::GetOccurrencePosition<char, kFunctionSignature.Size()>(
                     kFunctionSignature, '<', 0)
                 + 1;
@@ -114,8 +114,8 @@ namespace AltinaEngine::Core::TypeMeta {
                 Algorithm::GetLastOccurrencePosition<char, kFunctionSignature.Size()>(
                     kFunctionSignature, '>')
                 + 1;
-            constexpr usize  kFinalOffset = kFirstPos + 0 + 0;
-            constexpr auto kSubArray =
+            constexpr usize kFinalOffset = kFirstPos + 0 + 0;
+            constexpr auto  kSubArray =
                 GetSubArray<kFinalOffset, kLastPos, char, kFunctionSignature.Size()>(
                     kFunctionSignature);
             return kSubArray;

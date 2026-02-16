@@ -4,8 +4,8 @@
 #include "IndexSequence.h"
 
 namespace AltinaEngine::Core::Container {
-    using AltinaEngine::usize;
     using AltinaEngine::Forward;
+    using AltinaEngine::usize;
 
     // Helper to get Nth type from parameter pack
     template <usize I, typename... Ts> struct TNthType;

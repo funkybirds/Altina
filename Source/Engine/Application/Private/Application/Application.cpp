@@ -3,11 +3,12 @@
 #include "Logging/Log.h"
 #include "RhiModule.h"
 
+using AltinaEngine::Core::Container::TVector;
 namespace AltinaEngine::Application {
     namespace Container = Core::Container;
     namespace {
         template <typename Func>
-        void ForEachHandler(const Container::TVector<IAppMessageHandler*>& handlers, Func&& fn) {
+        void ForEachHandler(const TVector<IAppMessageHandler*>& handlers, Func&& fn) {
             for (auto* handler : handlers) {
                 if (handler != nullptr) {
                     fn(*handler);

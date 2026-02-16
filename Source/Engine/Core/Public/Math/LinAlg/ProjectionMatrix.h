@@ -24,7 +24,6 @@ namespace AltinaEngine::Core::Math::LinAlg {
             (*this)(2, 3) = -minZ * maxZ / zRange;
             (*this)(3, 2) = static_cast<T>(1);
         }
-
     };
 
     using FProjectionMatrixf = TProjectionMatrix<f32>; // NOLINT(*-identifier-naming)
@@ -50,7 +49,9 @@ namespace AltinaEngine::Core::Math::LinAlg {
         }
     };
 
-    using FReversedZProjectionMatrixf = TReversedZProjectionMatrix<f32>; // NOLINT(*-identifier-naming)
-    using FReversedZProjectionMatrixd = TReversedZProjectionMatrix<f64>; // NOLINT(*-identifier-naming)
+    using FReversedZProjectionMatrixf =
+        TReversedZProjectionMatrix<f32>; // NOLINT(*-identifier-naming)
+    using FReversedZProjectionMatrixd =
+        TReversedZProjectionMatrix<f64>; // NOLINT(*-identifier-naming)
 
 } // namespace AltinaEngine::Core::Math::LinAlg

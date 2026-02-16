@@ -40,9 +40,7 @@ namespace AltinaEngine::Core::Math {
             return FQuaternion(a.X() * s, a.Y() * s, a.Z() * s, Cos(half));
         }
 
-        [[nodiscard]] f32 Length() const noexcept {
-            return Sqrt(x * x + y * y + z * z + w * w);
-        }
+        [[nodiscard]] f32 Length() const noexcept { return Sqrt(x * x + y * y + z * z + w * w); }
 
         [[nodiscard]] FQuaternion Normalized() const noexcept {
             const f32 l = Length();

@@ -22,6 +22,7 @@
     #include <wrl/client.h>
 #endif
 
+using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
     using Microsoft::WRL::ComPtr;
@@ -313,7 +314,7 @@ namespace AltinaEngine::Rhi {
 
         factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
 
-        mState->mSwapChain   = AltinaEngine::Move(swapChain);
+        mState->mSwapChain   = Move(swapChain);
         mState->mBufferCount = swapDesc.BufferCount;
         return true;
 #else

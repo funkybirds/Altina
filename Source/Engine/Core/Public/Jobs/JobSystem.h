@@ -5,13 +5,7 @@
 #include "../Container/ThreadSafeQueue.h"
 #include "../Threading/Event.h"
 #include "../Container/Function.h"
-// Avoid leaking STL types in public headers; use engine containers and atomics.
-#include "../Container/Vector.h"
-#include "../Threading/Atomic.h"
 
-// Bring common fixed-size aliases into the including translation unit for
-// convenience and compatibility with existing tests that expect unqualified
-// names like `u32` to be available.
 using AltinaEngine::i16;
 using AltinaEngine::i32;
 using AltinaEngine::i64;
@@ -22,6 +16,14 @@ using AltinaEngine::u32;
 using AltinaEngine::u64;
 using AltinaEngine::u8;
 using AltinaEngine::usize;
+
+// Avoid leaking STL types in public headers; use engine containers and atomics.
+#include "../Container/Vector.h"
+#include "../Threading/Atomic.h"
+
+// Bring common fixed-size aliases into the including translation unit for
+// convenience and compatibility with existing tests that expect unqualified
+// names like `u32` to be available.
 
 namespace std {
     class thread;

@@ -1,6 +1,6 @@
 #include "TestHarness.h"
 
-#include "../../Engine/Core/Private/Math/SpatialTransform.h"
+#include "Math/LinAlg/SpatialTransform.h"
 
 #include "Math/Common.h"
 #include "Math/Matrix.h"
@@ -8,6 +8,7 @@
 #include "Math/Vector.h"
 
 using namespace AltinaEngine::Core::Math;
+using namespace AltinaEngine::Core::Math::LinAlg;
 using AltinaEngine::f32;
 using AltinaEngine::u32;
 
@@ -30,10 +31,9 @@ namespace {
 } // namespace
 
 TEST_CASE("SpatialTransform - ToMatrix encodes TRS") {
-    const FQuaternion rotation =
-        FQuaternion::FromAxisAngle(FVector3f(0.0f, 0.0f, 1.0f), kHalfPiF);
-    const FVector3f translation(1.0f, 2.0f, 3.0f);
-    const FVector3f scale(2.0f, 3.0f, 4.0f);
+    const FQuaternion rotation = FQuaternion::FromAxisAngle(FVector3f(0.0f, 0.0f, 1.0f), kHalfPiF);
+    const FVector3f   translation(1.0f, 2.0f, 3.0f);
+    const FVector3f   scale(2.0f, 3.0f, 4.0f);
 
     const FSpatialTransform transform(rotation, translation, scale);
     const FMatrix4x4f       m = transform.ToMatrix();
@@ -60,19 +60,15 @@ TEST_CASE("SpatialTransform - ToMatrix encodes TRS") {
 }
 
 TEST_CASE("SpatialTransform - Multiply order applies B then A") {
-    const FSpatialTransform a(
-        FQuaternion::FromAxisAngle(FVector3f(0.0f, 0.0f, 1.0f), kHalfPiF),
-        FVector3f(0.0f, 0.0f, 0.0f),
-        FVector3f(1.0f, 1.0f, 1.0f));
+    const FSpatialTransform a(FQuaternion::FromAxisAngle(FVector3f(0.0f, 0.0f, 1.0f), kHalfPiF),
+        FVector3f(0.0f, 0.0f, 0.0f), FVector3f(1.0f, 1.0f, 1.0f));
     const FSpatialTransform b(
-        FQuaternion::Identity(),
-        FVector3f(1.0f, 0.0f, 0.0f),
-        FVector3f(1.0f, 1.0f, 1.0f));
+        FQuaternion::Identity(), FVector3f(1.0f, 0.0f, 0.0f), FVector3f(1.0f, 1.0f, 1.0f));
 
-    const FVector3f point(1.0f, 0.0f, 0.0f);
-    const FVector3f expected = ApplyTransform(a, ApplyTransform(b, point));
+    const FVector3f         point(1.0f, 0.0f, 0.0f);
+    const FVector3f         expected = ApplyTransform(a, ApplyTransform(b, point));
 
-    const FSpatialTransform composed = a * b;
+    const FSpatialTransform composed       = a * b;
     const FMatrix4x4f       composedMatrix = composed.ToMatrix();
     const FVector4f         homo(point.X(), point.Y(), point.Z(), 1.0f);
     const FVector4f         result = MatMul(composedMatrix, homo);

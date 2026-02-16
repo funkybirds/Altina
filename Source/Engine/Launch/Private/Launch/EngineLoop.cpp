@@ -5,6 +5,7 @@
 
 #include "Console/ConsoleVariable.h"
 #include "Logging/Log.h"
+#include "Platform/Generic/GenericPlatformDecl.h"
 #include "Threading/RenderingThread.h"
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiStructs.h"
@@ -197,6 +198,8 @@ namespace AltinaEngine::Launch {
         auto      viewport   = mMainViewport;
         auto      callback   = mRenderCallback;
 
+        LogInfo(TEXT("GameThread Frame {}"), frameIndex);
+
         Core::Jobs::FJobDescriptor desc{};
         desc.AffinityMask = static_cast<u32>(Core::Jobs::ENamedThread::Rendering);
         desc.Callback     = [device, viewport, callback, frameIndex, width, height,
@@ -225,6 +228,9 @@ namespace AltinaEngine::Launch {
             }
 
             device->EndFrame();
+
+            LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
+            Core::Platform::Generic::PlatformSleepMilliseconds(2000);
         };
 
         auto handle = Core::Jobs::FJobSystem::Submit(AltinaEngine::Move(desc));
@@ -232,6 +238,8 @@ namespace AltinaEngine::Launch {
             mPendingRenderFrames.Push(handle);
             EnforceRenderLag(GetRenderThreadLagFrames());
         }
+
+        Core::Platform::Generic::PlatformSleepMilliseconds(1000);
     }
 
     void FEngineLoop::Exit() {

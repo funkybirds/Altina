@@ -6,7 +6,6 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
-#include <string>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Core::Utility::Json {
@@ -323,10 +322,14 @@ namespace AltinaEngine::Core::Utility::Json {
                 }
 
                 const usize end = mIndex;
-                std::string token(mText.Data() + start, mText.Data() + end);
+                FNativeString token;
+                if (end > start) {
+                    token.Append(mText.Data() + start, end - start);
+                }
+                const char* cstr  = token.CStr();
                 char*       endPtr = nullptr;
-                out                = std::strtod(token.c_str(), &endPtr);
-                if (endPtr == token.c_str()) {
+                out                = std::strtod(cstr, &endPtr);
+                if (endPtr == cstr) {
                     SetError("Invalid number.");
                     return false;
                 }

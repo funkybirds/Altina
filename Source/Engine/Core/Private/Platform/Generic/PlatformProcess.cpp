@@ -55,32 +55,37 @@ namespace AltinaEngine::Core::Platform {
         auto ToWideString(const FString& value) -> std::wstring { return ToWideStringImpl(value); }
 
         template <typename CharT>
-        auto FromUtf8Impl(const std::string& value) -> TBasicString<CharT> {
+        auto FromUtf8Impl(Container::FNativeStringView value) -> TBasicString<CharT> {
             TBasicString<CharT> out;
-            if (value.empty()) {
+            if (value.Length() == 0) {
                 return out;
             }
             if constexpr (std::is_same_v<CharT, wchar_t>) {
 #if AE_PLATFORM_WIN
                 int wideCount = MultiByteToWideChar(
-                    CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
+                    CP_UTF8, 0, value.Data(), static_cast<int>(value.Length()), nullptr, 0);
                 if (wideCount <= 0) {
                     return out;
                 }
                 std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-                MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()),
+                MultiByteToWideChar(CP_UTF8, 0, value.Data(), static_cast<int>(value.Length()),
                     wide.data(), wideCount);
                 out.Append(wide.c_str(), wide.size());
 #else
-                out.Append(value.c_str(), value.size());
+                for (usize i = 0; i < value.Length(); ++i) {
+                    out.Append(static_cast<wchar_t>(
+                        static_cast<unsigned char>(value.Data()[i])));
+                }
 #endif
             } else {
-                out.Append(value.c_str(), value.size());
+                out.Append(value.Data(), value.Length());
             }
             return out;
         }
 
-        auto FromUtf8(const std::string& value) -> FString { return FromUtf8Impl<TChar>(value); }
+        auto FromUtf8(Container::FNativeStringView value) -> FString {
+            return FromUtf8Impl<TChar>(value);
+        }
 
         void AppendDiagnosticLine(FString& diagnostics, const TChar* line) {
             if ((line == nullptr) || (line[0] == static_cast<TChar>(0))) {
@@ -157,11 +162,11 @@ namespace AltinaEngine::Core::Platform {
 
         CloseHandle(writePipe);
 
-        std::string buffer;
+        Container::FNativeString buffer;
         char        chunk[4096];
         DWORD       bytesRead = 0;
         while (ReadFile(readPipe, chunk, sizeof(chunk), &bytesRead, nullptr) && bytesRead > 0) {
-            buffer.append(chunk, chunk + bytesRead);
+            buffer.Append(chunk, static_cast<usize>(bytesRead));
         }
         CloseHandle(readPipe);
 
@@ -173,7 +178,7 @@ namespace AltinaEngine::Core::Platform {
 
         output.mExitCode  = static_cast<u32>(exitCode);
         output.mSucceeded = (exitCode == 0);
-        output.mOutput    = FromUtf8(buffer);
+        output.mOutput    = FromUtf8(buffer.ToView());
 #else
         (void)exePath;
         (void)args;

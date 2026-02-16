@@ -106,19 +106,19 @@ namespace AltinaEngine::Asset {
                 return out;
             }
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-            std::string utf8(value.GetData(), value.GetData() + value.Length());
     #if AE_PLATFORM_WIN
             int wideCount = MultiByteToWideChar(
-                CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
+                CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()), nullptr, 0);
             if (wideCount <= 0) {
                 return out;
             }
             std::wstring wide(static_cast<size_t>(wideCount), L'\0');
             MultiByteToWideChar(
-                CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), wide.data(), wideCount);
+                CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()), wide.data(),
+                wideCount);
             out.Append(wide.c_str(), wide.size());
     #else
-            out.Append(utf8.c_str(), utf8.size());
+            out.Append(value.GetData(), value.Length());
     #endif
 #else
             out.Append(value.GetData(), value.Length());

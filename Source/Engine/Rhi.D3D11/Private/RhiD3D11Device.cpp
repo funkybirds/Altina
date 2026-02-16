@@ -41,7 +41,6 @@
     #include <wrl/client.h>
 #endif
 
-#include <string>
 #include <vector>
 #include <type_traits>
 #include <limits>
@@ -1057,14 +1056,14 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        auto ToAnsiString(const FString& text) -> std::string {
-            std::string out;
-            const auto  length = static_cast<size_t>(text.Length());
-            out.reserve(length);
+        auto ToAnsiString(const FString& text) -> Container::FNativeString {
+            Container::FNativeString out;
+            const auto               length = text.Length();
+            out.Reserve(length);
             const auto* data = text.GetData();
-            for (size_t i = 0; i < length; ++i) {
+            for (usize i = 0; i < length; ++i) {
                 const auto ch = data[i];
-                out.push_back((ch <= 0x7f) ? static_cast<char>(ch) : '?');
+                out.Append((static_cast<u32>(ch) <= 0x7fU) ? static_cast<char>(ch) : '?');
             }
             return out;
         }
@@ -1084,8 +1083,8 @@ namespace AltinaEngine::Rhi {
             TVector<D3D11_INPUT_ELEMENT_DESC> elements;
             elements.Reserve(desc.mVertexLayout.mAttributes.Size());
 
-            std::vector<std::string> semanticStorage;
-            semanticStorage.reserve(static_cast<size_t>(desc.mVertexLayout.mAttributes.Size()));
+            TVector<Container::FNativeString> semanticStorage;
+            semanticStorage.Reserve(desc.mVertexLayout.mAttributes.Size());
 
             for (const auto& attribute : desc.mVertexLayout.mAttributes) {
                 const DXGI_FORMAT format = ToD3D11Format(attribute.mFormat);
@@ -1093,10 +1092,10 @@ namespace AltinaEngine::Rhi {
                     return layout;
                 }
 
-                semanticStorage.push_back(ToAnsiString(attribute.mSemanticName));
+                semanticStorage.PushBack(ToAnsiString(attribute.mSemanticName));
 
                 D3D11_INPUT_ELEMENT_DESC element{};
-                element.SemanticName      = semanticStorage.back().c_str();
+                element.SemanticName      = semanticStorage.Back().CStr();
                 element.SemanticIndex     = attribute.mSemanticIndex;
                 element.Format            = format;
                 element.InputSlot         = attribute.mInputSlot;

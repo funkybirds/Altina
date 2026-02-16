@@ -1,13 +1,12 @@
 #pragma once
 
 #include "Logging/Log.h"
-
-#include <string>
+#include "Container/String.h"
 
 namespace AltinaEngine {
 
     struct FStartupParameters {
-        std::string mCommandLine; // Raw command-line passed to the engine.
+        Core::Container::FNativeString mCommandLine; // Raw command-line passed to the engine.
     };
 
 } // namespace AltinaEngine

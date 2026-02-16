@@ -2,8 +2,6 @@
 
 #include <filesystem>
 #include <fstream>
-#include <string>
-#include <type_traits>
 
 using AltinaEngine::Core::Container::TBasicString;
 namespace AltinaEngine::Core::Platform {
@@ -11,11 +9,7 @@ namespace AltinaEngine::Core::Platform {
     namespace {
         template <typename CharT>
         auto ToPathImpl(const TBasicString<CharT>& value) -> std::filesystem::path {
-            if constexpr (std::is_same_v<CharT, wchar_t>) {
-                return std::filesystem::path(std::wstring(value.GetData(), value.Length()));
-            } else {
-                return std::filesystem::path(std::string(value.GetData(), value.Length()));
-            }
+            return std::filesystem::path(value.CStr());
         }
 
         auto ToPath(const FString& value) -> std::filesystem::path { return ToPathImpl(value); }
@@ -61,10 +55,21 @@ namespace AltinaEngine::Core::Platform {
             return false;
         }
 
-        std::string content(
-            (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        if (!content.empty()) {
-            outText.Append(content.c_str(), content.size());
+        file.seekg(0, std::ios::end);
+        const auto endPos = file.tellg();
+        if (endPos < 0) {
+            return false;
+        }
+        const auto size = static_cast<usize>(endPos);
+        file.seekg(0, std::ios::beg);
+
+        if (size > 0) {
+            outText.Resize(size);
+            file.read(outText.GetData(), static_cast<std::streamsize>(size));
+            if (!file.good() && !file.eof()) {
+                outText.Clear();
+                return false;
+            }
         }
         return file.good() || file.eof();
     }

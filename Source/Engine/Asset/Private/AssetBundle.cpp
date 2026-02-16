@@ -8,11 +8,7 @@
 namespace AltinaEngine::Asset {
     namespace {
         auto ToPath(const FString& value) -> std::filesystem::path {
-#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-            return std::filesystem::path(std::wstring(value.GetData(), value.Length()));
-#else
-            return std::filesystem::path(std::string(value.GetData(), value.Length()));
-#endif
+            return std::filesystem::path(value.CStr());
         }
 
         auto ReadExact(std::ifstream& stream, void* outBuffer, usize size) -> bool {

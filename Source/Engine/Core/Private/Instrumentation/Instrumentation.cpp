@@ -12,10 +12,10 @@ using namespace AltinaEngine;
 using namespace AltinaEngine::Core;
 
 namespace AltinaEngine::Core::Instrumentation {
+    using Container::FNativeString;
     using Container::MakeShared;
     using Container::THashMap;
     using Container::TShared;
-    using std::string;
     using Threading::TAtomic;
 
     struct FCounter {
@@ -28,8 +28,8 @@ namespace AltinaEngine::Core::Instrumentation {
     };
 
     static Threading::FMutex                   gMutex;
-    static THashMap<string, TShared<FCounter>> gCounters;
-    static THashMap<string, TShared<FTiming>>  gTimings;
+    static THashMap<FNativeString, TShared<FCounter>> gCounters;
+    static THashMap<FNativeString, TShared<FTiming>>  gTimings;
 
     // Per-thread name stored in thread_local for fast reads.
     thread_local const char*                   tThreadName = nullptr;
@@ -41,7 +41,7 @@ namespace AltinaEngine::Core::Instrumentation {
 
         // Ensure a placeholder counter entry exists for visibility tools.
         Threading::FScopedLock lk(gMutex);
-        string                 key(name);
+        FNativeString          key(name);
         if (gCounters.find(key) == gCounters.end()) {
             gCounters.emplace(Move(key), MakeShared<FCounter>());
         }
@@ -53,7 +53,7 @@ namespace AltinaEngine::Core::Instrumentation {
         if (!name)
             return;
         Threading::FScopedLock lk(gMutex);
-        string                 key(name);
+        FNativeString          key(name);
         auto                   it = gCounters.find(key);
         if (it == gCounters.end()) {
             auto shared = MakeShared<FCounter>();
@@ -68,7 +68,7 @@ namespace AltinaEngine::Core::Instrumentation {
         if (name == nullptr)
             return 0;
         Threading::FScopedLock lk(gMutex);
-        string                 key(name);
+        FNativeString          key(name);
         auto                   it = gCounters.find(key);
         if (it == gCounters.end())
             return 0;
@@ -79,7 +79,7 @@ namespace AltinaEngine::Core::Instrumentation {
         if (name == nullptr)
             return;
         Threading::FScopedLock lk(gMutex);
-        string                 key(name);
+        FNativeString          key(name);
         auto                   it = gTimings.find(key);
         if (it == gTimings.end()) {
             auto shared = MakeShared<FTiming>();
@@ -99,7 +99,7 @@ namespace AltinaEngine::Core::Instrumentation {
         if (!name)
             return;
         Threading::FScopedLock lk(gMutex);
-        string                 key(name);
+        FNativeString          key(name);
         auto                   it = gTimings.find(key);
         if (it == gTimings.end())
             return;

@@ -19,6 +19,7 @@
 #include "RhiD3D11/RhiD3D11CommandContext.h"
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "Types/Aliases.h"
+#include "Container/String.h"
 
 #include <atomic>
 #include <chrono>
@@ -27,7 +28,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <string>
 
 #if AE_PLATFORM_WIN
     #ifdef TEXT
@@ -87,27 +87,28 @@ namespace {
             return out;
         }
 
-        auto ToAsciiString(const Container::FString& text) -> std::string {
-            std::string out;
+        auto ToAsciiString(const Container::FString& text) -> Container::FNativeString {
+            Container::FNativeString out;
             const auto* data = text.GetData();
             const auto  size = text.Length();
-            out.reserve(static_cast<size_t>(size));
+            out.Reserve(size);
             for (usize i = 0; i < size; ++i) {
                 const auto ch = data[i];
-                out.push_back((ch <= 0x7f) ? static_cast<char>(ch) : '?');
+                out.Append((static_cast<u32>(ch) <= 0x7fU) ? static_cast<char>(ch) : '?');
             }
             return out;
         }
 
         auto IsCompilerUnavailable(const Container::FString& diagnostics) -> bool {
             const auto diag = ToAsciiString(diagnostics);
-            if (diag.find("disabled") != std::string::npos) {
+            const auto view = diag.ToView();
+            if (view.Contains(Container::FNativeStringView("disabled"))) {
                 return true;
             }
-            if (diag.find("Failed to launch compiler process.") != std::string::npos) {
+            if (view.Contains(Container::FNativeStringView("Failed to launch compiler process."))) {
                 return true;
             }
-            if (diag.find("Process execution not supported") != std::string::npos) {
+            if (view.Contains(Container::FNativeStringView("Process execution not supported"))) {
                 return true;
             }
             return false;
@@ -189,7 +190,8 @@ namespace {
         }
 
         auto CompileD3D11ShaderFxc(const char* source, const char* entryPoint,
-            const char* targetProfile, Shader::FShaderBytecode& outBytecode, std::string& outErrors)
+            const char* targetProfile, Shader::FShaderBytecode& outBytecode,
+            Container::FNativeString& outErrors)
             -> bool {
             if (!source || !entryPoint || !targetProfile) {
                 return false;
@@ -201,10 +203,10 @@ namespace {
             const HRESULT    hr = D3DCompile(source, std::strlen(source), nullptr, nullptr, nullptr,
                    entryPoint, targetProfile, flags, 0, &bytecode, &errors);
 
-            outErrors.clear();
+            outErrors.Clear();
             if (errors) {
                 const auto* data = static_cast<const char*>(errors->GetBufferPointer());
-                outErrors.assign(data, data + errors->GetBufferSize());
+                outErrors.Append(data, static_cast<usize>(errors->GetBufferSize()));
             }
 
             if (FAILED(hr) || !bytecode) {
@@ -217,7 +219,8 @@ namespace {
             return true;
         }
 
-        auto WriteTempShaderFile(const char* prefix, const char* content, std::string& outErrors)
+        auto WriteTempShaderFile(const char* prefix, const char* content,
+            Container::FNativeString& outErrors)
             -> std::filesystem::path {
             if (content == nullptr) {
                 outErrors = "Shader source is null.";
@@ -241,8 +244,11 @@ namespace {
             }
 
             const auto            id = counter.fetch_add(1, std::memory_order_relaxed);
-            std::filesystem::path path =
-                dir / (std::string(prefix) + "_" + std::to_string(id) + ".hlsl");
+            Container::FNativeString fileName(prefix);
+            fileName.Append("_");
+            fileName.AppendNumber(id);
+            fileName.Append(".hlsl");
+            std::filesystem::path path = dir / std::filesystem::path(fileName.CStr());
 
             std::ofstream file(path, std::ios::binary | std::ios::trunc);
             if (!file) {
@@ -263,12 +269,12 @@ namespace {
         auto CompileD3D11ShaderWithShaderCompiler(const char* source, const char* entryPoint,
             Shader::EShaderStage stage, ShaderCompiler::EShaderSourceLanguage sourceLanguage,
             Shader::FShaderBytecode& outBytecode, Shader::FShaderReflection& outReflection,
-            std::string& outErrors, const char* targetProfile = nullptr) -> bool {
+            Container::FNativeString& outErrors, const char* targetProfile = nullptr) -> bool {
             if (!source || !entryPoint) {
                 return false;
             }
 
-            outErrors.clear();
+            outErrors.Clear();
             const auto shaderPath = WriteTempShaderFile("TriangleShader", source, outErrors);
             if (shaderPath.empty()) {
                 return false;
@@ -441,7 +447,7 @@ float4 PSMain(VSOut input) : SV_Target0 {
                                    Rhi::FRhiShaderRef& outShader) -> bool {
                 Shader::FShaderBytecode   bytecode;
                 Shader::FShaderReflection reflection;
-                std::string               errors;
+                Container::FNativeString  errors;
 
                 if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(kTriangleShaderHlsl,
                         entryPoint, stage, ShaderCompiler::EShaderSourceLanguage::Hlsl, bytecode,
@@ -453,12 +459,12 @@ float4 PSMain(VSOut input) : SV_Target0 {
                     }
                     std::cerr << "[Triangle] " << label
                               << " create failed for DXC output; trying Slang.\n";
-                } else if (!errors.empty()) {
+                } else if (!errors.IsEmptyString()) {
                     std::cerr << "[Triangle] " << label << " DXC compile failed:\n"
-                              << errors << "\n";
+                              << errors.CStr() << "\n";
                 }
 
-                errors.clear();
+                errors.Clear();
                 if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(kTriangleShaderHlsl,
                         entryPoint, stage, ShaderCompiler::EShaderSourceLanguage::Slang, bytecode,
                         reflection, errors, targetProfile)) {
@@ -469,12 +475,12 @@ float4 PSMain(VSOut input) : SV_Target0 {
                     }
                     std::cerr << "[Triangle] " << label
                               << " create failed for Slang output; trying D3DCompile.\n";
-                } else if (!errors.empty()) {
+                } else if (!errors.IsEmptyString()) {
                     std::cerr << "[Triangle] " << label << " Slang compile failed:\n"
-                              << errors << "\n";
+                              << errors.CStr() << "\n";
                 }
 
-                errors.clear();
+                errors.Clear();
                 Shader::FShaderBytecode fxcBytecode;
                 if (ShaderCompileHelpers::CompileD3D11ShaderFxc(
                         kTriangleShaderHlsl, entryPoint, targetProfile, fxcBytecode, errors)) {
@@ -488,9 +494,9 @@ float4 PSMain(VSOut input) : SV_Target0 {
                     std::cerr << "[Triangle] " << label << " create failed after D3DCompile.\n";
                 }
 
-                if (!errors.empty()) {
+                if (!errors.IsEmptyString()) {
                     std::cerr << "[Triangle] " << label << " D3DCompile failed:\n"
-                              << errors << "\n";
+                              << errors.CStr() << "\n";
                 }
                 return false;
             };

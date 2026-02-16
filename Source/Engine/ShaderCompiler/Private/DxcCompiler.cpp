@@ -41,6 +41,7 @@
 namespace AltinaEngine::ShaderCompiler::Detail {
     namespace Container = Core::Container;
     using Container::FString;
+    using Container::FNativeString;
     using Container::TVector;
     using Core::Platform::ReadFileBytes;
     using Core::Platform::RemoveFileIfExists;
@@ -109,12 +110,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         auto ToFString(u32 value) -> FString {
-            const auto text = std::to_string(value);
-            FString    out;
-            for (char ch : text) {
-                out.Append(static_cast<TChar>(ch));
-            }
-            return out;
+            return FString::ToString(value);
         }
 
         void AddArg(TVector<FString>& args, const TChar* text) { args.EmplaceBack(text); }
@@ -196,16 +192,16 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         struct FStructMemberInfo {
-            std::string                 mName;
+            FNativeString               mName;
             ID3D12ShaderReflectionType* mType = nullptr;
             D3D12_SHADER_TYPE_DESC      mDesc{};
             u32                         mOffset = 0U;
         };
 
-        auto AppendCBufferMember(FShaderConstantBuffer& outCb, const std::string& name,
+        auto AppendCBufferMember(FShaderConstantBuffer& outCb, const FNativeString& name,
             u32 offsetBytes, u32 sizeBytes, u32 elementCount, u32 elementStride) -> void {
             FShaderConstantBufferMember member{};
-            member.mName          = ConvertNameToString(name.c_str());
+            member.mName          = ConvertNameToString(name.CStr());
             member.mOffset        = offsetBytes;
             member.mSize          = sizeBytes;
             member.mElementCount  = elementCount;
@@ -213,7 +209,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             outCb.mMembers.PushBack(member);
         }
 
-        auto AppendStructMembers(ID3D12ShaderReflectionType* type, const std::string& prefix,
+        auto AppendStructMembers(ID3D12ShaderReflectionType* type, const FNativeString& prefix,
             u32 baseOffset, u32 parentSize, FShaderConstantBuffer& outCb) -> void {
             if (type == nullptr || parentSize == 0U) {
                 return;
@@ -267,7 +263,11 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     }
                 }
 
-                const std::string fullName     = prefix + "." + entry.mName;
+                FNativeString fullName = prefix;
+                if (!fullName.IsEmptyString()) {
+                    fullName.Append('.');
+                }
+                fullName.Append(entry.mName);
                 const u32         elementCount = static_cast<u32>(entry.mDesc.Elements);
                 const u32         elementStride =
                     (elementCount > 0U && sizeBytes > 0U) ? (sizeBytes / elementCount) : 0U;
@@ -463,14 +463,15 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                         ? (static_cast<u32>(varDesc.Size) / elementCount)
                         : 0U;
 
-                    AppendCBufferMember(cbInfo, std::string(varDesc.Name),
+                    FNativeString varName(varDesc.Name);
+                    AppendCBufferMember(cbInfo, varName,
                         static_cast<u32>(varDesc.StartOffset), static_cast<u32>(varDesc.Size),
                         elementCount, elementStride);
 
                     const bool isStruct = varType != nullptr && typeDesc.Class == D3D_SVC_STRUCT;
                     if (isStruct && typeDesc.Elements == 0 && typeDesc.Members > 0
                         && varDesc.Size > 0U) {
-                        AppendStructMembers(varType, std::string(varDesc.Name),
+                        AppendStructMembers(varType, varName,
                             static_cast<u32>(varDesc.StartOffset), static_cast<u32>(varDesc.Size),
                             cbInfo);
                     }

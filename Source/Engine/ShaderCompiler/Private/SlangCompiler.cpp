@@ -43,6 +43,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
     namespace {
         using Container::FNativeString;
+        using Container::FNativeStringView;
         using Container::FStringView;
 
         constexpr const TChar* kSlangName = TEXT("Slang");
@@ -489,9 +490,9 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 member.mElementStride = elementStride;
                 outCb.mMembers.PushBack(member);
 
-                const std::string kindStr(kind.GetData(), kind.Length());
-                const bool        isArray = (kindStr == "array");
-                if (!isArray && kindStr == "struct") {
+                const FNativeStringView kindView(kind.GetData(), kind.Length());
+                const bool              isArray = (kindView == FNativeStringView("array"));
+                if (!isArray && kindView == FNativeStringView("struct")) {
                     ParseSlangTypeLayoutFields(
                         fieldTypeLayout, fullName, baseOffset + offsetBytes, outCb);
                 }
@@ -526,31 +527,31 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         auto MapResourceKind(const FNativeString& kind, const FNativeString& baseShape,
             const FNativeString& access, EShaderResourceAccess& outAccess) -> EShaderResourceType {
             outAccess = EShaderResourceAccess::ReadOnly;
-            const std::string accessStr(access.GetData(), access.Length());
-            if (accessStr == "readWrite") {
+            const FNativeStringView accessView(access.GetData(), access.Length());
+            if (accessView == FNativeStringView("readWrite")) {
                 outAccess = EShaderResourceAccess::ReadWrite;
             }
 
-            const std::string kindStr(kind.GetData(), kind.Length());
-            if (kindStr.empty()) {
+            const FNativeStringView kindView(kind.GetData(), kind.Length());
+            if (kindView.IsEmpty()) {
                 return EShaderResourceType::Texture;
             }
 
-            if (kindStr == "constantBuffer") {
+            if (kindView == FNativeStringView("constantBuffer")) {
                 return EShaderResourceType::ConstantBuffer;
             }
-            if (kindStr == "samplerState") {
+            if (kindView == FNativeStringView("samplerState")) {
                 return EShaderResourceType::Sampler;
             }
-            if (kindStr == "resource") {
-                const std::string shapeStr(baseShape.GetData(), baseShape.Length());
-                if (!shapeStr.empty()) {
-                    if (shapeStr.find("texture") != std::string::npos) {
+            if (kindView == FNativeStringView("resource")) {
+                const FNativeStringView shapeView(baseShape.GetData(), baseShape.Length());
+                if (!shapeView.IsEmpty()) {
+                    if (shapeView.Find(FNativeStringView("texture")) != FNativeStringView::npos) {
                         return (outAccess == EShaderResourceAccess::ReadWrite)
                             ? EShaderResourceType::StorageTexture
                             : EShaderResourceType::Texture;
                     }
-                    if (shapeStr.find("buffer") != std::string::npos) {
+                    if (shapeView.Find(FNativeStringView("buffer")) != FNativeStringView::npos) {
                         return EShaderResourceType::StorageBuffer;
                     }
                 }
@@ -620,8 +621,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     binding.mType     = MapResourceKind(kind, baseShape, access, binding.mAccess);
                     outReflection.mResources.PushBack(binding);
 
-                    const std::string kindStr(kind.GetData(), kind.Length());
-                    if (kindStr == "constantBuffer") {
+                    const FNativeStringView kindView(kind.GetData(), kind.Length());
+                    if (kindView == FNativeStringView("constantBuffer")) {
                         FShaderConstantBuffer cbInfo{};
                         cbInfo.mName     = binding.mName;
                         cbInfo.mBinding  = binding.mBinding;
@@ -791,12 +792,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         auto ToFString(u32 value) -> FString {
-            const auto text = std::to_string(value);
-            FString    out;
-            for (char ch : text) {
-                out.Append(static_cast<TChar>(ch));
-            }
-            return out;
+            return FString::ToString(value);
         }
 
         void AddArg(TVector<FString>& args, const TChar* text) { args.EmplaceBack(text); }

@@ -28,11 +28,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         template <typename CharT>
         auto ToPathImpl(const TBasicString<CharT>& value) -> std::filesystem::path {
-            if constexpr (std::is_same_v<CharT, wchar_t>) {
-                return std::filesystem::path(std::wstring(value.GetData(), value.Length()));
-            } else {
-                return std::filesystem::path(std::string(value.GetData(), value.Length()));
-            }
+            return std::filesystem::path(value.CStr());
         }
 
         auto ToPath(const FString& value) -> std::filesystem::path { return ToPathImpl(value); }
@@ -82,9 +78,9 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         const auto            uniqueId = counter.fetch_add(1, std::memory_order_relaxed);
         std::filesystem::path filename = stem;
-        filename += std::filesystem::path("_");
-        filename += std::filesystem::path(std::to_string(uniqueId));
-        filename += std::filesystem::path("_");
+        filename += std::filesystem::path(TEXT("_"));
+        filename += ToPath(FString::ToString(uniqueId));
+        filename += std::filesystem::path(TEXT("_"));
         filename += ToPath(suffix);
         filename += ToPath(extension);
 

@@ -5,6 +5,7 @@
 
 #include <thread>
 
+using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Container::TFunction;
 using AltinaEngine::Move;
 namespace AltinaEngine::RenderCore {
@@ -12,9 +13,10 @@ namespace AltinaEngine::RenderCore {
         TEXT("gRenderingThreadLagFrames"),
         1);
 
-    auto EnqueueRenderTask(TFunction<void()> task) noexcept
+    auto EnqueueRenderTask(FString TaskName, TFunction<void()> task) noexcept
         -> Core::Jobs::FJobHandle {
         Core::Jobs::FJobDescriptor desc{};
+        desc.TaskName     = Move(TaskName);
         desc.AffinityMask = static_cast<u32>(Core::Jobs::ENamedThread::Rendering);
         desc.Callback     = Move(task);
         return Core::Jobs::FJobSystem::Submit(Move(desc));

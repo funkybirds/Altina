@@ -5,6 +5,7 @@
 #include "../Container/ThreadSafeQueue.h"
 #include "../Threading/Event.h"
 #include "../Container/Function.h"
+#include "../Container/String.h"
 
 using AltinaEngine::i16;
 using AltinaEngine::i32;
@@ -33,6 +34,7 @@ namespace AltinaEngine::Core::Jobs {
 
     // Shorten commonly used engine types in this header to keep declarations concise.
     using Container::TFunction;
+    using Container::FString;
     using Container::TThreadSafeQueue;
     using Container::TVector;
     using Threading::FEvent;
@@ -117,6 +119,7 @@ namespace AltinaEngine::Core::Jobs {
         TFunction<void()> Callback;
         void*             Payload    = nullptr; // optional user data
         const char*       DebugLabel = nullptr;
+        FString           TaskName;
         AltinaEngine::u32 AffinityMask =
             0; // mapping to named thread / pool ids (implementation-defined)
         int                 Priority = 0; // advisory priority

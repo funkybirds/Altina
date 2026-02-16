@@ -199,36 +199,36 @@ namespace AltinaEngine::Launch {
 
         LogInfo(TEXT("GameThread Frame {}"), frameIndex);
 
-        auto handle = RenderCore::EnqueueRenderTask([device, viewport, callback, frameIndex, width,
-                                                        height, shouldResize]() mutable -> void {
-            if (!device)
-                return;
+        auto handle = RenderCore::EnqueueRenderTask(Container::FString(TEXT("RenderFrame")),
+            [device, viewport, callback, frameIndex, width, height, shouldResize]() mutable -> void {
+                if (!device)
+                    return;
 
-            device->BeginFrame(frameIndex);
+                device->BeginFrame(frameIndex);
 
-            if (viewport && width > 0U && height > 0U) {
-                if (shouldResize) {
-                    viewport->Resize(width, height);
+                if (viewport && width > 0U && height > 0U) {
+                    if (shouldResize) {
+                        viewport->Resize(width, height);
+                    }
+
+                    if (callback) {
+                        callback(*device, *viewport, width, height);
+                    }
+
+                    const auto queue = device->GetQueue(Rhi::ERhiQueueType::Graphics);
+                    if (queue) {
+                        Rhi::FRhiPresentInfo presentInfo{};
+                        presentInfo.mViewport     = viewport.Get();
+                        presentInfo.mSyncInterval = 1U;
+                        queue->Present(presentInfo);
+                    }
                 }
 
-                if (callback) {
-                    callback(*device, *viewport, width, height);
-                }
+                device->EndFrame();
 
-                const auto queue = device->GetQueue(Rhi::ERhiQueueType::Graphics);
-                if (queue) {
-                    Rhi::FRhiPresentInfo presentInfo{};
-                    presentInfo.mViewport     = viewport.Get();
-                    presentInfo.mSyncInterval = 1U;
-                    queue->Present(presentInfo);
-                }
-            }
-
-            device->EndFrame();
-
-            LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
-            Core::Platform::Generic::PlatformSleepMilliseconds(2000);
-        });
+                LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
+                Core::Platform::Generic::PlatformSleepMilliseconds(2000);
+            });
         if (handle.IsValid()) {
             mPendingRenderFrames.Push(handle);
             EnforceRenderLag(GetRenderThreadLagFrames());

@@ -7,13 +7,14 @@
 #include "Console/ConsoleVariable.h"
 #include "Jobs/JobSystem.h"
 
+using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Container::TFunction;
 namespace AltinaEngine::RenderCore {
     // Controls how many frames the game thread can lead the rendering thread.
     AE_RENDER_CORE_API extern Core::Console::TConsoleVariable<i32> gRenderingThreadLagFrames;
 
     // Enqueue a render task from the game thread.
-    AE_RENDER_CORE_API auto EnqueueRenderTask(TFunction<void()> task) noexcept
+    AE_RENDER_CORE_API auto EnqueueRenderTask(FString TaskName, TFunction<void()> task) noexcept
         -> Core::Jobs::FJobHandle;
 
     class AE_RENDER_CORE_API FRenderingThread final {

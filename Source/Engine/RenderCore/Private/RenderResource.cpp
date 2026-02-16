@@ -6,6 +6,7 @@
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiInit.h"
 
+using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Container::TVector;
 namespace AltinaEngine::RenderCore {
     namespace {
@@ -48,11 +49,12 @@ namespace AltinaEngine::RenderCore {
             return;
         }
 
-        mInitHandle = EnqueueRenderTask([this]() -> void {
-            InitRHI();
-            mState.Store(static_cast<i32>(EState::Initialized));
-            OnInitComplete();
-        });
+        mInitHandle = EnqueueRenderTask(FString(TEXT("RenderResource.Init")),
+            [this]() -> void {
+                InitRHI();
+                mState.Store(static_cast<i32>(EState::Initialized));
+                OnInitComplete();
+            });
     }
 
     void FRenderResource::ReleaseResource() noexcept {
@@ -63,10 +65,11 @@ namespace AltinaEngine::RenderCore {
         }
 
         mState.Store(static_cast<i32>(EState::ReleasePending));
-        mReleaseHandle = EnqueueRenderTask([this]() -> void {
-            ReleaseRHI();
-            mState.Store(static_cast<i32>(EState::Uninitialized));
-        });
+        mReleaseHandle = EnqueueRenderTask(FString(TEXT("RenderResource.Release")),
+            [this]() -> void {
+                ReleaseRHI();
+                mState.Store(static_cast<i32>(EState::Uninitialized));
+            });
     }
 
     void FRenderResource::UpdateResource() noexcept {
@@ -74,7 +77,8 @@ namespace AltinaEngine::RenderCore {
             return;
         }
 
-        EnqueueRenderTask([this]() -> void { UpdateRHI(); });
+        EnqueueRenderTask(FString(TEXT("RenderResource.Update")),
+            [this]() -> void { UpdateRHI(); });
     }
 
     void FRenderResource::WaitForInit() noexcept {

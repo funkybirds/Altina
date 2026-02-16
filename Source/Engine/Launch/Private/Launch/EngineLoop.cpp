@@ -5,7 +5,6 @@
 
 #include "Console/ConsoleVariable.h"
 #include "Logging/Log.h"
-#include "Platform/Generic/GenericPlatformDecl.h"
 #include "Threading/RenderingThread.h"
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiStructs.h"
@@ -227,14 +226,12 @@ namespace AltinaEngine::Launch {
                 device->EndFrame();
 
                 LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
-                Core::Platform::Generic::PlatformSleepMilliseconds(2000);
             });
         if (handle.IsValid()) {
             mPendingRenderFrames.Push(handle);
             EnforceRenderLag(GetRenderThreadLagFrames());
         }
 
-        Core::Platform::Generic::PlatformSleepMilliseconds(1000);
     }
 
     void FEngineLoop::Exit() {

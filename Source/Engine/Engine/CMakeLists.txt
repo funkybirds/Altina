@@ -40,6 +40,7 @@ target_include_directories(${TargetName}
 target_link_libraries(${TargetName}
     PUBLIC
         AltinaEngine::Core
+        AltinaEngine::RenderCore
 )
 
 target_compile_definitions(${TargetName}

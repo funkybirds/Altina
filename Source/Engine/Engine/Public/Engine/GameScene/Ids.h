@@ -1,16 +1,16 @@
 #pragma once
 
-#include "Gameplay/GameplayAPI.h"
+#include "Engine/EngineAPI.h"
 #include "Types/Aliases.h"
 #include "Types/Meta.h"
 
-namespace AltinaEngine::Gameplay {
+namespace AltinaEngine::GameScene {
     using FComponentTypeHash = Core::TypeMeta::FTypeMetaHash;
 
     /**
      * @brief Opaque identifier for a game object inside a world.
      */
-    struct AE_GAMEPLAY_API FGameObjectId {
+    struct AE_ENGINE_API FGameObjectId {
         u32 Index      = 0;
         u32 Generation = 0;
         u32 WorldId    = 0;
@@ -31,7 +31,7 @@ namespace AltinaEngine::Gameplay {
     /**
      * @brief Opaque identifier for a component instance.
      */
-    struct AE_GAMEPLAY_API FComponentId {
+    struct AE_ENGINE_API FComponentId {
         u32               Index      = 0;
         u32               Generation = 0;
         FComponentTypeHash Type      = 0;
@@ -82,4 +82,9 @@ namespace AltinaEngine::Gameplay {
             Core::TypeMeta::FMetaTypeInfo::Create<T>().GetHash();
         return kHash;
     }
-} // namespace AltinaEngine::Gameplay
+} // namespace AltinaEngine::GameScene
+
+
+
+
+

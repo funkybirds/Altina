@@ -21,10 +21,7 @@ namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
     namespace {
         auto GetRenderThreadLagFrames() noexcept -> u32 {
-            auto* cvar = RenderCore::gRenderingThreadLagFrames;
-            if (!cvar)
-                return 0U;
-            int value = cvar->GetInt();
+            int value = RenderCore::gRenderingThreadLagFrames.Get();
             if (value < 0)
                 value = 0;
             return static_cast<u32>(value);

@@ -53,7 +53,7 @@ namespace AltinaEngine::Core::Container {
         static_assert(sizeof...(TArgs) > 0, "TVariant requires at least one alternative type.");
         static constexpr usize kInvalidIndex = static_cast<usize>(-1);
 
-        TVariant() noexcept : mStorage{} {}
+        TVariant() noexcept : mStorage{}, mIndex(kInvalidIndex) {}
 
         template <typename T>
             requires TTypeIsAnyOf<typename TDecay<T>::TType, TTypeSet<TArgs...>>::Value

@@ -1,8 +1,8 @@
-#include "Gameplay/ComponentRegistry.h"
+#include "Engine/GameScene/ComponentRegistry.h"
 
 #include "Logging/Log.h"
 
-namespace AltinaEngine::Gameplay {
+namespace AltinaEngine::GameScene {
     namespace {
         FComponentRegistry gComponentRegistry;
     }
@@ -16,7 +16,7 @@ namespace AltinaEngine::Gameplay {
         mEntries[entry.TypeHash] = entry;
 
         if (existed) {
-            LogWarning(TEXT("Gameplay component registry: replaced type hash {}"), entry.TypeHash);
+            LogWarning(TEXT("GameScene component registry: replaced type hash {}"), entry.TypeHash);
         }
     }
 
@@ -68,4 +68,9 @@ namespace AltinaEngine::Gameplay {
     }
 
     auto GetComponentRegistry() -> FComponentRegistry& { return gComponentRegistry; }
-} // namespace AltinaEngine::Gameplay
+} // namespace AltinaEngine::GameScene
+
+
+
+
+

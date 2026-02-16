@@ -1,18 +1,19 @@
 #pragma once
-#include "../Types/Traits.h"
 #include "../Types/Aliases.h"
+#include "../Types/Traits.h"
 #include "IndexSequence.h"
 
 namespace AltinaEngine::Core::Container {
     using AltinaEngine::usize;
+    using AltinaEngine::Forward;
 
     // Helper to get Nth type from parameter pack
     template <usize I, typename... Ts> struct TNthType;
     template <typename T, typename... Ts> struct TNthType<0, T, Ts...> {
-        using type = T;
+        using TType = T;
     };
     template <usize I, typename T, typename... Ts> struct TNthType<I, T, Ts...> {
-        using type = TNthType<I - 1, Ts...>::type;
+        using TType = typename TNthType<I - 1, Ts...>::TType;
     };
 
     template <usize I, typename T> struct TTupleElement {
@@ -30,7 +31,7 @@ namespace AltinaEngine::Core::Container {
 
         template <usize... Is, typename... Ts>
         struct TTupleImpl<TIndexSequence<Is...>, Ts...> : TTupleElement<Is, Ts>... {
-            using Self             = TTupleImpl;
+            using TSelf            = TTupleImpl;
             constexpr TTupleImpl() = default;
 
             template <typename... Us>
@@ -40,28 +41,28 @@ namespace AltinaEngine::Core::Container {
 
     template <typename... Ts>
     struct TTuple : Detail::TTupleImpl<TMakeIndexSequence<sizeof...(Ts)>, Ts...> {
-        using Base = Detail::TTupleImpl<TMakeIndexSequence<sizeof...(Ts)>, Ts...>;
+        using TBase = Detail::TTupleImpl<TMakeIndexSequence<sizeof...(Ts)>, Ts...>;
         static constexpr usize Size() noexcept { return sizeof...(Ts); }
 
         constexpr TTuple() = default;
 
         template <typename... Us>
-        constexpr explicit TTuple(Us&&... us) : Base(Forward<Us>(us)...) {}
+        constexpr explicit TTuple(Us&&... us) : TBase(Forward<Us>(us)...) {}
     };
 
     // Get helpers
-    template <usize I, typename... Ts> constexpr auto& Get(TTuple<Ts...>& t) {
-        using TElement = TTupleElement<I, typename TNthType<I, Ts...>::type>;
+    template <usize I, typename... Ts> constexpr auto Get(TTuple<Ts...>& t) -> auto& {
+        using TElement = TTupleElement<I, typename TNthType<I, Ts...>::TType>;
         return static_cast<TElement&>(t).mValue;
     }
 
-    template <usize I, typename... Ts> constexpr auto const& Get(TTuple<Ts...> const& t) {
-        using TElement = TTupleElement<I, typename TNthType<I, Ts...>::type>;
+    template <usize I, typename... Ts> constexpr auto Get(TTuple<Ts...> const& t) -> auto const& {
+        using TElement = TTupleElement<I, typename TNthType<I, Ts...>::TType>;
         return static_cast<TElement const&>(t).mValue;
     }
 
-    template <usize I, typename... Ts> constexpr auto&& Get(TTuple<Ts...>&& t) {
-        using TElement = TTupleElement<I, typename TNthType<I, Ts...>::type>;
+    template <usize I, typename... Ts> constexpr auto Get(TTuple<Ts...>&& t) -> auto&& {
+        using TElement = TTupleElement<I, typename TNthType<I, Ts...>::TType>;
         return static_cast<TElement&&>(t).mValue;
     }
 

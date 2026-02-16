@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Gameplay/GameplayAPI.h"
-#include "Gameplay/Ids.h"
+#include "Engine/EngineAPI.h"
+#include "Engine/GameScene/Ids.h"
 
-namespace AltinaEngine::Gameplay {
+namespace AltinaEngine::GameScene {
     class FWorld;
 
     /**
@@ -25,4 +25,9 @@ namespace AltinaEngine::Gameplay {
         FWorld*      mWorld = nullptr;
         FComponentId mId{};
     };
-} // namespace AltinaEngine::Gameplay
+} // namespace AltinaEngine::GameScene
+
+
+
+
+

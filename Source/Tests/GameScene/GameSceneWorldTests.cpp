@@ -1,14 +1,14 @@
 #include "TestHarness.h"
 
-#include "Gameplay/World.h"
+#include "Engine/GameScene/World.h"
 
 namespace {
-    using AltinaEngine::Gameplay::FComponentId;
-    using AltinaEngine::Gameplay::FComponentTypeHash;
-    using AltinaEngine::Gameplay::FGameObjectId;
-    using AltinaEngine::Gameplay::FWorld;
-    using AltinaEngine::Gameplay::GetComponentTypeHash;
-    using AltinaEngine::Gameplay::FComponent;
+    using AltinaEngine::GameScene::FComponentId;
+    using AltinaEngine::GameScene::FComponentTypeHash;
+    using AltinaEngine::GameScene::FGameObjectId;
+    using AltinaEngine::GameScene::FWorld;
+    using AltinaEngine::GameScene::GetComponentTypeHash;
+    using AltinaEngine::GameScene::FComponent;
     using AltinaEngine::u32;
 
     struct FTestComponent final : public FComponent {
@@ -30,7 +30,7 @@ namespace {
     }
 } // namespace
 
-TEST_CASE("Gameplay.World.GameObjectId.GenerationAndReuse") {
+TEST_CASE("GameScene.World.GameObjectId.GenerationAndReuse") {
     FWorld world;
 
     const FGameObjectId first = world.CreateGameObject();
@@ -55,7 +55,7 @@ TEST_CASE("Gameplay.World.GameObjectId.GenerationAndReuse") {
     REQUIRE(!view.IsActive());
 }
 
-TEST_CASE("Gameplay.World.ComponentId.GenerationAndReuse") {
+TEST_CASE("GameScene.World.ComponentId.GenerationAndReuse") {
     ResetCounters();
 
     FWorld world;
@@ -85,7 +85,7 @@ TEST_CASE("Gameplay.World.ComponentId.GenerationAndReuse") {
     REQUIRE_EQ(FTestComponent::sCreateCount, 2);
 }
 
-TEST_CASE("Gameplay.World.DestroyGameObjectDestroysComponents") {
+TEST_CASE("GameScene.World.DestroyGameObjectDestroysComponents") {
     ResetCounters();
 
     FWorld world;
@@ -104,3 +104,7 @@ TEST_CASE("Gameplay.World.DestroyGameObjectDestroysComponents") {
     REQUIRE(!world.IsAlive(compId));
     REQUIRE_EQ(FTestComponent::sDestroyCount, 1);
 }
+
+
+
+

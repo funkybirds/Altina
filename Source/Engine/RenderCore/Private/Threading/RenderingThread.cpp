@@ -6,10 +6,9 @@
 #include <thread>
 
 namespace AltinaEngine::RenderCore {
-    Core::Console::FConsoleVariable* gRenderingThreadLagFrames =
-        Core::Console::FConsoleVariable::Register(
-            Core::Container::FString(TEXT("gRenderingThreadLagFrames")),
-            Core::Container::FString(TEXT("1")));
+    Core::Console::TConsoleVariable<i32> gRenderingThreadLagFrames(
+        TEXT("gRenderingThreadLagFrames"),
+        1);
 
     FRenderingThread::FRenderingThread() noexcept = default;
 

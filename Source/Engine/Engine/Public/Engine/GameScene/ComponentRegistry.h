@@ -1,13 +1,13 @@
 #pragma once
 
-#include "Gameplay/GameplayAPI.h"
-#include "Gameplay/Component.h"
-#include "Gameplay/Ids.h"
+#include "Engine/EngineAPI.h"
+#include "Engine/GameScene/Component.h"
+#include "Engine/GameScene/Ids.h"
 #include "Container/HashMap.h"
 #include "Reflection/Serializer.h"
 #include "Types/Traits.h"
 
-namespace AltinaEngine::Gameplay {
+namespace AltinaEngine::GameScene {
     namespace Container = Core::Container;
     using Container::THashMap;
 
@@ -40,7 +40,7 @@ namespace AltinaEngine::Gameplay {
     /**
      * @brief Registry for component types and their lifecycle hooks.
      */
-    class AE_GAMEPLAY_API FComponentRegistry {
+    class AE_ENGINE_API FComponentRegistry {
     public:
         void Register(const FComponentTypeEntry& entry);
 
@@ -57,7 +57,7 @@ namespace AltinaEngine::Gameplay {
         THashMap<FComponentTypeHash, FComponentTypeEntry> mEntries;
     };
 
-    AE_GAMEPLAY_API auto GetComponentRegistry() -> FComponentRegistry&;
+    AE_ENGINE_API auto GetComponentRegistry() -> FComponentRegistry&;
 
     namespace Detail {
         template <typename T> auto CreateComponentThunk(FComponentCreateContext& ctx) -> FComponentId;
@@ -78,4 +78,9 @@ namespace AltinaEngine::Gameplay {
     template <typename T> inline void RegisterComponentType() {
         GetComponentRegistry().Register(BuildComponentTypeEntry<T>());
     }
-} // namespace AltinaEngine::Gameplay
+} // namespace AltinaEngine::GameScene
+
+
+
+
+

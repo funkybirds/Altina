@@ -1,6 +1,6 @@
-#include "Gameplay/World.h"
+#include "Engine/GameScene/World.h"
 
-namespace AltinaEngine::Gameplay {
+namespace AltinaEngine::GameScene {
     namespace {
         Core::Threading::TAtomic<u32> gNextWorldId(1);
 
@@ -248,4 +248,9 @@ namespace AltinaEngine::Gameplay {
     auto FGameObjectView::IsActive() const -> bool {
         return mWorld != nullptr && mWorld->IsGameObjectActive(mId);
     }
-} // namespace AltinaEngine::Gameplay
+} // namespace AltinaEngine::GameScene
+
+
+
+
+

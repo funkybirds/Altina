@@ -1,15 +1,15 @@
 #pragma once
 
-#include "Gameplay/GameplayAPI.h"
-#include "Gameplay/Ids.h"
+#include "Engine/EngineAPI.h"
+#include "Engine/GameScene/Ids.h"
 
-namespace AltinaEngine::Gameplay {
+namespace AltinaEngine::GameScene {
     class FWorld;
 
     /**
-     * @brief Base class for gameplay components.
+     * @brief Base class for scene components.
      */
-    class AE_GAMEPLAY_API FComponent {
+    class AE_ENGINE_API FComponent {
     public:
         virtual ~FComponent() = default;
 
@@ -53,4 +53,9 @@ namespace AltinaEngine::Gameplay {
             OnDisable();
         }
     }
-} // namespace AltinaEngine::Gameplay
+} // namespace AltinaEngine::GameScene
+
+
+
+
+

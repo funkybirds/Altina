@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Gameplay/GameplayAPI.h"
-#include "Gameplay/Component.h"
-#include "Gameplay/ComponentRegistry.h"
-#include "Gameplay/GameObject.h"
-#include "Gameplay/GameObjectView.h"
+#include "Engine/EngineAPI.h"
+#include "Engine/GameScene/Component.h"
+#include "Engine/GameScene/ComponentRegistry.h"
+#include "Engine/GameScene/GameObject.h"
+#include "Engine/GameScene/GameObjectView.h"
 #include "Container/HashMap.h"
 #include "Container/SmartPtr.h"
 #include "Container/Vector.h"
@@ -12,7 +12,7 @@
 #include "Threading/Atomic.h"
 #include "Types/Traits.h"
 
-namespace AltinaEngine::Gameplay {
+namespace AltinaEngine::GameScene {
     namespace Container = Core::Container;
     using Container::THashMap;
     using Container::TOwner;
@@ -22,7 +22,7 @@ namespace AltinaEngine::Gameplay {
     /**
      * @brief Runtime container for game objects and components.
      */
-    class AE_GAMEPLAY_API FWorld {
+    class AE_ENGINE_API FWorld {
     public:
         FWorld();
         explicit FWorld(u32 worldId);
@@ -382,4 +382,9 @@ namespace AltinaEngine::Gameplay {
     template <typename T> inline auto TComponentRef<T>::Get() const -> const T& {
         return mWorld->ResolveComponent<T>(mId);
     }
-} // namespace AltinaEngine::Gameplay
+} // namespace AltinaEngine::GameScene
+
+
+
+
+

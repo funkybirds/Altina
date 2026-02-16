@@ -1,16 +1,16 @@
 #pragma once
 
-#include "Gameplay/GameplayAPI.h"
-#include "Gameplay/ComponentRef.h"
-#include "Gameplay/Ids.h"
+#include "Engine/EngineAPI.h"
+#include "Engine/GameScene/ComponentRef.h"
+#include "Engine/GameScene/Ids.h"
 
-namespace AltinaEngine::Gameplay {
+namespace AltinaEngine::GameScene {
     class FWorld;
 
     /**
      * @brief Lightweight view for manipulating a game object via IDs.
      */
-    class AE_GAMEPLAY_API FGameObjectView {
+    class AE_ENGINE_API FGameObjectView {
     public:
         FGameObjectView() = default;
         FGameObjectView(FWorld* world, FGameObjectId id) : mWorld(world), mId(id) {}
@@ -30,4 +30,9 @@ namespace AltinaEngine::Gameplay {
         FWorld*       mWorld = nullptr;
         FGameObjectId mId{};
     };
-} // namespace AltinaEngine::Gameplay
+} // namespace AltinaEngine::GameScene
+
+
+
+
+

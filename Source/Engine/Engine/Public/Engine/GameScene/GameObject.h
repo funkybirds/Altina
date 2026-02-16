@@ -1,12 +1,12 @@
 #pragma once
 
-#include "Gameplay/GameplayAPI.h"
-#include "Gameplay/Ids.h"
+#include "Engine/EngineAPI.h"
+#include "Engine/GameScene/Ids.h"
 #include "Container/String.h"
 #include "Container/StringView.h"
 #include "Container/Vector.h"
 
-namespace AltinaEngine::Gameplay {
+namespace AltinaEngine::GameScene {
     namespace Container = Core::Container;
     using Container::FString;
     using Container::FStringView;
@@ -17,7 +17,7 @@ namespace AltinaEngine::Gameplay {
     /**
      * @brief Component container identified by an opaque ID.
      */
-    class AE_GAMEPLAY_API FGameObject {
+    class AE_ENGINE_API FGameObject {
     public:
         [[nodiscard]] auto GetId() const noexcept -> FGameObjectId { return mId; }
         [[nodiscard]] auto IsActive() const noexcept -> bool { return mActive; }
@@ -48,4 +48,9 @@ namespace AltinaEngine::Gameplay {
         bool            mActive = true;
         TVector<FComponentId> mComponents{};
     };
-} // namespace AltinaEngine::Gameplay
+} // namespace AltinaEngine::GameScene
+
+
+
+
+

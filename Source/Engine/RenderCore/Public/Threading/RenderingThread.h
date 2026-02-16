@@ -4,14 +4,11 @@
 
 #include "Threading/Atomic.h"
 #include "Types/Aliases.h"
-
-namespace AltinaEngine::Core::Console {
-    class FConsoleVariable;
-} // namespace AltinaEngine::Core::Console
+#include "Console/ConsoleVariable.h"
 
 namespace AltinaEngine::RenderCore {
     // Controls how many frames the game thread can lead the rendering thread.
-    AE_RENDER_CORE_API extern Core::Console::FConsoleVariable* gRenderingThreadLagFrames;
+    AE_RENDER_CORE_API extern Core::Console::TConsoleVariable<i32> gRenderingThreadLagFrames;
 
     class AE_RENDER_CORE_API FRenderingThread final {
     public:

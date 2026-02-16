@@ -21,12 +21,12 @@ namespace AltinaEngine::RenderCore {
         // Caller must ensure ReleaseResource() is invoked before destruction.
         ~FRenderResource() override;
 
-        void InitResource() noexcept;
-        void ReleaseResource() noexcept;
-        void UpdateResource() noexcept;
+        void               InitResource() noexcept;
+        void               ReleaseResource() noexcept;
+        void               UpdateResource() noexcept;
 
-        void WaitForInit() noexcept;
-        void WaitForRelease() noexcept;
+        void               WaitForInit() noexcept;
+        void               WaitForRelease() noexcept;
 
         [[nodiscard]] auto IsInitialized() const noexcept -> bool;
 
@@ -54,79 +54,19 @@ namespace AltinaEngine::RenderCore {
         FPositionBuffer() noexcept;
         explicit FPositionBuffer(const Rhi::FRhiBufferDesc& desc) noexcept;
 
-        void SetData(const void* data, u32 sizeBytes, u32 strideBytes);
+        void               SetData(const void* data, u32 sizeBytes, u32 strideBytes);
 
         [[nodiscard]] auto GetBuffer() const noexcept -> Rhi::FRhiBufferRef { return mBuffer; }
         [[nodiscard]] auto GetView() const noexcept -> Rhi::FRhiVertexBufferView;
 
-    protected:
-        void InitRHI() override;
-        void ReleaseRHI() override;
-        void UpdateRHI() override;
+        [[nodiscard]] auto GetSizeBytes() const noexcept -> u64 { return mDesc.mSizeBytes; }
+        [[nodiscard]] auto GetStrideBytes() const noexcept -> u32 { return mStrideBytes; }
 
-    private:
-        Rhi::FRhiBufferDesc             mDesc{};
-        u32                             mStrideBytes = 0U;
-        TVector<u8>                     mStagingData;
-        Rhi::FRhiBufferRef              mBuffer;
-    };
-
-    class AE_RENDER_CORE_API FVertexTangentBuffer : public FRenderResource {
-    public:
-        FVertexTangentBuffer() noexcept;
-        explicit FVertexTangentBuffer(const Rhi::FRhiBufferDesc& desc) noexcept;
-
-        void SetData(const void* data, u32 sizeBytes, u32 strideBytes);
-
-        [[nodiscard]] auto GetBuffer() const noexcept -> Rhi::FRhiBufferRef { return mBuffer; }
-        [[nodiscard]] auto GetView() const noexcept -> Rhi::FRhiVertexBufferView;
-
-    protected:
-        void InitRHI() override;
-        void ReleaseRHI() override;
-        void UpdateRHI() override;
-
-    private:
-        Rhi::FRhiBufferDesc             mDesc{};
-        u32                             mStrideBytes = 0U;
-        TVector<u8>                     mStagingData;
-        Rhi::FRhiBufferRef              mBuffer;
-    };
-
-    class AE_RENDER_CORE_API FVertexUVBuffer : public FRenderResource {
-    public:
-        FVertexUVBuffer() noexcept;
-        explicit FVertexUVBuffer(const Rhi::FRhiBufferDesc& desc) noexcept;
-
-        void SetData(const void* data, u32 sizeBytes, u32 strideBytes);
-
-        [[nodiscard]] auto GetBuffer() const noexcept -> Rhi::FRhiBufferRef { return mBuffer; }
-        [[nodiscard]] auto GetView() const noexcept -> Rhi::FRhiVertexBufferView;
-
-    protected:
-        void InitRHI() override;
-        void ReleaseRHI() override;
-        void UpdateRHI() override;
-
-    private:
-        Rhi::FRhiBufferDesc             mDesc{};
-        u32                             mStrideBytes = 0U;
-        TVector<u8>                     mStagingData;
-        Rhi::FRhiBufferRef              mBuffer;
-    };
-
-    class AE_RENDER_CORE_API FIndexBuffer : public FRenderResource {
-    public:
-        FIndexBuffer() noexcept;
-        explicit FIndexBuffer(const Rhi::FRhiBufferDesc& desc,
-            Rhi::ERhiIndexType indexType = Rhi::ERhiIndexType::Uint32) noexcept;
-
-        void SetData(const void* data, u32 sizeBytes, Rhi::ERhiIndexType indexType);
-
-        [[nodiscard]] auto GetBuffer() const noexcept -> Rhi::FRhiBufferRef { return mBuffer; }
-        [[nodiscard]] auto GetView() const noexcept -> Rhi::FRhiIndexBufferView;
-        [[nodiscard]] auto GetIndexType() const noexcept -> Rhi::ERhiIndexType {
-            return mIndexType;
+        [[nodiscard]] auto GetElementCount() const noexcept -> u32 {
+            if (mStrideBytes == 0U) {
+                return 0U;
+            }
+            return static_cast<u32>(mDesc.mSizeBytes / static_cast<u64>(mStrideBytes));
         }
 
     protected:
@@ -135,10 +75,102 @@ namespace AltinaEngine::RenderCore {
         void UpdateRHI() override;
 
     private:
-        Rhi::FRhiBufferDesc             mDesc{};
-        Rhi::ERhiIndexType              mIndexType = Rhi::ERhiIndexType::Uint32;
-        TVector<u8>                     mStagingData;
-        Rhi::FRhiBufferRef              mBuffer;
+        Rhi::FRhiBufferDesc mDesc{};
+        u32                 mStrideBytes = 0U;
+        TVector<u8>         mStagingData;
+        Rhi::FRhiBufferRef  mBuffer;
+    };
+
+    class AE_RENDER_CORE_API FVertexTangentBuffer : public FRenderResource {
+    public:
+        FVertexTangentBuffer() noexcept;
+        explicit FVertexTangentBuffer(const Rhi::FRhiBufferDesc& desc) noexcept;
+
+        void               SetData(const void* data, u32 sizeBytes, u32 strideBytes);
+
+        [[nodiscard]] auto GetBuffer() const noexcept -> Rhi::FRhiBufferRef { return mBuffer; }
+        [[nodiscard]] auto GetView() const noexcept -> Rhi::FRhiVertexBufferView;
+
+        [[nodiscard]] auto GetSizeBytes() const noexcept -> u64 { return mDesc.mSizeBytes; }
+        [[nodiscard]] auto GetStrideBytes() const noexcept -> u32 { return mStrideBytes; }
+
+        [[nodiscard]] auto GetElementCount() const noexcept -> u32 {
+            if (mStrideBytes == 0U) {
+                return 0U;
+            }
+            return static_cast<u32>(mDesc.mSizeBytes / static_cast<u64>(mStrideBytes));
+        }
+
+    protected:
+        void InitRHI() override;
+        void ReleaseRHI() override;
+        void UpdateRHI() override;
+
+    private:
+        Rhi::FRhiBufferDesc mDesc{};
+        u32                 mStrideBytes = 0U;
+        TVector<u8>         mStagingData;
+        Rhi::FRhiBufferRef  mBuffer;
+    };
+
+    class AE_RENDER_CORE_API FVertexUVBuffer : public FRenderResource {
+    public:
+        FVertexUVBuffer() noexcept;
+        explicit FVertexUVBuffer(const Rhi::FRhiBufferDesc& desc) noexcept;
+
+        void               SetData(const void* data, u32 sizeBytes, u32 strideBytes);
+
+        [[nodiscard]] auto GetBuffer() const noexcept -> Rhi::FRhiBufferRef { return mBuffer; }
+        [[nodiscard]] auto GetView() const noexcept -> Rhi::FRhiVertexBufferView;
+
+        [[nodiscard]] auto GetSizeBytes() const noexcept -> u64 { return mDesc.mSizeBytes; }
+        [[nodiscard]] auto GetStrideBytes() const noexcept -> u32 { return mStrideBytes; }
+
+        [[nodiscard]] auto GetElementCount() const noexcept -> u32 {
+            if (mStrideBytes == 0U) {
+                return 0U;
+            }
+            return static_cast<u32>(mDesc.mSizeBytes / static_cast<u64>(mStrideBytes));
+        }
+
+    protected:
+        void InitRHI() override;
+        void ReleaseRHI() override;
+        void UpdateRHI() override;
+
+    private:
+        Rhi::FRhiBufferDesc mDesc{};
+        u32                 mStrideBytes = 0U;
+        TVector<u8>         mStagingData;
+        Rhi::FRhiBufferRef  mBuffer;
+    };
+
+    class AE_RENDER_CORE_API FIndexBuffer : public FRenderResource {
+    public:
+        FIndexBuffer() noexcept;
+        explicit FIndexBuffer(const Rhi::FRhiBufferDesc& desc,
+            Rhi::ERhiIndexType indexType = Rhi::ERhiIndexType::Uint32) noexcept;
+
+        void               SetData(const void* data, u32 sizeBytes, Rhi::ERhiIndexType indexType);
+
+        [[nodiscard]] auto GetBuffer() const noexcept -> Rhi::FRhiBufferRef { return mBuffer; }
+        [[nodiscard]] auto GetView() const noexcept -> Rhi::FRhiIndexBufferView;
+        [[nodiscard]] auto GetIndexType() const noexcept -> Rhi::ERhiIndexType {
+            return mIndexType;
+        }
+
+        [[nodiscard]] auto GetSizeBytes() const noexcept -> u64 { return mDesc.mSizeBytes; }
+
+    protected:
+        void InitRHI() override;
+        void ReleaseRHI() override;
+        void UpdateRHI() override;
+
+    private:
+        Rhi::FRhiBufferDesc mDesc{};
+        Rhi::ERhiIndexType  mIndexType = Rhi::ERhiIndexType::Uint32;
+        TVector<u8>         mStagingData;
+        Rhi::FRhiBufferRef  mBuffer;
     };
 
     class AE_RENDER_CORE_API FTexture : public FRenderResource {
@@ -146,7 +178,7 @@ namespace AltinaEngine::RenderCore {
         FTexture() noexcept = default;
         explicit FTexture(const Rhi::FRhiTextureDesc& desc) noexcept;
 
-        void SetDesc(const Rhi::FRhiTextureDesc& desc) noexcept;
+        void               SetDesc(const Rhi::FRhiTextureDesc& desc) noexcept;
         [[nodiscard]] auto GetDesc() const noexcept -> const Rhi::FRhiTextureDesc&;
 
         [[nodiscard]] auto GetTexture() const noexcept -> Rhi::FRhiTextureRef { return mTexture; }
@@ -165,7 +197,7 @@ namespace AltinaEngine::RenderCore {
         FTextureWithSRV() noexcept = default;
         explicit FTextureWithSRV(const Rhi::FRhiTextureDesc& desc) noexcept;
 
-        void SetSRVDesc(const Rhi::FRhiShaderResourceViewDesc& desc) noexcept;
+        void               SetSRVDesc(const Rhi::FRhiShaderResourceViewDesc& desc) noexcept;
         [[nodiscard]] auto GetSRV() const noexcept -> Rhi::FRhiShaderResourceViewRef {
             return mSRV;
         }
@@ -184,7 +216,7 @@ namespace AltinaEngine::RenderCore {
         FTextureWithUAV() noexcept;
         explicit FTextureWithUAV(const Rhi::FRhiTextureDesc& desc) noexcept;
 
-        void SetUAVDesc(const Rhi::FRhiUnorderedAccessViewDesc& desc) noexcept;
+        void               SetUAVDesc(const Rhi::FRhiUnorderedAccessViewDesc& desc) noexcept;
         [[nodiscard]] auto GetUAV() const noexcept -> Rhi::FRhiUnorderedAccessViewRef {
             return mUAV;
         }
@@ -203,8 +235,8 @@ namespace AltinaEngine::RenderCore {
         FTextureWithSRVUAV() noexcept;
         explicit FTextureWithSRVUAV(const Rhi::FRhiTextureDesc& desc) noexcept;
 
-        void SetSRVDesc(const Rhi::FRhiShaderResourceViewDesc& desc) noexcept;
-        void SetUAVDesc(const Rhi::FRhiUnorderedAccessViewDesc& desc) noexcept;
+        void               SetSRVDesc(const Rhi::FRhiShaderResourceViewDesc& desc) noexcept;
+        void               SetUAVDesc(const Rhi::FRhiUnorderedAccessViewDesc& desc) noexcept;
 
         [[nodiscard]] auto GetSRV() const noexcept -> Rhi::FRhiShaderResourceViewRef {
             return mSRV;
@@ -218,20 +250,10 @@ namespace AltinaEngine::RenderCore {
         void ReleaseRHI() override;
 
     private:
-        Rhi::FRhiShaderResourceViewDesc mSRVDesc{};
+        Rhi::FRhiShaderResourceViewDesc  mSRVDesc{};
         Rhi::FRhiUnorderedAccessViewDesc mUAVDesc{};
-        Rhi::FRhiShaderResourceViewRef  mSRV;
+        Rhi::FRhiShaderResourceViewRef   mSRV;
         Rhi::FRhiUnorderedAccessViewRef  mUAV;
     };
 
 } // namespace AltinaEngine::RenderCore
-
-
-
-
-
-
-
-
-
-

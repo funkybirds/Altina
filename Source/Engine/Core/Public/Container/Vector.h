@@ -6,6 +6,7 @@
 
 #include "../Base/CoreAPI.h"
 #include "../Types/Aliases.h"
+#include "../Types/Traits.h"
 #include "Allocator.h"
 
 using AltinaEngine::Move;
@@ -60,6 +61,7 @@ namespace AltinaEngine::Core::Container {
         }
 
         TVector(const TVector& other)
+            requires(::AltinaEngine::CCopyConstructible<TValueType>)
             : mData(nullptr), mSize(0), mCapacity(0), mAllocator(other.mAllocator) {
             if (other.mSize == 0) {
                 return;
@@ -71,6 +73,10 @@ namespace AltinaEngine::Core::Container {
             }
             mSize = other.mSize;
         }
+
+        TVector(const TVector& other)
+            requires(!::AltinaEngine::CCopyConstructible<TValueType>)
+        = delete;
 
         TVector(TVector&& other) noexcept
             : mData(other.mData)
@@ -92,7 +98,9 @@ namespace AltinaEngine::Core::Container {
             }
         }
 
-        TVector& operator=(const TVector& other) {
+        TVector& operator=(const TVector& other)
+            requires(::AltinaEngine::CCopyConstructible<TValueType>)
+        {
             if (this == &other) {
                 return *this;
             }
@@ -100,6 +108,10 @@ namespace AltinaEngine::Core::Container {
             AssignFrom(other);
             return *this;
         }
+
+        TVector& operator=(const TVector& other)
+            requires(!::AltinaEngine::CCopyConstructible<TValueType>)
+        = delete;
 
         TVector& operator=(TVector&& other) noexcept {
             if (this == &other) {

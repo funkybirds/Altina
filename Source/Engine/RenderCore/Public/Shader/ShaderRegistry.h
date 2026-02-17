@@ -29,9 +29,9 @@ namespace AltinaEngine::RenderCore {
             EShaderStage         Stage       = EShaderStage::Vertex;
             FShaderPermutationId Permutation = {};
 
-            [[nodiscard]] auto IsValid() const noexcept -> bool { return !Name.IsEmptyString(); }
+            [[nodiscard]] auto   IsValid() const noexcept -> bool { return !Name.IsEmptyString(); }
 
-            friend auto         operator==(const FShaderKey& lhs, const FShaderKey& rhs) noexcept
+            friend auto          operator==(const FShaderKey& lhs, const FShaderKey& rhs) noexcept
                 -> bool = default;
         };
 
@@ -47,7 +47,7 @@ namespace AltinaEngine::RenderCore {
         [[nodiscard]] auto RemoveShader(const FShaderKey& key) -> bool;
 
         static auto        MakeKey(FStringView name, EShaderStage stage,
-                           FShaderPermutationId permutation = {}) -> FShaderKey;
+                   FShaderPermutationId permutation = {}) -> FShaderKey;
 
     private:
         struct FShaderKeyHash {
@@ -60,8 +60,7 @@ namespace AltinaEngine::RenderCore {
 
         private:
             static constexpr auto HashCombine(size_t seed, size_t value) noexcept -> size_t {
-                constexpr size_t kMul =
-                    (sizeof(size_t) == 8) ? 0x9e3779b97f4a7c15ULL : 0x9e3779b9U;
+                constexpr size_t kMul = (sizeof(size_t) == 8) ? 0x9e3779b97f4a7c15ULL : 0x9e3779b9U;
                 return seed ^ (value + kMul + (seed << 6) + (seed >> 2));
             }
         };
@@ -72,8 +71,8 @@ namespace AltinaEngine::RenderCore {
             }
         };
 
-        using FRegistryMap = THashMap<FShaderKey, Rhi::FRhiShaderRef, FShaderKeyHash,
-            FShaderKeyEqual>;
+        using FRegistryMap =
+            THashMap<FShaderKey, Rhi::FRhiShaderRef, FShaderKeyHash, FShaderKeyEqual>;
 
         mutable FMutex mMutex;
         FRegistryMap   mEntries;

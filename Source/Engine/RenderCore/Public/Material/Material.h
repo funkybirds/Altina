@@ -9,6 +9,9 @@
 #include "Container/HashMap.h"
 #include "Container/SmartPtr.h"
 #include "Container/Vector.h"
+#include "Rhi/RhiBindGroup.h"
+#include "Rhi/RhiBindGroupLayout.h"
+#include "Rhi/RhiSampler.h"
 
 namespace AltinaEngine::RenderCore {
     namespace Container = Core::Container;

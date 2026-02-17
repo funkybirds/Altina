@@ -66,6 +66,9 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto Object(FGameObjectId id) -> FGameObjectView {
             return FGameObjectView(this, id);
         }
+        [[nodiscard]] auto Object(FGameObjectId id) const -> FGameObjectView {
+            return FGameObjectView(const_cast<FWorld*>(this), id);
+        }
 
         void               SetGameObjectActive(FGameObjectId id, bool active);
         [[nodiscard]] auto IsGameObjectActive(FGameObjectId id) const -> bool;

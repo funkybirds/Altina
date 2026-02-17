@@ -189,7 +189,7 @@ namespace AltinaEngine::GameScene {
             id.Index      = index;
             id.Generation = mGameObjects[index].Generation;
             id.WorldId    = mWorldId;
-            UpdateTransformRecursive(id, mTransformUpdateId);
+            (void)UpdateTransformRecursive(id, mTransformUpdateId);
         }
     }
 

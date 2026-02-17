@@ -3,6 +3,7 @@
 #include "Engine/EngineAPI.h"
 #include "Engine/GameScene/Ids.h"
 #include "Container/Vector.h"
+#include "Math/Matrix.h"
 #include "Types/Aliases.h"
 #include "View/ViewData.h"
 
@@ -25,10 +26,13 @@ namespace AltinaEngine::Engine {
     };
 
     struct AE_ENGINE_API FSceneStaticMesh {
+        GameScene::FGameObjectId                    OwnerId{};
         GameScene::FComponentId                     MeshComponentId{};
         GameScene::FComponentId                     MaterialComponentId{};
         const RenderCore::Geometry::FStaticMeshData* Mesh = nullptr;
         const GameScene::FMeshMaterialComponent*     Materials = nullptr;
+        Core::Math::FMatrix4x4f                      WorldMatrix{};
+        Core::Math::FMatrix4x4f                      PrevWorldMatrix{};
     };
 
     struct AE_ENGINE_API FRenderScene {

@@ -1,6 +1,7 @@
 #include "Engine/Runtime/SceneView.h"
 
 #include "Engine/GameScene/CameraComponent.h"
+#include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
 
@@ -46,22 +47,38 @@ namespace AltinaEngine::Engine {
             outScene.Views.PushBack(Move(sceneView));
         }
 
-        const auto& staticMeshIds = world.GetActiveStaticMeshComponents();
-        outScene.StaticMeshes.Reserve(staticMeshIds.Size());
-        for (const auto& id : staticMeshIds) {
+        const auto& meshMaterialIds = world.GetActiveMeshMaterialComponents();
+        outScene.StaticMeshes.Reserve(meshMaterialIds.Size());
+        for (const auto& id : meshMaterialIds) {
             if (!world.IsAlive(id)) {
                 continue;
             }
 
-            const auto& component =
-                world.ResolveComponent<GameScene::FStaticMeshFilterComponent>(id);
-            if (!component.IsEnabled() || !world.IsGameObjectActive(component.GetOwner())) {
+            const auto& materialComponent =
+                world.ResolveComponent<GameScene::FMeshMaterialComponent>(id);
+            if (!materialComponent.IsEnabled()
+                || !world.IsGameObjectActive(materialComponent.GetOwner())) {
+                continue;
+            }
+
+            const auto meshId =
+                world.GetComponent<GameScene::FStaticMeshFilterComponent>(
+                    materialComponent.GetOwner());
+            if (!meshId.IsValid()) {
+                continue;
+            }
+
+            const auto& meshComponent =
+                world.ResolveComponent<GameScene::FStaticMeshFilterComponent>(meshId);
+            if (!meshComponent.IsEnabled()) {
                 continue;
             }
 
             FSceneStaticMesh entry{};
-            entry.ComponentId = id;
-            entry.Mesh        = &component.GetStaticMesh();
+            entry.MeshComponentId     = meshId;
+            entry.MaterialComponentId = id;
+            entry.Mesh                = &meshComponent.GetStaticMesh();
+            entry.Materials           = &materialComponent;
             outScene.StaticMeshes.PushBack(entry);
         }
     }

@@ -8,6 +8,7 @@
 
 namespace AltinaEngine::GameScene {
     class FWorld;
+    class FMeshMaterialComponent;
 }
 
 namespace AltinaEngine::RenderCore::Geometry {
@@ -24,8 +25,10 @@ namespace AltinaEngine::Engine {
     };
 
     struct AE_ENGINE_API FSceneStaticMesh {
-        GameScene::FComponentId                    ComponentId{};
+        GameScene::FComponentId                     MeshComponentId{};
+        GameScene::FComponentId                     MaterialComponentId{};
         const RenderCore::Geometry::FStaticMeshData* Mesh = nullptr;
+        const GameScene::FMeshMaterialComponent*     Materials = nullptr;
     };
 
     struct AE_ENGINE_API FRenderScene {

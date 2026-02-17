@@ -1,6 +1,7 @@
 #include "Engine/GameScene/World.h"
 
 #include "Engine/GameScene/CameraComponent.h"
+#include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 
 using AltinaEngine::Move;
@@ -15,6 +16,8 @@ namespace AltinaEngine::GameScene {
             GetComponentTypeHash<FCameraComponent>();
         const FComponentTypeHash      kStaticMeshComponentType =
             GetComponentTypeHash<FStaticMeshFilterComponent>();
+        const FComponentTypeHash      kMeshMaterialComponentType =
+            GetComponentTypeHash<FMeshMaterialComponent>();
     } // namespace
 
     FWorld::FWorld() : mWorldId(AcquireWorldId()) {}
@@ -172,12 +175,35 @@ namespace AltinaEngine::GameScene {
         return obj->IsActive();
     }
 
+    void FWorld::UpdateTransforms() {
+        ++mTransformUpdateId;
+        if (mTransformUpdateId == 0) {
+            mTransformUpdateId = 1;
+        }
+
+        for (u32 index = 0; index < static_cast<u32>(mGameObjects.Size()); ++index) {
+            if (!mGameObjects[index].Alive) {
+                continue;
+            }
+            FGameObjectId id{};
+            id.Index      = index;
+            id.Generation = mGameObjects[index].Generation;
+            id.WorldId    = mWorldId;
+            UpdateTransformRecursive(id, mTransformUpdateId);
+        }
+    }
+
     auto FWorld::GetActiveCameraComponents() const noexcept -> const TVector<FComponentId>& {
         return mActiveCameraComponents;
     }
 
     auto FWorld::GetActiveStaticMeshComponents() const noexcept -> const TVector<FComponentId>& {
         return mActiveStaticMeshComponents;
+    }
+
+    auto FWorld::GetActiveMeshMaterialComponents() const noexcept
+        -> const TVector<FComponentId>& {
+        return mActiveMeshMaterialComponents;
     }
 
     void FWorld::AddActiveComponent(TVector<FComponentId>& list, FComponentId id) {
@@ -221,6 +247,14 @@ namespace AltinaEngine::GameScene {
             if (component.IsEnabled()) {
                 AddActiveComponent(mActiveStaticMeshComponents, id);
             }
+            return;
+        }
+
+        if (id.Type == kMeshMaterialComponentType) {
+            const auto& component = ResolveComponent<FMeshMaterialComponent>(id);
+            if (component.IsEnabled()) {
+                AddActiveComponent(mActiveMeshMaterialComponents, id);
+            }
         }
     }
 
@@ -232,6 +266,11 @@ namespace AltinaEngine::GameScene {
 
         if (id.Type == kStaticMeshComponentType) {
             RemoveActiveComponent(mActiveStaticMeshComponents, id);
+            return;
+        }
+
+        if (id.Type == kMeshMaterialComponentType) {
+            RemoveActiveComponent(mActiveMeshMaterialComponents, id);
         }
     }
 
@@ -251,6 +290,15 @@ namespace AltinaEngine::GameScene {
                 AddActiveComponent(mActiveStaticMeshComponents, id);
             } else {
                 RemoveActiveComponent(mActiveStaticMeshComponents, id);
+            }
+            return;
+        }
+
+        if (id.Type == kMeshMaterialComponentType) {
+            if (enabled && IsGameObjectActive(owner)) {
+                AddActiveComponent(mActiveMeshMaterialComponents, id);
+            } else {
+                RemoveActiveComponent(mActiveMeshMaterialComponents, id);
             }
         }
     }
@@ -281,6 +329,15 @@ namespace AltinaEngine::GameScene {
                     AddActiveComponent(mActiveStaticMeshComponents, id);
                 } else {
                     RemoveActiveComponent(mActiveStaticMeshComponents, id);
+                }
+                continue;
+            }
+
+            if (id.Type == kMeshMaterialComponentType) {
+                if (active && ResolveComponent<FMeshMaterialComponent>(id).IsEnabled()) {
+                    AddActiveComponent(mActiveMeshMaterialComponents, id);
+                } else {
+                    RemoveActiveComponent(mActiveMeshMaterialComponents, id);
                 }
             }
         }
@@ -314,6 +371,38 @@ namespace AltinaEngine::GameScene {
             return nullptr;
         }
         return mGameObjects[id.Index].Handle.Get();
+    }
+
+    auto FWorld::UpdateTransformRecursive(FGameObjectId id, u32 updateId) -> bool {
+        auto* obj = ResolveGameObject(id);
+        if (obj == nullptr) {
+            return false;
+        }
+
+        if (obj->mTransformUpdateId == updateId) {
+            return obj->mTransformChangedId == updateId;
+        }
+
+        bool              parentChanged = false;
+        const auto        parentId      = obj->mParent;
+        const FGameObject* parentObj     = nullptr;
+        if (parentId.IsValid()) {
+            parentChanged = UpdateTransformRecursive(parentId, updateId);
+            parentObj     = ResolveGameObject(parentId);
+        }
+
+        const bool shouldUpdate = obj->mTransformDirty || parentChanged;
+        if (shouldUpdate) {
+            if (parentObj != nullptr) {
+                obj->UpdateWorldTransform(parentObj->GetWorldTransform());
+            } else {
+                obj->UpdateWorldTransform();
+            }
+            obj->mTransformChangedId = updateId;
+        }
+
+        obj->mTransformUpdateId = updateId;
+        return shouldUpdate;
     }
 
     auto FWorld::FindComponentStorage(FComponentTypeHash type) const -> FComponentStorageBase* {
@@ -370,5 +459,82 @@ namespace AltinaEngine::GameScene {
 
     auto FGameObjectView::IsActive() const -> bool {
         return mWorld != nullptr && mWorld->IsGameObjectActive(mId);
+    }
+
+    auto FGameObjectView::GetLocalTransform() const noexcept -> LinAlg::FSpatialTransform {
+        if (mWorld == nullptr) {
+            return LinAlg::FSpatialTransform::Identity();
+        }
+        const auto* obj = mWorld->ResolveGameObject(mId);
+        if (obj == nullptr) {
+            return LinAlg::FSpatialTransform::Identity();
+        }
+        return obj->GetLocalTransform();
+    }
+
+    auto FGameObjectView::GetWorldTransform() const noexcept -> LinAlg::FSpatialTransform {
+        if (mWorld == nullptr) {
+            return LinAlg::FSpatialTransform::Identity();
+        }
+        const auto* obj = mWorld->ResolveGameObject(mId);
+        if (obj == nullptr) {
+            return LinAlg::FSpatialTransform::Identity();
+        }
+        return obj->GetWorldTransform();
+    }
+
+    void FGameObjectView::SetLocalTransform(const LinAlg::FSpatialTransform& transform) {
+        if (mWorld == nullptr) {
+            return;
+        }
+        auto* obj = mWorld->ResolveGameObject(mId);
+        if (obj == nullptr) {
+            return;
+        }
+        obj->SetLocalTransform(transform);
+    }
+
+    void FGameObjectView::SetWorldTransform(const LinAlg::FSpatialTransform& transform) {
+        if (mWorld == nullptr) {
+            return;
+        }
+        auto* obj = mWorld->ResolveGameObject(mId);
+        if (obj == nullptr) {
+            return;
+        }
+        obj->SetWorldTransform(transform);
+    }
+
+    auto FGameObjectView::GetParent() const noexcept -> FGameObjectId {
+        if (mWorld == nullptr) {
+            return {};
+        }
+        const auto* obj = mWorld->ResolveGameObject(mId);
+        if (obj == nullptr) {
+            return {};
+        }
+        return obj->GetParent();
+    }
+
+    void FGameObjectView::SetParent(FGameObjectId parent) {
+        if (mWorld == nullptr) {
+            return;
+        }
+        auto* obj = mWorld->ResolveGameObject(mId);
+        if (obj == nullptr) {
+            return;
+        }
+        obj->SetParent(parent);
+    }
+
+    void FGameObjectView::ClearParent() {
+        if (mWorld == nullptr) {
+            return;
+        }
+        auto* obj = mWorld->ResolveGameObject(mId);
+        if (obj == nullptr) {
+            return;
+        }
+        obj->ClearParent();
     }
 } // namespace AltinaEngine::GameScene

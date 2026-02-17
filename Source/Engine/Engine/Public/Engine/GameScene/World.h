@@ -70,9 +70,13 @@ namespace AltinaEngine::GameScene {
         void               SetGameObjectActive(FGameObjectId id, bool active);
         [[nodiscard]] auto IsGameObjectActive(FGameObjectId id) const -> bool;
 
+        void               UpdateTransforms();
+
         [[nodiscard]] auto GetActiveCameraComponents() const noexcept
             -> const TVector<FComponentId>&;
         [[nodiscard]] auto GetActiveStaticMeshComponents() const noexcept
+            -> const TVector<FComponentId>&;
+        [[nodiscard]] auto GetActiveMeshMaterialComponents() const noexcept
             -> const TVector<FComponentId>&;
 
     private:
@@ -213,6 +217,7 @@ namespace AltinaEngine::GameScene {
             TOwner<FComponentStorageBase, TPolymorphicDeleter<FComponentStorageBase>>;
 
         friend class FComponent;
+        friend class FGameObjectView;
         template <typename T> friend class TComponentStorage;
 
         void InitializeComponent(FComponent& component, FComponentId id, FGameObjectId owner) {
@@ -233,6 +238,8 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto ResolveGameObject(FGameObjectId id) -> FGameObject*;
         [[nodiscard]] auto ResolveGameObject(FGameObjectId id) const -> const FGameObject*;
 
+        [[nodiscard]] auto UpdateTransformRecursive(FGameObjectId id, u32 updateId) -> bool;
+
         [[nodiscard]] auto FindComponentStorage(FComponentTypeHash type) const
             -> FComponentStorageBase*;
 
@@ -249,6 +256,8 @@ namespace AltinaEngine::GameScene {
         THashMap<FComponentTypeHash, FComponentStoragePtr> mComponentStorage{};
         TVector<FComponentId>                              mActiveCameraComponents{};
         TVector<FComponentId>                              mActiveStaticMeshComponents{};
+        TVector<FComponentId>                              mActiveMeshMaterialComponents{};
+        u32                                                mTransformUpdateId = 0;
     };
 
     namespace Detail {

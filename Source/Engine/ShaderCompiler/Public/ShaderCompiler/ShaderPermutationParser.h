@@ -16,6 +16,7 @@ namespace AltinaEngine::ShaderCompiler {
     using Shader::FShaderBuiltinValues;
     using Shader::FShaderPermutationLayout;
     using Shader::FShaderPermutationValues;
+    using Shader::FShaderRasterState;
 
     enum class EShaderPermutationRuleOperator : u8 {
         Add,
@@ -69,6 +70,8 @@ namespace AltinaEngine::ShaderCompiler {
         FShaderPermutationLayout   mPermutationLayout;
         FShaderBuiltinLayout       mBuiltinLayout;
         FShaderPermutationRuleSet  mRules;
+        bool                       mHasRasterState = false;
+        FShaderRasterState         mRasterState;
     };
 
     AE_SHADER_COMPILER_API auto ParseShaderPermutationSource(FStringView source,

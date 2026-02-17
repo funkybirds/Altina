@@ -5,6 +5,9 @@
 
 namespace {
     using AltinaEngine::TChar;
+    using AltinaEngine::Shader::EShaderRasterCullMode;
+    using AltinaEngine::Shader::EShaderRasterFillMode;
+    using AltinaEngine::Shader::EShaderRasterFrontFace;
     using AltinaEngine::Shader::EShaderStage;
     using AltinaEngine::Shader::FShaderPermutationId;
     using AltinaEngine::ShaderCompiler::BuildBuiltinDefines;
@@ -122,6 +125,34 @@ TEST_CASE("ShaderCompiler.ShaderPermutation.ParseAndEvaluate") {
     const auto* reverseDefine = FindDefine(builtinDefines, TEXT("AE_BUILTIN_REVERSEZ"));
     REQUIRE(fogDefine != nullptr);
     REQUIRE(reverseDefine != nullptr);
+}
+
+TEST_CASE("ShaderCompiler.ShaderPermutation.RasterState") {
+    const auto shaderSource = TEXT(R"(
+// @altina raster_state {
+//   fill = wireframe
+//   cull = front
+//   front_face = cw
+//   depth_bias = 4
+//   depth_bias_clamp = 1.5
+//   slope_scaled_depth_bias = 0.25
+//   depth_clip = false
+//   conservative = true
+// }
+)");
+
+    FShaderPermutationParseResult parsed;
+    REQUIRE(ParseShaderPermutationSource(shaderSource, parsed));
+    REQUIRE(parsed.mSucceeded);
+    REQUIRE(parsed.mHasRasterState);
+    REQUIRE(parsed.mRasterState.mFillMode == EShaderRasterFillMode::Wireframe);
+    REQUIRE(parsed.mRasterState.mCullMode == EShaderRasterCullMode::Front);
+    REQUIRE(parsed.mRasterState.mFrontFace == EShaderRasterFrontFace::CW);
+    REQUIRE_EQ(parsed.mRasterState.mDepthBias, 4);
+    REQUIRE_CLOSE(parsed.mRasterState.mDepthBiasClamp, 1.5f, 0.0001f);
+    REQUIRE_CLOSE(parsed.mRasterState.mSlopeScaledDepthBias, 0.25f, 0.0001f);
+    REQUIRE(!parsed.mRasterState.mDepthClip);
+    REQUIRE(parsed.mRasterState.mConservativeRaster);
 }
 
 TEST_CASE("ShaderCompiler.ShaderPermutation.BuildId") {

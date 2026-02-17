@@ -65,6 +65,33 @@ namespace AltinaEngine::Shader {
         TVector<i32> mValues;
     };
 
+    enum class EShaderRasterFillMode : u8 {
+        Solid = 0,
+        Wireframe
+    };
+
+    enum class EShaderRasterCullMode : u8 {
+        None = 0,
+        Front,
+        Back
+    };
+
+    enum class EShaderRasterFrontFace : u8 {
+        CCW = 0,
+        CW
+    };
+
+    struct FShaderRasterState {
+        EShaderRasterFillMode  mFillMode            = EShaderRasterFillMode::Solid;
+        EShaderRasterCullMode  mCullMode            = EShaderRasterCullMode::Back;
+        EShaderRasterFrontFace mFrontFace           = EShaderRasterFrontFace::CCW;
+        i32                    mDepthBias           = 0;
+        f32                    mDepthBiasClamp      = 0.0f;
+        f32                    mSlopeScaledDepthBias = 0.0f;
+        bool                   mDepthClip           = true;
+        bool                   mConservativeRaster  = false;
+    };
+
     [[nodiscard]] AE_SHADER_API auto BuildShaderPermutationId(FStringView shaderPath,
         FStringView entryPoint, EShaderStage stage, const FShaderPermutationLayout& layout,
         const FShaderPermutationValues& values, const FShaderBuiltinLayout* builtinLayout = nullptr,

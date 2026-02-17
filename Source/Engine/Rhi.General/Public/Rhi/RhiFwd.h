@@ -68,6 +68,9 @@ namespace AltinaEngine::Rhi {
     struct FRhiShaderDesc;
     struct FRhiVertexAttributeDesc;
     struct FRhiVertexLayoutDesc;
+    struct FRhiRasterStateDesc;
+    struct FRhiDepthStateDesc;
+    struct FRhiBlendStateDesc;
     struct FRhiGraphicsPipelineDesc;
     struct FRhiComputePipelineDesc;
     struct FRhiShaderResourceViewDesc;

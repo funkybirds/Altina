@@ -1,6 +1,10 @@
 
 #include "ShaderCompiler/ShaderPermutationParser.h"
 
+#include <cstdlib>
+#include <cwchar>
+#include <string>
+
 #include "Container/HashMap.h"
 #include "Types/Traits.h"
 
@@ -12,8 +16,25 @@ namespace AltinaEngine::ShaderCompiler {
     using Shader::EShaderPermutationValueType;
     using Shader::FShaderBuiltinDefinition;
     using Shader::FShaderPermutationDimension;
+    using Shader::FShaderRasterState;
 
     namespace {
+        auto ParseIntLiteral(const char* text, char** endPtr) -> long {
+            return std::strtol(text, endPtr, 10);
+        }
+
+        auto ParseIntLiteral(const wchar_t* text, wchar_t** endPtr) -> long {
+            return std::wcstol(text, endPtr, 10);
+        }
+
+        auto ParseFloatLiteral(const char* text, char** endPtr) -> double {
+            return std::strtod(text, endPtr);
+        }
+
+        auto ParseFloatLiteral(const wchar_t* text, wchar_t** endPtr) -> double {
+            return std::wcstod(text, endPtr);
+        }
+
         auto IsWhitespace(TChar ch) -> bool {
             return (ch == static_cast<TChar>(' ')) || (ch == static_cast<TChar>('\t'))
                 || (ch == static_cast<TChar>('\r')) || (ch == static_cast<TChar>('\n'));
@@ -50,6 +71,61 @@ namespace AltinaEngine::ShaderCompiler {
                 --end;
             }
             return view.Substr(start, end - start);
+        }
+
+        auto TrimLineTerminator(FStringView view) -> FStringView {
+            auto trimmed = TrimView(view);
+            if (trimmed.IsEmpty()) {
+                return trimmed;
+            }
+            if (trimmed.EndsWith(FStringView(TEXT(";")))) {
+                trimmed = TrimView(trimmed.Substr(0, trimmed.Length() - 1U));
+            }
+            return trimmed;
+        }
+
+        auto ParseBoolValue(FStringView value, bool& out) -> bool {
+            if (value == FStringView(TEXT("true")) || value == FStringView(TEXT("1"))) {
+                out = true;
+                return true;
+            }
+            if (value == FStringView(TEXT("false")) || value == FStringView(TEXT("0"))) {
+                out = false;
+                return true;
+            }
+            return false;
+        }
+
+        auto ParseIntValue(FStringView value, i32& out) -> bool {
+            const auto trimmed = TrimView(value);
+            if (trimmed.IsEmpty()) {
+                return false;
+            }
+            std::basic_string<TChar> temp(trimmed.Data(),
+                trimmed.Data() + trimmed.Length());
+            TChar* endPtr = nullptr;
+            const long parsed = ParseIntLiteral(temp.c_str(), &endPtr);
+            if (endPtr == temp.c_str() || *endPtr != static_cast<TChar>(0)) {
+                return false;
+            }
+            out = static_cast<i32>(parsed);
+            return true;
+        }
+
+        auto ParseFloatValue(FStringView value, f32& out) -> bool {
+            const auto trimmed = TrimView(value);
+            if (trimmed.IsEmpty()) {
+                return false;
+            }
+            std::basic_string<TChar> temp(trimmed.Data(),
+                trimmed.Data() + trimmed.Length());
+            TChar* endPtr = nullptr;
+            const double parsed = ParseFloatLiteral(temp.c_str(), &endPtr);
+            if (endPtr == temp.c_str() || *endPtr != static_cast<TChar>(0)) {
+                return false;
+            }
+            out = static_cast<f32>(parsed);
+            return true;
         }
 
         void AppendDiagnostic(FString& dst, FStringView msg) {
@@ -480,6 +556,119 @@ namespace AltinaEngine::ShaderCompiler {
                         return false;
                     }
                     layout.mBuiltins.PushBack(builtin);
+                }
+                if (lineEnd < length && view[lineEnd] == static_cast<TChar>('\r')
+                    && (lineEnd + 1U) < length && view[lineEnd + 1U] == static_cast<TChar>('\n')) {
+                    pos = lineEnd + 2U;
+                } else {
+                    pos = lineEnd + 1U;
+                }
+            }
+            return true;
+        }
+
+        auto ParseRasterStateBlock(const FString& normalized, FShaderRasterState& state,
+            FString& diagnostics) -> bool {
+            state = {};
+            usize       pos    = 0U;
+            const auto  view   = normalized.ToView();
+            const usize length = view.Length();
+            while (pos < length) {
+                usize lineEnd = pos;
+                while (lineEnd < length && view[lineEnd] != static_cast<TChar>('\n')
+                    && view[lineEnd] != static_cast<TChar>('\r')) {
+                    ++lineEnd;
+                }
+                auto line = TrimLineTerminator(view.Substr(pos, lineEnd - pos));
+                if (!line.IsEmpty()) {
+                    const auto eqPos = line.Find(FStringView(TEXT("=")));
+                    if (eqPos == FStringView::npos) {
+                        AppendDiagnostic(diagnostics, TEXT("Raster state line missing '='."));
+                        return false;
+                    }
+                    const auto key   = TrimView(line.Substr(0, eqPos));
+                    auto       value = TrimLineTerminator(
+                        line.Substr(eqPos + 1U, line.Length() - eqPos - 1U));
+                    if (key.IsEmpty() || value.IsEmpty()) {
+                        AppendDiagnostic(diagnostics,
+                            TEXT("Raster state line requires key and value."));
+                        return false;
+                    }
+
+                    if (key == FStringView(TEXT("fill")) || key == FStringView(TEXT("fill_mode"))) {
+                        if (value == FStringView(TEXT("solid"))) {
+                            state.mFillMode = Shader::EShaderRasterFillMode::Solid;
+                        } else if (value == FStringView(TEXT("wireframe"))) {
+                            state.mFillMode = Shader::EShaderRasterFillMode::Wireframe;
+                        } else {
+                            AppendDiagnostic(diagnostics, TEXT("Invalid fill mode."));
+                            return false;
+                        }
+                    } else if (key == FStringView(TEXT("cull"))
+                        || key == FStringView(TEXT("cull_mode"))) {
+                        if (value == FStringView(TEXT("none"))) {
+                            state.mCullMode = Shader::EShaderRasterCullMode::None;
+                        } else if (value == FStringView(TEXT("front"))) {
+                            state.mCullMode = Shader::EShaderRasterCullMode::Front;
+                        } else if (value == FStringView(TEXT("back"))) {
+                            state.mCullMode = Shader::EShaderRasterCullMode::Back;
+                        } else {
+                            AppendDiagnostic(diagnostics, TEXT("Invalid cull mode."));
+                            return false;
+                        }
+                    } else if (key == FStringView(TEXT("front_face"))
+                        || key == FStringView(TEXT("frontface"))) {
+                        if (value == FStringView(TEXT("ccw"))) {
+                            state.mFrontFace = Shader::EShaderRasterFrontFace::CCW;
+                        } else if (value == FStringView(TEXT("cw"))) {
+                            state.mFrontFace = Shader::EShaderRasterFrontFace::CW;
+                        } else {
+                            AppendDiagnostic(diagnostics, TEXT("Invalid front face."));
+                            return false;
+                        }
+                    } else if (key == FStringView(TEXT("depth_bias"))) {
+                        i32 bias = 0;
+                        if (!ParseIntValue(value, bias)) {
+                            AppendDiagnostic(diagnostics, TEXT("Invalid depth bias."));
+                            return false;
+                        }
+                        state.mDepthBias = bias;
+                    } else if (key == FStringView(TEXT("depth_bias_clamp"))) {
+                        f32 clamp = 0.0f;
+                        if (!ParseFloatValue(value, clamp)) {
+                            AppendDiagnostic(diagnostics, TEXT("Invalid depth bias clamp."));
+                            return false;
+                        }
+                        state.mDepthBiasClamp = clamp;
+                    } else if (key == FStringView(TEXT("slope_scaled_depth_bias"))
+                        || key == FStringView(TEXT("slope_depth_bias"))) {
+                        f32 slope = 0.0f;
+                        if (!ParseFloatValue(value, slope)) {
+                            AppendDiagnostic(diagnostics,
+                                TEXT("Invalid slope scaled depth bias."));
+                            return false;
+                        }
+                        state.mSlopeScaledDepthBias = slope;
+                    } else if (key == FStringView(TEXT("depth_clip"))) {
+                        bool enabled = true;
+                        if (!ParseBoolValue(value, enabled)) {
+                            AppendDiagnostic(diagnostics, TEXT("Invalid depth clip value."));
+                            return false;
+                        }
+                        state.mDepthClip = enabled;
+                    } else if (key == FStringView(TEXT("conservative"))
+                        || key == FStringView(TEXT("conservative_raster"))) {
+                        bool enabled = false;
+                        if (!ParseBoolValue(value, enabled)) {
+                            AppendDiagnostic(diagnostics,
+                                TEXT("Invalid conservative raster value."));
+                            return false;
+                        }
+                        state.mConservativeRaster = enabled;
+                    } else {
+                        AppendDiagnostic(diagnostics, TEXT("Unknown raster state key."));
+                        return false;
+                    }
                 }
                 if (lineEnd < length && view[lineEnd] == static_cast<TChar>('\r')
                     && (lineEnd + 1U) < length && view[lineEnd + 1U] == static_cast<TChar>('\n')) {
@@ -1169,6 +1358,7 @@ namespace AltinaEngine::ShaderCompiler {
         FString permBlock;
         FString builtinBlock;
         FString rulesBlock;
+        FString rasterBlock;
 
         auto    ExtractBlock = [&](FStringView blockName, FString& outBlock) -> bool {
             const auto  marker = FStringView(TEXT("@altina"));
@@ -1225,6 +1415,8 @@ namespace AltinaEngine::ShaderCompiler {
         const bool hasPerm     = ExtractBlock(FStringView(TEXT("perm")), permBlock);
         const bool hasBuiltins = ExtractBlock(FStringView(TEXT("builtins")), builtinBlock);
         const bool hasRules    = ExtractBlock(FStringView(TEXT("rules")), rulesBlock);
+        const bool hasRasterState =
+            ExtractBlock(FStringView(TEXT("raster_state")), rasterBlock);
 
         if (hasPerm) {
             const auto normalized = NormalizeAltinaBlock(permBlock.ToView());
@@ -1240,6 +1432,15 @@ namespace AltinaEngine::ShaderCompiler {
                 out.mSucceeded = false;
                 return false;
             }
+        }
+
+        if (hasRasterState) {
+            const auto normalized = NormalizeAltinaBlock(rasterBlock.ToView());
+            if (!ParseRasterStateBlock(normalized, out.mRasterState, out.mDiagnostics)) {
+                out.mSucceeded = false;
+                return false;
+            }
+            out.mHasRasterState = true;
         }
 
         if (hasRules) {

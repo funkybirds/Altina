@@ -49,6 +49,22 @@ namespace AltinaEngine::Rhi {
         TriangleStrip
     };
 
+    enum class ERhiRasterFillMode : u8 {
+        Solid = 0,
+        Wireframe
+    };
+
+    enum class ERhiRasterCullMode : u8 {
+        None = 0,
+        Front,
+        Back
+    };
+
+    enum class ERhiRasterFrontFace : u8 {
+        CCW = 0,
+        CW
+    };
+
     enum class ERhiIndexType : u8 {
         Uint16 = 0,
         Uint32
@@ -185,6 +201,52 @@ namespace AltinaEngine::Rhi {
         AccelerationStructure
     };
 
+    enum class ERhiCompareOp : u8 {
+        Never = 0,
+        Less,
+        Equal,
+        LessEqual,
+        Greater,
+        NotEqual,
+        GreaterEqual,
+        Always
+    };
+
+    enum class ERhiBlendOp : u8 {
+        Add = 0,
+        Subtract,
+        ReverseSubtract,
+        Min,
+        Max
+    };
+
+    enum class ERhiBlendFactor : u8 {
+        Zero = 0,
+        One,
+        SrcColor,
+        InvSrcColor,
+        SrcAlpha,
+        InvSrcAlpha,
+        DestAlpha,
+        InvDestAlpha,
+        DestColor,
+        InvDestColor,
+        SrcAlphaSaturate,
+        ConstantColor,
+        InvConstantColor,
+        ConstantAlpha,
+        InvConstantAlpha
+    };
+
+    enum class ERhiColorWriteMask : u8 {
+        None = 0,
+        R    = 1u << 0,
+        G    = 1u << 1,
+        B    = 1u << 2,
+        A    = 1u << 3,
+        All  = (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3)
+    };
+
     [[nodiscard]] constexpr auto operator|(ERhiCpuAccess lhs, ERhiCpuAccess rhs) noexcept
         -> ERhiCpuAccess {
         return static_cast<ERhiCpuAccess>(ToUnderlying(lhs) | ToUnderlying(rhs));
@@ -250,6 +312,28 @@ namespace AltinaEngine::Rhi {
 
     constexpr auto operator&=(ERhiShaderStageFlags& lhs, ERhiShaderStageFlags rhs) noexcept
         -> ERhiShaderStageFlags& {
+        lhs = lhs & rhs;
+        return lhs;
+    }
+
+    [[nodiscard]] constexpr auto operator|(
+        ERhiColorWriteMask lhs, ERhiColorWriteMask rhs) noexcept -> ERhiColorWriteMask {
+        return static_cast<ERhiColorWriteMask>(ToUnderlying(lhs) | ToUnderlying(rhs));
+    }
+
+    [[nodiscard]] constexpr auto operator&(
+        ERhiColorWriteMask lhs, ERhiColorWriteMask rhs) noexcept -> ERhiColorWriteMask {
+        return static_cast<ERhiColorWriteMask>(ToUnderlying(lhs) & ToUnderlying(rhs));
+    }
+
+    constexpr auto operator|=(ERhiColorWriteMask& lhs, ERhiColorWriteMask rhs) noexcept
+        -> ERhiColorWriteMask& {
+        lhs = lhs | rhs;
+        return lhs;
+    }
+
+    constexpr auto operator&=(ERhiColorWriteMask& lhs, ERhiColorWriteMask rhs) noexcept
+        -> ERhiColorWriteMask& {
         lhs = lhs & rhs;
         return lhs;
     }

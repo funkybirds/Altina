@@ -32,6 +32,7 @@ target_compile_features(${TargetName}
 )
 
 set(DemoBinaryDir ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)
+set(DemoAssetCookStamp ${CMAKE_BINARY_DIR}/Demo/Minimal/AssetCook/Minimal.cook.stamp)
 
 set_target_properties(${TargetName}
     PROPERTIES
@@ -48,3 +49,85 @@ add_custom_command(
         ${DemoBinaryDir}
     COMMENT "Staging Minimal demo executable"
 )
+
+find_program(AE_DOTNET_HOST dotnet)
+if(AE_DOTNET_HOST)
+    set(AE_DEMO_MANAGED_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/Source/Managed/AltinaEngine.Demo.Minimal)
+    set(AE_DEMO_MANAGED_PROJECT ${AE_DEMO_MANAGED_ROOT}/AltinaEngine.Demo.Minimal.csproj)
+    set(AE_DEMO_MANAGED_OUT_DIR ${CMAKE_BINARY_DIR}/Demo/Minimal/Managed)
+    set(AE_DEMO_MANAGED_STAMP ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.build.stamp)
+
+    add_custom_command(
+        OUTPUT ${AE_DEMO_MANAGED_STAMP}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${AE_DEMO_MANAGED_OUT_DIR}
+        COMMAND ${AE_DOTNET_HOST} build ${AE_DEMO_MANAGED_PROJECT}
+            -o ${AE_DEMO_MANAGED_OUT_DIR}
+            -c $<IF:$<CONFIG:Debug>,Debug,Release>
+            /t:Rebuild
+            /p:NoIncremental=true
+            /p:BaseIntermediateOutputPath=${AE_DEMO_MANAGED_OUT_DIR}/obj/
+            /p:IntermediateOutputPath=${AE_DEMO_MANAGED_OUT_DIR}/obj/$<IF:$<CONFIG:Debug>,Debug,Release>/
+        COMMAND ${CMAKE_COMMAND} -E touch ${AE_DEMO_MANAGED_STAMP}
+        DEPENDS
+            ${AE_DEMO_MANAGED_PROJECT}
+            ${AE_DEMO_MANAGED_ROOT}/DemoScript.cs
+            ${CMAKE_SOURCE_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.csproj
+            ${CMAKE_SOURCE_DIR}/Source/Managed/AltinaEngine.Managed/ManagedLog.cs
+        BYPRODUCTS
+            ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.dll
+            ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.runtimeconfig.json
+            ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.deps.json
+            ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.pdb
+        COMMENT "Building Minimal demo managed scripting assembly"
+        VERBATIM
+    )
+
+    add_custom_target(AltinaEngineDemoMinimalManagedBuild
+        DEPENDS ${AE_DEMO_MANAGED_STAMP}
+    )
+    set_property(TARGET AltinaEngineDemoMinimalManagedBuild PROPERTY BUILD_ALWAYS TRUE)
+    add_dependencies(${TargetName} AltinaEngineDemoMinimalManagedBuild)
+
+    add_custom_command(
+        TARGET AltinaEngineDemoMinimalManagedBuild
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.dll
+            ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.runtimeconfig.json
+            ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.deps.json
+            ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.pdb
+            ${DemoBinaryDir}
+        COMMENT "Staging Minimal demo managed scripting assembly"
+    )
+else()
+    message(STATUS "dotnet not found; skipping Minimal demo managed build.")
+endif()
+
+add_custom_command(
+    OUTPUT ${DemoAssetCookStamp}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Demo/Minimal/AssetCook
+    COMMAND $<TARGET_FILE:AltinaEngineAssetTool> cook
+        --root ${CMAKE_SOURCE_DIR}
+        --platform Win64
+        --demo Minimal
+        --build-root ${CMAKE_SOURCE_DIR}/build
+    COMMAND ${CMAKE_COMMAND} -E touch ${DemoAssetCookStamp}
+    DEPENDS
+        AltinaEngineAssetTool
+        ${CMAKE_CURRENT_SOURCE_DIR}/Assets/Scripts/DemoScript.script
+    COMMENT "Cooking Minimal demo assets"
+    VERBATIM
+)
+
+add_custom_target(AltinaEngineDemoMinimalCookAssets
+    DEPENDS ${DemoAssetCookStamp}
+)
+
+add_dependencies(${TargetName} AltinaEngineDemoMinimalCookAssets)

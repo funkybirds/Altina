@@ -1,4 +1,6 @@
-namespace AltinaEngine.Managed;
+using AltinaEngine.Managed;
+
+namespace AltinaEngine.Demo.Minimal;
 
 public sealed class DemoScript : ScriptComponent
 {
@@ -14,12 +16,12 @@ public sealed class DemoScript : ScriptComponent
         }
 
         _loggedCreate = true;
-        Native.LogInfo($"[DemoScript] OnCreate owner=({OwnerIndex},{OwnerGeneration}) world={WorldId}");
+        ManagedLog.Info($"[DemoScript] OnCreate owner=({OwnerIndex},{OwnerGeneration}) world={WorldId}");
     }
 
     public override void OnDestroy()
     {
-        Native.LogInfo("[DemoScript] OnDestroy");
+        ManagedLog.Info("[DemoScript] OnDestroy");
     }
 
     public override void Tick(float dt)
@@ -27,19 +29,19 @@ public sealed class DemoScript : ScriptComponent
         if (!_loggedFirstTick)
         {
             _loggedFirstTick = true;
-            Native.LogInfo("[DemoScript] Tick start.");
+            ManagedLog.Info("[DemoScript] Tick start.");
         }
 
         _elapsedSeconds += dt;
         if (_elapsedSeconds >= 1.0f)
         {
             _elapsedSeconds = 0.0f;
-            Native.LogInfo($"[DemoScript] Tick mouse=({Input.MouseX},{Input.MouseY})");
+            ManagedLog.Info($"[DemoScript] Tick mouse=({Input.MouseX},{Input.MouseY})");
         }
 
         if (Input.WasKeyPressed(EKey.Space))
         {
-            Native.LogInfo("[DemoScript] Space pressed (managed).");
+            ManagedLog.Info("[DemoScript] Space pressed (managed).");
         }
     }
 }

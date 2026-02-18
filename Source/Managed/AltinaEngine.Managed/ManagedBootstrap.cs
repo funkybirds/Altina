@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
+using System.Text;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -18,6 +20,7 @@ public static unsafe class ManagedBootstrap
         new(StringComparer.OrdinalIgnoreCase);
     private static IntPtr sManagedApiPtr = IntPtr.Zero;
     private static ulong sNextHandle = 1;
+    private static bool sResolverInstalled = false;
 
     public static IntPtr Startup(IntPtr nativeApi, int nativeApiSize)
     {
@@ -29,6 +32,13 @@ public static unsafe class ManagedBootstrap
         NativeApi api = *(NativeApi*)nativeApi;
         Native.SetApi(api);
         Native.LogInfo("Managed scripting runtime startup initialized.");
+
+        if (!sResolverInstalled)
+        {
+            AssemblyLoadContext.Default.Resolving += ResolveAssembly;
+            sResolverInstalled = true;
+            Native.LogInfo($"Managed assembly resolver installed. BaseDir='{GetBaseDirectory()}'");
+        }
 
         if (sManagedApiPtr == IntPtr.Zero)
         {
@@ -155,6 +165,15 @@ public static unsafe class ManagedBootstrap
 
     private static Type? ResolveType(string typeName, string? assemblyPath)
     {
+        string? simpleTypeName = typeName;
+        string? assemblyName = null;
+        int commaIndex = typeName.IndexOf(',');
+        if (commaIndex >= 0)
+        {
+            simpleTypeName = typeName[..commaIndex].Trim();
+            assemblyName = typeName[(commaIndex + 1)..].Trim();
+        }
+
         Type? type = Type.GetType(typeName, throwOnError: false);
         if (type != null)
         {
@@ -163,18 +182,71 @@ public static unsafe class ManagedBootstrap
 
         if (string.IsNullOrEmpty(assemblyPath))
         {
-            return null;
+            if (!string.IsNullOrEmpty(assemblyName))
+            {
+                string candidate = Path.Combine(AppContext.BaseDirectory, assemblyName + ".dll");
+                if (File.Exists(candidate))
+                {
+                    assemblyPath = candidate;
+                }
+            }
+            if (string.IsNullOrEmpty(assemblyPath))
+            {
+                return null;
+            }
         }
 
         try
         {
+            if (!Path.IsPathRooted(assemblyPath))
+            {
+                assemblyPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, assemblyPath));
+            }
+
             if (!sLoadedAssemblies.TryGetValue(assemblyPath, out Assembly? assembly))
             {
                 assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
                 sLoadedAssemblies[assemblyPath] = assembly;
             }
 
-            return assembly.GetType(typeName, throwOnError: false);
+            type = assembly.GetType(typeName, throwOnError: false);
+            if (type != null)
+            {
+                return type;
+            }
+
+            if (!string.IsNullOrEmpty(simpleTypeName) && !string.Equals(simpleTypeName, typeName, StringComparison.Ordinal))
+            {
+                type = assembly.GetType(simpleTypeName, throwOnError: false);
+                if (type != null)
+                {
+                    return type;
+                }
+            }
+
+            try
+            {
+                Type[] types = assembly.GetTypes();
+                int count = types.Length;
+                int max = Math.Min(count, 16);
+                StringBuilder builder = new();
+                for (int i = 0; i < max; ++i)
+                {
+                    if (i > 0)
+                    {
+                        builder.Append(", ");
+                    }
+                    builder.Append(types[i].FullName ?? types[i].Name);
+                }
+                Native.LogInfo(
+                    $"Managed ResolveType miss. Assembly='{assembly.FullName}' Location='{assembly.Location}' Types={count} Sample=[{builder}]");
+            }
+            catch (Exception ex)
+            {
+                Native.LogError($"Managed ResolveType failed to enumerate types: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            return null;
         }
         catch (Exception ex)
         {
@@ -191,5 +263,67 @@ public static unsafe class ManagedBootstrap
         }
 
         return Marshal.PtrToStringUTF8((IntPtr)ptr);
+    }
+
+    private static Assembly? ResolveAssembly(AssemblyLoadContext context, AssemblyName name)
+    {
+        if (string.IsNullOrEmpty(name.Name))
+        {
+            return null;
+        }
+
+        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            AssemblyName loadedName = assembly.GetName();
+            if (string.Equals(loadedName.Name, name.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return assembly;
+            }
+        }
+
+        string baseDir = GetBaseDirectory();
+        if (string.IsNullOrEmpty(baseDir))
+        {
+            return null;
+        }
+
+        string candidate = Path.Combine(baseDir, name.Name + ".dll");
+        if (!Path.IsPathRooted(candidate))
+        {
+            candidate = Path.GetFullPath(candidate);
+        }
+
+        if (File.Exists(candidate))
+        {
+            try
+            {
+                return context.LoadFromAssemblyPath(candidate);
+            }
+            catch (Exception ex)
+            {
+                Native.LogError($"Managed ResolveAssembly failed: {name.Name} -> {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        return null;
+    }
+
+    private static string GetBaseDirectory()
+    {
+        if (!string.IsNullOrEmpty(AppContext.BaseDirectory))
+        {
+            return AppContext.BaseDirectory;
+        }
+
+        if (!string.IsNullOrEmpty(Environment.ProcessPath))
+        {
+            string? dir = Path.GetDirectoryName(Environment.ProcessPath);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                return dir;
+            }
+        }
+
+        return Directory.GetCurrentDirectory();
     }
 }

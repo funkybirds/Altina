@@ -98,17 +98,20 @@ if(AE_DOTNET_HOST)
         COMMAND ${CMAKE_COMMAND} -E make_directory ${AE_MANAGED_OUT_DIR}
         COMMAND ${AE_DOTNET_HOST} build ${AE_MANAGED_PROJECT}
             -o ${AE_MANAGED_OUT_DIR}
+            -c $<IF:$<CONFIG:Debug>,Debug,Release>
             /t:Rebuild
             /p:NoIncremental=true
+            /p:BaseIntermediateOutputPath=${AE_MANAGED_OUT_DIR}/obj/
+            /p:IntermediateOutputPath=${AE_MANAGED_OUT_DIR}/obj/$<IF:$<CONFIG:Debug>,Debug,Release>/
         COMMAND ${CMAKE_COMMAND} -E touch ${AE_MANAGED_STAMP}
         DEPENDS
             ${AE_MANAGED_PROJECT}
             ${AE_MANAGED_ROOT}/ManagedBootstrap.cs
             ${AE_MANAGED_ROOT}/ManagedApi.cs
             ${AE_MANAGED_ROOT}/NativeApi.cs
+            ${AE_MANAGED_ROOT}/ManagedLog.cs
             ${AE_MANAGED_ROOT}/ScriptComponent.cs
             ${AE_MANAGED_ROOT}/Input.cs
-            ${AE_MANAGED_ROOT}/DemoScript.cs
         BYPRODUCTS
             ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.dll
             ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.runtimeconfig.json

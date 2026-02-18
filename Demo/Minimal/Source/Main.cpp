@@ -7,6 +7,7 @@
 #include "Engine/Runtime/MaterialCache.h"
 #include "Engine/Runtime/SceneBatching.h"
 #include "Engine/Runtime/SceneView.h"
+#include "Asset/AssetRegistry.h"
 #include "Gameplay/GameplayModule.h"
 #include "Launch/EngineLoop.h"
 #include "Input/InputSystem.h"
@@ -680,20 +681,38 @@ int main(int argc, char** argv) {
         materialComponent.ClearMaterials();
     }
 
-    if (assetsReady) {
-        const auto scriptHandle =
-            EngineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/scripts/demoscript"));
-        if (scriptHandle.IsValid()) {
-            const auto scriptObject = world->CreateGameObject(TEXT("ManagedScript"));
-            const auto scriptComponentId =
-                world->CreateComponent<GameScene::FScriptComponent>(scriptObject);
-            if (scriptComponentId.IsValid()) {
-                auto& scriptComponent =
-                    world->ResolveComponent<GameScene::FScriptComponent>(scriptComponentId);
-                scriptComponent.SetScriptAsset(scriptHandle);
+    {
+        const auto scriptObject = world->CreateGameObject(TEXT("ManagedScript"));
+        const auto scriptComponentId =
+            world->CreateComponent<GameScene::FScriptComponent>(scriptObject);
+        if (scriptComponentId.IsValid()) {
+            auto& scriptComponent =
+                world->ResolveComponent<GameScene::FScriptComponent>(scriptComponentId);
+
+            bool configured = false;
+            if (assetsReady) {
+                const auto scriptHandle =
+                    EngineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/scripts/demoscript"));
+                if (scriptHandle.IsValid()) {
+                    if (const auto* desc =
+                            EngineLoop.GetAssetRegistry().GetDesc(scriptHandle)) {
+                        if (!desc->Script.TypeName.IsEmptyString()) {
+                            scriptComponent.SetAssemblyPath(desc->Script.AssemblyPath.ToView());
+                            scriptComponent.SetTypeName(desc->Script.TypeName.ToView());
+                            configured = true;
+                        }
+                    }
+                } else {
+                    LogWarning(TEXT("ScriptAsset demo/minimal/scripts/demoscript not found."));
+                }
             }
-        } else {
-            LogWarning(TEXT("ScriptAsset demo/minimal/scripts/demoscript not found."));
+
+            if (!configured) {
+                scriptComponent.SetAssemblyPath("AltinaEngine.Demo.Minimal.dll");
+                scriptComponent.SetTypeName(
+                    "AltinaEngine.Demo.Minimal.DemoScript, AltinaEngine.Demo.Minimal");
+                LogWarning(TEXT("ScriptComponent using fallback managed type."));
+            }
         }
     }
 

@@ -1,4 +1,4 @@
 {
-  "AssemblyPath": "",
-  "TypeName": "AltinaEngine.Managed.DemoScript, AltinaEngine.Managed"
+  "AssemblyPath": "AltinaEngine.Demo.Minimal.dll",
+  "TypeName": "AltinaEngine.Demo.Minimal.DemoScript, AltinaEngine.Demo.Minimal"
 }

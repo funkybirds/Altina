@@ -49,5 +49,7 @@ namespace AltinaEngine::GameScene {
         bool                           mLoggedTick = false;
         bool                           mLoggedCreate = false;
         bool                           mLoggedCreateFailure = false;
+        bool                           mLoggedResolveFailure = false;
+        bool                           mLoggedResolved = false;
     };
 } // namespace AltinaEngine::GameScene

@@ -175,6 +175,24 @@ namespace AltinaEngine::GameScene {
         return obj->IsActive();
     }
 
+    void FWorld::Tick(float InDeltaTime) {
+        TVector<FComponentStorageBase*> storages;
+        storages.Reserve(static_cast<usize>(mComponentStorage.size()));
+        for (auto& entry : mComponentStorage) {
+            if (entry.second) {
+                storages.PushBack(entry.second.Get());
+            }
+        }
+
+        for (auto* storage : storages) {
+            if (storage != nullptr) {
+                storage->Tick(*this, InDeltaTime);
+            }
+        }
+
+        UpdateTransforms();
+    }
+
     void FWorld::UpdateTransforms() {
         ++mTransformUpdateId;
         if (mTransformUpdateId == 0) {

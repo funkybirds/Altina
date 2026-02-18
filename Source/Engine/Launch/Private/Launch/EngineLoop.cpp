@@ -171,6 +171,10 @@ namespace AltinaEngine::Launch {
             return;
         }
 
+        if (auto* world = mEngineRuntime.GetWorldManager().GetActiveWorld()) {
+            world->Tick(InDeltaTime);
+        }
+
         u32  width        = 0U;
         u32  height       = 0U;
         bool shouldResize = false;
@@ -291,6 +295,14 @@ namespace AltinaEngine::Launch {
 
     auto FEngineLoop::GetInputSystem() const noexcept -> const Input::FInputSystem* {
         return mInputSystem.Get();
+    }
+
+    auto FEngineLoop::GetWorldManager() noexcept -> GameScene::FWorldManager& {
+        return mEngineRuntime.GetWorldManager();
+    }
+
+    auto FEngineLoop::GetWorldManager() const noexcept -> const GameScene::FWorldManager& {
+        return mEngineRuntime.GetWorldManager();
     }
 
     void FEngineLoop::FlushRenderFrames() {

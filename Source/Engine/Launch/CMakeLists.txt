@@ -50,6 +50,7 @@ target_link_libraries(${TargetName}
         AltinaEngine::Core
         AltinaEngine::Asset
         AltinaEngine::Application
+        AltinaEngine::Engine
         AltinaEngine::Input
         AltinaEngine::RenderCore
         AltinaEngine::Rhi::General

@@ -1,8 +1,16 @@
 #include "Base/AltinaBase.h"
+#include "Engine/GameScene/CameraComponent.h"
+#include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/StaticMeshFilterComponent.h"
+#include "Engine/GameScene/World.h"
+#include "Engine/Runtime/MaterialCache.h"
+#include "Engine/Runtime/SceneBatching.h"
+#include "Engine/Runtime/SceneView.h"
 #include "Gameplay/GameplayModule.h"
 #include "Launch/EngineLoop.h"
 #include "Input/InputSystem.h"
 #include "Input/Keys.h"
+#include "Math/Vector.h"
 #include "Reflection/Reflection.h"
 #include "Rhi/Command/RhiCmdBuiltins.h"
 #include "Rhi/Command/RhiCmdContextAdapter.h"
@@ -356,6 +364,36 @@ float4 PSMain(VSOut input) : SV_Target0 {
 }
 )";
 
+    auto BuildDemoStaticMesh() -> RenderCore::Geometry::FStaticMeshData {
+        using RenderCore::Geometry::FStaticMeshData;
+        using RenderCore::Geometry::FStaticMeshLodData;
+        using RenderCore::Geometry::FStaticMeshSection;
+
+        FStaticMeshData    mesh{};
+        FStaticMeshLodData lod{};
+
+        const Core::Math::FVector3f positions[] = {
+            Core::Math::FVector3f(0.0f, 0.5f, 0.0f),
+            Core::Math::FVector3f(0.5f, -0.5f, 0.0f),
+            Core::Math::FVector3f(-0.5f, -0.5f, 0.0f),
+        };
+
+        const u16 indices[] = { 0U, 1U, 2U };
+
+        lod.SetPositions(positions, 3U);
+        lod.SetIndices(indices, 3U, Rhi::ERhiIndexType::Uint16);
+
+        FStaticMeshSection section{};
+        section.FirstIndex   = 0U;
+        section.IndexCount   = 3U;
+        section.BaseVertex   = 0;
+        section.MaterialSlot = 0U;
+        lod.Sections.PushBack(section);
+
+        mesh.Lods.PushBack(AltinaEngine::Move(lod));
+        return mesh;
+    }
+
     class FTriangleRenderer {
     public:
         void Render(Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport, u32 width, u32 height) {
@@ -594,10 +632,60 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    auto& worldManager = EngineLoop.GetWorldManager();
+    const auto worldHandle = worldManager.CreateWorld();
+    worldManager.SetActiveWorld(worldHandle);
+    auto* world = worldManager.GetWorld(worldHandle);
+    if (world == nullptr) {
+        LogError(TEXT("Demo world creation failed."));
+        EngineLoop.Exit();
+        return 1;
+    }
+
+    const auto cameraObject = world->CreateGameObject(TEXT("Camera"));
+    const auto cameraComponentId =
+        world->CreateComponent<GameScene::FCameraComponent>(cameraObject);
+    if (cameraComponentId.IsValid()) {
+        auto& camera = world->ResolveComponent<GameScene::FCameraComponent>(cameraComponentId);
+        camera.SetNearPlane(0.1f);
+        camera.SetFarPlane(1000.0f);
+    }
+
+    const auto meshObject = world->CreateGameObject(TEXT("TriangleMesh"));
+    const auto meshComponentId =
+        world->CreateComponent<GameScene::FStaticMeshFilterComponent>(meshObject);
+    const auto materialComponentId =
+        world->CreateComponent<GameScene::FMeshMaterialComponent>(meshObject);
+    if (meshComponentId.IsValid()) {
+        auto& meshComponent =
+            world->ResolveComponent<GameScene::FStaticMeshFilterComponent>(meshComponentId);
+        meshComponent.SetStaticMesh(BuildDemoStaticMesh());
+    }
+    if (materialComponentId.IsValid()) {
+        auto& materialComponent =
+            world->ResolveComponent<GameScene::FMeshMaterialComponent>(materialComponentId);
+        materialComponent.ClearMaterials();
+    }
+
+    Engine::FSceneViewBuilder  sceneViewBuilder;
+    Engine::FSceneBatchBuilder sceneBatchBuilder;
+    Engine::FMaterialCache     materialCache;
+    Engine::FRenderScene       renderScene;
+    RenderCore::Render::FDrawList drawList;
+    Engine::FSceneViewBuildParams  viewParams{};
+    Engine::FSceneBatchBuildParams batchParams{};
+
+    std::atomic<u32> renderWidth{ 1280U };
+    std::atomic<u32> renderHeight{ 720U };
+
     FTriangleRenderer triangleRenderer;
     EngineLoop.SetRenderCallback(
-        [&triangleRenderer](Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport, u32 width,
-            u32 height) { triangleRenderer.Render(device, viewport, width, height); });
+        [&triangleRenderer, &renderWidth, &renderHeight](Rhi::FRhiDevice& device,
+            Rhi::FRhiViewport& viewport, u32 width, u32 height) {
+            renderWidth.store(width, std::memory_order_relaxed);
+            renderHeight.store(height, std::memory_order_relaxed);
+            triangleRenderer.Render(device, viewport, width, height);
+        });
 
     constexpr f32 kFixedDeltaTime          = 1.0f / 60.0f;
     constexpr f32 kMoveSpeedUnitsPerSecond = 300.0f;
@@ -608,6 +696,41 @@ int main(int argc, char** argv) {
 
     for (i32 FrameIndex = 0; FrameIndex < 600; ++FrameIndex) {
         EngineLoop.Tick(kFixedDeltaTime);
+
+        const u32 viewWidth  = renderWidth.load(std::memory_order_relaxed);
+        const u32 viewHeight = renderHeight.load(std::memory_order_relaxed);
+        if (viewWidth > 0U && viewHeight > 0U) {
+            viewParams.ViewRect = RenderCore::View::FViewRect{ 0, 0, viewWidth, viewHeight };
+            viewParams.RenderTargetExtent =
+                RenderCore::View::FRenderTargetExtent2D{ viewWidth, viewHeight };
+            viewParams.FrameIndex       = static_cast<u64>(FrameIndex);
+            viewParams.DeltaTimeSeconds = kFixedDeltaTime;
+
+            sceneViewBuilder.Build(*world, viewParams, renderScene);
+
+            for (auto& view : renderScene.Views) {
+                if (!world->IsAlive(view.CameraId)) {
+                    continue;
+                }
+                const auto& camera =
+                    world->ResolveComponent<GameScene::FCameraComponent>(view.CameraId);
+                view.View.Camera.Transform = world->Object(camera.GetOwner()).GetWorldTransform();
+                view.View.UpdateMatrices();
+            }
+
+            usize totalBatches = 0U;
+            for (const auto& view : renderScene.Views) {
+                sceneBatchBuilder.Build(renderScene, view, batchParams, materialCache, drawList);
+                totalBatches += drawList.Batches.Size();
+            }
+
+            if ((FrameIndex % 60) == 0) {
+                LogInfo(TEXT("SceneView: {} views, {} meshes, {} batches"),
+                    static_cast<u32>(renderScene.Views.Size()),
+                    static_cast<u32>(renderScene.StaticMeshes.Size()),
+                    static_cast<u32>(totalBatches));
+            }
+        }
 
         if (const auto* inputSystem = EngineLoop.GetInputSystem()) {
             i32 moveX = 0;

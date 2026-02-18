@@ -17,6 +17,7 @@
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiRefs.h"
 #include "Rhi/RhiViewport.h"
+#include "Engine/Runtime/EngineRuntime.h"
 
 using AltinaEngine::Core::Container::TFunction;
 using AltinaEngine::Core::Container::TOwner;
@@ -49,6 +50,8 @@ namespace AltinaEngine::Launch {
         void               Exit();
         void               SetRenderCallback(FRenderCallback callback);
         [[nodiscard]] auto GetInputSystem() const noexcept -> const Input::FInputSystem*;
+        [[nodiscard]] auto GetWorldManager() noexcept -> GameScene::FWorldManager&;
+        [[nodiscard]] auto GetWorldManager() const noexcept -> const GameScene::FWorldManager&;
 
     private:
         void                                FlushRenderFrames();
@@ -76,5 +79,6 @@ namespace AltinaEngine::Launch {
         Asset::FTexture2DLoader                                         mTexture2DLoader;
         TOwner<RenderCore::FRenderingThread>                            mRenderingThread;
         TQueue<Core::Jobs::FJobHandle>                                  mPendingRenderFrames;
+        Engine::FEngineRuntime                                          mEngineRuntime{};
     };
 } // namespace AltinaEngine::Launch

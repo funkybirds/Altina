@@ -73,6 +73,7 @@ namespace AltinaEngine::GameScene {
         void               SetGameObjectActive(FGameObjectId id, bool active);
         [[nodiscard]] auto IsGameObjectActive(FGameObjectId id) const -> bool;
 
+        void               Tick(float InDeltaTime);
         void               UpdateTransforms();
 
         [[nodiscard]] auto GetActiveCameraComponents() const noexcept
@@ -95,6 +96,7 @@ namespace AltinaEngine::GameScene {
 
             virtual void               Destroy(FWorld& world, FComponentId id) = 0;
             [[nodiscard]] virtual auto IsAlive(FComponentId id) const -> bool  = 0;
+            virtual void               Tick(FWorld& world, float deltaTime)    = 0;
             virtual void               DestroyAll(FWorld& world)               = 0;
         };
 
@@ -182,6 +184,24 @@ namespace AltinaEngine::GameScene {
                     id.Generation = mSlots[index].Generation;
                     id.Type       = mTypeHash;
                     Destroy(world, id);
+                }
+            }
+
+            void Tick(FWorld& world, float deltaTime) override {
+                const u32 count = static_cast<u32>(mSlots.Size());
+                for (u32 index = 0; index < count; ++index) {
+                    auto& slot = mSlots[index];
+                    if (!slot.Alive || !slot.Handle) {
+                        continue;
+                    }
+                    if (!world.IsGameObjectActive(slot.Owner)) {
+                        continue;
+                    }
+                    auto* component = slot.Handle.Get();
+                    if (component == nullptr || !component->IsEnabled()) {
+                        continue;
+                    }
+                    component->Tick(deltaTime);
                 }
             }
 

@@ -19,6 +19,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
     private:
         FHostFxrLibrary                         mHostFxr;
         load_assembly_and_get_function_pointer_fn mLoadAssemblyAndGetFunctionPointer = nullptr;
+        hostfxr_error_writer_fn                 mPrevErrorWriter = nullptr;
         FScriptRuntimeConfig                    mConfig;
         bool                                    mInitialized = false;
     };

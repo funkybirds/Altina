@@ -56,6 +56,17 @@ target_link_libraries(${TargetName}
         AltinaEngine::Rhi::General
 )
 
+if(AE_ENABLE_SCRIPTING_CORECLR)
+    target_link_libraries(${TargetName}
+        PUBLIC
+            AltinaEngine::Scripting::CoreCLR
+    )
+    target_compile_definitions(${TargetName}
+        PRIVATE
+            AE_ENABLE_SCRIPTING_CORECLR=1
+    )
+endif()
+
 if(WIN32)
     target_link_libraries(${TargetName}
         PRIVATE

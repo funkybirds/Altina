@@ -75,6 +75,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             bool                  HasMeshDesc = false;
             Asset::FAudioDesc     AudioDesc{};
             bool                  HasAudioDesc = false;
+            std::string           ScriptAssemblyPath;
+            std::string           ScriptTypeName;
+            bool                  HasScriptDesc = false;
         };
 
         struct FCookCacheEntry {
@@ -175,6 +178,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return "Material";
                 case Asset::EAssetType::Audio:
                     return "Audio";
+                case Asset::EAssetType::Script:
+                    return "Script";
                 case Asset::EAssetType::Redirector:
                     return "Redirector";
                 default:
@@ -196,6 +201,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             if (value == "audio") {
                 return Asset::EAssetType::Audio;
             }
+            if (value == "script") {
+                return Asset::EAssetType::Script;
+            }
             if (value == "redirector") {
                 return Asset::EAssetType::Redirector;
             }
@@ -210,6 +218,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return "MeshImporter";
                 case Asset::EAssetType::Audio:
                     return "AudioImporter";
+                case Asset::EAssetType::Script:
+                    return "ScriptImporter";
                 default:
                     return "UnknownImporter";
             }
@@ -233,6 +243,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return ext == ".wav" || ext == ".ogg";
         }
 
+        auto IsScriptExtension(const std::filesystem::path& path) -> bool {
+            std::string ext = path.extension().string();
+            ToLowerAscii(ext);
+            return ext == ".script";
+        }
+
         auto GuessAssetType(const std::filesystem::path& path) -> Asset::EAssetType {
             if (IsTextureExtension(path)) {
                 return Asset::EAssetType::Texture2D;
@@ -243,7 +259,47 @@ namespace AltinaEngine::Tools::AssetPipeline {
             if (IsAudioExtension(path)) {
                 return Asset::EAssetType::Audio;
             }
+            if (IsScriptExtension(path)) {
+                return Asset::EAssetType::Script;
+            }
             return Asset::EAssetType::Unknown;
+        }
+
+        auto ParseScriptDescriptor(const std::vector<u8>& bytes, std::string& outAssemblyPath,
+            std::string& outTypeName) -> bool {
+            outAssemblyPath.clear();
+            outTypeName.clear();
+            if (bytes.empty()) {
+                return false;
+            }
+
+            std::string text(bytes.begin(), bytes.end());
+            FNativeString native;
+            native.Append(text.c_str(), text.size());
+            const FNativeStringView view(native.GetData(), native.Length());
+
+            FJsonDocument document;
+            if (!document.Parse(view)) {
+                return false;
+            }
+
+            const FJsonValue* root = document.GetRoot();
+            if (root == nullptr || root->Type != EJsonType::Object) {
+                return false;
+            }
+
+            FNativeString assemblyText;
+            FNativeString typeText;
+            (void)GetStringValue(FindObjectValueInsensitive(*root, "AssemblyPath"), assemblyText);
+            (void)GetStringValue(FindObjectValueInsensitive(*root, "TypeName"), typeText);
+
+            if (typeText.IsEmptyString()) {
+                return false;
+            }
+
+            outAssemblyPath = ToStdString(assemblyText);
+            outTypeName = ToStdString(typeText);
+            return true;
         }
         void HashBytes(u64& hash, const void* data, size_t size) {
             if (data == nullptr || size == 0U) {
@@ -2369,6 +2425,16 @@ namespace AltinaEngine::Tools::AssetPipeline {
                                 << "\"Codec\": 0, \"Channels\": 0, \"SampleRate\": 0, \"Duration\": 0";
                         }
                         break;
+                    case Asset::EAssetType::Script:
+                        if (entry.HasScriptDesc) {
+                            stream << "\"AssemblyPath\": \""
+                                   << EscapeJson(entry.ScriptAssemblyPath)
+                                   << "\", \"TypeName\": \"" << EscapeJson(entry.ScriptTypeName)
+                                   << "\"";
+                        } else {
+                            stream << "\"AssemblyPath\": \"\", \"TypeName\": \"\"";
+                        }
+                        break;
                     default:
                         break;
                 }
@@ -2459,6 +2525,18 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 const bool            isTexture = asset.Type == Asset::EAssetType::Texture2D;
                 const bool            isMesh    = asset.Type == Asset::EAssetType::Mesh;
                 const bool            isAudio   = asset.Type == Asset::EAssetType::Audio;
+                const bool            isScript  = asset.Type == Asset::EAssetType::Script;
+                std::string           scriptAssemblyPath;
+                std::string           scriptTypeName;
+                bool                  hasScriptDesc = false;
+                if (isScript) {
+                    if (!ParseScriptDescriptor(bytes, scriptAssemblyPath, scriptTypeName)) {
+                        std::cerr << "Failed to read script descriptor: "
+                                  << asset.SourcePath.string() << "\n";
+                        continue;
+                    }
+                    hasScriptDesc = true;
+                }
                 if (isTexture) {
                     constexpr bool kDefaultSrgb = true;
                     if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
@@ -2530,6 +2608,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 } else if (isAudio) {
                     registryEntry.AudioDesc    = audioDesc;
                     registryEntry.HasAudioDesc = true;
+                } else if (isScript) {
+                    registryEntry.ScriptAssemblyPath = scriptAssemblyPath;
+                    registryEntry.ScriptTypeName = scriptTypeName;
+                    registryEntry.HasScriptDesc = hasScriptDesc;
                 }
                 registryAssets.push_back(registryEntry);
             }

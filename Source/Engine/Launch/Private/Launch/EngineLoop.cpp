@@ -2,6 +2,11 @@
 
 #include "Input/InputMessageHandler.h"
 #include "Input/InputSystem.h"
+#include "Engine/GameScene/ScriptComponent.h"
+
+#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+    #include "Scripting/ScriptSystemCoreCLR.h"
+#endif
 
 #include "Console/ConsoleVariable.h"
 #include "Logging/Log.h"
@@ -9,16 +14,50 @@
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiStructs.h"
 
+#include <filesystem>
+#include <string>
+#include <system_error>
+#include <vector>
+
 #if AE_PLATFORM_WIN
+#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+    #ifdef TEXT
+        #undef TEXT
+    #endif
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h>
+    #ifdef TEXT
+        #undef TEXT
+    #endif
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        #define TEXT(str) L##str
+    #else
+        #define TEXT(str) str
+    #endif
+#endif
     #include "Application/Windows/WindowsApplication.h"
     #include "RhiD3D11/RhiD3D11Context.h"
+#elif AE_PLATFORM_MACOS
+#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+    #include <mach-o/dyld.h>
+    #include <unistd.h>
+#endif
 #else
     #include "RhiMock/RhiMockContext.h"
+#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+    #include <unistd.h>
+#endif
 #endif
 
 using AltinaEngine::Move;
 using AltinaEngine::Core::Container::MakeUnique;
 using AltinaEngine::Core::Container::MakeUniqueAs;
+using AltinaEngine::Core::Logging::LogWarningCat;
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
     namespace {
@@ -28,6 +67,118 @@ namespace AltinaEngine::Launch {
                 value = 0;
             return static_cast<u32>(value);
         }
+
+#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+        constexpr auto kScriptingCategory = TEXT("Scripting.CoreCLR");
+        constexpr auto kManagedRuntimeConfig = TEXT("AltinaEngine.Managed.runtimeconfig.json");
+        constexpr auto kManagedAssembly = TEXT("AltinaEngine.Managed.dll");
+        constexpr auto kManagedType =
+            TEXT("AltinaEngine.Managed.ManagedBootstrap, AltinaEngine.Managed");
+        constexpr auto kManagedStartupMethod = TEXT("Startup");
+        constexpr auto kManagedStartupDelegate =
+            TEXT("AltinaEngine.Managed.ManagedStartupDelegate, AltinaEngine.Managed");
+
+        struct FManagedPathResolve {
+            std::filesystem::path mPath;
+            bool                  mExists = false;
+        };
+
+        auto GetExecutableDir() -> std::filesystem::path {
+#if AE_PLATFORM_WIN
+            std::wstring buffer(260, L'\0');
+            DWORD        length = 0;
+            while (true) {
+                length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+                if (length == 0) {
+                    return {};
+                }
+                if (length < buffer.size() - 1) {
+                    buffer.resize(length);
+                    break;
+                }
+                buffer.resize(buffer.size() * 2);
+            }
+            return std::filesystem::path(buffer).parent_path();
+#elif AE_PLATFORM_MACOS
+            uint32_t size = 0;
+            if (_NSGetExecutablePath(nullptr, &size) != -1 || size == 0) {
+                return {};
+            }
+            std::vector<char> buffer(size, '\0');
+            if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
+                return {};
+            }
+            return std::filesystem::path(buffer.data()).parent_path();
+#else
+            std::vector<char> buffer(1024, '\0');
+            while (true) {
+                const ssize_t length = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
+                if (length <= 0) {
+                    return {};
+                }
+                if (static_cast<size_t>(length) < buffer.size() - 1) {
+                    buffer[static_cast<size_t>(length)] = '\0';
+                    return std::filesystem::path(buffer.data()).parent_path();
+                }
+                buffer.resize(buffer.size() * 2);
+            }
+#endif
+        }
+
+        auto ToFString(const std::filesystem::path& path) -> Container::FString {
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+            const std::wstring wide = path.wstring();
+            return Container::FString(wide.c_str(), static_cast<usize>(wide.size()));
+#else
+            const std::string narrow = path.string();
+            return Container::FString(narrow.c_str(), static_cast<usize>(narrow.size()));
+#endif
+        }
+
+        auto ResolveManagedPath(const std::filesystem::path& exeDir, const TChar* fileName)
+            -> FManagedPathResolve {
+            FManagedPathResolve result{};
+            if (fileName == nullptr || fileName[0] == static_cast<TChar>(0)) {
+                return result;
+            }
+
+            const std::filesystem::path filePart(fileName);
+            std::error_code             ec;
+
+            auto TryCandidate = [&](const std::filesystem::path& root) -> bool {
+                if (root.empty()) {
+                    return false;
+                }
+                const auto candidate = root / filePart;
+                if (std::filesystem::exists(candidate, ec)) {
+                    result.mPath = candidate;
+                    result.mExists = true;
+                    return true;
+                }
+                return false;
+            };
+
+            if (TryCandidate(exeDir)) {
+                return result;
+            }
+
+            if (!exeDir.empty()) {
+                const auto parent = exeDir.parent_path();
+                if (TryCandidate(parent)) {
+                    return result;
+                }
+            }
+
+            ec = {};
+            const auto cwd = std::filesystem::current_path(ec);
+            if (!ec && TryCandidate(cwd)) {
+                return result;
+            }
+
+            result.mPath = exeDir.empty() ? filePart : (exeDir / filePart);
+            return result;
+        }
+#endif
     } // namespace
 
     FEngineLoop::FEngineLoop(const FStartupParameters& InStartupParameters)
@@ -91,7 +242,9 @@ namespace AltinaEngine::Launch {
             mAssetManager.RegisterLoader(&mAudioLoader);
             mAssetManager.RegisterLoader(&mMaterialLoader);
             mAssetManager.RegisterLoader(&mMeshLoader);
+            mAssetManager.RegisterLoader(&mScriptLoader);
             mAssetManager.RegisterLoader(&mTexture2DLoader);
+            GameScene::FScriptComponent::SetAssetManager(&mAssetManager);
             mAssetReady = true;
         }
 
@@ -145,6 +298,50 @@ namespace AltinaEngine::Launch {
         if (mRenderingThread && !mRenderingThread->IsRunning()) {
             mRenderingThread->Start();
         }
+
+#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+        if (!mScriptSystem) {
+            mScriptSystem = MakeUnique<Scripting::CoreCLR::FScriptSystem>();
+        }
+        if (mScriptSystem) {
+            Scripting::FScriptRuntimeConfig runtimeConfig{};
+            const auto exeDir = GetExecutableDir();
+            const auto runtimePath = ResolveManagedPath(exeDir, kManagedRuntimeConfig);
+            if (runtimePath.mPath.empty()) {
+                runtimeConfig.mRuntimeConfigPath.Assign(kManagedRuntimeConfig);
+            } else {
+                runtimeConfig.mRuntimeConfigPath = ToFString(runtimePath.mPath);
+            }
+            if (!runtimePath.mExists) {
+                LogWarningCat(kScriptingCategory,
+                    TEXT("Managed runtime config not found at {}."),
+                    runtimeConfig.mRuntimeConfigPath.ToView());
+            }
+
+            Scripting::CoreCLR::FManagedRuntimeConfig managedConfig{};
+            const auto assemblyPath = ResolveManagedPath(exeDir, kManagedAssembly);
+            if (assemblyPath.mPath.empty()) {
+                managedConfig.mAssemblyPath.Assign(kManagedAssembly);
+            } else {
+                managedConfig.mAssemblyPath = ToFString(assemblyPath.mPath);
+            }
+            if (!assemblyPath.mExists) {
+                LogWarningCat(kScriptingCategory,
+                    TEXT("Managed assembly not found at {}."), managedConfig.mAssemblyPath.ToView());
+            }
+            managedConfig.mTypeName.Assign(kManagedType);
+            managedConfig.mMethodName.Assign(kManagedStartupMethod);
+            managedConfig.mDelegateTypeName.Assign(kManagedStartupDelegate);
+
+            const bool scriptingReady =
+                mScriptSystem->Initialize(runtimeConfig, managedConfig, mInputSystem.Get());
+            if (!scriptingReady) {
+                LogWarningCat(kScriptingCategory, TEXT("Managed scripting runtime init failed."));
+            } else {
+                LogInfoCat(kScriptingCategory, TEXT("Managed scripting runtime initialized."));
+            }
+        }
+#endif
 
         return true;
     }
@@ -250,10 +447,12 @@ namespace AltinaEngine::Launch {
         if (mAssetReady) {
             mAssetManager.ClearCache();
             mAssetManager.UnregisterLoader(&mTexture2DLoader);
+            mAssetManager.UnregisterLoader(&mScriptLoader);
             mAssetManager.UnregisterLoader(&mMeshLoader);
             mAssetManager.UnregisterLoader(&mMaterialLoader);
             mAssetManager.UnregisterLoader(&mAudioLoader);
             mAssetManager.SetRegistry(nullptr);
+            GameScene::FScriptComponent::SetAssetManager(nullptr);
             mAssetReady = false;
         }
 
@@ -283,6 +482,11 @@ namespace AltinaEngine::Launch {
             mAppMessageHandler.Reset();
         }
 
+        if (mScriptSystem) {
+            mScriptSystem->Shutdown();
+            mScriptSystem.Reset();
+        }
+
         if (mInputSystem) {
             mInputSystem.Reset();
         }
@@ -303,6 +507,14 @@ namespace AltinaEngine::Launch {
 
     auto FEngineLoop::GetWorldManager() const noexcept -> const GameScene::FWorldManager& {
         return mEngineRuntime.GetWorldManager();
+    }
+
+    auto FEngineLoop::GetAssetRegistry() noexcept -> Asset::FAssetRegistry& {
+        return mAssetRegistry;
+    }
+
+    auto FEngineLoop::GetAssetRegistry() const noexcept -> const Asset::FAssetRegistry& {
+        return mAssetRegistry;
     }
 
     void FEngineLoop::FlushRenderFrames() {

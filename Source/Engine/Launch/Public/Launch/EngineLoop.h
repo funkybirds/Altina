@@ -11,6 +11,7 @@
 #include "Asset/AudioLoader.h"
 #include "Asset/MaterialLoader.h"
 #include "Asset/MeshLoader.h"
+#include "Asset/ScriptLoader.h"
 #include "Asset/Texture2DLoader.h"
 #include "Jobs/JobSystem.h"
 #include "Rhi/RhiContext.h"
@@ -33,6 +34,10 @@ namespace AltinaEngine::Input {
     class FInputSystem;
 } // namespace AltinaEngine::Input
 
+namespace AltinaEngine::Scripting::CoreCLR {
+    class FScriptSystem;
+} // namespace AltinaEngine::Scripting::CoreCLR
+
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
 
@@ -52,6 +57,8 @@ namespace AltinaEngine::Launch {
         [[nodiscard]] auto GetInputSystem() const noexcept -> const Input::FInputSystem*;
         [[nodiscard]] auto GetWorldManager() noexcept -> GameScene::FWorldManager&;
         [[nodiscard]] auto GetWorldManager() const noexcept -> const GameScene::FWorldManager&;
+        [[nodiscard]] auto GetAssetRegistry() noexcept -> Asset::FAssetRegistry&;
+        [[nodiscard]] auto GetAssetRegistry() const noexcept -> const Asset::FAssetRegistry&;
 
     private:
         void                                FlushRenderFrames();
@@ -61,6 +68,7 @@ namespace AltinaEngine::Launch {
         TOwner<Input::FInputMessageHandler> mAppMessageHandler;
         TOwner<Application::FApplication, TPolymorphicDeleter<Application::FApplication>>
                                                                         mApplication;
+        TOwner<Scripting::CoreCLR::FScriptSystem>                       mScriptSystem;
         TOwner<Rhi::FRhiContext, TPolymorphicDeleter<Rhi::FRhiContext>> mRhiContext;
         TShared<Rhi::FRhiDevice>                                        mRhiDevice;
         Rhi::FRhiViewportRef                                            mMainViewport;
@@ -76,6 +84,7 @@ namespace AltinaEngine::Launch {
         Asset::FAudioLoader                                             mAudioLoader;
         Asset::FMaterialLoader                                          mMaterialLoader;
         Asset::FMeshLoader                                              mMeshLoader;
+        Asset::FScriptLoader                                            mScriptLoader;
         Asset::FTexture2DLoader                                         mTexture2DLoader;
         TOwner<RenderCore::FRenderingThread>                            mRenderingThread;
         TQueue<Core::Jobs::FJobHandle>                                  mPendingRenderFrames;

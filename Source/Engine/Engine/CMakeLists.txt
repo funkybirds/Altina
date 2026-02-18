@@ -42,6 +42,7 @@ target_link_libraries(${TargetName}
         AltinaEngine::Core
         AltinaEngine::Asset
         AltinaEngine::RenderCore
+        AltinaEngine::Scripting
 )
 
 target_compile_definitions(${TargetName}

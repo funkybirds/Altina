@@ -94,6 +94,9 @@ namespace AltinaEngine::Asset {
             if (EqualLiteralI(text, "audio")) {
                 return EAssetType::Audio;
             }
+            if (EqualLiteralI(text, "script")) {
+                return EAssetType::Script;
+            }
             if (EqualLiteralI(text, "redirector")) {
                 return EAssetType::Redirector;
             }
@@ -225,6 +228,19 @@ namespace AltinaEngine::Asset {
                     ReadU32Field(descObject, "SampleRate", desc.Audio.SampleRate);
                     ReadFloatField(descObject, "Duration", desc.Audio.DurationSeconds);
                     break;
+                case EAssetType::Script: {
+                    FNativeString assemblyText;
+                    if (GetStringValue(FindObjectValueInsensitive(descObject, "AssemblyPath"),
+                            assemblyText)) {
+                        desc.Script.AssemblyPath.Assign(assemblyText);
+                    }
+                    FNativeString typeText;
+                    if (GetStringValue(FindObjectValueInsensitive(descObject, "TypeName"),
+                            typeText)) {
+                        desc.Script.TypeName.Assign(typeText);
+                    }
+                    break;
+                }
                 default:
                     break;
             }

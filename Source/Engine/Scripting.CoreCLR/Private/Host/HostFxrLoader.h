@@ -42,6 +42,10 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
 
     using hostfxr_close_fn = i32 (AE_HOSTFXR_CALLTYPE*)(hostfxr_handle handle);
 
+    using hostfxr_error_writer_fn = void (AE_HOSTFXR_CALLTYPE*)(const FHostFxrChar* message);
+    using hostfxr_set_error_writer_fn =
+        hostfxr_error_writer_fn (AE_HOSTFXR_CALLTYPE*)(hostfxr_error_writer_fn errorWriter);
+
     using load_assembly_and_get_function_pointer_fn = i32 (AE_CORECLR_CALLTYPE*)(
         const FHostFxrChar* assemblyPath, const FHostFxrChar* typeName,
         const FHostFxrChar* methodName, const FHostFxrChar* delegateTypeName, void* reserved,
@@ -56,6 +60,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
         hostfxr_initialize_for_runtime_config_fn InitializeForRuntimeConfig = nullptr;
         hostfxr_get_runtime_delegate_fn          GetRuntimeDelegate          = nullptr;
         hostfxr_close_fn                         Close                       = nullptr;
+        hostfxr_set_error_writer_fn              SetErrorWriter              = nullptr;
     };
 
     struct FDynamicLibrary {

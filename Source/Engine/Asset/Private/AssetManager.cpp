@@ -94,7 +94,7 @@ namespace AltinaEngine::Asset {
         }
 
         const FAssetDesc* desc = mRegistry->GetDesc(resolved);
-        if (desc == nullptr || desc->CookedPath.IsEmptyString()) {
+        if (desc == nullptr) {
             return {};
         }
 
@@ -104,7 +104,11 @@ namespace AltinaEngine::Asset {
         }
 
         TVector<u8> bytes;
-        if (!ReadFileBytes(desc->CookedPath, bytes)) {
+        if (!desc->CookedPath.IsEmptyString()) {
+            if (!ReadFileBytes(desc->CookedPath, bytes)) {
+                return {};
+            }
+        } else if (desc->Handle.Type != EAssetType::Script) {
             return {};
         }
 

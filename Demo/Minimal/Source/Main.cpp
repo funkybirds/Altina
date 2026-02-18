@@ -1,6 +1,7 @@
 #include "Base/AltinaBase.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/ScriptComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
 #include "Engine/Runtime/MaterialCache.h"
@@ -62,6 +63,45 @@ struct Neko {
 };
 
 namespace {
+    auto ToFString(const std::filesystem::path& path) -> Container::FString {
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        const std::wstring wide = path.wstring();
+        return Container::FString(wide.c_str(), static_cast<usize>(wide.size()));
+#else
+        const std::string narrow = path.string();
+        return Container::FString(narrow.c_str(), static_cast<usize>(narrow.size()));
+#endif
+    }
+
+    auto FindAssetRegistryPath() -> std::filesystem::path {
+        std::filesystem::path probe = std::filesystem::current_path();
+        for (int depth = 0; depth < 6; ++depth) {
+            const auto candidate =
+                probe / "build" / "Cooked" / "Win64" / "Registry" / "AssetRegistry.json";
+            if (std::filesystem::exists(candidate)) {
+                return candidate;
+            }
+            if (!probe.has_parent_path()) {
+                break;
+            }
+            probe = probe.parent_path();
+        }
+        return {};
+    }
+
+    auto LoadDemoAssetRegistry(FEngineLoop& engineLoop) -> bool {
+        const auto registryPath = FindAssetRegistryPath();
+        if (registryPath.empty()) {
+            LogWarning(TEXT("Demo asset registry not found; ScriptAsset test will be skipped."));
+            return false;
+        }
+        if (!engineLoop.GetAssetRegistry().LoadFromJsonFile(ToFString(registryPath))) {
+            LogWarning(TEXT("Demo asset registry load failed; ScriptAsset test will be skipped."));
+            return false;
+        }
+        return true;
+    }
+
 #if AE_PLATFORM_WIN
     namespace ShaderCompileHelpers {
         using Microsoft::WRL::ComPtr;
@@ -364,35 +404,7 @@ float4 PSMain(VSOut input) : SV_Target0 {
 }
 )";
 
-    auto BuildDemoStaticMesh() -> RenderCore::Geometry::FStaticMeshData {
-        using RenderCore::Geometry::FStaticMeshData;
-        using RenderCore::Geometry::FStaticMeshLodData;
-        using RenderCore::Geometry::FStaticMeshSection;
-
-        FStaticMeshData    mesh{};
-        FStaticMeshLodData lod{};
-
-        const Core::Math::FVector3f positions[] = {
-            Core::Math::FVector3f(0.0f, 0.5f, 0.0f),
-            Core::Math::FVector3f(0.5f, -0.5f, 0.0f),
-            Core::Math::FVector3f(-0.5f, -0.5f, 0.0f),
-        };
-
-        const u16 indices[] = { 0U, 1U, 2U };
-
-        lod.SetPositions(positions, 3U);
-        lod.SetIndices(indices, 3U, Rhi::ERhiIndexType::Uint16);
-
-        FStaticMeshSection section{};
-        section.FirstIndex   = 0U;
-        section.IndexCount   = 3U;
-        section.BaseVertex   = 0;
-        section.MaterialSlot = 0U;
-        lod.Sections.PushBack(section);
-
-        mesh.Lods.PushBack(AltinaEngine::Move(lod));
-        return mesh;
-    }
+    auto BuildDemoStaticMesh() -> RenderCore::Geometry::FStaticMeshData { return {}; }
 
     class FTriangleRenderer {
     public:
@@ -632,6 +644,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    const bool assetsReady = LoadDemoAssetRegistry(EngineLoop);
     auto& worldManager = EngineLoop.GetWorldManager();
     const auto worldHandle = worldManager.CreateWorld();
     worldManager.SetActiveWorld(worldHandle);
@@ -665,6 +678,23 @@ int main(int argc, char** argv) {
         auto& materialComponent =
             world->ResolveComponent<GameScene::FMeshMaterialComponent>(materialComponentId);
         materialComponent.ClearMaterials();
+    }
+
+    if (assetsReady) {
+        const auto scriptHandle =
+            EngineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/scripts/demoscript"));
+        if (scriptHandle.IsValid()) {
+            const auto scriptObject = world->CreateGameObject(TEXT("ManagedScript"));
+            const auto scriptComponentId =
+                world->CreateComponent<GameScene::FScriptComponent>(scriptObject);
+            if (scriptComponentId.IsValid()) {
+                auto& scriptComponent =
+                    world->ResolveComponent<GameScene::FScriptComponent>(scriptComponentId);
+                scriptComponent.SetScriptAsset(scriptHandle);
+            }
+        } else {
+            LogWarning(TEXT("ScriptAsset demo/minimal/scripts/demoscript not found."));
+        }
     }
 
     Engine::FSceneViewBuilder  sceneViewBuilder;

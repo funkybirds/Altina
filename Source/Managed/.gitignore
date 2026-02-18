@@ -1,0 +1,19 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio
+.vs/
+*.user
+*.userprefs
+*.suo
+*.rsuser
+*.sln.docstates
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,9 @@
+{
+  "Uuid": "f6a1b5f2-3b1f-4d8b-9ae5-8e0b6c0f0f64",
+  "Type": "Script",
+  "VirtualPath": "demo/minimal/scripts/demoscript",
+  "SourcePath": "Demo/Minimal/Assets/Scripts/DemoScript.script",
+  "Importer": "ScriptImporter",
+  "ImporterVersion": 1,
+  "Dependencies": []
+}

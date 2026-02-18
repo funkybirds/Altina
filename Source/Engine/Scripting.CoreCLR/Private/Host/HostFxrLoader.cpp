@@ -417,6 +417,8 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
         mFunctions.GetRuntimeDelegate = reinterpret_cast<hostfxr_get_runtime_delegate_fn>(
             mLibrary.GetSymbol("hostfxr_get_runtime_delegate"));
         mFunctions.Close = reinterpret_cast<hostfxr_close_fn>(mLibrary.GetSymbol("hostfxr_close"));
+        mFunctions.SetErrorWriter = reinterpret_cast<hostfxr_set_error_writer_fn>(
+            mLibrary.GetSymbol("hostfxr_set_error_writer"));
 
         if (!mFunctions.InitializeForRuntimeConfig || !mFunctions.GetRuntimeDelegate
             || !mFunctions.Close) {

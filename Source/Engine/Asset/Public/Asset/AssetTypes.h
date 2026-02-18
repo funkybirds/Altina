@@ -11,6 +11,7 @@ namespace AltinaEngine::Asset {
     namespace Container = Core::Container;
     using Container::FString;
     using Container::FStringView;
+    using Container::FNativeString;
     using Container::TVector;
 
     enum class EAssetType : u8 {
@@ -19,6 +20,7 @@ namespace AltinaEngine::Asset {
         Mesh,
         Material,
         Audio,
+        Script,
         Redirector,
     };
 
@@ -74,6 +76,11 @@ namespace AltinaEngine::Asset {
         f32 DurationSeconds = 0.0f;
     };
 
+    struct AE_ASSET_API FScriptDesc {
+        FNativeString AssemblyPath;
+        FNativeString TypeName;
+    };
+
     struct AE_ASSET_API FAssetDesc {
         FAssetHandle          Handle;
         FString               VirtualPath;
@@ -84,6 +91,7 @@ namespace AltinaEngine::Asset {
         FMeshDesc             Mesh;
         FMaterialDesc         Material;
         FAudioDesc            Audio;
+        FScriptDesc           Script;
     };
 
 } // namespace AltinaEngine::Asset

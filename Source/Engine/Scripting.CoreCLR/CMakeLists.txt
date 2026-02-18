@@ -49,6 +49,8 @@ target_link_libraries(${TargetName}
     PUBLIC
         AltinaEngine::Core
         AltinaEngine::Scripting
+    PRIVATE
+        AltinaEngine::Input
 )
 
 if(UNIX AND NOT APPLE)
@@ -83,6 +85,49 @@ target_compile_options(${TargetName}
 set(AE_DEMO_MINIMAL_BIN_DIR ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)
 set(AE_TEST_BIN_DIR ${CMAKE_BINARY_DIR}/Source/Tests)
 
+find_program(AE_DOTNET_HOST dotnet)
+if(AE_DOTNET_HOST)
+    set(AE_MANAGED_ROOT ${CMAKE_SOURCE_DIR}/Source/Managed/AltinaEngine.Managed)
+    set(AE_MANAGED_PROJECT ${AE_MANAGED_ROOT}/AltinaEngine.Managed.csproj)
+    set(AE_MANAGED_OUT_DIR ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed)
+    set(AE_MANAGED_DLL ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.dll)
+    set(AE_MANAGED_STAMP ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.build.stamp)
+
+    add_custom_command(
+        OUTPUT ${AE_MANAGED_STAMP}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${AE_MANAGED_OUT_DIR}
+        COMMAND ${AE_DOTNET_HOST} build ${AE_MANAGED_PROJECT}
+            -o ${AE_MANAGED_OUT_DIR}
+            /t:Rebuild
+            /p:NoIncremental=true
+        COMMAND ${CMAKE_COMMAND} -E touch ${AE_MANAGED_STAMP}
+        DEPENDS
+            ${AE_MANAGED_PROJECT}
+            ${AE_MANAGED_ROOT}/ManagedBootstrap.cs
+            ${AE_MANAGED_ROOT}/ManagedApi.cs
+            ${AE_MANAGED_ROOT}/NativeApi.cs
+            ${AE_MANAGED_ROOT}/ScriptComponent.cs
+            ${AE_MANAGED_ROOT}/Input.cs
+            ${AE_MANAGED_ROOT}/DemoScript.cs
+        BYPRODUCTS
+            ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.dll
+            ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.runtimeconfig.json
+            ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.deps.json
+            ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.pdb
+        COMMENT "Building managed scripting runtime assembly"
+        VERBATIM
+    )
+
+    add_custom_target(AltinaEngineManagedBuild
+        DEPENDS ${AE_MANAGED_STAMP}
+    )
+    set_property(TARGET AltinaEngineManagedBuild PROPERTY BUILD_ALWAYS TRUE)
+
+    add_dependencies(${TargetName} AltinaEngineManagedBuild)
+else()
+    message(STATUS "dotnet not found; skipping managed scripting runtime build.")
+endif()
+
 add_custom_command(
     TARGET ${TargetName}
     POST_BUILD
@@ -96,6 +141,27 @@ add_custom_command(
         ${AE_TEST_BIN_DIR}
     COMMENT "Copying ${TargetName} to consumer binaries"
 )
+
+if(AE_DOTNET_HOST)
+    add_custom_command(
+        TARGET AltinaEngineManagedBuild
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${AE_DEMO_MINIMAL_BIN_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.dll
+            ${AE_DEMO_MINIMAL_BIN_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.runtimeconfig.json
+            ${AE_DEMO_MINIMAL_BIN_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.deps.json
+            ${AE_DEMO_MINIMAL_BIN_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.pdb
+            ${AE_DEMO_MINIMAL_BIN_DIR}
+        COMMENT "Staging managed scripting runtime assets"
+    )
+endif()
 
 set_target_properties(${TargetName}
     PROPERTIES

@@ -76,6 +76,13 @@ out/*
 # Ignore Testing temporary files and CTest outputs
 Testing/
 
+# Scripting / test managed build outputs
+Source/Tests/Scripting/Managed/**/bin/
+Source/Tests/Scripting/Managed/**/obj/
+
+# Test result artifacts
+Source/Tests/**/TestResults/
+
 # Demo binaries/staging
 Demo/*/Binaries/
 

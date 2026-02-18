@@ -29,6 +29,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(${CMAKE_SOURCE_DIR}/BuildConfig/AltinaReflection.cmake)
 
+option(AE_ENABLE_SCRIPTING_CORECLR "Enable CoreCLR scripting runtime." ON)
+
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "In-source builds are not supported. Please create a separate build directory.")
 endif()
@@ -36,6 +38,10 @@ endif()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory(Source/Engine/Core)
+add_subdirectory(Source/Engine/Scripting)
+if(AE_ENABLE_SCRIPTING_CORECLR)
+    add_subdirectory(Source/Engine/Scripting.CoreCLR)
+endif()
 add_subdirectory(Source/Tools/ReflectionScanner)
 add_subdirectory(Source/Engine/Imaging)
 add_subdirectory(Source/Engine/Asset)

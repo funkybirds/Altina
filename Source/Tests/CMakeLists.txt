@@ -147,4 +147,63 @@ ae_add_test_target(AltinaEngineTestsGameScene
     LIBS AltinaEngine::Engine
 )
 
+if(AE_ENABLE_SCRIPTING_CORECLR)
+    find_program(AE_DOTNET_HOST dotnet)
+    if(AE_DOTNET_HOST)
+        set(AE_SCRIPTING_TEST_ROOT ${AE_TESTS_ROOT}/Scripting)
+        set(AE_SCRIPTING_MANAGED_PROJECT
+            ${AE_SCRIPTING_TEST_ROOT}/Managed/AltinaEngine.Scripting.Tests/AltinaEngine.Scripting.Tests.csproj)
+        set(AE_SCRIPTING_MANAGED_OUT_DIR ${CMAKE_BINARY_DIR}/Source/Tests/ScriptingManaged)
+        set(AE_SCRIPTING_MANAGED_DLL
+            ${AE_SCRIPTING_MANAGED_OUT_DIR}/AltinaEngine.Scripting.Tests.dll)
+
+        add_custom_command(
+            OUTPUT ${AE_SCRIPTING_MANAGED_DLL}
+            COMMAND ${AE_DOTNET_HOST} build ${AE_SCRIPTING_MANAGED_PROJECT}
+                -o ${AE_SCRIPTING_MANAGED_OUT_DIR}
+            DEPENDS
+                ${AE_SCRIPTING_MANAGED_PROJECT}
+                ${AE_SCRIPTING_TEST_ROOT}/Managed/AltinaEngine.Scripting.Tests/InteropEntry.cs
+            COMMENT "Building managed CoreCLR interop test assembly"
+            VERBATIM
+        )
+
+        add_custom_target(AltinaEngineScriptingManagedBuild
+            DEPENDS ${AE_SCRIPTING_MANAGED_DLL}
+        )
+
+        file(GLOB_RECURSE AE_TEST_SCRIPTING_SOURCES
+            CONFIGURE_DEPENDS
+            ${AE_SCRIPTING_TEST_ROOT}/CoreCLR/*.cpp
+        )
+
+        ae_add_test_target(AltinaEngineTestsScriptingCoreCLR
+            FOLDER "Scripting/CoreCLR"
+            SOURCES ${AE_TEST_SCRIPTING_SOURCES}
+            LIBS
+                AltinaEngine::Scripting
+                AltinaEngine::Scripting::CoreCLR
+        )
+
+        add_dependencies(AltinaEngineTestsScriptingCoreCLR AltinaEngineScriptingManagedBuild)
+
+        add_custom_command(
+            TARGET AltinaEngineTestsScriptingCoreCLR
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${AE_SCRIPTING_MANAGED_OUT_DIR}/AltinaEngine.Scripting.Tests.dll
+                $<TARGET_FILE_DIR:AltinaEngineTestsScriptingCoreCLR>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${AE_SCRIPTING_MANAGED_OUT_DIR}/AltinaEngine.Scripting.Tests.runtimeconfig.json
+                $<TARGET_FILE_DIR:AltinaEngineTestsScriptingCoreCLR>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${AE_SCRIPTING_MANAGED_OUT_DIR}/AltinaEngine.Scripting.Tests.deps.json
+                $<TARGET_FILE_DIR:AltinaEngineTestsScriptingCoreCLR>
+            COMMENT "Staging managed interop test assets"
+        )
+    else()
+        message(STATUS "dotnet not found; skipping CoreCLR scripting interop tests.")
+    endif()
+endif()
+
 

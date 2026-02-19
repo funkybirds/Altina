@@ -28,59 +28,59 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
     };
 
     struct FHostFxrInitializeParameters {
-        usize              mSize;
+        usize               mSize;
         const FHostFxrChar* mHostPath;
         const FHostFxrChar* mDotnetRoot;
     };
 
-    using hostfxr_initialize_for_runtime_config_fn = i32 (AE_HOSTFXR_CALLTYPE*)(
+    using hostfxr_initialize_for_runtime_config_fn = i32(AE_HOSTFXR_CALLTYPE*)(
         const FHostFxrChar* runtimeConfigPath, const FHostFxrInitializeParameters* parameters,
         hostfxr_handle* outHandle);
 
-    using hostfxr_get_runtime_delegate_fn = i32 (AE_HOSTFXR_CALLTYPE*)(
+    using hostfxr_get_runtime_delegate_fn = i32(AE_HOSTFXR_CALLTYPE*)(
         hostfxr_handle handle, EHostFxrDelegateType type, void** delegate);
 
-    using hostfxr_close_fn = i32 (AE_HOSTFXR_CALLTYPE*)(hostfxr_handle handle);
+    using hostfxr_close_fn = i32(AE_HOSTFXR_CALLTYPE*)(hostfxr_handle handle);
 
-    using hostfxr_error_writer_fn = void (AE_HOSTFXR_CALLTYPE*)(const FHostFxrChar* message);
-    using hostfxr_set_error_writer_fn =
-        hostfxr_error_writer_fn (AE_HOSTFXR_CALLTYPE*)(hostfxr_error_writer_fn errorWriter);
+    using hostfxr_error_writer_fn     = void(AE_HOSTFXR_CALLTYPE*)(const FHostFxrChar* message);
+    using hostfxr_set_error_writer_fn = hostfxr_error_writer_fn(AE_HOSTFXR_CALLTYPE*)(
+        hostfxr_error_writer_fn errorWriter);
 
-    using load_assembly_and_get_function_pointer_fn = i32 (AE_CORECLR_CALLTYPE*)(
+    using load_assembly_and_get_function_pointer_fn = i32(AE_CORECLR_CALLTYPE*)(
         const FHostFxrChar* assemblyPath, const FHostFxrChar* typeName,
         const FHostFxrChar* methodName, const FHostFxrChar* delegateTypeName, void* reserved,
         void** delegate);
 
-    using component_entry_point_fn = i32 (AE_CORECLR_CALLTYPE*)(void* args, i32 size);
+    using component_entry_point_fn = i32(AE_CORECLR_CALLTYPE*)(void* args, i32 size);
 
-    using get_hostfxr_path_fn = i32 (AE_HOSTFXR_CALLTYPE*)(
+    using get_hostfxr_path_fn = i32(AE_HOSTFXR_CALLTYPE*)(
         FHostFxrChar* buffer, usize* bufferSize, const FHostFxrChar* assemblyPath);
 
     struct FHostFxrFunctions {
         hostfxr_initialize_for_runtime_config_fn InitializeForRuntimeConfig = nullptr;
-        hostfxr_get_runtime_delegate_fn          GetRuntimeDelegate          = nullptr;
-        hostfxr_close_fn                         Close                       = nullptr;
-        hostfxr_set_error_writer_fn              SetErrorWriter              = nullptr;
+        hostfxr_get_runtime_delegate_fn          GetRuntimeDelegate         = nullptr;
+        hostfxr_close_fn                         Close                      = nullptr;
+        hostfxr_set_error_writer_fn              SetErrorWriter             = nullptr;
     };
 
     struct FDynamicLibrary {
         ~FDynamicLibrary() { Unload(); }
 
-        auto Load(const std::filesystem::path& path) -> bool;
-        void Unload();
+        auto               Load(const std::filesystem::path& path) -> bool;
+        void               Unload();
         [[nodiscard]] auto GetSymbol(const char* name) const -> void*;
         [[nodiscard]] auto IsLoaded() const noexcept -> bool { return mHandle != nullptr; }
 
-        void* mHandle = nullptr;
+        void*              mHandle = nullptr;
     };
 
     auto ToHostFxrString(Container::FStringView value) -> FHostFxrString;
 
     class FHostFxrLibrary {
     public:
-        auto Load(const Container::FString& runtimeConfigPath, const Container::FString& runtimeRoot,
-            const Container::FString& dotnetRoot) -> bool;
-        void Unload();
+        auto               Load(const Container::FString& runtimeConfigPath,
+                          const Container::FString& runtimeRoot, const Container::FString& dotnetRoot) -> bool;
+        void               Unload();
 
         [[nodiscard]] auto IsLoaded() const noexcept -> bool { return mLibrary.IsLoaded(); }
         [[nodiscard]] auto GetFunctions() const noexcept -> const FHostFxrFunctions& {
@@ -94,7 +94,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
         }
 
     private:
-        FDynamicLibrary  mLibrary;
+        FDynamicLibrary   mLibrary;
         FHostFxrFunctions mFunctions{};
         FHostFxrString    mDotnetRoot;
         FHostFxrString    mHostFxrPath;

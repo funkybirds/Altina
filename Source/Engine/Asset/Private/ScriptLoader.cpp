@@ -15,8 +15,8 @@ namespace AltinaEngine::Asset {
             using Container::kSmartPtrUseManagedAllocator;
             using Container::TAllocator;
             using Container::TAllocatorTraits;
-            using Container::TShared;
             using Container::TPolymorphicDeleter;
+            using Container::TShared;
 
             TDerived* ptr = nullptr;
             if constexpr (kSmartPtrUseManagedAllocator) {
@@ -46,8 +46,7 @@ namespace AltinaEngine::Asset {
         return type == EAssetType::Script;
     }
 
-    auto FScriptLoader::Load(const FAssetDesc& desc, IAssetStream& /*stream*/)
-        -> TShared<IAsset> {
+    auto FScriptLoader::Load(const FAssetDesc& desc, IAssetStream& /*stream*/) -> TShared<IAsset> {
         if (desc.Script.TypeName.IsEmptyString()) {
             return {};
         }

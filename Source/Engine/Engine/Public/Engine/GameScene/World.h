@@ -255,8 +255,8 @@ namespace AltinaEngine::GameScene {
         void AddActiveComponent(TVector<FComponentId>& list, FComponentId id);
         void RemoveActiveComponent(TVector<FComponentId>& list, FComponentId id);
 
-        void               LinkComponentToOwner(FGameObjectId owner, FComponentId id);
-        void               UnlinkComponentFromOwner(FGameObjectId owner, FComponentId id);
+        void LinkComponentToOwner(FGameObjectId owner, FComponentId id);
+        void UnlinkComponentFromOwner(FGameObjectId owner, FComponentId id);
 
         [[nodiscard]] auto ResolveGameObject(FGameObjectId id) -> FGameObject*;
         [[nodiscard]] auto ResolveGameObject(FGameObjectId id) const -> const FGameObject*;

@@ -9,9 +9,9 @@
 
 namespace AltinaEngine::Asset {
     namespace Container = Core::Container;
+    using Container::FNativeString;
     using Container::FString;
     using Container::FStringView;
-    using Container::FNativeString;
     using Container::TVector;
 
     enum class EAssetType : u8 {

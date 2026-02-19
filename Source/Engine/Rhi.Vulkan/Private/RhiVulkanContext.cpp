@@ -21,12 +21,12 @@ namespace AltinaEngine::Rhi {
 
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     struct FRhiVulkanContextState {
-        VkInstance                mInstance        = VK_NULL_HANDLE;
-        VkDebugUtilsMessengerEXT  mDebugMessenger  = VK_NULL_HANDLE;
-        u32                       mInstanceVersion = VK_API_VERSION_1_0;
-        bool                      mDebugUtilsEnabled = false;
-        TVector<const char*>      mEnabledLayers;
-        TVector<const char*>      mEnabledExtensions;
+        VkInstance               mInstance          = VK_NULL_HANDLE;
+        VkDebugUtilsMessengerEXT mDebugMessenger    = VK_NULL_HANDLE;
+        u32                      mInstanceVersion   = VK_API_VERSION_1_0;
+        bool                     mDebugUtilsEnabled = false;
+        TVector<const char*>     mEnabledLayers;
+        TVector<const char*>     mEnabledExtensions;
     };
 #else
     struct FRhiVulkanContextState {};
@@ -75,13 +75,13 @@ namespace AltinaEngine::Rhi {
         }
 
         auto PickApiVersion(u32 available) -> u32 {
-#if defined(VK_API_VERSION_1_4)
+    #if defined(VK_API_VERSION_1_4)
             const u32 preferred = VK_API_VERSION_1_4;
-#elif defined(VK_API_VERSION_1_3)
+    #elif defined(VK_API_VERSION_1_3)
             const u32 preferred = VK_API_VERSION_1_3;
-#else
+    #else
             const u32 preferred = VK_API_VERSION_1_2;
-#endif
+    #endif
             return (available < preferred) ? available : preferred;
         }
 
@@ -110,10 +110,8 @@ namespace AltinaEngine::Rhi {
         }
 
         VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
-            VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-            VkDebugUtilsMessageTypeFlagsEXT,
-            const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
-            void*) {
+            VkDebugUtilsMessageSeverityFlagBitsEXT      severity, VkDebugUtilsMessageTypeFlagsEXT,
+            const VkDebugUtilsMessengerCallbackDataEXT* callbackData, void*) {
             if (!callbackData || !callbackData->pMessage) {
                 return VK_FALSE;
             }
@@ -127,7 +125,7 @@ namespace AltinaEngine::Rhi {
 
         auto CreateDebugMessenger(VkInstance instance) -> VkDebugUtilsMessengerEXT {
             VkDebugUtilsMessengerCreateInfoEXT info{};
-            info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+            info.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
             info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
                 | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
             info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
@@ -248,7 +246,7 @@ namespace AltinaEngine::Rhi {
         LogInfo(TEXT("RHI(Vulkan): Initializing (DebugLayer={}, GPUValidation={})."),
             desc.mEnableDebugLayer, desc.mEnableGpuValidation);
 
-        const u32 loaderVersion = GetVulkanVersion();
+        const u32 loaderVersion  = GetVulkanVersion();
         mState->mInstanceVersion = PickApiVersion(loaderVersion);
 
         VkApplicationInfo appInfo{};
@@ -262,7 +260,7 @@ namespace AltinaEngine::Rhi {
         appInfo.pEngineName = "AltinaEngine";
 
         TVector<VkLayerProperties> layers;
-        u32 layerCount = 0;
+        u32                        layerCount = 0;
         if (vkEnumerateInstanceLayerProperties(&layerCount, nullptr) == VK_SUCCESS
             && layerCount > 0) {
             layers.Resize(layerCount);
@@ -277,7 +275,7 @@ namespace AltinaEngine::Rhi {
         }
 
         TVector<VkExtensionProperties> exts;
-        u32 extCount = 0;
+        u32                            extCount = 0;
         if (vkEnumerateInstanceExtensionProperties(nullptr, &extCount, nullptr) == VK_SUCCESS
             && extCount > 0) {
             exts.Resize(extCount);
@@ -285,11 +283,11 @@ namespace AltinaEngine::Rhi {
         }
 
         mState->mEnabledExtensions.PushBack(VK_KHR_SURFACE_EXTENSION_NAME);
-#if AE_PLATFORM_WIN
+    #if AE_PLATFORM_WIN
         mState->mEnabledExtensions.PushBack(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-#endif
-        if ((desc.mEnableDebugLayer || desc.mEnableDebugNames) &&
-            HasExtension(exts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
+    #endif
+        if ((desc.mEnableDebugLayer || desc.mEnableDebugNames)
+            && HasExtension(exts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
             mState->mEnabledExtensions.PushBack(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
             mState->mDebugUtilsEnabled = true;
         }
@@ -312,8 +310,7 @@ namespace AltinaEngine::Rhi {
         }
 
         LogInfo(TEXT("RHI(Vulkan): Instance created (API={}.{}.{})"),
-            VK_VERSION_MAJOR(mState->mInstanceVersion),
-            VK_VERSION_MINOR(mState->mInstanceVersion),
+            VK_VERSION_MAJOR(mState->mInstanceVersion), VK_VERSION_MINOR(mState->mInstanceVersion),
             VK_VERSION_PATCH(mState->mInstanceVersion));
         return true;
 #else
@@ -368,9 +365,9 @@ namespace AltinaEngine::Rhi {
 
             FRhiAdapterDesc desc;
             desc.mName.Assign(props.deviceName);
-            desc.mVendorId  = MapVendorId(props.vendorID);
-            desc.mDeviceId  = props.deviceID;
-            desc.mType      = MapAdapterType(props.deviceType);
+            desc.mVendorId      = MapVendorId(props.vendorID);
+            desc.mDeviceId      = props.deviceID;
+            desc.mType          = MapAdapterType(props.deviceType);
             desc.mApiVersion    = props.apiVersion;
             desc.mDriverVersion = props.driverVersion;
             FillAdapterMemoryDesc(physical, desc);
@@ -418,7 +415,7 @@ namespace AltinaEngine::Rhi {
         VkPhysicalDeviceDynamicRenderingFeatures dynRendering{};
         dynRendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
 
-        features2.pNext = &features13;
+        features2.pNext  = &features13;
         features13.pNext = &features12;
         features12.pNext = &descIndex;
         descIndex.pNext  = &timeline;
@@ -428,16 +425,16 @@ namespace AltinaEngine::Rhi {
         vkGetPhysicalDeviceFeatures2(physical, &features2);
 
         features13.dynamicRendering = features13.dynamicRendering || dynRendering.dynamicRendering;
-        sync2.synchronization2 = sync2.synchronization2;
+        sync2.synchronization2      = sync2.synchronization2;
 
         // Enable supported feature subset.
         VkPhysicalDeviceFeatures2 enabledFeatures = features2;
-        enabledFeatures.pNext = &features13;
-        features13.pNext      = &features12;
-        features12.pNext      = &descIndex;
-        descIndex.pNext       = &timeline;
-        timeline.pNext        = &sync2;
-        sync2.pNext           = &dynRendering;
+        enabledFeatures.pNext                     = &features13;
+        features13.pNext                          = &features12;
+        features12.pNext                          = &descIndex;
+        descIndex.pNext                           = &timeline;
+        timeline.pNext                            = &sync2;
+        sync2.pNext                               = &dynRendering;
 
         // Enable commonly used core features if supported.
         enabledFeatures.features.samplerAnisotropy = features2.features.samplerAnisotropy;
@@ -448,10 +445,9 @@ namespace AltinaEngine::Rhi {
             descIndex.shaderSampledImageArrayNonUniformIndexing;
         descIndex.shaderStorageBufferArrayNonUniformIndexing =
             descIndex.shaderStorageBufferArrayNonUniformIndexing;
-        descIndex.descriptorBindingPartiallyBound = descIndex.descriptorBindingPartiallyBound;
-        descIndex.descriptorBindingUpdateAfterBind =
-            descIndex.descriptorBindingUpdateAfterBind;
-        descIndex.runtimeDescriptorArray = descIndex.runtimeDescriptorArray;
+        descIndex.descriptorBindingPartiallyBound  = descIndex.descriptorBindingPartiallyBound;
+        descIndex.descriptorBindingUpdateAfterBind = descIndex.descriptorBindingUpdateAfterBind;
+        descIndex.runtimeDescriptorArray           = descIndex.runtimeDescriptorArray;
         descIndex.descriptorBindingVariableDescriptorCount =
             descIndex.descriptorBindingVariableDescriptorCount;
 
@@ -487,8 +483,8 @@ namespace AltinaEngine::Rhi {
         };
 
         const u32 graphicsFamily = selectFamily(VK_QUEUE_GRAPHICS_BIT, VK_QUEUE_GRAPHICS_BIT);
-        u32 computeFamily = selectFamily(VK_QUEUE_COMPUTE_BIT, VK_QUEUE_COMPUTE_BIT);
-        u32 transferFamily = selectFamily(VK_QUEUE_TRANSFER_BIT, VK_QUEUE_TRANSFER_BIT);
+        u32       computeFamily  = selectFamily(VK_QUEUE_COMPUTE_BIT, VK_QUEUE_COMPUTE_BIT);
+        u32       transferFamily = selectFamily(VK_QUEUE_TRANSFER_BIT, VK_QUEUE_TRANSFER_BIT);
 
         if (graphicsFamily == UINT32_MAX) {
             LogError(TEXT("RHI(Vulkan): No graphics queue family found."));
@@ -501,16 +497,16 @@ namespace AltinaEngine::Rhi {
             transferFamily = (computeFamily != graphicsFamily) ? computeFamily : graphicsFamily;
         }
 
-        const float queuePriority = 1.0f;
+        const float                      queuePriority = 1.0f;
         TVector<VkDeviceQueueCreateInfo> queueInfos;
-        auto addQueueInfo = [&](u32 family) {
+        auto                             addQueueInfo = [&](u32 family) {
             for (const auto& info : queueInfos) {
                 if (info.queueFamilyIndex == family) {
                     return;
                 }
             }
             VkDeviceQueueCreateInfo info{};
-            info.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
             info.queueFamilyIndex = family;
             info.queueCount       = 1;
             info.pQueuePriorities = &queuePriority;
@@ -533,8 +529,8 @@ namespace AltinaEngine::Rhi {
             deviceExtensions.PushBack(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
         }
 
-        createInfo.pQueueCreateInfos = queueInfos.Data();
-        createInfo.queueCreateInfoCount = static_cast<u32>(queueInfos.Size());
+        createInfo.pQueueCreateInfos       = queueInfos.Data();
+        createInfo.queueCreateInfoCount    = static_cast<u32>(queueInfos.Size());
         createInfo.ppEnabledExtensionNames = deviceExtensions.Data();
         createInfo.enabledExtensionCount   = static_cast<u32>(deviceExtensions.Size());
         createInfo.pNext                   = &enabledFeatures;

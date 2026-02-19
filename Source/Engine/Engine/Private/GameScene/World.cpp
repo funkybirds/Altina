@@ -12,11 +12,10 @@ namespace AltinaEngine::GameScene {
 
         auto                          AcquireWorldId() -> u32 { return gNextWorldId.FetchAdd(1); }
 
-        const FComponentTypeHash      kCameraComponentType =
-            GetComponentTypeHash<FCameraComponent>();
-        const FComponentTypeHash      kStaticMeshComponentType =
+        const FComponentTypeHash kCameraComponentType = GetComponentTypeHash<FCameraComponent>();
+        const FComponentTypeHash kStaticMeshComponentType =
             GetComponentTypeHash<FStaticMeshFilterComponent>();
-        const FComponentTypeHash      kMeshMaterialComponentType =
+        const FComponentTypeHash kMeshMaterialComponentType =
             GetComponentTypeHash<FMeshMaterialComponent>();
     } // namespace
 
@@ -219,8 +218,7 @@ namespace AltinaEngine::GameScene {
         return mActiveStaticMeshComponents;
     }
 
-    auto FWorld::GetActiveMeshMaterialComponents() const noexcept
-        -> const TVector<FComponentId>& {
+    auto FWorld::GetActiveMeshMaterialComponents() const noexcept -> const TVector<FComponentId>& {
         return mActiveMeshMaterialComponents;
     }
 
@@ -292,8 +290,7 @@ namespace AltinaEngine::GameScene {
         }
     }
 
-    void FWorld::OnComponentEnabledChanged(
-        FComponentId id, FGameObjectId owner, bool enabled) {
+    void FWorld::OnComponentEnabledChanged(FComponentId id, FGameObjectId owner, bool enabled) {
         if (id.Type == kCameraComponentType) {
             if (enabled && IsGameObjectActive(owner)) {
                 AddActiveComponent(mActiveCameraComponents, id);
@@ -401,8 +398,8 @@ namespace AltinaEngine::GameScene {
             return obj->mTransformChangedId == updateId;
         }
 
-        bool              parentChanged = false;
-        const auto        parentId      = obj->mParent;
+        bool               parentChanged = false;
+        const auto         parentId      = obj->mParent;
         const FGameObject* parentObj     = nullptr;
         if (parentId.IsValid()) {
             parentChanged = UpdateTransformRecursive(parentId, updateId);

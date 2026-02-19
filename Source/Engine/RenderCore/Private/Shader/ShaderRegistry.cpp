@@ -3,8 +3,8 @@
 #include "Types/Traits.h"
 
 namespace AltinaEngine::RenderCore {
-    auto FShaderRegistry::MakeKey(FStringView name, EShaderStage stage,
-        FShaderPermutationId permutation) -> FShaderKey {
+    auto FShaderRegistry::MakeKey(
+        FStringView name, EShaderStage stage, FShaderPermutationId permutation) -> FShaderKey {
         FShaderKey key{};
         key.Name.Assign(name);
         key.Stage       = stage;

@@ -7,9 +7,8 @@
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Engine {
-    void FSceneViewBuilder::Build(
-        const GameScene::FWorld& world, const FSceneViewBuildParams& params,
-        FRenderScene& outScene) const {
+    void FSceneViewBuilder::Build(const GameScene::FWorld& world,
+        const FSceneViewBuildParams& params, FRenderScene& outScene) const {
         outScene.Views.Clear();
         outScene.StaticMeshes.Clear();
 
@@ -29,19 +28,18 @@ namespace AltinaEngine::Engine {
             sceneView.CameraId = id;
             sceneView.Target   = params.ViewTarget;
 
-            auto& viewData              = sceneView.View;
-            viewData.Camera.ProjectionType =
-                RenderCore::View::ECameraProjectionType::Perspective;
+            auto& viewData                 = sceneView.View;
+            viewData.Camera.ProjectionType = RenderCore::View::ECameraProjectionType::Perspective;
             viewData.Camera.VerticalFovRadians = component.GetFovYRadians();
             viewData.Camera.NearPlane          = component.GetNearPlane();
             viewData.Camera.FarPlane           = component.GetFarPlane();
 
-            viewData.ViewRect             = params.ViewRect;
-            viewData.RenderTargetExtent   = params.RenderTargetExtent;
-            viewData.FrameIndex           = params.FrameIndex;
-            viewData.TemporalSampleIndex  = params.TemporalSampleIndex;
-            viewData.DeltaTimeSeconds     = params.DeltaTimeSeconds;
-            viewData.bReverseZ            = params.bReverseZ;
+            viewData.ViewRect            = params.ViewRect;
+            viewData.RenderTargetExtent  = params.RenderTargetExtent;
+            viewData.FrameIndex          = params.FrameIndex;
+            viewData.TemporalSampleIndex = params.TemporalSampleIndex;
+            viewData.DeltaTimeSeconds    = params.DeltaTimeSeconds;
+            viewData.bReverseZ           = params.bReverseZ;
 
             viewData.BeginFrame();
 
@@ -62,9 +60,8 @@ namespace AltinaEngine::Engine {
                 continue;
             }
 
-            const auto meshId =
-                world.GetComponent<GameScene::FStaticMeshFilterComponent>(
-                    materialComponent.GetOwner());
+            const auto meshId = world.GetComponent<GameScene::FStaticMeshFilterComponent>(
+                materialComponent.GetOwner());
             if (!meshId.IsValid()) {
                 continue;
             }
@@ -75,7 +72,7 @@ namespace AltinaEngine::Engine {
                 continue;
             }
 
-            const auto owner = materialComponent.GetOwner();
+            const auto       owner = materialComponent.GetOwner();
             FSceneStaticMesh entry{};
             entry.OwnerId             = owner;
             entry.MeshComponentId     = meshId;

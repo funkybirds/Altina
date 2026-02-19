@@ -39,7 +39,7 @@ namespace AltinaEngine::GameScene {
 
         FComponentId  mId{};
         FGameObjectId mOwner{};
-        FWorld*       mWorld = nullptr;
+        FWorld*       mWorld   = nullptr;
         bool          mEnabled = true;
     };
 } // namespace AltinaEngine::GameScene

@@ -131,7 +131,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             u32 group) -> FNativeString {
             const char reg = GetRegisterChar(resource);
             if (backend == Rhi::ERhiBackend::DirectX11) {
-                const u32 dx11Index = GetDx11Base(resource, group) + index;
+                const u32     dx11Index = GetDx11Base(resource, group) + index;
                 FNativeString out("register(");
                 out.Append(reg);
                 out.AppendNumber(dx11Index);
@@ -205,27 +205,26 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
 
             const FNativeStringView groupToken = text.Substr(cursor, groupEnd - cursor);
-            EAutoBindingGroup group{};
+            EAutoBindingGroup       group{};
             if (!ResolveGroupToken(groupToken, group)) {
                 return false;
             }
 
-            cursor                   = groupEnd + 1;
-            const auto resourceEnd =
-                text.FindFirstOf(FNativeStringView(" \t\r\n("), cursor);
+            cursor                 = groupEnd + 1;
+            const auto resourceEnd = text.FindFirstOf(FNativeStringView(" \t\r\n("), cursor);
             if (resourceEnd == FNativeStringView::npos) {
                 return false;
             }
 
             const FNativeStringView resourceToken = text.Substr(cursor, resourceEnd - cursor);
-            EAutoBindingResource resource{};
+            EAutoBindingResource    resource{};
             if (!ResolveResourceToken(resourceToken, resource)) {
                 return false;
             }
 
             cursor = resourceEnd;
-            while (cursor < text.Length()
-                && std::isspace(static_cast<unsigned char>(text[cursor]))) {
+            while (
+                cursor < text.Length() && std::isspace(static_cast<unsigned char>(text[cursor]))) {
                 ++cursor;
             }
             if (cursor >= text.Length() || text[cursor] != '(') {
@@ -233,8 +232,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
 
             const usize parenStart = cursor;
-            int    depth      = 0;
-            usize parenEnd   = FNativeStringView::npos;
+            int         depth      = 0;
+            usize       parenEnd   = FNativeStringView::npos;
             for (usize i = parenStart + 1; i < text.Length(); ++i) {
                 const char ch = text[i];
                 if (ch == '(') {
@@ -255,8 +254,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             outMarker.mEnd      = parenEnd + 1;
             outMarker.mGroup    = group;
             outMarker.mResource = resource;
-            outMarker.mArgs =
-                FNativeString(text.Substr(parenStart + 1, parenEnd - parenStart - 1));
+            outMarker.mArgs = FNativeString(text.Substr(parenStart + 1, parenEnd - parenStart - 1));
             return true;
         }
 

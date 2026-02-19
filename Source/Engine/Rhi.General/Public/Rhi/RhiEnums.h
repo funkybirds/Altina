@@ -317,13 +317,13 @@ namespace AltinaEngine::Rhi {
         return lhs;
     }
 
-    [[nodiscard]] constexpr auto operator|(
-        ERhiColorWriteMask lhs, ERhiColorWriteMask rhs) noexcept -> ERhiColorWriteMask {
+    [[nodiscard]] constexpr auto operator|(ERhiColorWriteMask lhs, ERhiColorWriteMask rhs) noexcept
+        -> ERhiColorWriteMask {
         return static_cast<ERhiColorWriteMask>(ToUnderlying(lhs) | ToUnderlying(rhs));
     }
 
-    [[nodiscard]] constexpr auto operator&(
-        ERhiColorWriteMask lhs, ERhiColorWriteMask rhs) noexcept -> ERhiColorWriteMask {
+    [[nodiscard]] constexpr auto operator&(ERhiColorWriteMask lhs, ERhiColorWriteMask rhs) noexcept
+        -> ERhiColorWriteMask {
         return static_cast<ERhiColorWriteMask>(ToUnderlying(lhs) & ToUnderlying(rhs));
     }
 

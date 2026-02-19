@@ -24,7 +24,9 @@ namespace AltinaEngine::Engine {
     class AE_ENGINE_API FMaterialCache {
     public:
         void SetAssetManager(Asset::FAssetManager* manager) noexcept { mAssetManager = manager; }
-        void SetDefaultMaterial(Render::FMaterial* material) noexcept { mDefaultMaterial = material; }
+        void SetDefaultMaterial(Render::FMaterial* material) noexcept {
+            mDefaultMaterial = material;
+        }
         void SetDefaultTemplate(Container::TShared<Render::FMaterialTemplate> templ) noexcept {
             mDefaultTemplate = Move(templ);
         }
@@ -34,41 +36,42 @@ namespace AltinaEngine::Engine {
         [[nodiscard]] auto ResolveDefault() -> Render::FMaterial*;
         void               PrepareMaterialForRendering(Render::FMaterial& material);
 
-        void Clear();
+        void               Clear();
 
     private:
         struct FTextureBinding {
-            Render::FMaterialParamId NameHash    = 0U;
+            Render::FMaterialParamId NameHash = 0U;
             Asset::FAssetHandle      Texture{};
             u32                      SamplerFlags = 0U;
         };
 
         struct FEntry {
-            Asset::FAssetHandle                 Handle{};
+            Asset::FAssetHandle                   Handle{};
             Container::TShared<Render::FMaterial> Material;
-            Container::TVector<FTextureBinding> TextureBindings;
+            Container::TVector<FTextureBinding>   TextureBindings;
         };
 
-        [[nodiscard]] auto FindEntryIndex(const Asset::FAssetHandle& handle) const noexcept -> isize;
+        [[nodiscard]] auto FindEntryIndex(const Asset::FAssetHandle& handle) const noexcept
+            -> isize;
         [[nodiscard]] auto FindEntryByMaterial(const Render::FMaterial* material) noexcept
             -> FEntry*;
         [[nodiscard]] auto FindTextureEntryIndex(const Asset::FAssetHandle& handle) const noexcept
             -> isize;
-        auto               ResolveTextureEntry(const Asset::FAssetHandle& handle)
+        auto ResolveTextureEntry(const Asset::FAssetHandle& handle)
             -> Rhi::FRhiShaderResourceViewRef;
-        auto               BuildMaterialFromAsset(const Asset::FMaterialAsset& asset,
-                          Container::TVector<FTextureBinding>& outBindings) const
+        auto BuildMaterialFromAsset(const Asset::FMaterialAsset& asset,
+            Container::TVector<FTextureBinding>&                 outBindings) const
             -> Container::TShared<Render::FMaterial>;
-        void               ApplyTextureBindings(Render::FMaterial& material,
-                          const Container::TVector<FTextureBinding>& bindings);
+        void ApplyTextureBindings(
+            Render::FMaterial& material, const Container::TVector<FTextureBinding>& bindings);
 
-        Asset::FAssetManager*                     mAssetManager = nullptr;
-        Container::TShared<Render::FMaterialTemplate> mDefaultTemplate;
-        Render::FMaterial*                        mDefaultMaterial = nullptr;
-        Container::TShared<Render::FMaterial>     mFallbackMaterial;
-        Container::TVector<FEntry>                mEntries;
-        Container::TVector<Asset::FAssetHandle>   mTextureHandles;
+        Asset::FAssetManager*                              mAssetManager = nullptr;
+        Container::TShared<Render::FMaterialTemplate>      mDefaultTemplate;
+        Render::FMaterial*                                 mDefaultMaterial = nullptr;
+        Container::TShared<Render::FMaterial>              mFallbackMaterial;
+        Container::TVector<FEntry>                         mEntries;
+        Container::TVector<Asset::FAssetHandle>            mTextureHandles;
         Container::TVector<Rhi::FRhiShaderResourceViewRef> mTextureSRVs;
-        Rhi::FRhiSamplerRef                       mDefaultSampler;
+        Rhi::FRhiSamplerRef                                mDefaultSampler;
     };
 } // namespace AltinaEngine::Engine

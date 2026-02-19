@@ -278,30 +278,30 @@ namespace AltinaEngine::Rhi {
     };
 
     struct FRhiRasterStateDesc {
-        ERhiRasterFillMode  mFillMode            = ERhiRasterFillMode::Solid;
-        ERhiRasterCullMode  mCullMode            = ERhiRasterCullMode::Back;
-        ERhiRasterFrontFace mFrontFace           = ERhiRasterFrontFace::CCW;
-        i32                 mDepthBias           = 0;
-        f32                 mDepthBiasClamp      = 0.0f;
+        ERhiRasterFillMode  mFillMode             = ERhiRasterFillMode::Solid;
+        ERhiRasterCullMode  mCullMode             = ERhiRasterCullMode::Back;
+        ERhiRasterFrontFace mFrontFace            = ERhiRasterFrontFace::CCW;
+        i32                 mDepthBias            = 0;
+        f32                 mDepthBiasClamp       = 0.0f;
         f32                 mSlopeScaledDepthBias = 0.0f;
-        bool                mDepthClip           = true;
-        bool                mConservativeRaster  = false;
+        bool                mDepthClip            = true;
+        bool                mConservativeRaster   = false;
     };
 
     struct FRhiDepthStateDesc {
-        bool          mDepthEnable = true;
-        bool          mDepthWrite  = true;
+        bool          mDepthEnable  = true;
+        bool          mDepthWrite   = true;
         ERhiCompareOp mDepthCompare = ERhiCompareOp::LessEqual;
     };
 
     struct FRhiBlendStateDesc {
-        bool             mBlendEnable    = false;
-        ERhiBlendFactor  mSrcColor       = ERhiBlendFactor::One;
-        ERhiBlendFactor  mDstColor       = ERhiBlendFactor::Zero;
-        ERhiBlendOp      mColorOp        = ERhiBlendOp::Add;
-        ERhiBlendFactor  mSrcAlpha       = ERhiBlendFactor::One;
-        ERhiBlendFactor  mDstAlpha       = ERhiBlendFactor::Zero;
-        ERhiBlendOp      mAlphaOp        = ERhiBlendOp::Add;
+        bool               mBlendEnable    = false;
+        ERhiBlendFactor    mSrcColor       = ERhiBlendFactor::One;
+        ERhiBlendFactor    mDstColor       = ERhiBlendFactor::Zero;
+        ERhiBlendOp        mColorOp        = ERhiBlendOp::Add;
+        ERhiBlendFactor    mSrcAlpha       = ERhiBlendFactor::One;
+        ERhiBlendFactor    mDstAlpha       = ERhiBlendFactor::Zero;
+        ERhiBlendOp        mAlphaOp        = ERhiBlendOp::Add;
         ERhiColorWriteMask mColorWriteMask = ERhiColorWriteMask::All;
     };
 

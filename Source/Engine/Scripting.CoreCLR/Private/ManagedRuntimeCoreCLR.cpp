@@ -10,26 +10,25 @@ namespace AltinaEngine::Scripting::CoreCLR {
     namespace {
         constexpr auto kLogCategory = TEXT("Scripting.CoreCLR");
 
-    #if AE_PLATFORM_WIN
-        using managed_startup_fn = void* (__cdecl*)(const void* nativeApi, i32 nativeApiSize);
-    #else
+#if AE_PLATFORM_WIN
+        using managed_startup_fn = void*(__cdecl*)(const void* nativeApi, i32 nativeApiSize);
+#else
         using managed_startup_fn = void* (*)(const void* nativeApi, i32 nativeApiSize);
-    #endif
-    }
+#endif
+    } // namespace
 
     struct FManagedRuntime::FImpl {
-        Host::FRuntimeHost   Host;
+        Host::FRuntimeHost      Host;
         Interop::FManagedBridge Bridge;
     };
 
-    FManagedRuntime::FManagedRuntime()
-        : mImpl(Core::Container::MakeUnique<FImpl>()) {}
+    FManagedRuntime::FManagedRuntime() : mImpl(Core::Container::MakeUnique<FImpl>()) {}
 
     FManagedRuntime::~FManagedRuntime() = default;
 
     auto FManagedRuntime::Initialize(const FScriptRuntimeConfig& runtimeConfig,
         const FManagedRuntimeConfig& managedConfig, const FNativeApi& nativeApi) -> bool {
-        mManagedApi = {};
+        mManagedApi  = {};
         mInitialized = false;
 
         if (!mImpl) {
@@ -48,13 +47,14 @@ namespace AltinaEngine::Scripting::CoreCLR {
         }
 
         FScriptLoadRequest request{};
-        request.mAssemblyPath = managedConfig.mAssemblyPath;
-        request.mTypeName = managedConfig.mTypeName;
-        request.mMethodName = managedConfig.mMethodName;
+        request.mAssemblyPath     = managedConfig.mAssemblyPath;
+        request.mTypeName         = managedConfig.mTypeName;
+        request.mMethodName       = managedConfig.mMethodName;
         request.mDelegateTypeName = managedConfig.mDelegateTypeName;
 
         FScriptHandle handle{};
-        if (!mImpl->Bridge.Load(mImpl->Host.GetLoadAssemblyAndGetFunctionPointer(), request, handle)) {
+        if (!mImpl->Bridge.Load(
+                mImpl->Host.GetLoadAssemblyAndGetFunctionPointer(), request, handle)) {
             mImpl->Host.Shutdown();
             LogErrorCat(kLogCategory, TEXT("Failed to load managed startup entry."));
             return false;
@@ -74,13 +74,13 @@ namespace AltinaEngine::Scripting::CoreCLR {
             return false;
         }
 
-        mManagedApi = *reinterpret_cast<const FManagedApi*>(managedApiPtr);
+        mManagedApi  = *reinterpret_cast<const FManagedApi*>(managedApiPtr);
         mInitialized = true;
         return true;
     }
 
     void FManagedRuntime::Shutdown() {
-        mManagedApi = {};
+        mManagedApi  = {};
         mInitialized = false;
         if (mImpl) {
             mImpl->Host.Shutdown();

@@ -5,6 +5,8 @@
 
 namespace {
     using AltinaEngine::TChar;
+    using AltinaEngine::Core::Container::TVector;
+    using AltinaEngine::Shader::BuildShaderPermutationId;
     using AltinaEngine::Shader::EShaderRasterCullMode;
     using AltinaEngine::Shader::EShaderRasterFillMode;
     using AltinaEngine::Shader::EShaderRasterFrontFace;
@@ -18,8 +20,6 @@ namespace {
     using AltinaEngine::ShaderCompiler::ExpandMultiPermutationValues;
     using AltinaEngine::ShaderCompiler::FShaderPermutationParseResult;
     using AltinaEngine::ShaderCompiler::ParseShaderPermutationSource;
-    using AltinaEngine::Shader::BuildShaderPermutationId;
-    using AltinaEngine::Core::Container::TVector;
 
     auto FindDimensionIndex(const AltinaEngine::Shader::FShaderPermutationLayout& layout,
         const TChar* name) -> AltinaEngine::i32 {
@@ -53,7 +53,7 @@ namespace {
 } // namespace
 
 TEST_CASE("ShaderCompiler.ShaderPermutation.ParseAndEvaluate") {
-    const auto shaderSource = TEXT(R"(
+    const auto                    shaderSource = TEXT(R"(
 // @altina perm {
 //   USE_FOG: bool = 1 [multi]
 //   SHADING_MODEL: enum {0,1,2} = 2 [multi]
@@ -83,52 +83,51 @@ TEST_CASE("ShaderCompiler.ShaderPermutation.ParseAndEvaluate") {
     REQUIRE(ExpandMultiPermutationValues(parsed.mPermutationLayout, combos, 32));
     REQUIRE_EQ(combos.Size(), 6U);
 
-    auto values = BuildDefaultPermutationValues(parsed.mPermutationLayout);
-    auto builtins = BuildDefaultBuiltinValues(parsed.mBuiltinLayout);
+    auto       values   = BuildDefaultPermutationValues(parsed.mPermutationLayout);
+    auto       builtins = BuildDefaultBuiltinValues(parsed.mBuiltinLayout);
 
-    const auto useFogIndex = FindDimensionIndex(parsed.mPermutationLayout, TEXT("USE_FOG"));
-    const auto shadingIndex = FindDimensionIndex(parsed.mPermutationLayout, TEXT("SHADING_MODEL"));
-    const auto lightsIndex = FindDimensionIndex(parsed.mPermutationLayout, TEXT("NUM_LIGHTS"));
-    const auto reverseZIndex =
-        FindBuiltinIndex(parsed.mBuiltinLayout, TEXT("AE_BUILTIN_REVERSEZ"));
+    const auto useFogIndex   = FindDimensionIndex(parsed.mPermutationLayout, TEXT("USE_FOG"));
+    const auto shadingIndex  = FindDimensionIndex(parsed.mPermutationLayout, TEXT("SHADING_MODEL"));
+    const auto lightsIndex   = FindDimensionIndex(parsed.mPermutationLayout, TEXT("NUM_LIGHTS"));
+    const auto reverseZIndex = FindBuiltinIndex(parsed.mBuiltinLayout, TEXT("AE_BUILTIN_REVERSEZ"));
     REQUIRE(useFogIndex >= 0);
     REQUIRE(shadingIndex >= 0);
     REQUIRE(lightsIndex >= 0);
     REQUIRE(reverseZIndex >= 0);
 
-    values.mValues[static_cast<AltinaEngine::usize>(useFogIndex)] = 1;
-    values.mValues[static_cast<AltinaEngine::usize>(shadingIndex)] = 2;
-    values.mValues[static_cast<AltinaEngine::usize>(lightsIndex)] = 2;
+    values.mValues[static_cast<AltinaEngine::usize>(useFogIndex)]     = 1;
+    values.mValues[static_cast<AltinaEngine::usize>(shadingIndex)]    = 2;
+    values.mValues[static_cast<AltinaEngine::usize>(lightsIndex)]     = 2;
     builtins.mValues[static_cast<AltinaEngine::usize>(reverseZIndex)] = 0;
-    REQUIRE(!EvaluateShaderPermutationRules(parsed.mRules, parsed.mPermutationLayout, values,
-        &parsed.mBuiltinLayout, &builtins));
+    REQUIRE(!EvaluateShaderPermutationRules(
+        parsed.mRules, parsed.mPermutationLayout, values, &parsed.mBuiltinLayout, &builtins));
 
-    values.mValues[static_cast<AltinaEngine::usize>(useFogIndex)] = 0;
+    values.mValues[static_cast<AltinaEngine::usize>(useFogIndex)]  = 0;
     values.mValues[static_cast<AltinaEngine::usize>(shadingIndex)] = 2;
-    values.mValues[static_cast<AltinaEngine::usize>(lightsIndex)] = 4;
-    REQUIRE(!EvaluateShaderPermutationRules(parsed.mRules, parsed.mPermutationLayout, values,
-        &parsed.mBuiltinLayout, &builtins));
+    values.mValues[static_cast<AltinaEngine::usize>(lightsIndex)]  = 4;
+    REQUIRE(!EvaluateShaderPermutationRules(
+        parsed.mRules, parsed.mPermutationLayout, values, &parsed.mBuiltinLayout, &builtins));
 
-    values.mValues[static_cast<AltinaEngine::usize>(useFogIndex)] = 0;
-    values.mValues[static_cast<AltinaEngine::usize>(shadingIndex)] = 1;
-    values.mValues[static_cast<AltinaEngine::usize>(lightsIndex)] = 4;
+    values.mValues[static_cast<AltinaEngine::usize>(useFogIndex)]     = 0;
+    values.mValues[static_cast<AltinaEngine::usize>(shadingIndex)]    = 1;
+    values.mValues[static_cast<AltinaEngine::usize>(lightsIndex)]     = 4;
     builtins.mValues[static_cast<AltinaEngine::usize>(reverseZIndex)] = 1;
-    REQUIRE(EvaluateShaderPermutationRules(parsed.mRules, parsed.mPermutationLayout, values,
-        &parsed.mBuiltinLayout, &builtins));
+    REQUIRE(EvaluateShaderPermutationRules(
+        parsed.mRules, parsed.mPermutationLayout, values, &parsed.mBuiltinLayout, &builtins));
 
-    const auto permDefines = BuildPermutationDefines(parsed.mPermutationLayout, values);
+    const auto permDefines    = BuildPermutationDefines(parsed.mPermutationLayout, values);
     const auto builtinDefines = BuildBuiltinDefines(parsed.mBuiltinLayout, builtins);
     REQUIRE_EQ(permDefines.Size(), parsed.mPermutationLayout.mDimensions.Size());
     REQUIRE_EQ(builtinDefines.Size(), parsed.mBuiltinLayout.mBuiltins.Size());
 
-    const auto* fogDefine = FindDefine(permDefines, TEXT("AE_PERM_USE_FOG"));
+    const auto* fogDefine     = FindDefine(permDefines, TEXT("AE_PERM_USE_FOG"));
     const auto* reverseDefine = FindDefine(builtinDefines, TEXT("AE_BUILTIN_REVERSEZ"));
     REQUIRE(fogDefine != nullptr);
     REQUIRE(reverseDefine != nullptr);
 }
 
 TEST_CASE("ShaderCompiler.ShaderPermutation.RasterState") {
-    const auto shaderSource = TEXT(R"(
+    const auto                    shaderSource = TEXT(R"(
 // @altina raster_state {
 //   fill = wireframe
 //   cull = front
@@ -156,7 +155,7 @@ TEST_CASE("ShaderCompiler.ShaderPermutation.RasterState") {
 }
 
 TEST_CASE("ShaderCompiler.ShaderPermutation.BuildId") {
-    const auto shaderSource = TEXT(R"(
+    const auto                    shaderSource = TEXT(R"(
 // @altina perm {
 //   USE_FOG: bool = 0 [multi]
 //   SHADING_MODEL: enum {0,1,2} = 1 [multi]
@@ -169,31 +168,27 @@ TEST_CASE("ShaderCompiler.ShaderPermutation.BuildId") {
     FShaderPermutationParseResult parsed;
     REQUIRE(ParseShaderPermutationSource(shaderSource, parsed));
 
-    auto values = BuildDefaultPermutationValues(parsed.mPermutationLayout);
-    auto builtins = BuildDefaultBuiltinValues(parsed.mBuiltinLayout);
+    auto       values   = BuildDefaultPermutationValues(parsed.mPermutationLayout);
+    auto       builtins = BuildDefaultBuiltinValues(parsed.mBuiltinLayout);
 
-    const auto fogIndex = FindDimensionIndex(parsed.mPermutationLayout, TEXT("USE_FOG"));
-    const auto reverseIndex =
-        FindBuiltinIndex(parsed.mBuiltinLayout, TEXT("AE_BUILTIN_REVERSEZ"));
+    const auto fogIndex     = FindDimensionIndex(parsed.mPermutationLayout, TEXT("USE_FOG"));
+    const auto reverseIndex = FindBuiltinIndex(parsed.mBuiltinLayout, TEXT("AE_BUILTIN_REVERSEZ"));
     REQUIRE(fogIndex >= 0);
     REQUIRE(reverseIndex >= 0);
 
-    values.mValues[static_cast<AltinaEngine::usize>(fogIndex)] = 0;
+    values.mValues[static_cast<AltinaEngine::usize>(fogIndex)]       = 0;
     builtins.mValues[static_cast<AltinaEngine::usize>(reverseIndex)] = 0;
 
     const auto idA = BuildShaderPermutationId(TEXT("TestShader"), TEXT("VSMain"),
-        EShaderStage::Vertex, parsed.mPermutationLayout, values, &parsed.mBuiltinLayout,
-        &builtins);
+        EShaderStage::Vertex, parsed.mPermutationLayout, values, &parsed.mBuiltinLayout, &builtins);
     const auto idB = BuildShaderPermutationId(TEXT("TestShader"), TEXT("VSMain"),
-        EShaderStage::Vertex, parsed.mPermutationLayout, values, &parsed.mBuiltinLayout,
-        &builtins);
+        EShaderStage::Vertex, parsed.mPermutationLayout, values, &parsed.mBuiltinLayout, &builtins);
     REQUIRE(idA.IsValid());
     REQUIRE_EQ(idA.mHash, idB.mHash);
 
     values.mValues[static_cast<AltinaEngine::usize>(fogIndex)] = 1;
     const auto idC = BuildShaderPermutationId(TEXT("TestShader"), TEXT("VSMain"),
-        EShaderStage::Vertex, parsed.mPermutationLayout, values, &parsed.mBuiltinLayout,
-        &builtins);
+        EShaderStage::Vertex, parsed.mPermutationLayout, values, &parsed.mBuiltinLayout, &builtins);
     REQUIRE(idC.IsValid());
     REQUIRE(idA.mHash != idC.mHash);
 }

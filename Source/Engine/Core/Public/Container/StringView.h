@@ -13,9 +13,8 @@ namespace AltinaEngine::Core::Container {
         using TPointer   = const TValueType*;
         using TReference = const TValueType&;
         using TSizeType  = usize;
-        using TUnsigned =
-            std::conditional_t<std::is_integral_v<TValueType>, std::make_unsigned_t<TValueType>,
-                TValueType>;
+        using TUnsigned  = std::conditional_t<std::is_integral_v<TValueType>,
+             std::make_unsigned_t<TValueType>, TValueType>;
 
         static constexpr TSizeType npos = static_cast<TSizeType>(-1);
 
@@ -139,8 +138,8 @@ namespace AltinaEngine::Core::Container {
             return Find(value) != npos;
         }
 
-        [[nodiscard]] constexpr auto Find(TBasicStringView needle,
-            TSizeType pos = 0) const noexcept -> TSizeType {
+        [[nodiscard]] constexpr auto Find(TBasicStringView needle, TSizeType pos = 0) const noexcept
+            -> TSizeType {
             if (needle.mLength == 0) {
                 return (pos <= mLength) ? pos : npos;
             }
@@ -164,8 +163,8 @@ namespace AltinaEngine::Core::Container {
             return npos;
         }
 
-        [[nodiscard]] constexpr auto Find(TValueType value,
-            TSizeType pos = 0) const noexcept -> TSizeType {
+        [[nodiscard]] constexpr auto Find(TValueType value, TSizeType pos = 0) const noexcept
+            -> TSizeType {
             if (pos >= mLength) {
                 return npos;
             }
@@ -177,8 +176,8 @@ namespace AltinaEngine::Core::Container {
             return npos;
         }
 
-        [[nodiscard]] constexpr auto RFind(TBasicStringView needle,
-            TSizeType pos = npos) const noexcept -> TSizeType {
+        [[nodiscard]] constexpr auto RFind(
+            TBasicStringView needle, TSizeType pos = npos) const noexcept -> TSizeType {
             if (needle.mLength == 0) {
                 if (mLength == 0) {
                     return 0;
@@ -209,8 +208,8 @@ namespace AltinaEngine::Core::Container {
             return npos;
         }
 
-        [[nodiscard]] constexpr auto RFind(TValueType value,
-            TSizeType pos = npos) const noexcept -> TSizeType {
+        [[nodiscard]] constexpr auto RFind(TValueType value, TSizeType pos = npos) const noexcept
+            -> TSizeType {
             if (mLength == 0) {
                 return npos;
             }
@@ -226,8 +225,8 @@ namespace AltinaEngine::Core::Container {
             return npos;
         }
 
-        [[nodiscard]] constexpr auto FindFirstOf(TBasicStringView set,
-            TSizeType pos = 0) const noexcept -> TSizeType {
+        [[nodiscard]] constexpr auto FindFirstOf(
+            TBasicStringView set, TSizeType pos = 0) const noexcept -> TSizeType {
             if (set.mLength == 0 || pos >= mLength) {
                 return npos;
             }
@@ -239,8 +238,8 @@ namespace AltinaEngine::Core::Container {
             return npos;
         }
 
-        [[nodiscard]] constexpr auto FindLastOf(TBasicStringView set,
-            TSizeType pos = npos) const noexcept -> TSizeType {
+        [[nodiscard]] constexpr auto FindLastOf(
+            TBasicStringView set, TSizeType pos = npos) const noexcept -> TSizeType {
             if (set.mLength == 0 || mLength == 0) {
                 return npos;
             }
@@ -256,8 +255,8 @@ namespace AltinaEngine::Core::Container {
             return npos;
         }
 
-        [[nodiscard]] constexpr auto FindFirstNotOf(TBasicStringView set,
-            TSizeType pos = 0) const noexcept -> TSizeType {
+        [[nodiscard]] constexpr auto FindFirstNotOf(
+            TBasicStringView set, TSizeType pos = 0) const noexcept -> TSizeType {
             if (pos >= mLength) {
                 return npos;
             }
@@ -272,8 +271,8 @@ namespace AltinaEngine::Core::Container {
             return npos;
         }
 
-        [[nodiscard]] constexpr auto FindLastNotOf(TBasicStringView set,
-            TSizeType pos = npos) const noexcept -> TSizeType {
+        [[nodiscard]] constexpr auto FindLastNotOf(
+            TBasicStringView set, TSizeType pos = npos) const noexcept -> TSizeType {
             if (mLength == 0) {
                 return npos;
             }

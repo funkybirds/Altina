@@ -5,13 +5,12 @@
 
 #include <thread>
 
+using AltinaEngine::Move;
 using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Container::TFunction;
-using AltinaEngine::Move;
 namespace AltinaEngine::RenderCore {
     Core::Console::TConsoleVariable<i32> gRenderingThreadLagFrames(
-        TEXT("gRenderingThreadLagFrames"),
-        1);
+        TEXT("gRenderingThreadLagFrames"), 1);
 
     auto EnqueueRenderTask(FString TaskName, TFunction<void()> task) noexcept
         -> Core::Jobs::FJobHandle {
@@ -71,13 +70,3 @@ namespace AltinaEngine::RenderCore {
         Core::Jobs::UnregisterNamedThread(Core::Jobs::ENamedThread::Rendering);
     }
 } // namespace AltinaEngine::RenderCore
-
-
-
-
-
-
-
-
-
-

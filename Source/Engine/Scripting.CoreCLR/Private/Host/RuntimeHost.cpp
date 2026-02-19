@@ -29,19 +29,19 @@
     #endif
 #endif
 
+using AltinaEngine::usize;
+using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Logging::LogErrorCat;
 using AltinaEngine::Core::Logging::LogWarningCat;
-using AltinaEngine::Core::Container::FString;
-using AltinaEngine::usize;
 
 namespace AltinaEngine::Scripting::CoreCLR::Host {
     namespace {
         constexpr auto kLogCategory = TEXT("Scripting.CoreCLR");
 
 #if AE_PLATFORM_WIN
-        #define AE_HOSTFXR_CALLTYPE __stdcall
+    #define AE_HOSTFXR_CALLTYPE __stdcall
 #else
-        #define AE_HOSTFXR_CALLTYPE
+    #define AE_HOSTFXR_CALLTYPE
 #endif
 
         auto GetMessageLength(const FHostFxrChar* message) -> usize {
@@ -68,9 +68,8 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
                     CP_UTF8, 0, message, static_cast<int>(length), nullptr, 0, nullptr, nullptr);
                 if (required > 0) {
                     std::string utf8(static_cast<size_t>(required), '\0');
-                    const int converted = WideCharToMultiByte(
-                        CP_UTF8, 0, message, static_cast<int>(length), utf8.data(), required,
-                        nullptr, nullptr);
+                    const int   converted = WideCharToMultiByte(CP_UTF8, 0, message,
+                          static_cast<int>(length), utf8.data(), required, nullptr, nullptr);
                     if (converted > 0) {
                         out.Append(utf8.c_str(), static_cast<usize>(utf8.size()));
                         return out;
@@ -99,8 +98,8 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             } else {
                 out.Reserve(length);
                 for (usize i = 0; i < length; ++i) {
-                    out.Append(static_cast<AltinaEngine::TChar>(
-                        static_cast<unsigned char>(message[i])));
+                    out.Append(
+                        static_cast<AltinaEngine::TChar>(static_cast<unsigned char>(message[i])));
                 }
                 return out;
             }
@@ -120,13 +119,13 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
         }
 
 #undef AE_HOSTFXR_CALLTYPE
-    }
+    } // namespace
 
     auto FRuntimeHost::Initialize(const FScriptRuntimeConfig& config) -> bool {
-        mConfig = config;
-        mInitialized = false;
+        mConfig                            = config;
+        mInitialized                       = false;
         mLoadAssemblyAndGetFunctionPointer = nullptr;
-        mPrevErrorWriter = nullptr;
+        mPrevErrorWriter                   = nullptr;
 
         if (config.mRuntimeConfigPath.IsEmptyString()) {
             LogErrorCat(kLogCategory, TEXT("Runtime config path is empty."));
@@ -149,21 +148,20 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             return false;
         }
 
-        hostfxr_handle hostHandle = nullptr;
-        FHostFxrInitializeParameters params{};
+        hostfxr_handle                      hostHandle = nullptr;
+        FHostFxrInitializeParameters        params{};
         const FHostFxrInitializeParameters* paramsPtr = nullptr;
         if (!mHostFxr.GetDotnetRoot().empty()) {
-            params.mSize = sizeof(FHostFxrInitializeParameters);
-            params.mHostPath = nullptr;
+            params.mSize       = sizeof(FHostFxrInitializeParameters);
+            params.mHostPath   = nullptr;
             params.mDotnetRoot = mHostFxr.GetDotnetRoot().c_str();
-            paramsPtr = &params;
+            paramsPtr          = &params;
         }
 
         const i32 initResult = mHostFxr.GetFunctions().InitializeForRuntimeConfig(
             runtimeConfigPath.c_str(), paramsPtr, &hostHandle);
         if (initResult != 0 || hostHandle == nullptr) {
-            LogErrorCat(
-                kLogCategory, TEXT("hostfxr_initialize_for_runtime_config failed ({})."),
+            LogErrorCat(kLogCategory, TEXT("hostfxr_initialize_for_runtime_config failed ({})."),
                 initResult);
             if (hostHandle != nullptr) {
                 mHostFxr.GetFunctions().Close(hostHandle);
@@ -172,12 +170,12 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             return false;
         }
 
-        void* delegate = nullptr;
+        void*     delegate       = nullptr;
         const i32 delegateResult = mHostFxr.GetFunctions().GetRuntimeDelegate(
             hostHandle, EHostFxrDelegateType::LoadAssemblyAndGetFunctionPointer, &delegate);
         if (delegateResult != 0 || delegate == nullptr) {
-            LogErrorCat(kLogCategory, TEXT("hostfxr_get_runtime_delegate failed ({})."),
-                delegateResult);
+            LogErrorCat(
+                kLogCategory, TEXT("hostfxr_get_runtime_delegate failed ({})."), delegateResult);
             mHostFxr.GetFunctions().Close(hostHandle);
             mHostFxr.Unload();
             return false;
@@ -193,7 +191,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
 
     void FRuntimeHost::Shutdown() {
         mLoadAssemblyAndGetFunctionPointer = nullptr;
-        mInitialized = false;
+        mInitialized                       = false;
         if (mHostFxr.GetFunctions().SetErrorWriter) {
             mHostFxr.GetFunctions().SetErrorWriter(mPrevErrorWriter);
         }

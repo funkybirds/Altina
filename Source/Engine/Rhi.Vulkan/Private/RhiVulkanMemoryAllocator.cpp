@@ -26,13 +26,13 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
             }
         }
         mPools.Clear();
-        mStats = {};
-        mDevice = VK_NULL_HANDLE;
+        mStats          = {};
+        mDevice         = VK_NULL_HANDLE;
         mPhysicalDevice = VK_NULL_HANDLE;
     }
 
-    auto FVulkanMemoryAllocator::FindMemoryType(u32 typeBits, VkMemoryPropertyFlags flags) const
-        noexcept -> u32 {
+    auto FVulkanMemoryAllocator::FindMemoryType(
+        u32 typeBits, VkMemoryPropertyFlags flags) const noexcept -> u32 {
         for (u32 i = 0; i < mMemoryProps.memoryTypeCount; ++i) {
             if ((typeBits & (1u << i)) == 0u) {
                 continue;
@@ -44,8 +44,8 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         return UINT32_MAX;
     }
 
-    auto FVulkanMemoryAllocator::CreatePool(
-        u32 memoryTypeIndex, u64 sizeBytes, bool hostVisible) -> FPool {
+    auto FVulkanMemoryAllocator::CreatePool(u32 memoryTypeIndex, u64 sizeBytes, bool hostVisible)
+        -> FPool {
         FPool pool;
         pool.mMemoryTypeIndex = memoryTypeIndex;
         pool.mSize            = sizeBytes;
@@ -66,7 +66,7 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
             if (vkMapMemory(mDevice, pool.mMemory, 0, sizeBytes, 0, &pool.mMappedPtr)
                 != VK_SUCCESS) {
                 vkFreeMemory(mDevice, pool.mMemory, nullptr);
-                pool.mMemory = VK_NULL_HANDLE;
+                pool.mMemory    = VK_NULL_HANDLE;
                 pool.mMappedPtr = nullptr;
                 return pool;
             }
@@ -144,7 +144,7 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         }
 
         FScopedLock lock(mMutex);
-        auto* pool = static_cast<FPool*>(allocation.mPool);
+        auto*       pool = static_cast<FPool*>(allocation.mPool);
         if (pool != nullptr) {
             pool->mAllocator.Free(allocation.mSubAllocation);
         }

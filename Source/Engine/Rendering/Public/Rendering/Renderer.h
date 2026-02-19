@@ -15,8 +15,8 @@ namespace AltinaEngine::RenderCore::Render {
 
 namespace AltinaEngine::Rendering {
     struct AE_RENDERING_API FRenderViewContext {
-        const RenderCore::View::FViewData*   View = nullptr;
-        const RenderCore::Render::FDrawList* DrawList = nullptr;
+        const RenderCore::View::FViewData*   View         = nullptr;
+        const RenderCore::Render::FDrawList* DrawList     = nullptr;
         Rhi::FRhiTexture*                    OutputTarget = nullptr;
     };
 

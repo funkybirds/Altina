@@ -7,18 +7,17 @@
 
 namespace AltinaEngine::Rendering {
     struct FDrawListBindings {
-        Rhi::FRhiBindGroup* PerFrame           = nullptr;
-        u32                 PerFrameSetIndex   = 0U;
-        u32                 PerDrawSetIndex    = 1U;
+        Rhi::FRhiBindGroup* PerFrame            = nullptr;
+        u32                 PerFrameSetIndex    = 0U;
+        u32                 PerDrawSetIndex     = 1U;
         u32                 PerMaterialSetIndex = 2U;
     };
 
     using FDrawPipelineResolver =
         Rhi::FRhiPipeline* (*)(const RenderCore::Render::FDrawBatch& batch,
             const RenderCore::FMaterialPassDesc* passDesc, void* userData);
-    using FDrawBatchBinder =
-        void (*)(Rhi::FRhiCmdContext& ctx, const RenderCore::Render::FDrawBatch& batch,
-            void* userData);
+    using FDrawBatchBinder = void (*)(
+        Rhi::FRhiCmdContext& ctx, const RenderCore::Render::FDrawBatch& batch, void* userData);
 
     class AE_RENDERING_API FDrawListExecutor {
     public:

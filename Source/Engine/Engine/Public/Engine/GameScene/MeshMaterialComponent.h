@@ -22,7 +22,7 @@ namespace AltinaEngine::GameScene {
             return mMaterials;
         }
 
-        void               SetMaterials(TVector<Asset::FAssetHandle>&& materials) noexcept {
+        void SetMaterials(TVector<Asset::FAssetHandle>&& materials) noexcept {
             mMaterials = Move(materials);
         }
         void               ClearMaterials() { mMaterials.Clear(); }

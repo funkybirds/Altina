@@ -6,14 +6,14 @@
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     #include <vulkan/vulkan.h>
 #else
-    struct VkInstance_T;
-    struct VkPhysicalDevice_T;
-    struct VkDevice_T;
-    struct VkQueue_T;
-    using VkInstance = VkInstance_T*;
-    using VkPhysicalDevice = VkPhysicalDevice_T*;
-    using VkDevice = VkDevice_T*;
-    using VkQueue = VkQueue_T*;
+struct VkInstance_T;
+struct VkPhysicalDevice_T;
+struct VkDevice_T;
+struct VkQueue_T;
+using VkInstance       = VkInstance_T*;
+using VkPhysicalDevice = VkPhysicalDevice_T*;
+using VkDevice         = VkDevice_T*;
+using VkQueue          = VkQueue_T*;
 #endif
 
 namespace AltinaEngine::Rhi {
@@ -41,9 +41,9 @@ namespace AltinaEngine::Rhi {
         [[nodiscard]] auto ConsumePendingAcquireSemaphore() noexcept -> VkSemaphore;
         [[nodiscard]] auto ConsumePendingRenderCompleteSemaphore() noexcept -> VkSemaphore;
 
-        auto CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef override;
-        auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef override;
-        auto CreateShaderResourceView(const FRhiShaderResourceViewDesc& desc)
+        auto               CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef override;
+        auto               CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef override;
+        auto               CreateShaderResourceView(const FRhiShaderResourceViewDesc& desc)
             -> FRhiShaderResourceViewRef override;
         auto CreateUnorderedAccessView(const FRhiUnorderedAccessViewDesc& desc)
             -> FRhiUnorderedAccessViewRef override;

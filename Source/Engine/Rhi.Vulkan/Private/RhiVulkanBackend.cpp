@@ -33,7 +33,7 @@ namespace AltinaEngine::Rhi {
             return;
         }
         mRunning = true;
-        mThread = std::thread([this]() { ThreadMain(); });
+        mThread  = std::thread([this]() { ThreadMain(); });
     }
 
     void FRhiVulkanCommandSubmitter::Stop() {
@@ -52,8 +52,7 @@ namespace AltinaEngine::Rhi {
     void FRhiVulkanCommandSubmitter::Enqueue(FSubmitWork&& work) { mQueue.Push(Move(work)); }
 
     void FRhiVulkanCommandSubmitter::ThreadMain() {
-        Core::Jobs::RegisterNamedThread(Core::Jobs::ENamedThread::RHI,
-            "RhiCommandSubmitThread");
+        Core::Jobs::RegisterNamedThread(Core::Jobs::ENamedThread::RHI, "RhiCommandSubmitThread");
         while (true) {
             FSubmitWork work;
             if (!mQueue.WaitPop(work)) {
@@ -75,9 +74,8 @@ namespace AltinaEngine::Rhi {
                 present.swapchainCount     = 1;
                 present.pSwapchains        = &work.mSwapchain;
                 present.pImageIndices      = &work.mImageIndex;
-                present.waitSemaphoreCount =
-                    static_cast<u32>(work.mPresentWaitSemaphores.Size());
-                present.pWaitSemaphores = work.mPresentWaitSemaphores.Data();
+                present.waitSemaphoreCount = static_cast<u32>(work.mPresentWaitSemaphores.Size());
+                present.pWaitSemaphores    = work.mPresentWaitSemaphores.Data();
                 vkQueuePresentKHR(work.mQueue, &present);
                 continue;
             }
@@ -85,9 +83,8 @@ namespace AltinaEngine::Rhi {
             VkTimelineSemaphoreSubmitInfo timelineInfo{};
             timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
             if (!work.mWaitValues.IsEmpty()) {
-                timelineInfo.waitSemaphoreValueCount =
-                    static_cast<u32>(work.mWaitValues.Size());
-                timelineInfo.pWaitSemaphoreValues = work.mWaitValues.Data();
+                timelineInfo.waitSemaphoreValueCount = static_cast<u32>(work.mWaitValues.Size());
+                timelineInfo.pWaitSemaphoreValues    = work.mWaitValues.Data();
             }
             if (!work.mSignalValues.IsEmpty()) {
                 timelineInfo.signalSemaphoreValueCount =
@@ -98,9 +95,9 @@ namespace AltinaEngine::Rhi {
             VkSubmitInfo submit{};
             submit.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             submit.pNext                = (timelineInfo.waitSemaphoreValueCount > 0
-                            || timelineInfo.signalSemaphoreValueCount > 0)
-                ? &timelineInfo
-                : nullptr;
+                               || timelineInfo.signalSemaphoreValueCount > 0)
+                               ? &timelineInfo
+                               : nullptr;
             submit.commandBufferCount   = static_cast<u32>(work.mCommandBuffers.Size());
             submit.pCommandBuffers      = work.mCommandBuffers.Data();
             submit.waitSemaphoreCount   = static_cast<u32>(work.mWaitSemaphores.Size());
@@ -124,10 +121,9 @@ namespace AltinaEngine::Rhi {
     FRhiVulkanSemaphore::FRhiVulkanSemaphore(VkDevice device, bool timeline, u64 initialValue)
         : mDevice(device), mIsTimeline(timeline) {
         VkSemaphoreTypeCreateInfo typeInfo{};
-        typeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-        typeInfo.semaphoreType =
-            timeline ? VK_SEMAPHORE_TYPE_TIMELINE : VK_SEMAPHORE_TYPE_BINARY;
-        typeInfo.initialValue = initialValue;
+        typeInfo.sType         = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+        typeInfo.semaphoreType = timeline ? VK_SEMAPHORE_TYPE_TIMELINE : VK_SEMAPHORE_TYPE_BINARY;
+        typeInfo.initialValue  = initialValue;
 
         VkSemaphoreCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -172,7 +168,7 @@ namespace AltinaEngine::Rhi {
         if (info.mCommandLists && info.mCommandListCount > 0U) {
             work.mCommandBuffers.Reserve(info.mCommandListCount);
             for (u32 i = 0; i < info.mCommandListCount; ++i) {
-                auto* list = info.mCommandLists[i];
+                auto* list   = info.mCommandLists[i];
                 auto* vkList = static_cast<FRhiVulkanCommandList*>(list);
                 if (vkList && vkList->GetNativeCommandBuffer()) {
                     work.mCommandBuffers.PushBack(vkList->GetNativeCommandBuffer());
@@ -180,10 +176,10 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        VkSemaphore pendingAcquire = VK_NULL_HANDLE;
+        VkSemaphore pendingAcquire        = VK_NULL_HANDLE;
         VkSemaphore pendingRenderComplete = VK_NULL_HANDLE;
         if (mDevice) {
-            pendingAcquire = mDevice->ConsumePendingAcquireSemaphore();
+            pendingAcquire        = mDevice->ConsumePendingAcquireSemaphore();
             pendingRenderComplete = mDevice->ConsumePendingRenderCompleteSemaphore();
         }
 
@@ -275,10 +271,10 @@ namespace AltinaEngine::Rhi {
         }
 
         FSubmitWork work;
-        work.mType = FSubmitWork::EType::Present;
-        work.mQueue = mQueue;
-        work.mSwapchain = viewport->GetNativeSwapchain();
-        work.mImageIndex = viewport->GetCurrentImageIndex();
+        work.mType          = FSubmitWork::EType::Present;
+        work.mQueue         = mQueue;
+        work.mSwapchain     = viewport->GetNativeSwapchain();
+        work.mImageIndex    = viewport->GetCurrentImageIndex();
         VkSemaphore waitSem = viewport->GetRenderCompleteSemaphore();
         if (waitSem) {
             work.mPresentWaitSemaphores.PushBack(waitSem);

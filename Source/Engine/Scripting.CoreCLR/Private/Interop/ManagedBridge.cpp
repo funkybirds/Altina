@@ -23,8 +23,8 @@ namespace AltinaEngine::Scripting::CoreCLR::Interop {
         }
 
         const auto assemblyPath = Host::ToHostFxrString(request.mAssemblyPath.ToView());
-        const auto typeName = Host::ToHostFxrString(request.mTypeName.ToView());
-        const auto methodName = Host::ToHostFxrString(request.mMethodName.ToView());
+        const auto typeName     = Host::ToHostFxrString(request.mTypeName.ToView());
+        const auto methodName   = Host::ToHostFxrString(request.mMethodName.ToView());
         const auto delegateType = Host::ToHostFxrString(request.mDelegateTypeName.ToView());
 
         const Host::FHostFxrChar* delegateTypePtr = nullptr;
@@ -32,10 +32,9 @@ namespace AltinaEngine::Scripting::CoreCLR::Interop {
             delegateTypePtr = delegateType.c_str();
         }
 
-        void* entry = nullptr;
-        const i32 result = loader(
-            assemblyPath.c_str(), typeName.c_str(), methodName.c_str(), delegateTypePtr, nullptr,
-            &entry);
+        void*     entry  = nullptr;
+        const i32 result = loader(assemblyPath.c_str(), typeName.c_str(), methodName.c_str(),
+            delegateTypePtr, nullptr, &entry);
         if (result != 0 || entry == nullptr) {
             LogErrorCat(
                 kLogCategory, TEXT("load_assembly_and_get_function_pointer failed ({})."), result);
@@ -46,8 +45,8 @@ namespace AltinaEngine::Scripting::CoreCLR::Interop {
         return true;
     }
 
-    auto FManagedBridge::Invoke(const FScriptHandle& handle, const FScriptInvocation& invocation)
-        const -> bool {
+    auto FManagedBridge::Invoke(
+        const FScriptHandle& handle, const FScriptInvocation& invocation) const -> bool {
         if (!handle.IsValid()) {
             LogErrorCat(kLogCategory, TEXT("Script handle is invalid."));
             return false;

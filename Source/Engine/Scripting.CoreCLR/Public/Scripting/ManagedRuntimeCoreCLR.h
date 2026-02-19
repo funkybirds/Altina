@@ -18,14 +18,14 @@ namespace AltinaEngine::Scripting::CoreCLR {
         FManagedRuntime();
         ~FManagedRuntime();
 
-        FManagedRuntime(const FManagedRuntime&) = delete;
-        auto operator=(const FManagedRuntime&) -> FManagedRuntime& = delete;
-        FManagedRuntime(FManagedRuntime&&) = delete;
-        auto operator=(FManagedRuntime&&) -> FManagedRuntime& = delete;
+        FManagedRuntime(const FManagedRuntime&)                             = delete;
+        auto operator=(const FManagedRuntime&) -> FManagedRuntime&          = delete;
+        FManagedRuntime(FManagedRuntime&&)                                  = delete;
+        auto               operator=(FManagedRuntime&&) -> FManagedRuntime& = delete;
 
-        auto Initialize(const FScriptRuntimeConfig& runtimeConfig,
-            const FManagedRuntimeConfig& managedConfig, const FNativeApi& nativeApi) -> bool;
-        void Shutdown();
+        auto               Initialize(const FScriptRuntimeConfig& runtimeConfig,
+                          const FManagedRuntimeConfig& managedConfig, const FNativeApi& nativeApi) -> bool;
+        void               Shutdown();
 
         [[nodiscard]] auto IsInitialized() const noexcept -> bool { return mInitialized; }
         [[nodiscard]] auto GetManagedApi() const noexcept -> const FManagedApi*;
@@ -33,7 +33,7 @@ namespace AltinaEngine::Scripting::CoreCLR {
     private:
         struct FImpl;
         Core::Container::TOwner<FImpl> mImpl;
-        FManagedApi mManagedApi{};
-        bool mInitialized = false;
+        FManagedApi                    mManagedApi{};
+        bool                           mInitialized = false;
     };
 } // namespace AltinaEngine::Scripting::CoreCLR

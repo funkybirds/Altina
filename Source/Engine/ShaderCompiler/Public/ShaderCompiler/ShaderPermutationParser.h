@@ -45,12 +45,12 @@ namespace AltinaEngine::ShaderCompiler {
             Binary
         };
 
-        EKind                         mKind = EKind::Literal;
+        EKind                          mKind     = EKind::Literal;
         EShaderPermutationRuleOperator mOperator = EShaderPermutationRuleOperator::Add;
-        i32                           mLiteral   = 0;
-        FString                       mIdentifier;
-        i32                           mLeftIndex  = -1;
-        i32                           mRightIndex = -1;
+        i32                            mLiteral  = 0;
+        FString                        mIdentifier;
+        i32                            mLeftIndex  = -1;
+        i32                            mRightIndex = -1;
     };
 
     struct FShaderPermutationRuleSet {
@@ -59,42 +59,41 @@ namespace AltinaEngine::ShaderCompiler {
             i32     mExpressionIndex = -1;
         };
 
-        TVector<FLetRule>                 mLets;
-        TVector<i32>                      mRequires;
+        TVector<FLetRule>                         mLets;
+        TVector<i32>                              mRequires;
         TVector<FShaderPermutationRuleExpression> mExpressions;
     };
 
     struct FShaderPermutationParseResult {
-        bool                       mSucceeded = false;
-        FString                    mDiagnostics;
-        FShaderPermutationLayout   mPermutationLayout;
-        FShaderBuiltinLayout       mBuiltinLayout;
-        FShaderPermutationRuleSet  mRules;
-        bool                       mHasRasterState = false;
-        FShaderRasterState         mRasterState;
+        bool                      mSucceeded = false;
+        FString                   mDiagnostics;
+        FShaderPermutationLayout  mPermutationLayout;
+        FShaderBuiltinLayout      mBuiltinLayout;
+        FShaderPermutationRuleSet mRules;
+        bool                      mHasRasterState = false;
+        FShaderRasterState        mRasterState;
     };
 
-    AE_SHADER_COMPILER_API auto ParseShaderPermutationSource(FStringView source,
-        FShaderPermutationParseResult& out) -> bool;
+    AE_SHADER_COMPILER_API auto ParseShaderPermutationSource(
+        FStringView source, FShaderPermutationParseResult& out) -> bool;
 
     AE_SHADER_COMPILER_API auto BuildDefaultPermutationValues(
         const FShaderPermutationLayout& layout) -> FShaderPermutationValues;
 
-    AE_SHADER_COMPILER_API auto BuildDefaultBuiltinValues(
-        const FShaderBuiltinLayout& layout) -> FShaderBuiltinValues;
+    AE_SHADER_COMPILER_API auto BuildDefaultBuiltinValues(const FShaderBuiltinLayout& layout)
+        -> FShaderBuiltinValues;
 
-    AE_SHADER_COMPILER_API auto ExpandMultiPermutationValues(
-        const FShaderPermutationLayout& layout, TVector<FShaderPermutationValues>& outValues,
-        usize maxPermutations = 1024) -> bool;
+    AE_SHADER_COMPILER_API auto ExpandMultiPermutationValues(const FShaderPermutationLayout& layout,
+        TVector<FShaderPermutationValues>& outValues, usize maxPermutations = 1024) -> bool;
 
     AE_SHADER_COMPILER_API auto EvaluateShaderPermutationRules(
         const FShaderPermutationRuleSet& rules, const FShaderPermutationLayout& layout,
         const FShaderPermutationValues& values, const FShaderBuiltinLayout* builtinLayout,
         const FShaderBuiltinValues* builtinValues, FString* outDiagnostics = nullptr) -> bool;
 
-    AE_SHADER_COMPILER_API auto BuildPermutationDefines(
-        const FShaderPermutationLayout& layout, const FShaderPermutationValues& values,
-        FStringView prefix = TEXT("AE_PERM_")) -> TVector<FShaderMacro>;
+    AE_SHADER_COMPILER_API auto BuildPermutationDefines(const FShaderPermutationLayout& layout,
+        const FShaderPermutationValues& values, FStringView prefix = TEXT("AE_PERM_"))
+        -> TVector<FShaderMacro>;
 
     AE_SHADER_COMPILER_API auto BuildBuiltinDefines(const FShaderBuiltinLayout& layout,
         const FShaderBuiltinValues& values, FStringView prefix = TEXT("AE_BUILTIN_"))

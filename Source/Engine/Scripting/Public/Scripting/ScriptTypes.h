@@ -7,7 +7,7 @@ namespace AltinaEngine::Scripting {
     using AltinaEngine::u64;
 
     struct FScriptHandle {
-        void* mPointer = nullptr;
+        void*              mPointer = nullptr;
 
         [[nodiscard]] auto IsValid() const noexcept -> bool { return mPointer != nullptr; }
     };

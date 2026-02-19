@@ -116,9 +116,8 @@ namespace AltinaEngine::Asset {
                 return out;
             }
             std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-            MultiByteToWideChar(
-                CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()), wide.data(),
-                wideCount);
+            MultiByteToWideChar(CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()),
+                wide.data(), wideCount);
             out.Append(wide.c_str(), wide.size());
     #else
             out.Append(value.GetData(), value.Length());
@@ -228,15 +227,16 @@ namespace AltinaEngine::Asset {
                     ReadU32Field(descObject, "SampleRate", desc.Audio.SampleRate);
                     ReadFloatField(descObject, "Duration", desc.Audio.DurationSeconds);
                     break;
-                case EAssetType::Script: {
+                case EAssetType::Script:
+                {
                     FNativeString assemblyText;
-                    if (GetStringValue(FindObjectValueInsensitive(descObject, "AssemblyPath"),
-                            assemblyText)) {
+                    if (GetStringValue(
+                            FindObjectValueInsensitive(descObject, "AssemblyPath"), assemblyText)) {
                         desc.Script.AssemblyPath.Assign(assemblyText);
                     }
                     FNativeString typeText;
-                    if (GetStringValue(FindObjectValueInsensitive(descObject, "TypeName"),
-                            typeText)) {
+                    if (GetStringValue(
+                            FindObjectValueInsensitive(descObject, "TypeName"), typeText)) {
                         desc.Script.TypeName.Assign(typeText);
                     }
                     break;

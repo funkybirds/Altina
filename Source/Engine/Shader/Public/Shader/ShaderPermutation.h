@@ -35,8 +35,8 @@ namespace AltinaEngine::Shader {
 
     struct FShaderPermutationDimension {
         FString                     mName;
-        EShaderPermutationValueType mType   = EShaderPermutationValueType::Bool;
-        EShaderPermutationDomain    mDomain = EShaderPermutationDomain::Multi;
+        EShaderPermutationValueType mType         = EShaderPermutationValueType::Bool;
+        EShaderPermutationDomain    mDomain       = EShaderPermutationDomain::Multi;
         i32                         mDefaultValue = 0;
         i32                         mMinValue     = 0;
         i32                         mMaxValue     = 0;
@@ -53,7 +53,7 @@ namespace AltinaEngine::Shader {
 
     struct FShaderBuiltinDefinition {
         FString                     mName;
-        EShaderPermutationValueType mType = EShaderPermutationValueType::Bool;
+        EShaderPermutationValueType mType         = EShaderPermutationValueType::Bool;
         i32                         mDefaultValue = 0;
     };
 
@@ -82,14 +82,14 @@ namespace AltinaEngine::Shader {
     };
 
     struct FShaderRasterState {
-        EShaderRasterFillMode  mFillMode            = EShaderRasterFillMode::Solid;
-        EShaderRasterCullMode  mCullMode            = EShaderRasterCullMode::Back;
-        EShaderRasterFrontFace mFrontFace           = EShaderRasterFrontFace::CCW;
-        i32                    mDepthBias           = 0;
-        f32                    mDepthBiasClamp      = 0.0f;
+        EShaderRasterFillMode  mFillMode             = EShaderRasterFillMode::Solid;
+        EShaderRasterCullMode  mCullMode             = EShaderRasterCullMode::Back;
+        EShaderRasterFrontFace mFrontFace            = EShaderRasterFrontFace::CCW;
+        i32                    mDepthBias            = 0;
+        f32                    mDepthBiasClamp       = 0.0f;
         f32                    mSlopeScaledDepthBias = 0.0f;
-        bool                   mDepthClip           = true;
-        bool                   mConservativeRaster  = false;
+        bool                   mDepthClip            = true;
+        bool                   mConservativeRaster   = false;
     };
 
     [[nodiscard]] AE_SHADER_API auto BuildShaderPermutationId(FStringView shaderPath,

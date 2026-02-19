@@ -17,8 +17,8 @@ namespace AltinaEngine::Rendering {
             return &lod.Sections[sectionIndex];
         }
 
-        void BindVertexBuffers(Rhi::FRhiCmdContext& ctx,
-            const RenderCore::Geometry::FStaticMeshLodData& lod) {
+        void BindVertexBuffers(
+            Rhi::FRhiCmdContext& ctx, const RenderCore::Geometry::FStaticMeshLodData& lod) {
             const auto posView = lod.PositionBuffer.GetView();
             if (posView.mBuffer != nullptr) {
                 ctx.RHISetVertexBuffer(0U, posView);
@@ -43,8 +43,8 @@ namespace AltinaEngine::Rendering {
 
     void FDrawListExecutor::ExecuteBasePass(Rhi::FRhiCmdContext& ctx,
         const RenderCore::Render::FDrawList& drawList, const FDrawListBindings& bindings,
-        FDrawPipelineResolver pipelineResolver, void* pipelineUserData, FDrawBatchBinder batchBinder,
-        void* batchUserData) {
+        FDrawPipelineResolver pipelineResolver, void* pipelineUserData,
+        FDrawBatchBinder batchBinder, void* batchUserData) {
         if (drawList.Batches.IsEmpty()) {
             return;
         }
@@ -79,8 +79,7 @@ namespace AltinaEngine::Rendering {
             if (batch.Material != nullptr) {
                 auto group = batch.Material->GetBindGroup(batch.Pass);
                 if (group) {
-                    ctx.RHISetBindGroup(
-                        bindings.PerMaterialSetIndex, group.Get(), nullptr, 0U);
+                    ctx.RHISetBindGroup(bindings.PerMaterialSetIndex, group.Get(), nullptr, 0U);
                 }
             }
 

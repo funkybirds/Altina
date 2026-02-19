@@ -19,9 +19,7 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto GetStaticMesh() const noexcept -> const Geometry::FStaticMeshData& {
             return mStaticMesh;
         }
-        void               SetStaticMesh(Geometry::FStaticMeshData&& mesh) noexcept {
-            mStaticMesh = Move(mesh);
-        }
+        void SetStaticMesh(Geometry::FStaticMeshData&& mesh) noexcept { mStaticMesh = Move(mesh); }
 
     private:
         Geometry::FStaticMeshData mStaticMesh{};

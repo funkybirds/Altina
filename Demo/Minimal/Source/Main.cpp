@@ -60,7 +60,7 @@ namespace {
             return false;
         }
 
-        const auto assetRoot = registryPath.parent_path().parent_path();
+        const auto      assetRoot = registryPath.parent_path().parent_path();
         std::error_code ec;
         std::filesystem::current_path(assetRoot, ec);
         if (ec) {
@@ -100,8 +100,8 @@ namespace {
         return Core::Math::FVector3f(0.0f);
     }
 
-    auto BuildStaticMeshFromAsset(const Asset::FMeshAsset& asset,
-        RenderCore::Geometry::FStaticMeshData& outMesh) -> bool {
+    auto BuildStaticMeshFromAsset(
+        const Asset::FMeshAsset& asset, RenderCore::Geometry::FStaticMeshData& outMesh) -> bool {
         const auto& desc       = asset.GetDesc();
         const auto& attributes = asset.GetAttributes();
         const auto& subMeshes  = asset.GetSubMeshes();
@@ -137,8 +137,8 @@ namespace {
             return false;
         }
 
-        const u64 vertexBytes = static_cast<u64>(desc.VertexStride)
-            * static_cast<u64>(desc.VertexCount);
+        const u64 vertexBytes =
+            static_cast<u64>(desc.VertexStride) * static_cast<u64>(desc.VertexCount);
         if (vertices.Size() < vertexBytes) {
             return false;
         }
@@ -174,15 +174,14 @@ namespace {
             return false;
         }
 
-        const u64 indexBytes =
-            static_cast<u64>(desc.IndexCount) * static_cast<u64>(indexStride);
+        const u64 indexBytes = static_cast<u64>(desc.IndexCount) * static_cast<u64>(indexStride);
         if (indices.Size() < indexBytes) {
             return false;
         }
 
         RenderCore::Geometry::FStaticMeshData mesh;
         mesh.Lods.Reserve(1);
-        auto& lod = mesh.Lods.EmplaceBack();
+        auto& lod             = mesh.Lods.EmplaceBack();
         lod.PrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
         lod.SetPositions(positions.Data(), desc.VertexCount);
         lod.SetIndices(indices.Data(), desc.IndexCount, indexType);
@@ -206,10 +205,10 @@ namespace {
             lod.Sections.PushBack(section);
         }
 
-        lod.Bounds.Min = Core::Math::FVector3f(
-            desc.BoundsMin[0], desc.BoundsMin[1], desc.BoundsMin[2]);
-        lod.Bounds.Max = Core::Math::FVector3f(
-            desc.BoundsMax[0], desc.BoundsMax[1], desc.BoundsMax[2]);
+        lod.Bounds.Min =
+            Core::Math::FVector3f(desc.BoundsMin[0], desc.BoundsMin[1], desc.BoundsMin[2]);
+        lod.Bounds.Max =
+            Core::Math::FVector3f(desc.BoundsMax[0], desc.BoundsMax[1], desc.BoundsMax[2]);
 
         mesh.Bounds = lod.Bounds;
 
@@ -242,15 +241,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Asset::FAssetManager assetManager;
-    Asset::FMeshLoader   meshLoader;
+    Asset::FAssetManager   assetManager;
+    Asset::FMeshLoader     meshLoader;
     Asset::FMaterialLoader materialLoader;
     assetManager.SetRegistry(&engineLoop.GetAssetRegistry());
     assetManager.RegisterLoader(&meshLoader);
     assetManager.RegisterLoader(&materialLoader);
 
-    const auto meshHandle =
-        engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/triangle"));
+    const auto meshHandle = engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/triangle"));
     const auto materialHandle =
         engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/materials/purpledeferred"));
     if (!meshHandle.IsValid() || !materialHandle.IsValid()) {
@@ -259,8 +257,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto meshAsset = assetManager.Load(meshHandle);
-    auto* mesh = meshAsset ? static_cast<Asset::FMeshAsset*>(meshAsset.Get()) : nullptr;
+    auto  meshAsset = assetManager.Load(meshHandle);
+    auto* mesh      = meshAsset ? static_cast<Asset::FMeshAsset*>(meshAsset.Get()) : nullptr;
     if (mesh == nullptr) {
         LogError(TEXT("Failed to load mesh asset."));
         engineLoop.Exit();
@@ -287,8 +285,8 @@ int main(int argc, char** argv) {
         lod.UV1Buffer.WaitForInit();
     }
 
-    auto& worldManager = engineLoop.GetWorldManager();
-    const auto worldHandle = worldManager.CreateWorld();
+    auto&      worldManager = engineLoop.GetWorldManager();
+    const auto worldHandle  = worldManager.CreateWorld();
     worldManager.SetActiveWorld(worldHandle);
     auto* world = worldManager.GetWorld(worldHandle);
     if (world == nullptr) {
@@ -305,8 +303,8 @@ int main(int argc, char** argv) {
         camera.SetNearPlane(0.1f);
         camera.SetFarPlane(1000.0f);
 
-        auto cameraView = world->Object(cameraObject);
-        auto transform  = cameraView.GetWorldTransform();
+        auto cameraView       = world->Object(cameraObject);
+        auto transform        = cameraView.GetWorldTransform();
         transform.Translation = Core::Math::FVector3f(0.0f, 0.0f, -2.0f);
         cameraView.SetWorldTransform(transform);
     }

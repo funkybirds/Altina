@@ -8,14 +8,14 @@
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     #include <vulkan/vulkan.h>
 #else
-    struct VkPipeline_T;
-    struct VkPipelineLayout_T;
-    struct VkDescriptorSetLayout_T;
-    struct VkDescriptorSet_T;
-    using VkPipeline = VkPipeline_T*;
-    using VkPipelineLayout = VkPipelineLayout_T*;
-    using VkDescriptorSetLayout = VkDescriptorSetLayout_T*;
-    using VkDescriptorSet = VkDescriptorSet_T*;
+struct VkPipeline_T;
+struct VkPipelineLayout_T;
+struct VkDescriptorSetLayout_T;
+struct VkDescriptorSet_T;
+using VkPipeline            = VkPipeline_T*;
+using VkPipelineLayout      = VkPipelineLayout_T*;
+using VkDescriptorSetLayout = VkDescriptorSetLayout_T*;
+using VkDescriptorSet       = VkDescriptorSet_T*;
 #endif
 
 namespace AltinaEngine::Rhi {
@@ -69,17 +69,17 @@ namespace AltinaEngine::Rhi {
 
     private:
         [[nodiscard]] auto GetOrCreatePipeline(u64 attachmentHash, VkRenderPass renderPass,
-            const VkPipelineRenderingCreateInfo* renderingInfo,
-            VkPrimitiveTopology topology) -> VkPipeline;
+            const VkPipelineRenderingCreateInfo* renderingInfo, VkPrimitiveTopology topology)
+            -> VkPipeline;
 
         struct FState;
-        FState* mState = nullptr;
+        FState*               mState = nullptr;
         FRhiPipelineLayoutRef mPipelineLayout;
-        FRhiShaderRef mVertexShader;
-        FRhiShaderRef mPixelShader;
-        FRhiShaderRef mGeometryShader;
-        FRhiShaderRef mHullShader;
-        FRhiShaderRef mDomainShader;
+        FRhiShaderRef         mVertexShader;
+        FRhiShaderRef         mPixelShader;
+        FRhiShaderRef         mGeometryShader;
+        FRhiShaderRef         mHullShader;
+        FRhiShaderRef         mDomainShader;
 
         friend class FRhiVulkanCommandContext;
     };
@@ -94,9 +94,9 @@ namespace AltinaEngine::Rhi {
 
     private:
         struct FState;
-        FState* mState = nullptr;
+        FState*               mState = nullptr;
         FRhiPipelineLayoutRef mPipelineLayout;
-        FRhiShaderRef mComputeShader;
+        FRhiShaderRef         mComputeShader;
     };
 
 } // namespace AltinaEngine::Rhi

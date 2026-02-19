@@ -46,8 +46,7 @@ namespace AltinaEngine::RenderCore {
                 || !layout.SamplerBindings.IsEmpty();
         }
 
-        auto ToRhiFillMode(Shader::EShaderRasterFillMode mode) noexcept
-            -> Rhi::ERhiRasterFillMode {
+        auto ToRhiFillMode(Shader::EShaderRasterFillMode mode) noexcept -> Rhi::ERhiRasterFillMode {
             switch (mode) {
                 case Shader::EShaderRasterFillMode::Wireframe:
                     return Rhi::ERhiRasterFillMode::Wireframe;
@@ -86,7 +85,7 @@ namespace AltinaEngine::RenderCore {
             return 0U;
         }
 
-        u32 hash = kFnvOffset32;
+        u32         hash   = kFnvOffset32;
         const auto* data   = name.Data();
         const auto  length = name.Length();
         for (usize i = 0U; i < length; ++i) {
@@ -127,8 +126,8 @@ namespace AltinaEngine::RenderCore {
         }
     }
 
-    void FMaterialLayout::AddTextureBinding(FMaterialParamId nameHash, u32 textureBinding,
-        u32 samplerBinding) {
+    void FMaterialLayout::AddTextureBinding(
+        FMaterialParamId nameHash, u32 textureBinding, u32 samplerBinding) {
         TextureNameHashes.PushBack(nameHash);
         TextureBindings.PushBack(textureBinding);
         SamplerBindings.PushBack(samplerBinding);
@@ -157,8 +156,8 @@ namespace AltinaEngine::RenderCore {
             FEntry entry{};
             entry.mNameHash       = TextureNameHashes[i];
             entry.mTextureBinding = TextureBindings[i];
-            entry.mSamplerBinding = (i < samplerCount) ? SamplerBindings[i]
-                                                       : kMaterialInvalidBinding;
+            entry.mSamplerBinding =
+                (i < samplerCount) ? SamplerBindings[i] : kMaterialInvalidBinding;
             entries.PushBack(entry);
         }
 
@@ -189,14 +188,14 @@ namespace AltinaEngine::RenderCore {
     }
 
     void FMaterialPassState::ApplyRasterState(const Shader::FShaderRasterState& state) noexcept {
-        Raster.mFillMode            = ToRhiFillMode(state.mFillMode);
-        Raster.mCullMode            = ToRhiCullMode(state.mCullMode);
-        Raster.mFrontFace           = ToRhiFrontFace(state.mFrontFace);
-        Raster.mDepthBias           = state.mDepthBias;
-        Raster.mDepthBiasClamp      = state.mDepthBiasClamp;
+        Raster.mFillMode             = ToRhiFillMode(state.mFillMode);
+        Raster.mCullMode             = ToRhiCullMode(state.mCullMode);
+        Raster.mFrontFace            = ToRhiFrontFace(state.mFrontFace);
+        Raster.mDepthBias            = state.mDepthBias;
+        Raster.mDepthBiasClamp       = state.mDepthBiasClamp;
         Raster.mSlopeScaledDepthBias = state.mSlopeScaledDepthBias;
-        Raster.mDepthClip           = state.mDepthClip;
-        Raster.mConservativeRaster  = state.mConservativeRaster;
+        Raster.mDepthClip            = state.mDepthClip;
+        Raster.mConservativeRaster   = state.mConservativeRaster;
     }
 
     auto FMaterialShaderMap::Find(EMaterialPass pass) const noexcept
@@ -449,8 +448,8 @@ namespace AltinaEngine::RenderCore {
         return nullptr;
     }
 
-    void FMaterial::UpdateCBuffer(const FMaterialLayout& layout, bool& outRecreated,
-        bool& outUploaded) {
+    void FMaterial::UpdateCBuffer(
+        const FMaterialLayout& layout, bool& outRecreated, bool& outUploaded) {
         outRecreated = false;
         outUploaded  = false;
 
@@ -508,8 +507,8 @@ namespace AltinaEngine::RenderCore {
             applyParam(vector.NameHash, vector.Value.mComponents, sizeof(vector.Value));
         }
 
-        auto lock = mCBuffer->Lock(0ULL, static_cast<u64>(mCBufferData.Size()),
-            Rhi::ERhiBufferLockMode::WriteDiscard);
+        auto lock = mCBuffer->Lock(
+            0ULL, static_cast<u64>(mCBufferData.Size()), Rhi::ERhiBufferLockMode::WriteDiscard);
         if (!lock.IsValid()) {
             return;
         }
@@ -518,8 +517,8 @@ namespace AltinaEngine::RenderCore {
         outUploaded = true;
     }
 
-    void FMaterial::UpdateBindGroups(const FMaterialTemplate& templ,
-        const FMaterialLayout& defaultLayout) {
+    void FMaterial::UpdateBindGroups(
+        const FMaterialTemplate& templ, const FMaterialLayout& defaultLayout) {
         auto* device = Rhi::RHIGetDevice();
         if (!device) {
             return;
@@ -529,19 +528,17 @@ namespace AltinaEngine::RenderCore {
         mBindGroupLayouts.clear();
 
         for (const auto& entry : templ.GetPasses()) {
-            const auto  pass        = entry.first;
-            const auto& passDesc    = entry.second;
-            const auto& passLayout  = passDesc.Layout;
-            const auto& layout      = LayoutHasBindings(passLayout) ? passLayout : defaultLayout;
+            const auto  pass       = entry.first;
+            const auto& passDesc   = entry.second;
+            const auto& passLayout = passDesc.Layout;
+            const auto& layout     = LayoutHasBindings(passLayout) ? passLayout : defaultLayout;
 
             if (!LayoutHasBindings(layout)) {
                 continue;
             }
 
             Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-            layoutDesc.mSetIndex = layout.PropertyBag.IsValid()
-                ? layout.PropertyBag.GetSet()
-                : 0U;
+            layoutDesc.mSetIndex = layout.PropertyBag.IsValid() ? layout.PropertyBag.GetSet() : 0U;
 
             TVector<Rhi::FRhiBindGroupLayoutEntry> layoutEntries;
 
@@ -580,8 +577,8 @@ namespace AltinaEngine::RenderCore {
                 layoutEntries.PushBack(entryDesc);
             }
 
-            std::sort(layoutEntries.begin(), layoutEntries.end(),
-                [](const auto& lhs, const auto& rhs) {
+            std::sort(
+                layoutEntries.begin(), layoutEntries.end(), [](const auto& lhs, const auto& rhs) {
                     if (lhs.mBinding != rhs.mBinding) {
                         return lhs.mBinding < rhs.mBinding;
                     }
@@ -611,9 +608,8 @@ namespace AltinaEngine::RenderCore {
 
             const usize texCount = layout.TextureBindings.Size();
             for (usize i = 0U; i < texCount; ++i) {
-                const auto nameHash = (i < layout.TextureNameHashes.Size())
-                    ? layout.TextureNameHashes[i]
-                    : 0U;
+                const auto nameHash =
+                    (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i] : 0U;
                 const auto* param = (nameHash != 0U) ? FindTextureParam(nameHash) : nullptr;
 
                 Rhi::FRhiBindGroupEntry texEntry{};

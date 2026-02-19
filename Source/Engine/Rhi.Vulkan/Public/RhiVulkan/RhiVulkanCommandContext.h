@@ -8,8 +8,8 @@
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     #include <vulkan/vulkan.h>
 #else
-    struct VkCommandBuffer_T;
-    using VkCommandBuffer = VkCommandBuffer_T*;
+struct VkCommandBuffer_T;
+using VkCommandBuffer = VkCommandBuffer_T*;
 #endif
 
 namespace AltinaEngine::Rhi {
@@ -53,7 +53,7 @@ namespace AltinaEngine::Rhi {
 
     private:
         struct FState;
-        FState* mState = nullptr;
+        FState*            mState = nullptr;
         FRhiCommandPoolRef mPool;
         FRhiCommandListRef mCommandList;
     };

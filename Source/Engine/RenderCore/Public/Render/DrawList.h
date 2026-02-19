@@ -20,18 +20,18 @@ namespace AltinaEngine::RenderCore::Render {
     };
 
     struct FDrawKey {
-        u64 PassKey     = 0ULL; // EMaterialPass
-        u64 PipelineKey = 0ULL; // ShaderKey + Raster/Depth/Blend
-        u64 MaterialKey = 0ULL; // Material instance / BindGroup
-        u64 GeometryKey = 0ULL; // Vertex/Index buffers + topology
-        u64 SectionKey  = 0ULL; // FirstIndex/IndexCount/BaseVertex
+        u64                   PassKey     = 0ULL; // EMaterialPass
+        u64                   PipelineKey = 0ULL; // ShaderKey + Raster/Depth/Blend
+        u64                   MaterialKey = 0ULL; // Material instance / BindGroup
+        u64                   GeometryKey = 0ULL; // Vertex/Index buffers + topology
+        u64                   SectionKey  = 0ULL; // FirstIndex/IndexCount/BaseVertex
 
         friend constexpr auto operator==(const FDrawKey& lhs, const FDrawKey& rhs) noexcept
             -> bool = default;
     };
 
-    [[nodiscard]] inline constexpr auto operator<(const FDrawKey& lhs,
-        const FDrawKey& rhs) noexcept -> bool {
+    [[nodiscard]] inline constexpr auto operator<(const FDrawKey& lhs, const FDrawKey& rhs) noexcept
+        -> bool {
         if (lhs.PassKey != rhs.PassKey) {
             return lhs.PassKey < rhs.PassKey;
         }
@@ -60,20 +60,20 @@ namespace AltinaEngine::RenderCore::Render {
     };
 
     struct FDrawItem {
-        EDrawMeshType          MeshType = EDrawMeshType::StaticMesh;
-        EMaterialPass          Pass     = EMaterialPass::BasePass;
-        const FMaterial*       Material = nullptr;
-        FDrawKey               Key;
+        EDrawMeshType       MeshType = EDrawMeshType::StaticMesh;
+        EMaterialPass       Pass     = EMaterialPass::BasePass;
+        const FMaterial*    Material = nullptr;
+        FDrawKey            Key;
 
-        FStaticMeshDrawArgs    Static;
-        FDrawInstanceData      Instance; // 单实例（当前）
+        FStaticMeshDrawArgs Static;
+        FDrawInstanceData   Instance; // 单实例（当前）
     };
 
     struct FDrawBatch {
-        FDrawKey               BatchKey;
-        EMaterialPass          Pass     = EMaterialPass::BasePass;
-        const FMaterial*       Material = nullptr;
-        FStaticMeshDrawArgs    Static;
+        FDrawKey                   BatchKey;
+        EMaterialPass              Pass     = EMaterialPass::BasePass;
+        const FMaterial*           Material = nullptr;
+        FStaticMeshDrawArgs        Static;
         TVector<FDrawInstanceData> Instances; // Same Mesh+Material+Section can be instanced.
     };
 

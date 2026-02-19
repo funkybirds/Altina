@@ -217,15 +217,15 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
                 mapping.mLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
                 break;
             case ERhiResourceState::ShaderResource:
-                mapping.mStages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT
-                    | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                mapping.mStages =
+                    VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
                 mapping.mAccess = VK_ACCESS_2_SHADER_READ_BIT;
                 mapping.mLayout = isDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
                                           : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 break;
             case ERhiResourceState::UnorderedAccess:
-                mapping.mStages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT
-                    | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                mapping.mStages =
+                    VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
                 mapping.mAccess = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT;
                 mapping.mLayout = VK_IMAGE_LAYOUT_GENERAL;
                 break;

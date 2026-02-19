@@ -101,10 +101,9 @@ namespace AltinaEngine::ShaderCompiler {
             if (trimmed.IsEmpty()) {
                 return false;
             }
-            std::basic_string<TChar> temp(trimmed.Data(),
-                trimmed.Data() + trimmed.Length());
-            TChar* endPtr = nullptr;
-            const long parsed = ParseIntLiteral(temp.c_str(), &endPtr);
+            std::basic_string<TChar> temp(trimmed.Data(), trimmed.Data() + trimmed.Length());
+            TChar*                   endPtr = nullptr;
+            const long               parsed = ParseIntLiteral(temp.c_str(), &endPtr);
             if (endPtr == temp.c_str() || *endPtr != static_cast<TChar>(0)) {
                 return false;
             }
@@ -117,10 +116,9 @@ namespace AltinaEngine::ShaderCompiler {
             if (trimmed.IsEmpty()) {
                 return false;
             }
-            std::basic_string<TChar> temp(trimmed.Data(),
-                trimmed.Data() + trimmed.Length());
-            TChar* endPtr = nullptr;
-            const double parsed = ParseFloatLiteral(temp.c_str(), &endPtr);
+            std::basic_string<TChar> temp(trimmed.Data(), trimmed.Data() + trimmed.Length());
+            TChar*                   endPtr = nullptr;
+            const double             parsed = ParseFloatLiteral(temp.c_str(), &endPtr);
             if (endPtr == temp.c_str() || *endPtr != static_cast<TChar>(0)) {
                 return false;
             }
@@ -567,9 +565,9 @@ namespace AltinaEngine::ShaderCompiler {
             return true;
         }
 
-        auto ParseRasterStateBlock(const FString& normalized, FShaderRasterState& state,
-            FString& diagnostics) -> bool {
-            state = {};
+        auto ParseRasterStateBlock(
+            const FString& normalized, FShaderRasterState& state, FString& diagnostics) -> bool {
+            state              = {};
             usize       pos    = 0U;
             const auto  view   = normalized.ToView();
             const usize length = view.Length();
@@ -586,12 +584,12 @@ namespace AltinaEngine::ShaderCompiler {
                         AppendDiagnostic(diagnostics, TEXT("Raster state line missing '='."));
                         return false;
                     }
-                    const auto key   = TrimView(line.Substr(0, eqPos));
-                    auto       value = TrimLineTerminator(
-                        line.Substr(eqPos + 1U, line.Length() - eqPos - 1U));
+                    const auto key = TrimView(line.Substr(0, eqPos));
+                    auto       value =
+                        TrimLineTerminator(line.Substr(eqPos + 1U, line.Length() - eqPos - 1U));
                     if (key.IsEmpty() || value.IsEmpty()) {
-                        AppendDiagnostic(diagnostics,
-                            TEXT("Raster state line requires key and value."));
+                        AppendDiagnostic(
+                            diagnostics, TEXT("Raster state line requires key and value."));
                         return false;
                     }
 
@@ -644,8 +642,7 @@ namespace AltinaEngine::ShaderCompiler {
                         || key == FStringView(TEXT("slope_depth_bias"))) {
                         f32 slope = 0.0f;
                         if (!ParseFloatValue(value, slope)) {
-                            AppendDiagnostic(diagnostics,
-                                TEXT("Invalid slope scaled depth bias."));
+                            AppendDiagnostic(diagnostics, TEXT("Invalid slope scaled depth bias."));
                             return false;
                         }
                         state.mSlopeScaledDepthBias = slope;
@@ -660,8 +657,8 @@ namespace AltinaEngine::ShaderCompiler {
                         || key == FStringView(TEXT("conservative_raster"))) {
                         bool enabled = false;
                         if (!ParseBoolValue(value, enabled)) {
-                            AppendDiagnostic(diagnostics,
-                                TEXT("Invalid conservative raster value."));
+                            AppendDiagnostic(
+                                diagnostics, TEXT("Invalid conservative raster value."));
                             return false;
                         }
                         state.mConservativeRaster = enabled;
@@ -1412,11 +1409,10 @@ namespace AltinaEngine::ShaderCompiler {
             return false;
         };
 
-        const bool hasPerm     = ExtractBlock(FStringView(TEXT("perm")), permBlock);
-        const bool hasBuiltins = ExtractBlock(FStringView(TEXT("builtins")), builtinBlock);
-        const bool hasRules    = ExtractBlock(FStringView(TEXT("rules")), rulesBlock);
-        const bool hasRasterState =
-            ExtractBlock(FStringView(TEXT("raster_state")), rasterBlock);
+        const bool hasPerm        = ExtractBlock(FStringView(TEXT("perm")), permBlock);
+        const bool hasBuiltins    = ExtractBlock(FStringView(TEXT("builtins")), builtinBlock);
+        const bool hasRules       = ExtractBlock(FStringView(TEXT("rules")), rulesBlock);
+        const bool hasRasterState = ExtractBlock(FStringView(TEXT("raster_state")), rasterBlock);
 
         if (hasPerm) {
             const auto normalized = NormalizeAltinaBlock(permBlock.ToView());

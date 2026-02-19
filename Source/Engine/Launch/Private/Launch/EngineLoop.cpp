@@ -30,38 +30,38 @@
 #include <vector>
 
 #if AE_PLATFORM_WIN
-#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
-    #ifdef TEXT
-        #undef TEXT
+    #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+        #ifdef TEXT
+            #undef TEXT
+        #endif
+        #ifndef WIN32_LEAN_AND_MEAN
+            #define WIN32_LEAN_AND_MEAN
+        #endif
+        #ifndef NOMINMAX
+            #define NOMINMAX
+        #endif
+        #include <windows.h>
+        #ifdef TEXT
+            #undef TEXT
+        #endif
+        #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+            #define TEXT(str) L##str
+        #else
+            #define TEXT(str) str
+        #endif
     #endif
-    #ifndef WIN32_LEAN_AND_MEAN
-        #define WIN32_LEAN_AND_MEAN
-    #endif
-    #ifndef NOMINMAX
-        #define NOMINMAX
-    #endif
-    #include <windows.h>
-    #ifdef TEXT
-        #undef TEXT
-    #endif
-    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-        #define TEXT(str) L##str
-    #else
-        #define TEXT(str) str
-    #endif
-#endif
     #include "Application/Windows/WindowsApplication.h"
     #include "RhiD3D11/RhiD3D11Context.h"
 #elif AE_PLATFORM_MACOS
-#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
-    #include <mach-o/dyld.h>
-    #include <unistd.h>
-#endif
+    #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+        #include <mach-o/dyld.h>
+        #include <unistd.h>
+    #endif
 #else
     #include "RhiMock/RhiMockContext.h"
-#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
-    #include <unistd.h>
-#endif
+    #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+        #include <unistd.h>
+    #endif
 #endif
 
 using AltinaEngine::Move;
@@ -101,7 +101,7 @@ namespace AltinaEngine::Launch {
 
         void ExecuteFrameGraph(Rhi::FRhiDevice& device, RenderCore::FFrameGraph& graph) {
             Rhi::FRhiCommandContextDesc ctxDesc{};
-            ctxDesc.mQueueType = Rhi::ERhiQueueType::Graphics;
+            ctxDesc.mQueueType  = Rhi::ERhiQueueType::Graphics;
             auto commandContext = device.CreateCommandContext(ctxDesc);
             if (!commandContext) {
                 return;
@@ -135,19 +135,18 @@ namespace AltinaEngine::Launch {
         }
 
         void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
-            const Engine::FRenderScene& scene,
+            const Engine::FRenderScene&                              scene,
             const Container::TVector<RenderCore::Render::FDrawList>& drawLists,
-            Rendering::ERendererType rendererType) {
+            Rendering::ERendererType                                 rendererType) {
             if (scene.Views.IsEmpty()) {
                 return;
             }
 
             Rendering::FBasicDeferredRenderer deferredRenderer;
             Rendering::FBasicForwardRenderer  forwardRenderer;
-            Rendering::IRenderer* renderer =
-                (rendererType == Rendering::ERendererType::Deferred)
-                    ? static_cast<Rendering::IRenderer*>(&deferredRenderer)
-                    : static_cast<Rendering::IRenderer*>(&forwardRenderer);
+            Rendering::IRenderer* renderer = (rendererType == Rendering::ERendererType::Deferred)
+                ? static_cast<Rendering::IRenderer*>(&deferredRenderer)
+                : static_cast<Rendering::IRenderer*>(&forwardRenderer);
 
             renderer->PrepareForRendering(device);
 
@@ -179,9 +178,9 @@ namespace AltinaEngine::Launch {
         }
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
-        constexpr auto kScriptingCategory = TEXT("Scripting.CoreCLR");
+        constexpr auto kScriptingCategory    = TEXT("Scripting.CoreCLR");
         constexpr auto kManagedRuntimeConfig = TEXT("AltinaEngine.Managed.runtimeconfig.json");
-        constexpr auto kManagedAssembly = TEXT("AltinaEngine.Managed.dll");
+        constexpr auto kManagedAssembly      = TEXT("AltinaEngine.Managed.dll");
         constexpr auto kManagedType =
             TEXT("AltinaEngine.Managed.ManagedBootstrap, AltinaEngine.Managed");
         constexpr auto kManagedStartupMethod = TEXT("Startup");
@@ -194,11 +193,12 @@ namespace AltinaEngine::Launch {
         };
 
         auto GetExecutableDir() -> std::filesystem::path {
-#if AE_PLATFORM_WIN
+    #if AE_PLATFORM_WIN
             std::wstring buffer(260, L'\0');
             DWORD        length = 0;
             while (true) {
-                length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+                length =
+                    GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
                 if (length == 0) {
                     return {};
                 }
@@ -209,7 +209,7 @@ namespace AltinaEngine::Launch {
                 buffer.resize(buffer.size() * 2);
             }
             return std::filesystem::path(buffer).parent_path();
-#elif AE_PLATFORM_MACOS
+    #elif AE_PLATFORM_MACOS
             uint32_t size = 0;
             if (_NSGetExecutablePath(nullptr, &size) != -1 || size == 0) {
                 return {};
@@ -219,7 +219,7 @@ namespace AltinaEngine::Launch {
                 return {};
             }
             return std::filesystem::path(buffer.data()).parent_path();
-#else
+    #else
             std::vector<char> buffer(1024, '\0');
             while (true) {
                 const ssize_t length = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
@@ -232,17 +232,17 @@ namespace AltinaEngine::Launch {
                 }
                 buffer.resize(buffer.size() * 2);
             }
-#endif
+    #endif
         }
 
         auto ToFString(const std::filesystem::path& path) -> Container::FString {
-#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
             const std::wstring wide = path.wstring();
             return Container::FString(wide.c_str(), static_cast<usize>(wide.size()));
-#else
+    #else
             const std::string narrow = path.string();
             return Container::FString(narrow.c_str(), static_cast<usize>(narrow.size()));
-#endif
+    #endif
         }
 
         auto ResolveManagedPath(const std::filesystem::path& exeDir, const TChar* fileName)
@@ -261,7 +261,7 @@ namespace AltinaEngine::Launch {
                 }
                 const auto candidate = root / filePart;
                 if (std::filesystem::exists(candidate, ec)) {
-                    result.mPath = candidate;
+                    result.mPath   = candidate;
                     result.mExists = true;
                     return true;
                 }
@@ -279,7 +279,7 @@ namespace AltinaEngine::Launch {
                 }
             }
 
-            ec = {};
+            ec             = {};
             const auto cwd = std::filesystem::current_path(ec);
             if (!ec && TryCandidate(cwd)) {
                 return result;
@@ -373,7 +373,7 @@ namespace AltinaEngine::Launch {
         Rhi::FRhiInitDesc initDesc{};
         initDesc.mAppName.Assign(TEXT("AltinaEngine"));
 #if AE_PLATFORM_WIN
-        initDesc.mBackend = Rhi::ERhiBackend::DirectX11;
+        initDesc.mBackend          = Rhi::ERhiBackend::DirectX11;
         initDesc.mEnableDebugLayer = true;
 #endif
 
@@ -421,7 +421,7 @@ namespace AltinaEngine::Launch {
         }
         if (mScriptSystem) {
             Scripting::FScriptRuntimeConfig runtimeConfig{};
-            const auto exeDir = GetExecutableDir();
+            const auto                      exeDir = GetExecutableDir();
             const auto runtimePath = ResolveManagedPath(exeDir, kManagedRuntimeConfig);
             if (runtimePath.mPath.empty()) {
                 runtimeConfig.mRuntimeConfigPath.Assign(kManagedRuntimeConfig);
@@ -429,8 +429,7 @@ namespace AltinaEngine::Launch {
                 runtimeConfig.mRuntimeConfigPath = ToFString(runtimePath.mPath);
             }
             if (!runtimePath.mExists) {
-                LogWarningCat(kScriptingCategory,
-                    TEXT("Managed runtime config not found at {}."),
+                LogWarningCat(kScriptingCategory, TEXT("Managed runtime config not found at {}."),
                     runtimeConfig.mRuntimeConfigPath.ToView());
             }
 
@@ -442,8 +441,8 @@ namespace AltinaEngine::Launch {
                 managedConfig.mAssemblyPath = ToFString(assemblyPath.mPath);
             }
             if (!assemblyPath.mExists) {
-                LogWarningCat(kScriptingCategory,
-                    TEXT("Managed assembly not found at {}."), managedConfig.mAssemblyPath.ToView());
+                LogWarningCat(kScriptingCategory, TEXT("Managed assembly not found at {}."),
+                    managedConfig.mAssemblyPath.ToView());
             }
             managedConfig.mTypeName.Assign(kManagedType);
             managedConfig.mMethodName.Assign(kManagedStartupMethod);
@@ -513,29 +512,28 @@ namespace AltinaEngine::Launch {
             }
         }
 
-        const u64 frameIndex = ++mFrameIndex;
-        auto      device     = mRhiDevice;
-        auto      viewport   = mMainViewport;
-        auto      callback   = mRenderCallback;
+        const u64  frameIndex   = ++mFrameIndex;
+        auto       device       = mRhiDevice;
+        auto       viewport     = mMainViewport;
+        auto       callback     = mRenderCallback;
         const auto rendererType = Rendering::GetRendererTypeSetting();
         if (rendererType == Rendering::ERendererType::Deferred) {
             mMaterialCache.SetDefaultTemplate(
                 Rendering::FBasicDeferredRenderer::GetDefaultMaterialTemplate());
         }
 
-        Engine::FRenderScene renderScene;
+        Engine::FRenderScene                              renderScene;
         Container::TVector<RenderCore::Render::FDrawList> drawLists;
 
         if (width > 0U && height > 0U) {
             if (auto* world = mEngineRuntime.GetWorldManager().GetActiveWorld()) {
                 Engine::FSceneViewBuildParams viewParams{};
-                viewParams.ViewRect =
-                    RenderCore::View::FViewRect{ 0, 0, width, height };
+                viewParams.ViewRect = RenderCore::View::FViewRect{ 0, 0, width, height };
                 viewParams.RenderTargetExtent =
                     RenderCore::View::FRenderTargetExtent2D{ width, height };
-                viewParams.FrameIndex       = frameIndex;
-                viewParams.DeltaTimeSeconds = mLastDeltaTimeSeconds;
-                viewParams.ViewTarget.Type  = Engine::FSceneView::ETargetType::Viewport;
+                viewParams.FrameIndex          = frameIndex;
+                viewParams.DeltaTimeSeconds    = mLastDeltaTimeSeconds;
+                viewParams.ViewTarget.Type     = Engine::FSceneView::ETargetType::Viewport;
                 viewParams.ViewTarget.Viewport = viewport.Get();
 
                 Engine::FSceneViewBuilder viewBuilder;
@@ -554,20 +552,18 @@ namespace AltinaEngine::Launch {
                 }
 
                 if (!renderScene.Views.IsEmpty()) {
-                    Engine::FSceneBatchBuilder  batchBuilder;
+                    Engine::FSceneBatchBuilder     batchBuilder;
                     Engine::FSceneBatchBuildParams batchParams{};
                     batchParams.bAllowInstancing = false;
                     drawLists.Resize(renderScene.Views.Size());
                     for (usize i = 0; i < renderScene.Views.Size(); ++i) {
-                        batchBuilder.Build(
-                            renderScene, renderScene.Views[i], batchParams, mMaterialCache,
-                            drawLists[i]);
+                        batchBuilder.Build(renderScene, renderScene.Views[i], batchParams,
+                            mMaterialCache, drawLists[i]);
                     }
                     for (auto& drawList : drawLists) {
                         for (const auto& batch : drawList.Batches) {
                             if (batch.Material != nullptr) {
-                                auto* material =
-                                    const_cast<RenderCore::FMaterial*>(batch.Material);
+                                auto* material = const_cast<RenderCore::FMaterial*>(batch.Material);
                                 mMaterialCache.PrepareMaterialForRendering(*material);
                             }
                         }
@@ -587,8 +583,8 @@ namespace AltinaEngine::Launch {
 
         auto handle = RenderCore::EnqueueRenderTask(Container::FString(TEXT("RenderFrame")),
             [device, viewport, callback, frameIndex, width, height, shouldResize,
-                renderScene = Move(renderScene), drawLists = Move(drawLists), rendererType]()
-                mutable -> void {
+                renderScene = Move(renderScene), drawLists = Move(drawLists),
+                rendererType]() mutable -> void {
                 if (!device)
                     return;
 
@@ -600,8 +596,8 @@ namespace AltinaEngine::Launch {
                     }
 
                     if (!renderScene.Views.IsEmpty()) {
-                        SendSceneRenderingRequest(*device, viewport.Get(), renderScene, drawLists,
-                            rendererType);
+                        SendSceneRenderingRequest(
+                            *device, viewport.Get(), renderScene, drawLists, rendererType);
                     }
 
                     if (callback) {

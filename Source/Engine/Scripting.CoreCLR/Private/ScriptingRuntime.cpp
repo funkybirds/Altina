@@ -15,11 +15,13 @@ namespace AltinaEngine::Scripting::CoreCLR {
 
             void Shutdown() override { mHost.Shutdown(); }
 
-            auto Load(const FScriptLoadRequest& request, FScriptHandle& outHandle) -> bool override {
+            auto Load(const FScriptLoadRequest& request, FScriptHandle& outHandle)
+                -> bool override {
                 if (!mHost.IsInitialized()) {
                     return false;
                 }
-                return mBridge.Load(mHost.GetLoadAssemblyAndGetFunctionPointer(), request, outHandle);
+                return mBridge.Load(
+                    mHost.GetLoadAssemblyAndGetFunctionPointer(), request, outHandle);
             }
 
             auto Invoke(const FScriptHandle& handle, const FScriptInvocation& invocation)
@@ -30,7 +32,7 @@ namespace AltinaEngine::Scripting::CoreCLR {
             auto Reload() -> bool override { return mHost.Reload(); }
 
         private:
-            Host::FRuntimeHost     mHost;
+            Host::FRuntimeHost      mHost;
             Interop::FManagedBridge mBridge;
         };
     } // namespace

@@ -15,7 +15,7 @@ namespace AltinaEngine::Rhi {
 namespace AltinaEngine::GameScene {
     class FWorld;
     class FMeshMaterialComponent;
-}
+} // namespace AltinaEngine::GameScene
 
 namespace AltinaEngine::RenderCore::Geometry {
     struct FStaticMeshData;
@@ -26,7 +26,7 @@ namespace AltinaEngine::Engine {
     using Container::TVector;
 
     struct AE_ENGINE_API FSceneView {
-        GameScene::FComponentId  CameraId{};
+        GameScene::FComponentId     CameraId{};
         RenderCore::View::FViewData View{};
         enum class ETargetType : u8 {
             None = 0,
@@ -35,9 +35,9 @@ namespace AltinaEngine::Engine {
         };
 
         struct FTargetHandle {
-            ETargetType         Type = ETargetType::None;
-            Rhi::FRhiViewport*  Viewport = nullptr;
-            Asset::FAssetHandle Texture{};
+            ETargetType                  Type     = ETargetType::None;
+            Rhi::FRhiViewport*           Viewport = nullptr;
+            Asset::FAssetHandle          Texture{};
 
             [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {
                 switch (Type) {
@@ -59,10 +59,10 @@ namespace AltinaEngine::Engine {
     };
 
     struct AE_ENGINE_API FSceneStaticMesh {
-        GameScene::FGameObjectId                    OwnerId{};
-        GameScene::FComponentId                     MeshComponentId{};
-        GameScene::FComponentId                     MaterialComponentId{};
-        const RenderCore::Geometry::FStaticMeshData* Mesh = nullptr;
+        GameScene::FGameObjectId                     OwnerId{};
+        GameScene::FComponentId                      MeshComponentId{};
+        GameScene::FComponentId                      MaterialComponentId{};
+        const RenderCore::Geometry::FStaticMeshData* Mesh      = nullptr;
         const GameScene::FMeshMaterialComponent*     Materials = nullptr;
         Core::Math::FMatrix4x4f                      WorldMatrix{};
         Core::Math::FMatrix4x4f                      PrevWorldMatrix{};

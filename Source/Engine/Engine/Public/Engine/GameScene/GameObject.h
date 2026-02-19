@@ -34,17 +34,15 @@ namespace AltinaEngine::GameScene {
             mTransformDirty = true;
         }
         void ClearParent() noexcept {
-            mParent = {};
+            mParent         = {};
             mWorldTransform = mLocalTransform;
             mTransformDirty = true;
         }
 
-        [[nodiscard]] auto GetLocalTransform() const noexcept
-            -> const LinAlg::FSpatialTransform& {
+        [[nodiscard]] auto GetLocalTransform() const noexcept -> const LinAlg::FSpatialTransform& {
             return mLocalTransform;
         }
-        [[nodiscard]] auto GetWorldTransform() const noexcept
-            -> const LinAlg::FSpatialTransform& {
+        [[nodiscard]] auto GetWorldTransform() const noexcept -> const LinAlg::FSpatialTransform& {
             return mWorldTransform;
         }
 
@@ -86,21 +84,21 @@ namespace AltinaEngine::GameScene {
     private:
         friend class FWorld;
 
-        void                  SetWorld(FWorld* world) noexcept { mWorld = world; }
-        void                  SetId(FGameObjectId id) noexcept { mId = id; }
-        void                  AddComponentId(FComponentId id);
-        void                  RemoveComponentId(FComponentId id);
+        void                      SetWorld(FWorld* world) noexcept { mWorld = world; }
+        void                      SetId(FGameObjectId id) noexcept { mId = id; }
+        void                      AddComponentId(FComponentId id);
+        void                      RemoveComponentId(FComponentId id);
 
-        FWorld*               mWorld = nullptr;
-        FGameObjectId         mId{};
-        FGameObjectId         mParent{};
-        LinAlg::FSpatialTransform mLocalTransform = LinAlg::FSpatialTransform::Identity();
-        LinAlg::FSpatialTransform mWorldTransform = LinAlg::FSpatialTransform::Identity();
-        bool                  mTransformDirty = false;
-        u32                   mTransformUpdateId = 0;
-        u32                   mTransformChangedId = 0;
-        FString               mName{};
-        bool                  mActive = true;
-        TVector<FComponentId> mComponents{};
+        FWorld*                   mWorld = nullptr;
+        FGameObjectId             mId{};
+        FGameObjectId             mParent{};
+        LinAlg::FSpatialTransform mLocalTransform     = LinAlg::FSpatialTransform::Identity();
+        LinAlg::FSpatialTransform mWorldTransform     = LinAlg::FSpatialTransform::Identity();
+        bool                      mTransformDirty     = false;
+        u32                       mTransformUpdateId  = 0;
+        u32                       mTransformChangedId = 0;
+        FString                   mName{};
+        bool                      mActive = true;
+        TVector<FComponentId>     mComponents{};
     };
 } // namespace AltinaEngine::GameScene

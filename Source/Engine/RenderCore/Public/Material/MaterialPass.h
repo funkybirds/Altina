@@ -44,23 +44,23 @@ namespace AltinaEngine::RenderCore {
     };
 
     struct FMaterialLayout {
-        Shader::FShaderPropertyBag PropertyBag;
+        Shader::FShaderPropertyBag                                            PropertyBag;
 
-        TVector<FMaterialParamId>  TextureNameHashes;
-        TVector<u32>               TextureBindings;
-        TVector<u32>               SamplerBindings;
+        TVector<FMaterialParamId>                                             TextureNameHashes;
+        TVector<u32>                                                          TextureBindings;
+        TVector<u32>                                                          SamplerBindings;
 
         THashMap<FMaterialParamId, Shader::FShaderPropertyBag::FPropertyDesc> PropertyMap;
 
-        void                       Reset();
-        void                       InitFromConstantBuffer(const Shader::FShaderConstantBuffer& cbuffer);
-        void                       AddTextureBinding(FMaterialParamId nameHash, u32 textureBinding,
-                                   u32 samplerBinding = kMaterialInvalidBinding);
-        void                       SortTextureBindings();
+        void                                                                  Reset();
+        void               InitFromConstantBuffer(const Shader::FShaderConstantBuffer& cbuffer);
+        void               AddTextureBinding(FMaterialParamId nameHash, u32 textureBinding,
+                          u32 samplerBinding = kMaterialInvalidBinding);
+        void               SortTextureBindings();
 
-        [[nodiscard]] auto         FindProperty(FMaterialParamId id) const noexcept
+        [[nodiscard]] auto FindProperty(FMaterialParamId id) const noexcept
             -> const Shader::FShaderPropertyBag::FPropertyDesc*;
-        [[nodiscard]] auto         HasProperty(FMaterialParamId id) const noexcept -> bool {
+        [[nodiscard]] auto HasProperty(FMaterialParamId id) const noexcept -> bool {
             return FindProperty(id) != nullptr;
         }
     };
@@ -71,7 +71,7 @@ namespace AltinaEngine::RenderCore {
         RenderCore::FShaderRegistry::FShaderKey Compute;
         FShaderPermutationId                    Permutation;
 
-        [[nodiscard]] auto IsValid() const noexcept -> bool {
+        [[nodiscard]] auto                      IsValid() const noexcept -> bool {
             if (Compute.IsValid()) {
                 return true;
             }

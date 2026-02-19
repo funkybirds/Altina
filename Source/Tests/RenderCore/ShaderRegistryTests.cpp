@@ -39,8 +39,8 @@ namespace {
         return device;
     }
 
-    auto CreateMockShader(AltinaEngine::Rhi::FRhiDevice& device, const TChar* debugName,
-        EShaderStage stage) {
+    auto CreateMockShader(
+        AltinaEngine::Rhi::FRhiDevice& device, const TChar* debugName, EShaderStage stage) {
         FRhiShaderDesc desc;
         desc.mDebugName.Assign(debugName);
         desc.mStage = stage;
@@ -49,15 +49,15 @@ namespace {
 } // namespace
 
 TEST_CASE("RenderCore.ShaderRegistry.BasicOps") {
-    FRhiMockContext context;
-    auto            device = CreateMockDevice(context);
+    FRhiMockContext      context;
+    auto                 device = CreateMockDevice(context);
 
-    FShaderRegistry registry;
+    FShaderRegistry      registry;
 
     FShaderPermutationId permutation{};
     permutation.mHash = 42ULL;
-    const auto key = FShaderRegistry::MakeKey(TEXT("TestShader"), EShaderStage::Vertex,
-        permutation);
+    const auto key =
+        FShaderRegistry::MakeKey(TEXT("TestShader"), EShaderStage::Vertex, permutation);
 
     auto shader = CreateMockShader(*device, TEXT("TestShader.VS"), EShaderStage::Vertex);
     REQUIRE(shader);
@@ -82,18 +82,17 @@ TEST_CASE("RenderCore.ShaderRegistry.BasicOps") {
 }
 
 TEST_CASE("RenderCore.ShaderRegistry.Overwrite") {
-    FRhiMockContext context;
-    auto            device = CreateMockDevice(context);
+    FRhiMockContext      context;
+    auto                 device = CreateMockDevice(context);
 
-    FShaderRegistry registry;
+    FShaderRegistry      registry;
 
     FShaderPermutationId permutation{};
     permutation.mHash = 7ULL;
-    const auto key = FShaderRegistry::MakeKey(TEXT("TestShader"), EShaderStage::Pixel,
-        permutation);
+    const auto key = FShaderRegistry::MakeKey(TEXT("TestShader"), EShaderStage::Pixel, permutation);
 
-    auto shaderA = CreateMockShader(*device, TEXT("TestShader.PS.A"), EShaderStage::Pixel);
-    auto shaderB = CreateMockShader(*device, TEXT("TestShader.PS.B"), EShaderStage::Pixel);
+    auto       shaderA = CreateMockShader(*device, TEXT("TestShader.PS.A"), EShaderStage::Pixel);
+    auto       shaderB = CreateMockShader(*device, TEXT("TestShader.PS.B"), EShaderStage::Pixel);
     REQUIRE(shaderA);
     REQUIRE(shaderB);
 

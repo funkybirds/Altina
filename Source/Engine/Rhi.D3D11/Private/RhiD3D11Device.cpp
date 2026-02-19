@@ -813,16 +813,15 @@ namespace AltinaEngine::Rhi {
                                 const bool validRange = (offsetBytes <= bufferSizeBytes)
                                     && (sizeBytes != 0ULL)
                                     && (sizeBytes <= (bufferSizeBytes - offsetBytes))
-                                    && (offsetBytes % 16ULL == 0ULL)
-                                    && (sizeBytes % 16ULL == 0ULL);
+                                    && (offsetBytes % 16ULL == 0ULL) && (sizeBytes % 16ULL == 0ULL);
 
                                 if (validRange) {
                                     const u64 firstConstant64 = offsetBytes / 16ULL;
                                     const u64 numConstants64  = sizeBytes / 16ULL;
                                     const u64 maxUint =
                                         static_cast<u64>(std::numeric_limits<UINT>::max());
-                                    const bool alignedForSet1 =
-                                        (offsetBytes % 256ULL == 0ULL) && (sizeBytes % 256ULL == 0ULL);
+                                    const bool alignedForSet1 = (offsetBytes % 256ULL == 0ULL)
+                                        && (sizeBytes % 256ULL == 0ULL);
                                     if (firstConstant64 <= maxUint && numConstants64 <= maxUint
                                         && alignedForSet1) {
                                         const UINT firstConstant =

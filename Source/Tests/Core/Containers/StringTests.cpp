@@ -111,17 +111,17 @@ TEST_CASE("TBasicString comparison, substrings, and concatenation") {
 }
 
 TEST_CASE("TBasicString append overlaps and null termination") {
-    FString text(TEXT("abc"));
+    FString    text(TEXT("abc"));
     const auto view = text.SubstrView(1, 2);
     text.Append(view);
     REQUIRE(text == FStringView(TEXT("abcbc")));
 
     const FString empty;
-    const auto* emptyCStr = empty.CStr();
+    const auto*   emptyCStr = empty.CStr();
     REQUIRE(emptyCStr != nullptr);
     REQUIRE_EQ(emptyCStr[0], TEXT('\0'));
 
-    FString payload(TEXT("data"));
+    FString     payload(TEXT("data"));
     const auto* cstr = payload.CStr();
     REQUIRE_EQ(cstr[4], TEXT('\0'));
 }

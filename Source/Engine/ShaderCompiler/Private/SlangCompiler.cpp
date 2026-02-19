@@ -791,9 +791,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
         }
 
-        auto ToFString(u32 value) -> FString {
-            return FString::ToString(value);
-        }
+        auto ToFString(u32 value) -> FString { return FString::ToString(value); }
 
         void AddArg(TVector<FString>& args, const TChar* text) { args.EmplaceBack(text); }
 

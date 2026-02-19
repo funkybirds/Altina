@@ -40,8 +40,8 @@
 
 namespace AltinaEngine::ShaderCompiler::Detail {
     namespace Container = Core::Container;
-    using Container::FString;
     using Container::FNativeString;
+    using Container::FString;
     using Container::TVector;
     using Core::Platform::ReadFileBytes;
     using Core::Platform::RemoveFileIfExists;
@@ -109,9 +109,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
         }
 
-        auto ToFString(u32 value) -> FString {
-            return FString::ToString(value);
-        }
+        auto ToFString(u32 value) -> FString { return FString::ToString(value); }
 
         void AddArg(TVector<FString>& args, const TChar* text) { args.EmplaceBack(text); }
 
@@ -268,8 +266,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     fullName.Append('.');
                 }
                 fullName.Append(entry.mName);
-                const u32         elementCount = static_cast<u32>(entry.mDesc.Elements);
-                const u32         elementStride =
+                const u32 elementCount = static_cast<u32>(entry.mDesc.Elements);
+                const u32 elementStride =
                     (elementCount > 0U && sizeBytes > 0U) ? (sizeBytes / elementCount) : 0U;
                 AppendCBufferMember(outCb, fullName, baseOffset + entry.mOffset, sizeBytes,
                     elementCount, elementStride);
@@ -458,22 +456,20 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                         varType->GetDesc(&typeDesc);
                     }
 
-                    const u32 elementCount  = static_cast<u32>(typeDesc.Elements);
-                    const u32 elementStride = (elementCount > 0U && varDesc.Size > 0U)
-                        ? (static_cast<u32>(varDesc.Size) / elementCount)
-                        : 0U;
+                    const u32     elementCount  = static_cast<u32>(typeDesc.Elements);
+                    const u32     elementStride = (elementCount > 0U && varDesc.Size > 0U)
+                            ? (static_cast<u32>(varDesc.Size) / elementCount)
+                            : 0U;
 
                     FNativeString varName(varDesc.Name);
-                    AppendCBufferMember(cbInfo, varName,
-                        static_cast<u32>(varDesc.StartOffset), static_cast<u32>(varDesc.Size),
-                        elementCount, elementStride);
+                    AppendCBufferMember(cbInfo, varName, static_cast<u32>(varDesc.StartOffset),
+                        static_cast<u32>(varDesc.Size), elementCount, elementStride);
 
                     const bool isStruct = varType != nullptr && typeDesc.Class == D3D_SVC_STRUCT;
                     if (isStruct && typeDesc.Elements == 0 && typeDesc.Members > 0
                         && varDesc.Size > 0U) {
-                        AppendStructMembers(varType, varName,
-                            static_cast<u32>(varDesc.StartOffset), static_cast<u32>(varDesc.Size),
-                            cbInfo);
+                        AppendStructMembers(varType, varName, static_cast<u32>(varDesc.StartOffset),
+                            static_cast<u32>(varDesc.Size), cbInfo);
                     }
                 }
 

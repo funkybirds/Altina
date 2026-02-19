@@ -4,8 +4,8 @@ using AltinaEngine::Move;
 using AltinaEngine::Core::Container::MakeUnique;
 namespace AltinaEngine::GameScene {
     auto FWorldManager::CreateWorld() -> FWorldHandle {
-        auto world   = MakeUnique<FWorld>();
-        const u32 id = world->GetWorldId();
+        auto      world = MakeUnique<FWorld>();
+        const u32 id    = world->GetWorldId();
         mWorlds.emplace(id, Move(world));
 
         FWorldHandle handle{ id };
@@ -73,9 +73,7 @@ namespace AltinaEngine::GameScene {
         return mActiveWorld;
     }
 
-    auto FWorldManager::GetActiveWorld() noexcept -> FWorld* {
-        return GetWorld(mActiveWorld);
-    }
+    auto FWorldManager::GetActiveWorld() noexcept -> FWorld* { return GetWorld(mActiveWorld); }
 
     auto FWorldManager::GetActiveWorld() const noexcept -> const FWorld* {
         return GetWorld(mActiveWorld);

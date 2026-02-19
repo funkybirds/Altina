@@ -73,8 +73,7 @@ namespace AltinaEngine::Core::Platform {
                 out.Append(wide.c_str(), wide.size());
 #else
                 for (usize i = 0; i < value.Length(); ++i) {
-                    out.Append(static_cast<wchar_t>(
-                        static_cast<unsigned char>(value.Data()[i])));
+                    out.Append(static_cast<wchar_t>(static_cast<unsigned char>(value.Data()[i])));
                 }
 #endif
             } else {
@@ -163,8 +162,8 @@ namespace AltinaEngine::Core::Platform {
         CloseHandle(writePipe);
 
         Container::FNativeString buffer;
-        char        chunk[4096];
-        DWORD       bytesRead = 0;
+        char                     chunk[4096];
+        DWORD                    bytesRead = 0;
         while (ReadFile(readPipe, chunk, sizeof(chunk), &bytesRead, nullptr) && bytesRead > 0) {
             buffer.Append(chunk, static_cast<usize>(bytesRead));
         }

@@ -39,11 +39,11 @@
 using AltinaEngine::i32;
 using AltinaEngine::usize;
 using AltinaEngine::Core::Container::FString;
-using AltinaEngine::Scripting::CoreCLR::CreateCoreCLRRuntime;
 using AltinaEngine::Scripting::FScriptHandle;
 using AltinaEngine::Scripting::FScriptInvocation;
 using AltinaEngine::Scripting::FScriptLoadRequest;
 using AltinaEngine::Scripting::FScriptRuntimeConfig;
+using AltinaEngine::Scripting::CoreCLR::CreateCoreCLRRuntime;
 
 namespace {
 #if AE_PLATFORM_WIN
@@ -55,10 +55,10 @@ namespace {
     extern "C" int AE_SCRIPT_TEST_CALL NativeAdd(int a, int b) { return a + b; }
 
     struct FInteropPayload {
-        void* mCallback = nullptr;
-        i32   mA = 0;
-        i32   mB = 0;
-        i32   mResult = 0;
+        void* mCallback    = nullptr;
+        i32   mA           = 0;
+        i32   mB           = 0;
+        i32   mResult      = 0;
         i32   mCallbackHit = 0;
     };
 
@@ -122,7 +122,7 @@ TEST_CASE("Scripting.CoreCLR.Interop") {
         return;
     }
 
-    const auto assemblyPath = exeDir / "AltinaEngine.Scripting.Tests.dll";
+    const auto assemblyPath      = exeDir / "AltinaEngine.Scripting.Tests.dll";
     const auto runtimeConfigPath = exeDir / "AltinaEngine.Scripting.Tests.runtimeconfig.json";
 
     REQUIRE(std::filesystem::exists(assemblyPath));
@@ -147,13 +147,14 @@ TEST_CASE("Scripting.CoreCLR.Interop") {
 
     FScriptLoadRequest request{};
     request.mAssemblyPath = ToFString(assemblyPath);
-    request.mTypeName = FString(TEXT("AltinaEngine.Scripting.Tests.InteropEntry, AltinaEngine.Scripting.Tests"));
-    request.mMethodName = FString(TEXT("ManagedEntryPoint"));
-    request.mDelegateTypeName = FString(
-        TEXT("AltinaEngine.Scripting.Tests.ManagedEntryPointDelegate, AltinaEngine.Scripting.Tests"));
+    request.mTypeName =
+        FString(TEXT("AltinaEngine.Scripting.Tests.InteropEntry, AltinaEngine.Scripting.Tests"));
+    request.mMethodName       = FString(TEXT("ManagedEntryPoint"));
+    request.mDelegateTypeName = FString(TEXT(
+        "AltinaEngine.Scripting.Tests.ManagedEntryPointDelegate, AltinaEngine.Scripting.Tests"));
 
     FScriptHandle handle{};
-    const bool loaded = runtime->Load(request, handle);
+    const bool    loaded = runtime->Load(request, handle);
     REQUIRE(loaded);
     if (!loaded) {
         runtime->Shutdown();
@@ -162,8 +163,8 @@ TEST_CASE("Scripting.CoreCLR.Interop") {
 
     FInteropPayload payload{};
     payload.mCallback = reinterpret_cast<void*>(&NativeAdd);
-    payload.mA = 7;
-    payload.mB = 5;
+    payload.mA        = 7;
+    payload.mB        = 5;
 
     FScriptInvocation invocation{};
     invocation.mArgs = &payload;

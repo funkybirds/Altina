@@ -268,8 +268,8 @@ namespace AltinaEngine::Rhi {
         const u32     flags        = ResolvePresentFlags(syncInterval, info.mFlags);
         const HRESULT hr           = mState->mSwapChain->Present(syncInterval, flags);
         if (FAILED(hr)) {
-            LogError(TEXT("RHI(D3D11): Present failed (hr=0x{:08X}, {})."),
-                static_cast<u32>(hr), DxgiErrorToString(hr));
+            LogError(TEXT("RHI(D3D11): Present failed (hr=0x{:08X}, {})."), static_cast<u32>(hr),
+                DxgiErrorToString(hr));
             if (mState->mDevice) {
                 const HRESULT reason = mState->mDevice->GetDeviceRemovedReason();
                 if (reason != S_OK) {

@@ -13,11 +13,11 @@
 
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
-    using Container::TVector;
     using Container::TDeque;
+    using Container::TVector;
+    using Core::Threading::FConditionVariable;
     using Core::Threading::FMutex;
     using Core::Threading::FScopedLock;
-    using Core::Threading::FConditionVariable;
 
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     class FRhiVulkanCommandList;
@@ -32,8 +32,8 @@ namespace AltinaEngine::Rhi {
             Shutdown
         };
 
-        EType mType = EType::Submit;
-        VkQueue mQueue = VK_NULL_HANDLE;
+        EType                         mType  = EType::Submit;
+        VkQueue                       mQueue = VK_NULL_HANDLE;
 
         TVector<VkCommandBuffer>      mCommandBuffers;
         TVector<VkSemaphore>          mWaitSemaphores;
@@ -43,9 +43,9 @@ namespace AltinaEngine::Rhi {
         TVector<u64>                  mSignalValues;
         VkFence                       mFence = VK_NULL_HANDLE;
 
-        VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
-        u32            mImageIndex = 0U;
-        TVector<VkSemaphore> mPresentWaitSemaphores;
+        VkSwapchainKHR                mSwapchain  = VK_NULL_HANDLE;
+        u32                           mImageIndex = 0U;
+        TVector<VkSemaphore>          mPresentWaitSemaphores;
     };
 
     class FRhiVulkanCommandSubmitter {
@@ -62,14 +62,14 @@ namespace AltinaEngine::Rhi {
 
         private:
             TDeque<FSubmitWork> mQueue;
-            FMutex mMutex;
-            FConditionVariable mCond;
+            FMutex              mMutex;
+            FConditionVariable  mCond;
         };
 
-        void ThreadMain();
+        void         ThreadMain();
 
-        bool mRunning = false;
-        std::thread mThread;
+        bool         mRunning = false;
+        std::thread  mThread;
         FSubmitQueue mQueue;
     };
 
@@ -96,8 +96,8 @@ namespace AltinaEngine::Rhi {
         [[nodiscard]] auto GetNativeSemaphore() const noexcept -> VkSemaphore;
 
     private:
-        VkDevice    mDevice = VK_NULL_HANDLE;
-        VkSemaphore mSemaphore = VK_NULL_HANDLE;
+        VkDevice    mDevice     = VK_NULL_HANDLE;
+        VkSemaphore mSemaphore  = VK_NULL_HANDLE;
         bool        mIsTimeline = false;
     };
 
@@ -113,9 +113,9 @@ namespace AltinaEngine::Rhi {
         void Present(const FRhiPresentInfo& info) override;
 
     private:
-        VkQueue mQueue = VK_NULL_HANDLE;
+        VkQueue                     mQueue     = VK_NULL_HANDLE;
         FRhiVulkanCommandSubmitter* mSubmitter = nullptr;
-        FRhiVulkanDevice* mDevice = nullptr;
+        FRhiVulkanDevice*           mDevice    = nullptr;
     };
 #endif
 } // namespace AltinaEngine::Rhi

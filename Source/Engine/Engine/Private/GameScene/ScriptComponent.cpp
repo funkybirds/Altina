@@ -17,15 +17,15 @@ namespace AltinaEngine::GameScene {
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
             out.Reserve(text.Length());
             for (AltinaEngine::usize i = 0; i < text.Length(); ++i) {
-                out.Append(static_cast<AltinaEngine::TChar>(
-                    static_cast<unsigned char>(text.Data()[i])));
+                out.Append(
+                    static_cast<AltinaEngine::TChar>(static_cast<unsigned char>(text.Data()[i])));
             }
 #else
             out.Append(text.Data(), text.Length());
 #endif
             return out;
         }
-    }
+    } // namespace
 
     void FScriptComponent::SetAssetManager(AltinaEngine::Asset::FAssetManager* manager) {
         gScriptAssetManager = manager;
@@ -46,7 +46,7 @@ namespace AltinaEngine::GameScene {
     }
 
     void FScriptComponent::SetScriptAsset(AltinaEngine::Asset::FAssetHandle handle) {
-        mScriptAsset = handle;
+        mScriptAsset   = handle;
         mAssetResolved = false;
     }
 
@@ -80,8 +80,8 @@ namespace AltinaEngine::GameScene {
             }
         }
 
-        mManagedHandle = 0;
-        mCreatedCalled = false;
+        mManagedHandle   = 0;
+        mCreatedCalled   = false;
         mOnCreateInvoked = false;
     }
 
@@ -127,8 +127,7 @@ namespace AltinaEngine::GameScene {
             if (!mLoggedCreate) {
                 mLoggedCreate = true;
                 LogInfoCat(TEXT("Scripting.Managed"),
-                    TEXT("ScriptComponent Tick forwarded to managed (handle={})."),
-                    mManagedHandle);
+                    TEXT("ScriptComponent Tick forwarded to managed (handle={})."), mManagedHandle);
             }
             api->Tick(mManagedHandle, dt);
         }
@@ -153,8 +152,8 @@ namespace AltinaEngine::GameScene {
         if (mTypeName.IsEmptyString()) {
             if (!mLoggedCreateFailure) {
                 mLoggedCreateFailure = true;
-                LogWarningCat(TEXT("Scripting.Managed"),
-                    TEXT("ScriptComponent missing managed type name."));
+                LogWarningCat(
+                    TEXT("Scripting.Managed"), TEXT("ScriptComponent missing managed type name."));
             }
             return false;
         }
@@ -170,17 +169,17 @@ namespace AltinaEngine::GameScene {
         }
         args.mTypeNameUtf8 = mTypeName.CStr();
 
-        const auto owner = GetOwner();
-        args.mOwnerIndex = owner.Index;
+        const auto owner      = GetOwner();
+        args.mOwnerIndex      = owner.Index;
         args.mOwnerGeneration = owner.Generation;
-        args.mWorldId = owner.WorldId;
+        args.mWorldId         = owner.WorldId;
 
         mManagedHandle = api->CreateInstance(&args);
         if (mManagedHandle == 0) {
             if (!mLoggedCreateFailure) {
                 mLoggedCreateFailure = true;
-                LogWarningCat(TEXT("Scripting.Managed"),
-                    TEXT("ScriptComponent CreateInstance returned 0."));
+                LogWarningCat(
+                    TEXT("Scripting.Managed"), TEXT("ScriptComponent CreateInstance returned 0."));
             }
             return false;
         }
@@ -194,8 +193,8 @@ namespace AltinaEngine::GameScene {
         if (mScriptAsset.Type != AltinaEngine::Asset::EAssetType::Script) {
             if (!mLoggedResolveFailure) {
                 mLoggedResolveFailure = true;
-                LogWarningCat(TEXT("Scripting.Managed"),
-                    TEXT("ScriptComponent asset type is not Script."));
+                LogWarningCat(
+                    TEXT("Scripting.Managed"), TEXT("ScriptComponent asset type is not Script."));
             }
             return false;
         }
@@ -207,8 +206,8 @@ namespace AltinaEngine::GameScene {
         if (manager == nullptr) {
             if (!mLoggedResolveFailure) {
                 mLoggedResolveFailure = true;
-                LogWarningCat(TEXT("Scripting.Managed"),
-                    TEXT("ScriptComponent asset manager is null."));
+                LogWarningCat(
+                    TEXT("Scripting.Managed"), TEXT("ScriptComponent asset manager is null."));
             }
             return false;
         }
@@ -217,8 +216,8 @@ namespace AltinaEngine::GameScene {
         if (!asset) {
             if (!mLoggedResolveFailure) {
                 mLoggedResolveFailure = true;
-                LogWarningCat(TEXT("Scripting.Managed"),
-                    TEXT("ScriptComponent asset load failed."));
+                LogWarningCat(
+                    TEXT("Scripting.Managed"), TEXT("ScriptComponent asset load failed."));
             }
             return false;
         }
@@ -234,7 +233,7 @@ namespace AltinaEngine::GameScene {
         }
 
         const auto assemblyPath = scriptAsset->GetAssemblyPath();
-        const auto typeName = scriptAsset->GetTypeName();
+        const auto typeName     = scriptAsset->GetTypeName();
         if (typeName.IsEmpty()) {
             if (!mLoggedResolveFailure) {
                 mLoggedResolveFailure = true;
@@ -248,9 +247,9 @@ namespace AltinaEngine::GameScene {
         mTypeName.Assign(typeName);
         mAssetResolved = true;
         if (!mLoggedResolved) {
-            mLoggedResolved = true;
+            mLoggedResolved         = true;
             const auto assemblyText = ToFStringFromUtf8(mAssemblyPath.ToView());
-            const auto typeText = ToFStringFromUtf8(mTypeName.ToView());
+            const auto typeText     = ToFStringFromUtf8(mTypeName.ToView());
             LogInfoCat(TEXT("Scripting.Managed"),
                 TEXT("ScriptComponent resolved asset: assembly='{}' type='{}'"),
                 assemblyText.ToView(), typeText.ToView());

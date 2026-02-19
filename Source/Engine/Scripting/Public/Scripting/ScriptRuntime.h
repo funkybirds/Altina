@@ -32,8 +32,8 @@ namespace AltinaEngine::Scripting {
     public:
         virtual ~IScriptRuntime() = default;
 
-        virtual auto Initialize(const FScriptRuntimeConfig& config) -> bool = 0;
-        virtual void Shutdown()                                 = 0;
+        virtual auto Initialize(const FScriptRuntimeConfig& config) -> bool                    = 0;
+        virtual void Shutdown()                                                                = 0;
         virtual auto Load(const FScriptLoadRequest& request, FScriptHandle& outHandle) -> bool = 0;
         virtual auto Invoke(const FScriptHandle& handle, const FScriptInvocation& invocation)
             -> bool = 0;
@@ -49,7 +49,7 @@ namespace AltinaEngine::Scripting {
 
         [[nodiscard]] auto IsValid() const noexcept -> bool { return static_cast<bool>(mRuntime); }
 
-        auto Initialize(const FScriptRuntimeConfig& config) -> bool {
+        auto               Initialize(const FScriptRuntimeConfig& config) -> bool {
             if (!mRuntime) {
                 return false;
             }

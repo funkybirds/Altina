@@ -7,12 +7,11 @@
 namespace AltinaEngine::RenderCore {
     class AE_RENDER_CORE_API FMaterialTemplate {
     public:
-        void SetPassDesc(EMaterialPass pass, FMaterialPassDesc desc);
+        void               SetPassDesc(EMaterialPass pass, FMaterialPassDesc desc);
 
         [[nodiscard]] auto FindPassDesc(EMaterialPass pass) const noexcept
             -> const FMaterialPassDesc*;
-        [[nodiscard]] auto FindLayout(EMaterialPass pass) const noexcept
-            -> const FMaterialLayout*;
+        [[nodiscard]] auto FindLayout(EMaterialPass pass) const noexcept -> const FMaterialLayout*;
         [[nodiscard]] auto FindShaders(EMaterialPass pass) const noexcept
             -> const FMaterialPassShaders*;
         [[nodiscard]] auto FindState(EMaterialPass pass) const noexcept

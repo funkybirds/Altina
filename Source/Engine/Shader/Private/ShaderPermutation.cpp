@@ -4,16 +4,15 @@
 
 namespace AltinaEngine::Shader {
     namespace {
-        constexpr u64 kFnvOffset = 14695981039346656037ULL;
-        constexpr u64 kFnvPrime  = 1099511628211ULL;
+        constexpr u64                  kFnvOffset = 14695981039346656037ULL;
+        constexpr u64                  kFnvPrime  = 1099511628211ULL;
 
         template <typename CharT> void HashChars(u64& hash, const CharT* data, usize length) {
             if ((data == nullptr) || (length == 0U)) {
                 return;
             }
             for (usize i = 0; i < length; ++i) {
-                const auto ch =
-                    static_cast<u64>(static_cast<std::make_unsigned_t<CharT>>(data[i]));
+                const auto ch = static_cast<u64>(static_cast<std::make_unsigned_t<CharT>>(data[i]));
                 hash ^= ch;
                 hash *= kFnvPrime;
             }
@@ -29,17 +28,16 @@ namespace AltinaEngine::Shader {
         }
 
         void HashSeparator(u64& hash, TChar separator) {
-            const auto ch =
-                static_cast<u64>(static_cast<std::make_unsigned_t<TChar>>(separator));
+            const auto ch = static_cast<u64>(static_cast<std::make_unsigned_t<TChar>>(separator));
             hash ^= ch;
             hash *= kFnvPrime;
         }
     } // namespace
 
-    auto BuildShaderPermutationId(FStringView shaderPath, FStringView entryPoint, EShaderStage stage,
-        const FShaderPermutationLayout& layout, const FShaderPermutationValues& values,
-        const FShaderBuiltinLayout* builtinLayout, const FShaderBuiltinValues* builtinValues) noexcept
-        -> FShaderPermutationId {
+    auto BuildShaderPermutationId(FStringView shaderPath, FStringView entryPoint,
+        EShaderStage stage, const FShaderPermutationLayout& layout,
+        const FShaderPermutationValues& values, const FShaderBuiltinLayout* builtinLayout,
+        const FShaderBuiltinValues* builtinValues) noexcept -> FShaderPermutationId {
         if (layout.mDimensions.Size() != values.mValues.Size()) {
             return {};
         }
@@ -57,7 +55,7 @@ namespace AltinaEngine::Shader {
         HashNumber(hash, static_cast<i64>(stage));
         HashSeparator(hash, static_cast<TChar>('|'));
 
-        const TChar kEq = static_cast<TChar>('=');
+        const TChar kEq  = static_cast<TChar>('=');
         const TChar kSep = static_cast<TChar>(';');
         for (usize i = 0; i < layout.mDimensions.Size(); ++i) {
             const auto& dim = layout.mDimensions[i];

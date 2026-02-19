@@ -11,7 +11,7 @@ namespace AltinaEngine::GameScene {
     using Container::TOwner;
 
     struct AE_ENGINE_API FWorldHandle {
-        u32 Id = 0;
+        u32                          Id = 0;
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool { return Id != 0; }
 
@@ -29,10 +29,10 @@ namespace AltinaEngine::GameScene {
         FWorldManager()  = default;
         ~FWorldManager() = default;
 
-        FWorldManager(const FWorldManager&)                    = delete;
-        auto operator=(const FWorldManager&) -> FWorldManager& = delete;
-        FWorldManager(FWorldManager&&)                         = delete;
-        auto operator=(FWorldManager&&) -> FWorldManager&      = delete;
+        FWorldManager(const FWorldManager&)                             = delete;
+        auto operator=(const FWorldManager&) -> FWorldManager&          = delete;
+        FWorldManager(FWorldManager&&)                                  = delete;
+        auto               operator=(FWorldManager&&) -> FWorldManager& = delete;
 
         [[nodiscard]] auto CreateWorld() -> FWorldHandle;
         void               DestroyWorld(FWorldHandle handle);
@@ -49,6 +49,6 @@ namespace AltinaEngine::GameScene {
 
     private:
         THashMap<u32, TOwner<FWorld>> mWorlds;
-        FWorldHandle                 mActiveWorld{};
+        FWorldHandle                  mActiveWorld{};
     };
 } // namespace AltinaEngine::GameScene

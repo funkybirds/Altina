@@ -10,16 +10,16 @@
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     #include <vulkan/vulkan.h>
 #else
-    struct VkBuffer_T;
-    struct VkImage_T;
-    struct VkImageView_T;
-    struct VkSampler_T;
-    struct VkShaderModule_T;
-    using VkBuffer = VkBuffer_T*;
-    using VkImage = VkImage_T*;
-    using VkImageView = VkImageView_T*;
-    using VkSampler = VkSampler_T*;
-    using VkShaderModule = VkShaderModule_T*;
+struct VkBuffer_T;
+struct VkImage_T;
+struct VkImageView_T;
+struct VkSampler_T;
+struct VkShaderModule_T;
+using VkBuffer       = VkBuffer_T*;
+using VkImage        = VkImage_T*;
+using VkImageView    = VkImageView_T*;
+using VkSampler      = VkSampler_T*;
+using VkShaderModule = VkShaderModule_T*;
 #endif
 
 namespace AltinaEngine::Rhi {

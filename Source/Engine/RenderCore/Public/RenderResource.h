@@ -21,8 +21,8 @@ namespace AltinaEngine::RenderCore {
         // Caller must ensure ReleaseResource() is invoked before destruction.
         ~FRenderResource() override;
 
-        FRenderResource(FRenderResource&&) noexcept            = default;
-        auto operator=(FRenderResource&&) noexcept -> FRenderResource& = default;
+        FRenderResource(FRenderResource&&) noexcept                                  = default;
+        auto               operator=(FRenderResource&&) noexcept -> FRenderResource& = default;
 
         void               InitResource() noexcept;
         void               ReleaseResource() noexcept;

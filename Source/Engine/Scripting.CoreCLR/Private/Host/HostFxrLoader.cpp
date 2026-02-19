@@ -41,8 +41,8 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
     namespace {
         constexpr auto kLogCategory = TEXT("Scripting.CoreCLR");
 
-        auto Utf8ToWide(const char* data, usize length) -> std::wstring;
-        auto WideToUtf8(const wchar_t* data, usize length) -> std::string;
+        auto           Utf8ToWide(const char* data, usize length) -> std::wstring;
+        auto           WideToUtf8(const wchar_t* data, usize length) -> std::string;
 
         template <typename SrcChar, typename DstChar>
         auto ConvertStringView(AltinaEngine::Core::Container::TBasicStringView<SrcChar> value)
@@ -60,8 +60,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
                 && std::is_same_v<DstChar, char>) {
                 return WideToUtf8(value.Data(), value.Length());
             } else {
-                static_assert(std::is_same_v<SrcChar, DstChar>,
-                    "Unsupported string conversion.");
+                static_assert(std::is_same_v<SrcChar, DstChar>, "Unsupported string conversion.");
             }
         }
 
@@ -91,18 +90,18 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
 
         auto ParseVersion(const std::string& value, std::vector<int>& out) -> bool {
             out.clear();
-            int current = 0;
+            int  current  = 0;
             bool hasDigit = false;
             for (char ch : value) {
                 if (ch >= '0' && ch <= '9') {
-                    current = (current * 10) + (ch - '0');
+                    current  = (current * 10) + (ch - '0');
                     hasDigit = true;
                 } else if (ch == '.') {
                     if (!hasDigit) {
                         return false;
                     }
                     out.push_back(current);
-                    current = 0;
+                    current  = 0;
                     hasDigit = false;
                 } else {
                     return false;
@@ -118,7 +117,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
         auto IsVersionGreater(const std::vector<int>& a, const std::vector<int>& b) -> bool {
             const size_t maxCount = std::max(a.size(), b.size());
             for (size_t i = 0; i < maxCount; ++i) {
-                const int left = (i < a.size()) ? a[i] : 0;
+                const int left  = (i < a.size()) ? a[i] : 0;
                 const int right = (i < b.size()) ? b[i] : 0;
                 if (left != right) {
                     return left > right;
@@ -134,7 +133,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             }
 
             std::error_code ec;
-            auto direct = root / fileName;
+            auto            direct = root / fileName;
             if (std::filesystem::exists(direct, ec)) {
                 return direct;
             }
@@ -167,7 +166,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
 
                 if (bestPath.empty() || IsVersionGreater(parsed, bestVersion)) {
                     bestVersion = parsed;
-                    bestPath = candidate;
+                    bestPath    = candidate;
                 }
             }
 
@@ -182,7 +181,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
                     return {};
                 }
                 std::wstring value(size, L'\0');
-                DWORD written = GetEnvironmentVariableW(name, value.data(), size);
+                DWORD        written = GetEnvironmentVariableW(name, value.data(), size);
                 if (written == 0 || written >= size) {
                     return {};
                 }
@@ -232,8 +231,8 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
                 return {};
             }
 
-            auto getHostFxr = reinterpret_cast<get_hostfxr_path_fn>(
-                nethostLibrary.GetSymbol("get_hostfxr_path"));
+            auto getHostFxr =
+                reinterpret_cast<get_hostfxr_path_fn>(nethostLibrary.GetSymbol("get_hostfxr_path"));
             if (!getHostFxr) {
                 return {};
             }
@@ -256,14 +255,13 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             if (data == nullptr || length == 0) {
                 return {};
             }
-            const int wideCount = MultiByteToWideChar(
-                CP_UTF8, 0, data, static_cast<int>(length), nullptr, 0);
+            const int wideCount =
+                MultiByteToWideChar(CP_UTF8, 0, data, static_cast<int>(length), nullptr, 0);
             if (wideCount <= 0) {
                 return {};
             }
             std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-            MultiByteToWideChar(
-                CP_UTF8, 0, data, static_cast<int>(length), wide.data(), wideCount);
+            MultiByteToWideChar(CP_UTF8, 0, data, static_cast<int>(length), wide.data(), wideCount);
             return wide;
         }
 
@@ -353,9 +351,8 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
         return ConvertStringView<TChar, FHostFxrChar>(value);
     }
 
-    auto FHostFxrLibrary::Load(
-        const FString& runtimeConfigPath, const FString& runtimeRoot, const FString& dotnetRoot)
-        -> bool {
+    auto FHostFxrLibrary::Load(const FString& runtimeConfigPath, const FString& runtimeRoot,
+        const FString& dotnetRoot) -> bool {
         Unload();
 
         std::vector<std::filesystem::path> localRoots;

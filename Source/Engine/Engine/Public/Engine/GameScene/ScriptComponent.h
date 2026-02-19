@@ -17,39 +17,39 @@ namespace AltinaEngine::GameScene {
     public:
         FScriptComponent() = default;
 
-        void SetAssemblyPath(Core::Container::FNativeStringView path);
-        void SetTypeName(Core::Container::FNativeStringView typeName);
-        void SetScriptAsset(AltinaEngine::Asset::FAssetHandle handle);
+        void               SetAssemblyPath(Core::Container::FNativeStringView path);
+        void               SetTypeName(Core::Container::FNativeStringView typeName);
+        void               SetScriptAsset(AltinaEngine::Asset::FAssetHandle handle);
 
         [[nodiscard]] auto GetAssemblyPath() const noexcept -> Core::Container::FNativeStringView;
         [[nodiscard]] auto GetTypeName() const noexcept -> Core::Container::FNativeStringView;
         [[nodiscard]] auto GetScriptAsset() const noexcept -> AltinaEngine::Asset::FAssetHandle;
 
-        static void SetAssetManager(AltinaEngine::Asset::FAssetManager* manager);
+        static void        SetAssetManager(AltinaEngine::Asset::FAssetManager* manager);
         [[nodiscard]] static auto GetAssetManager() noexcept -> AltinaEngine::Asset::FAssetManager*;
 
-        void OnCreate() override;
-        void OnDestroy() override;
-        void OnEnable() override;
-        void OnDisable() override;
-        void Tick(float dt) override;
+        void                      OnCreate() override;
+        void                      OnDestroy() override;
+        void                      OnEnable() override;
+        void                      OnDisable() override;
+        void                      Tick(float dt) override;
 
     private:
-        auto TryCreateInstance() -> bool;
-        auto RefreshFromAsset() -> bool;
-        void EnsureOnCreateInvoked();
+        auto                              TryCreateInstance() -> bool;
+        auto                              RefreshFromAsset() -> bool;
+        void                              EnsureOnCreateInvoked();
 
-        Core::Container::FNativeString mAssemblyPath{};
-        Core::Container::FNativeString mTypeName{};
+        Core::Container::FNativeString    mAssemblyPath{};
+        Core::Container::FNativeString    mTypeName{};
         AltinaEngine::Asset::FAssetHandle mScriptAsset{};
-        u64                            mManagedHandle = 0;
-        bool                           mCreatedCalled = false;
-        bool                           mOnCreateInvoked = false;
-        bool                           mAssetResolved = false;
-        bool                           mLoggedTick = false;
-        bool                           mLoggedCreate = false;
-        bool                           mLoggedCreateFailure = false;
-        bool                           mLoggedResolveFailure = false;
-        bool                           mLoggedResolved = false;
+        u64                               mManagedHandle        = 0;
+        bool                              mCreatedCalled        = false;
+        bool                              mOnCreateInvoked      = false;
+        bool                              mAssetResolved        = false;
+        bool                              mLoggedTick           = false;
+        bool                              mLoggedCreate         = false;
+        bool                              mLoggedCreateFailure  = false;
+        bool                              mLoggedResolveFailure = false;
+        bool                              mLoggedResolved       = false;
     };
 } // namespace AltinaEngine::GameScene

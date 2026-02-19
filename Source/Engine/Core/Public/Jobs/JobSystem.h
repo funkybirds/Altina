@@ -33,8 +33,8 @@ namespace std {
 namespace AltinaEngine::Core::Jobs {
 
     // Shorten commonly used engine types in this header to keep declarations concise.
-    using Container::TFunction;
     using Container::FString;
+    using Container::TFunction;
     using Container::TThreadSafeQueue;
     using Container::TVector;
     using Threading::FEvent;

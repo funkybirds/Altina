@@ -279,7 +279,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         constexpr u32 kMaterialParamFnvOffset32 = 2166136261u;
         constexpr u32 kMaterialParamFnvPrime32  = 16777619u;
 
-        auto HashMaterialParamName(const std::string& name) -> u32 {
+        auto          HashMaterialParamName(const std::string& name) -> u32 {
             if (name.empty()) {
                 return 0U;
             }
@@ -299,10 +299,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             if (count < 3U) {
                 return false;
             }
-            out[0] = 0.0f;
-            out[1] = 0.0f;
-            out[2] = 0.0f;
-            out[3] = 1.0f;
+            out[0]            = 0.0f;
+            out[1]            = 0.0f;
+            out[2]            = 0.0f;
+            out[3]            = 1.0f;
             const usize limit = (count > 4U) ? 4U : count;
             for (usize i = 0U; i < limit; ++i) {
                 const FJsonValue* entry = value->Array[i];
@@ -320,12 +320,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            std::string text(sourceBytes.begin(), sourceBytes.end());
+            std::string   text(sourceBytes.begin(), sourceBytes.end());
             FNativeString native;
             native.Append(text.c_str(), text.size());
             const FNativeStringView view(native.GetData(), native.Length());
 
-            FJsonDocument document;
+            FJsonDocument           document;
             if (!document.Parse(view)) {
                 return false;
             }
@@ -336,8 +336,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             f32 baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-            if (const FJsonValue* colorValue =
-                    FindObjectValueInsensitive(*root, "BaseColor")) {
+            if (const FJsonValue* colorValue = FindObjectValueInsensitive(*root, "BaseColor")) {
                 if (!ReadJsonVec4(colorValue, baseColor)) {
                     return false;
                 }
@@ -350,17 +349,17 @@ namespace AltinaEngine::Tools::AssetPipeline {
             baseColorParam.Value[2] = baseColor[2];
             baseColorParam.Value[3] = baseColor[3];
 
-            const std::vector<Asset::FMaterialScalarParam> scalars;
-            const std::vector<Asset::FMaterialVectorParam> vectors = { baseColorParam };
+            const std::vector<Asset::FMaterialScalarParam>  scalars;
+            const std::vector<Asset::FMaterialVectorParam>  vectors = { baseColorParam };
             const std::vector<Asset::FMaterialTextureParam> textures;
 
-            const u32 scalarBytes =
+            const u32                                       scalarBytes =
                 static_cast<u32>(scalars.size() * sizeof(Asset::FMaterialScalarParam));
             const u32 vectorBytes =
                 static_cast<u32>(vectors.size() * sizeof(Asset::FMaterialVectorParam));
             const u32 textureBytes =
                 static_cast<u32>(textures.size() * sizeof(Asset::FMaterialTextureParam));
-            const u32 dataBytes = scalarBytes + vectorBytes + textureBytes;
+            const u32               dataBytes = scalarBytes + vectorBytes + textureBytes;
 
             Asset::FAssetBlobHeader header{};
             header.Type     = static_cast<u8>(Asset::EAssetType::Material);
@@ -407,12 +406,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            std::string text(bytes.begin(), bytes.end());
+            std::string   text(bytes.begin(), bytes.end());
             FNativeString native;
             native.Append(text.c_str(), text.size());
             const FNativeStringView view(native.GetData(), native.Length());
 
-            FJsonDocument document;
+            FJsonDocument           document;
             if (!document.Parse(view)) {
                 return false;
             }
@@ -432,7 +431,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             outAssemblyPath = ToStdString(assemblyText);
-            outTypeName = ToStdString(typeText);
+            outTypeName     = ToStdString(typeText);
             return true;
         }
         void HashBytes(u64& hash, const void* data, size_t size) {
@@ -2561,8 +2560,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         break;
                     case Asset::EAssetType::Script:
                         if (entry.HasScriptDesc) {
-                            stream << "\"AssemblyPath\": \""
-                                   << EscapeJson(entry.ScriptAssemblyPath)
+                            stream << "\"AssemblyPath\": \"" << EscapeJson(entry.ScriptAssemblyPath)
                                    << "\", \"TypeName\": \"" << EscapeJson(entry.ScriptTypeName)
                                    << "\"";
                         } else {
@@ -2656,11 +2654,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 Asset::FTexture2DDesc textureDesc{};
                 Asset::FMeshDesc      meshDesc{};
                 Asset::FAudioDesc     audioDesc{};
-                  const bool            isTexture = asset.Type == Asset::EAssetType::Texture2D;
-                  const bool            isMesh    = asset.Type == Asset::EAssetType::Mesh;
-                  const bool            isMaterial = asset.Type == Asset::EAssetType::Material;
-                  const bool            isAudio   = asset.Type == Asset::EAssetType::Audio;
-                  const bool            isScript  = asset.Type == Asset::EAssetType::Script;
+                const bool            isTexture  = asset.Type == Asset::EAssetType::Texture2D;
+                const bool            isMesh     = asset.Type == Asset::EAssetType::Mesh;
+                const bool            isMaterial = asset.Type == Asset::EAssetType::Material;
+                const bool            isAudio    = asset.Type == Asset::EAssetType::Audio;
+                const bool            isScript   = asset.Type == Asset::EAssetType::Script;
                 std::string           scriptAssemblyPath;
                 std::string           scriptTypeName;
                 bool                  hasScriptDesc = false;
@@ -2672,29 +2670,29 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     }
                     hasScriptDesc = true;
                 }
-                  if (isTexture) {
-                      constexpr bool kDefaultSrgb = true;
-                      if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
-                          std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
-                                    << "\n";
-                          continue;
-                      }
-                  } else if (isMesh) {
-                      if (!CookMesh(asset.SourcePath, cookedBytes, meshDesc, cookKeyExtras)) {
-                          std::cerr << "Failed to cook mesh: " << asset.SourcePath.string() << "\n";
-                          continue;
-                      }
-                  } else if (isMaterial) {
-                      if (!CookMaterial(bytes, cookedBytes)) {
-                          std::cerr << "Failed to cook material: " << asset.SourcePath.string()
-                                    << "\n";
-                          continue;
-                      }
-                  } else if (isAudio) {
-                      if (!CookAudio(asset.SourcePath, bytes, cookedBytes, audioDesc)) {
-                          std::cerr << "Failed to cook audio: " << asset.SourcePath.string() << "\n";
-                          continue;
-                      }
+                if (isTexture) {
+                    constexpr bool kDefaultSrgb = true;
+                    if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
+                        std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
+                                  << "\n";
+                        continue;
+                    }
+                } else if (isMesh) {
+                    if (!CookMesh(asset.SourcePath, cookedBytes, meshDesc, cookKeyExtras)) {
+                        std::cerr << "Failed to cook mesh: " << asset.SourcePath.string() << "\n";
+                        continue;
+                    }
+                } else if (isMaterial) {
+                    if (!CookMaterial(bytes, cookedBytes)) {
+                        std::cerr << "Failed to cook material: " << asset.SourcePath.string()
+                                  << "\n";
+                        continue;
+                    }
+                } else if (isAudio) {
+                    if (!CookAudio(asset.SourcePath, bytes, cookedBytes, audioDesc)) {
+                        std::cerr << "Failed to cook audio: " << asset.SourcePath.string() << "\n";
+                        continue;
+                    }
                 } else {
                     cookedBytes = bytes;
                 }
@@ -2751,8 +2749,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     registryEntry.HasAudioDesc = true;
                 } else if (isScript) {
                     registryEntry.ScriptAssemblyPath = scriptAssemblyPath;
-                    registryEntry.ScriptTypeName = scriptTypeName;
-                    registryEntry.HasScriptDesc = hasScriptDesc;
+                    registryEntry.ScriptTypeName     = scriptTypeName;
+                    registryEntry.HasScriptDesc      = hasScriptDesc;
                 }
                 registryAssets.push_back(registryEntry);
             }

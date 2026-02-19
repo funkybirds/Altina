@@ -27,14 +27,14 @@ namespace AltinaEngine::Core::Instrumentation {
         Threading::TAtomic<unsigned long long> mCount{ 0 };
     };
 
-    static Threading::FMutex                   gMutex;
+    static Threading::FMutex                          gMutex;
     static THashMap<FNativeString, TShared<FCounter>> gCounters;
     static THashMap<FNativeString, TShared<FTiming>>  gTimings;
 
     // Per-thread name stored in thread_local for fast reads.
-    thread_local const char*                   tThreadName = nullptr;
+    thread_local const char*                          tThreadName = nullptr;
 
-    void                                       SetCurrentThreadName(const char* name) noexcept {
+    void SetCurrentThreadName(const char* name) noexcept {
         tThreadName = name;
         if (name == nullptr)
             return;

@@ -17,8 +17,8 @@ namespace AltinaEngine::RenderCore {
                 return;
             }
 
-            auto lock = buffer->Lock(0ULL, static_cast<u64>(data.Size()),
-                Rhi::ERhiBufferLockMode::WriteDiscard);
+            auto lock = buffer->Lock(
+                0ULL, static_cast<u64>(data.Size()), Rhi::ERhiBufferLockMode::WriteDiscard);
             if (!lock.IsValid()) {
                 return;
             }
@@ -27,8 +27,7 @@ namespace AltinaEngine::RenderCore {
             buffer->Unlock(lock);
         }
 
-        void FillTextureRange(Rhi::FRhiTextureViewRange& range,
-            const Rhi::FRhiTextureDesc& desc) {
+        void FillTextureRange(Rhi::FRhiTextureViewRange& range, const Rhi::FRhiTextureDesc& desc) {
             if (range.mMipCount == 0U) {
                 range.mMipCount = desc.mMipLevels;
             }
@@ -49,12 +48,11 @@ namespace AltinaEngine::RenderCore {
             return;
         }
 
-        mInitHandle = EnqueueRenderTask(FString(TEXT("RenderResource.Init")),
-            [this]() -> void {
-                InitRHI();
-                mState.Store(static_cast<i32>(EState::Initialized));
-                OnInitComplete();
-            });
+        mInitHandle = EnqueueRenderTask(FString(TEXT("RenderResource.Init")), [this]() -> void {
+            InitRHI();
+            mState.Store(static_cast<i32>(EState::Initialized));
+            OnInitComplete();
+        });
     }
 
     void FRenderResource::ReleaseResource() noexcept {
@@ -65,8 +63,8 @@ namespace AltinaEngine::RenderCore {
         }
 
         mState.Store(static_cast<i32>(EState::ReleasePending));
-        mReleaseHandle = EnqueueRenderTask(FString(TEXT("RenderResource.Release")),
-            [this]() -> void {
+        mReleaseHandle =
+            EnqueueRenderTask(FString(TEXT("RenderResource.Release")), [this]() -> void {
                 ReleaseRHI();
                 mState.Store(static_cast<i32>(EState::Uninitialized));
             });
@@ -77,8 +75,8 @@ namespace AltinaEngine::RenderCore {
             return;
         }
 
-        EnqueueRenderTask(FString(TEXT("RenderResource.Update")),
-            [this]() -> void { UpdateRHI(); });
+        EnqueueRenderTask(
+            FString(TEXT("RenderResource.Update")), [this]() -> void { UpdateRHI(); });
     }
 
     void FRenderResource::WaitForInit() noexcept {
@@ -245,8 +243,8 @@ namespace AltinaEngine::RenderCore {
         mDesc.mCpuAccess = Rhi::ERhiCpuAccess::Write;
     }
 
-    FIndexBuffer::FIndexBuffer(const Rhi::FRhiBufferDesc& desc,
-        Rhi::ERhiIndexType indexType) noexcept
+    FIndexBuffer::FIndexBuffer(
+        const Rhi::FRhiBufferDesc& desc, Rhi::ERhiIndexType indexType) noexcept
         : mDesc(desc), mIndexType(indexType) {
         if (mDesc.mBindFlags == Rhi::ERhiBufferBindFlags::None) {
             mDesc.mBindFlags = Rhi::ERhiBufferBindFlags::Index;
@@ -314,7 +312,7 @@ namespace AltinaEngine::RenderCore {
         }
 
         Rhi::FRhiShaderResourceViewDesc desc = mSRVDesc;
-        desc.mTexture = mTexture.Get();
+        desc.mTexture                        = mTexture.Get();
         if (desc.mFormat == Rhi::ERhiFormat::Unknown) {
             desc.mFormat = mDesc.mFormat;
         }
@@ -348,7 +346,7 @@ namespace AltinaEngine::RenderCore {
         }
 
         Rhi::FRhiUnorderedAccessViewDesc desc = mUAVDesc;
-        desc.mTexture = mTexture.Get();
+        desc.mTexture                         = mTexture.Get();
         if (desc.mFormat == Rhi::ERhiFormat::Unknown) {
             desc.mFormat = mDesc.mFormat;
         }
@@ -389,7 +387,7 @@ namespace AltinaEngine::RenderCore {
         }
 
         Rhi::FRhiShaderResourceViewDesc srvDesc = mSRVDesc;
-        srvDesc.mTexture = mTexture.Get();
+        srvDesc.mTexture                        = mTexture.Get();
         if (srvDesc.mFormat == Rhi::ERhiFormat::Unknown) {
             srvDesc.mFormat = mDesc.mFormat;
         }
@@ -397,7 +395,7 @@ namespace AltinaEngine::RenderCore {
         mSRV = device->CreateShaderResourceView(srvDesc);
 
         Rhi::FRhiUnorderedAccessViewDesc uavDesc = mUAVDesc;
-        uavDesc.mTexture = mTexture.Get();
+        uavDesc.mTexture                         = mTexture.Get();
         if (uavDesc.mFormat == Rhi::ERhiFormat::Unknown) {
             uavDesc.mFormat = mDesc.mFormat;
         }
@@ -412,13 +410,3 @@ namespace AltinaEngine::RenderCore {
     }
 
 } // namespace AltinaEngine::RenderCore
-
-
-
-
-
-
-
-
-
-

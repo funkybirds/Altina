@@ -18,7 +18,7 @@ namespace AltinaEngine::Engine {
 
         constexpr u64 kHashSeed = 0x9e3779b97f4a7c15ULL;
 
-        auto HashCombine(u64 seed, u64 value) noexcept -> u64 {
+        auto          HashCombine(u64 seed, u64 value) noexcept -> u64 {
             return seed ^ (value + kHashSeed + (seed << 6U) + (seed >> 2U));
         }
 
@@ -149,16 +149,16 @@ namespace AltinaEngine::Engine {
 
             const u32 sectionCount = static_cast<u32>(lod.Sections.Size());
             for (u32 sectionIndex = 0U; sectionIndex < sectionCount; ++sectionIndex) {
-                const auto& section = lod.Sections[sectionIndex];
-                const auto* handle =
-                    (entry.Materials != nullptr) ? entry.Materials->GetMaterial(section.MaterialSlot)
-                                                 : nullptr;
+                const auto& section  = lod.Sections[sectionIndex];
+                const auto* handle   = (entry.Materials != nullptr)
+                      ? entry.Materials->GetMaterial(section.MaterialSlot)
+                      : nullptr;
                 const auto* material = materialCache.Resolve(handle);
 
-                FDrawItem item{};
-                item.MeshType = RenderCore::Render::EDrawMeshType::StaticMesh;
-                item.Pass     = params.Pass;
-                item.Material = material;
+                FDrawItem   item{};
+                item.MeshType            = RenderCore::Render::EDrawMeshType::StaticMesh;
+                item.Pass                = params.Pass;
+                item.Material            = material;
                 item.Static.Mesh         = entry.Mesh;
                 item.Static.LodIndex     = params.LodIndex;
                 item.Static.SectionIndex = sectionIndex;
@@ -167,13 +167,12 @@ namespace AltinaEngine::Engine {
                 item.Instance.ObjectId   = entry.OwnerId.IsValid() ? entry.OwnerId.Index : 0U;
 
                 item.Key.PassKey     = static_cast<u64>(params.Pass);
-                item.Key.PipelineKey =
-                    BuildPipelineKey(material != nullptr ? material->FindPassDesc(params.Pass)
-                                                         : nullptr);
+                item.Key.PipelineKey = BuildPipelineKey(
+                    material != nullptr ? material->FindPassDesc(params.Pass) : nullptr);
                 item.Key.MaterialKey = HashPointer(material);
-                item.Key.GeometryKey = BuildGeometryKey(
-                    entry.Mesh, params.LodIndex, lod.PrimitiveTopology);
-                item.Key.SectionKey  = BuildSectionKey(section);
+                item.Key.GeometryKey =
+                    BuildGeometryKey(entry.Mesh, params.LodIndex, lod.PrimitiveTopology);
+                item.Key.SectionKey = BuildSectionKey(section);
 
                 items.PushBack(Move(item));
             }
@@ -191,10 +190,10 @@ namespace AltinaEngine::Engine {
             if (outDrawList.Batches.IsEmpty() || !params.bAllowInstancing
                 || !(item.Key == outDrawList.Batches.Back().BatchKey)) {
                 RenderCore::Render::FDrawBatch batch{};
-                batch.BatchKey  = item.Key;
-                batch.Pass      = item.Pass;
-                batch.Material  = item.Material;
-                batch.Static    = item.Static;
+                batch.BatchKey = item.Key;
+                batch.Pass     = item.Pass;
+                batch.Material = item.Material;
+                batch.Static   = item.Static;
                 batch.Instances.PushBack(item.Instance);
                 outDrawList.Batches.PushBack(Move(batch));
             } else {

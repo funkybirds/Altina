@@ -45,15 +45,15 @@ namespace AltinaEngine::RenderCore::Geometry {
     };
 
     struct AE_RENDER_CORE_API FStaticMeshLodData {
-        FStaticMeshLodData() = default;
-        FStaticMeshLodData(const FStaticMeshLodData&) = delete;
-        auto operator=(const FStaticMeshLodData&) -> FStaticMeshLodData& = delete;
-        FStaticMeshLodData(FStaticMeshLodData&&) noexcept = default;
-        auto operator=(FStaticMeshLodData&&) noexcept -> FStaticMeshLodData& = default;
+        FStaticMeshLodData()                                                            = default;
+        FStaticMeshLodData(const FStaticMeshLodData&)                                   = delete;
+        auto operator=(const FStaticMeshLodData&) -> FStaticMeshLodData&                = delete;
+        FStaticMeshLodData(FStaticMeshLodData&&) noexcept                               = default;
+        auto            operator=(FStaticMeshLodData&&) noexcept -> FStaticMeshLodData& = default;
 
-        f32                         ScreenSize = 1.0f;
+        f32             ScreenSize = 1.0f;
 
-        FPositionBuffer             PositionBuffer;
+        FPositionBuffer PositionBuffer;
         FVertexTangentBuffer        TangentBuffer;
         FVertexUVBuffer             UV0Buffer;
         FVertexUVBuffer             UV1Buffer;

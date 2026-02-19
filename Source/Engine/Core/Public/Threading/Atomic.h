@@ -94,8 +94,8 @@ namespace AltinaEngine::Core::Threading {
         constexpr TAtomic() noexcept : mImpl(static_cast<TSignedType>(0)) {}
         constexpr explicit TAtomic(T desired) noexcept : mImpl(static_cast<TSignedType>(desired)) {}
 
-        TAtomic(const TAtomic&)                                  = delete;
-        auto               operator=(const TAtomic&) -> TAtomic& = delete;
+        TAtomic(const TAtomic&)                    = delete;
+        auto operator=(const TAtomic&) -> TAtomic& = delete;
         TAtomic(TAtomic&& other) noexcept : mImpl(AltinaEngine::Move(other.mImpl)) {}
         auto operator=(TAtomic&& other) noexcept -> TAtomic& {
             if (this != &other) {

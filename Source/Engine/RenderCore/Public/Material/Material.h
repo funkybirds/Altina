@@ -38,7 +38,7 @@ namespace AltinaEngine::RenderCore {
     };
 
     struct FMaterialTextureParam {
-        FMaterialParamId               NameHash     = 0U;
+        FMaterialParamId               NameHash = 0U;
         Rhi::FRhiShaderResourceViewRef SRV;
         Rhi::FRhiSamplerRef            Sampler;
         u32                            SamplerFlags = 0U;
@@ -46,13 +46,13 @@ namespace AltinaEngine::RenderCore {
 
     class AE_RENDER_CORE_API FMaterial final : public FRenderResource {
     public:
-        void SetDesc(const FMaterialDesc& desc) noexcept { mDesc = desc; }
-        void SetTemplate(TShared<FMaterialTemplate> templ) noexcept;
+        void               SetDesc(const FMaterialDesc& desc) noexcept { mDesc = desc; }
+        void               SetTemplate(TShared<FMaterialTemplate> templ) noexcept;
 
-        auto SetScalar(FMaterialParamId id, f32 value) -> bool;
-        auto SetVector(FMaterialParamId id, const Math::FVector4f& value) -> bool;
-        auto SetTexture(FMaterialParamId id, Rhi::FRhiShaderResourceViewRef srv,
-            Rhi::FRhiSamplerRef sampler, u32 samplerFlags) -> bool;
+        auto               SetScalar(FMaterialParamId id, f32 value) -> bool;
+        auto               SetVector(FMaterialParamId id, const Math::FVector4f& value) -> bool;
+        auto               SetTexture(FMaterialParamId id, Rhi::FRhiShaderResourceViewRef srv,
+                          Rhi::FRhiSamplerRef sampler, u32 samplerFlags) -> bool;
 
         [[nodiscard]] auto GetDesc() const noexcept -> const FMaterialDesc& { return mDesc; }
         [[nodiscard]] auto FindPassDesc(EMaterialPass pass) const noexcept
@@ -61,11 +61,9 @@ namespace AltinaEngine::RenderCore {
             -> const FMaterialPassShaders*;
         [[nodiscard]] auto FindState(EMaterialPass pass) const noexcept
             -> const FMaterialPassState*;
-        [[nodiscard]] auto FindLayout(EMaterialPass pass) const noexcept
-            -> const FMaterialLayout*;
+        [[nodiscard]] auto FindLayout(EMaterialPass pass) const noexcept -> const FMaterialLayout*;
 
-        [[nodiscard]] auto GetBindGroup(EMaterialPass pass) const noexcept
-            -> Rhi::FRhiBindGroupRef;
+        [[nodiscard]] auto GetBindGroup(EMaterialPass pass) const noexcept -> Rhi::FRhiBindGroupRef;
 
     protected:
         void InitRHI() override;
@@ -75,22 +73,20 @@ namespace AltinaEngine::RenderCore {
     private:
         [[nodiscard]] auto FindTextureParam(FMaterialParamId id) const noexcept
             -> const FMaterialTextureParam*;
-        void               UpdateCBuffer(const FMaterialLayout& layout,
-                              bool& outRecreated, bool& outUploaded);
-        void               UpdateBindGroups(const FMaterialTemplate& templ,
-                              const FMaterialLayout& defaultLayout);
+        void UpdateCBuffer(const FMaterialLayout& layout, bool& outRecreated, bool& outUploaded);
+        void UpdateBindGroups(const FMaterialTemplate& templ, const FMaterialLayout& defaultLayout);
 
-        FMaterialDesc              mDesc{};
-        TShared<FMaterialTemplate> mTemplate;
+        FMaterialDesc                                                           mDesc{};
+        TShared<FMaterialTemplate>                                              mTemplate;
 
-        TVector<FMaterialScalarParam>  mScalars;
-        TVector<FMaterialVectorParam>  mVectors;
-        TVector<FMaterialTextureParam> mTextures;
+        TVector<FMaterialScalarParam>                                           mScalars;
+        TVector<FMaterialVectorParam>                                           mVectors;
+        TVector<FMaterialTextureParam>                                          mTextures;
 
-        TVector<u8> mCBufferData;
+        TVector<u8>                                                             mCBufferData;
 
-        Rhi::FRhiBufferRef mCBuffer;
-        THashMap<EMaterialPass, Rhi::FRhiBindGroupRef, FMaterialPassHash> mBindGroups;
+        Rhi::FRhiBufferRef                                                      mCBuffer;
+        THashMap<EMaterialPass, Rhi::FRhiBindGroupRef, FMaterialPassHash>       mBindGroups;
         THashMap<EMaterialPass, Rhi::FRhiBindGroupLayoutRef, FMaterialPassHash> mBindGroupLayouts;
 
         bool mDirtyCBuffer  = false;

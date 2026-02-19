@@ -321,12 +321,12 @@ namespace AltinaEngine::Core::Utility::Json {
                     }
                 }
 
-                const usize end = mIndex;
+                const usize   end = mIndex;
                 FNativeString token;
                 if (end > start) {
                     token.Append(mText.Data() + start, end - start);
                 }
-                const char* cstr  = token.CStr();
+                const char* cstr   = token.CStr();
                 char*       endPtr = nullptr;
                 out                = std::strtod(cstr, &endPtr);
                 if (endPtr == cstr) {

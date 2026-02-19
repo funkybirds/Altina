@@ -6,12 +6,12 @@
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     #include <vulkan/vulkan.h>
 #else
-    struct VkSurfaceKHR_T;
-    struct VkSwapchainKHR_T;
-    struct VkSemaphore_T;
-    using VkSurfaceKHR = VkSurfaceKHR_T*;
-    using VkSwapchainKHR = VkSwapchainKHR_T*;
-    using VkSemaphore = VkSemaphore_T*;
+struct VkSurfaceKHR_T;
+struct VkSwapchainKHR_T;
+struct VkSemaphore_T;
+using VkSurfaceKHR   = VkSurfaceKHR_T*;
+using VkSwapchainKHR = VkSwapchainKHR_T*;
+using VkSemaphore    = VkSemaphore_T*;
 #endif
 
 namespace AltinaEngine::Rhi {
@@ -21,9 +21,9 @@ namespace AltinaEngine::Rhi {
             VkPhysicalDevice physicalDevice, VkQueue graphicsQueue, u32 graphicsQueueFamily);
         ~FRhiVulkanViewport() override;
 
-        void Resize(u32 width, u32 height) override;
+        void               Resize(u32 width, u32 height) override;
         [[nodiscard]] auto GetBackBuffer() const noexcept -> FRhiTexture* override;
-        void Present(const FRhiPresentInfo& info) override;
+        void               Present(const FRhiPresentInfo& info) override;
 
         [[nodiscard]] auto GetNativeSwapchain() const noexcept -> VkSwapchainKHR;
         [[nodiscard]] auto GetAcquireSemaphore() const noexcept -> VkSemaphore;

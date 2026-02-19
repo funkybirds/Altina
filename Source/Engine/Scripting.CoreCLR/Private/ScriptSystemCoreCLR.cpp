@@ -32,13 +32,13 @@
     #endif
 #endif
 
-using AltinaEngine::Core::Logging::FLogger;
 using AltinaEngine::Core::Logging::ELogLevel;
+using AltinaEngine::Core::Logging::FLogger;
 
 namespace AltinaEngine::Scripting::CoreCLR {
     namespace {
-        constexpr auto kManagedLogCategory = TEXT("Scripting.Managed");
-        const Input::FInputSystem* gInputSystem = nullptr;
+        constexpr auto             kManagedLogCategory = TEXT("Scripting.Managed");
+        const Input::FInputSystem* gInputSystem        = nullptr;
 
         auto ToFStringFromUtf8(const char* message) -> Core::Container::FString {
             using Core::Container::FNativeStringView;
@@ -50,19 +50,19 @@ namespace AltinaEngine::Scripting::CoreCLR {
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
             FString out;
     #if AE_PLATFORM_WIN
-            int wideCount = MultiByteToWideChar(
-                CP_UTF8, 0, message, static_cast<int>(length), nullptr, 0);
+            int wideCount =
+                MultiByteToWideChar(CP_UTF8, 0, message, static_cast<int>(length), nullptr, 0);
             if (wideCount <= 0) {
                 return out;
             }
             std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-            MultiByteToWideChar(CP_UTF8, 0, message, static_cast<int>(length),
-                wide.data(), wideCount);
+            MultiByteToWideChar(
+                CP_UTF8, 0, message, static_cast<int>(length), wide.data(), wideCount);
             out.Append(wide.c_str(), wide.size());
     #else
             for (usize i = 0; i < length; ++i) {
-                out.Append(static_cast<AltinaEngine::TChar>(
-                    static_cast<unsigned char>(message[i])));
+                out.Append(
+                    static_cast<AltinaEngine::TChar>(static_cast<unsigned char>(message[i])));
             }
     #endif
             return out;
@@ -177,25 +177,25 @@ namespace AltinaEngine::Scripting::CoreCLR {
         mInputSystem = inputSystem;
         gInputSystem = inputSystem;
 
-        mNativeApi = {};
-        mNativeApi.LogInfo = &LogManagedInfo;
-        mNativeApi.LogError = &LogManagedError;
-        mNativeApi.IsKeyDown = &IsKeyDown;
-        mNativeApi.WasKeyPressed = &WasKeyPressed;
-        mNativeApi.WasKeyReleased = &WasKeyReleased;
-        mNativeApi.IsMouseButtonDown = &IsMouseButtonDown;
-        mNativeApi.WasMouseButtonPressed = &WasMouseButtonPressed;
+        mNativeApi                        = {};
+        mNativeApi.LogInfo                = &LogManagedInfo;
+        mNativeApi.LogError               = &LogManagedError;
+        mNativeApi.IsKeyDown              = &IsKeyDown;
+        mNativeApi.WasKeyPressed          = &WasKeyPressed;
+        mNativeApi.WasKeyReleased         = &WasKeyReleased;
+        mNativeApi.IsMouseButtonDown      = &IsMouseButtonDown;
+        mNativeApi.WasMouseButtonPressed  = &WasMouseButtonPressed;
         mNativeApi.WasMouseButtonReleased = &WasMouseButtonReleased;
-        mNativeApi.GetMouseX = &GetMouseX;
-        mNativeApi.GetMouseY = &GetMouseY;
-        mNativeApi.GetMouseDeltaX = &GetMouseDeltaX;
-        mNativeApi.GetMouseDeltaY = &GetMouseDeltaY;
-        mNativeApi.GetMouseWheelDelta = &GetMouseWheelDelta;
-        mNativeApi.GetWindowWidth = &GetWindowWidth;
-        mNativeApi.GetWindowHeight = &GetWindowHeight;
-        mNativeApi.HasFocus = &HasFocus;
-        mNativeApi.GetCharInputCount = &GetCharInputCount;
-        mNativeApi.GetCharInputAt = &GetCharInputAt;
+        mNativeApi.GetMouseX              = &GetMouseX;
+        mNativeApi.GetMouseY              = &GetMouseY;
+        mNativeApi.GetMouseDeltaX         = &GetMouseDeltaX;
+        mNativeApi.GetMouseDeltaY         = &GetMouseDeltaY;
+        mNativeApi.GetMouseWheelDelta     = &GetMouseWheelDelta;
+        mNativeApi.GetWindowWidth         = &GetWindowWidth;
+        mNativeApi.GetWindowHeight        = &GetWindowHeight;
+        mNativeApi.HasFocus               = &HasFocus;
+        mNativeApi.GetCharInputCount      = &GetCharInputCount;
+        mNativeApi.GetCharInputAt         = &GetCharInputAt;
 
         if (!mRuntime.Initialize(runtimeConfig, managedConfig, mNativeApi)) {
             gInputSystem = nullptr;

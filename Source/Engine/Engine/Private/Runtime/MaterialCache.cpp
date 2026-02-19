@@ -212,10 +212,10 @@ namespace AltinaEngine::Engine {
         return srv;
     }
 
-    auto FMaterialCache::BuildMaterialFromAsset(const Asset::FMaterialAsset& asset,
-        Container::TVector<FTextureBinding>& outBindings) const
+    auto FMaterialCache::BuildMaterialFromAsset(
+        const Asset::FMaterialAsset& asset, Container::TVector<FTextureBinding>& outBindings) const
         -> Container::TShared<Render::FMaterial> {
-        auto material = Container::MakeShared<Render::FMaterial>();
+        auto                  material = Container::MakeShared<Render::FMaterial>();
         Render::FMaterialDesc desc{};
         const auto&           assetDesc = asset.GetDesc();
         desc.ShadingModel               = assetDesc.ShadingModel;
@@ -233,7 +233,7 @@ namespace AltinaEngine::Engine {
         }
 
         for (const auto& param : asset.GetVectors()) {
-            const auto& v = param.Value;
+            const auto&             v = param.Value;
             Render::Math::FVector4f value(v[0], v[1], v[2], v[3]);
             material->SetVector(param.NameHash, value);
         }
@@ -246,8 +246,8 @@ namespace AltinaEngine::Engine {
         return material;
     }
 
-    void FMaterialCache::ApplyTextureBindings(Render::FMaterial& material,
-        const Container::TVector<FTextureBinding>& bindings) {
+    void FMaterialCache::ApplyTextureBindings(
+        Render::FMaterial& material, const Container::TVector<FTextureBinding>& bindings) {
         if (bindings.IsEmpty()) {
             return;
         }

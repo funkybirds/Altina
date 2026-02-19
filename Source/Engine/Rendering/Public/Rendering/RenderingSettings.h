@@ -6,7 +6,7 @@
 
 namespace AltinaEngine::Rendering {
     enum class ERendererType : i32 {
-        Forward = 0,
+        Forward  = 0,
         Deferred = 1
     };
 

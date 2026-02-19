@@ -48,6 +48,8 @@ target_include_directories(${TargetName}
 target_link_libraries(${TargetName}
     PUBLIC
         AltinaEngine::RenderCore
+    PRIVATE
+        AltinaEngine::ShaderCompiler
 )
 
 target_compile_features(${TargetName}

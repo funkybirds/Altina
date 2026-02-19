@@ -1,76 +1,35 @@
 #include "Base/AltinaBase.h"
+#include "Asset/AssetBinary.h"
+#include "Asset/AssetManager.h"
+#include "Asset/AssetRegistry.h"
+#include "Asset/MaterialLoader.h"
+#include "Asset/MeshAsset.h"
+#include "Asset/MeshLoader.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
-#include "Engine/GameScene/ScriptComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
-#include "Engine/Runtime/MaterialCache.h"
-#include "Engine/Runtime/SceneBatching.h"
-#include "Engine/Runtime/SceneView.h"
-#include "Asset/AssetRegistry.h"
-#include "Gameplay/GameplayModule.h"
+#include "Geometry/StaticMeshData.h"
 #include "Launch/EngineLoop.h"
-#include "Input/InputSystem.h"
-#include "Input/Keys.h"
+#include "Logging/Log.h"
+#include "Math/LinAlg/SpatialTransform.h"
 #include "Math/Vector.h"
-#include "Reflection/Reflection.h"
-#include "Rhi/Command/RhiCmdBuiltins.h"
-#include "Rhi/Command/RhiCmdContextAdapter.h"
-#include "Rhi/Command/RhiCmdExecutor.h"
-#include "Rhi/Command/RhiCmdList.h"
-#include "Rhi/RhiBuffer.h"
-#include "Rhi/RhiDevice.h"
-#include "Rhi/RhiPipeline.h"
-#include "Rhi/RhiQueue.h"
-#include "Rhi/RhiResourceView.h"
-#include "Rhi/RhiShader.h"
-#include "Rhi/RhiStructs.h"
-#include "Rhi/RhiViewport.h"
-#include "RhiD3D11/RhiD3D11CommandContext.h"
-#include "ShaderCompiler/ShaderCompiler.h"
+#include "Platform/Generic/GenericPlatformDecl.h"
 #include "Types/Aliases.h"
-#include "Container/String.h"
+#include "Types/Traits.h"
 
-#include <atomic>
-#include <chrono>
-#include <cstdlib>
-#include <cstring>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
-
-#if AE_PLATFORM_WIN
-    #ifdef TEXT
-        #undef TEXT
-    #endif
-    #ifndef WIN32_LEAN_AND_MEAN
-        #define WIN32_LEAN_AND_MEAN
-    #endif
-    #ifndef NOMINMAX
-        #define NOMINMAX
-    #endif
-    #include <Windows.h>
-    #include <d3dcompiler.h>
-    #include <wrl/client.h>
-#endif
 
 using namespace AltinaEngine;
-using namespace AltinaEngine::Core;
-using namespace AltinaEngine::Launch;
-
-struct Neko {
-    int    mNya  = 114;
-    double mMeow = 1.0;
-};
 
 namespace {
-    auto ToFString(const std::filesystem::path& path) -> Container::FString {
+    auto ToFString(const std::filesystem::path& path) -> Core::Container::FString {
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
         const std::wstring wide = path.wstring();
-        return Container::FString(wide.c_str(), static_cast<usize>(wide.size()));
+        return Core::Container::FString(wide.c_str(), static_cast<usize>(wide.size()));
 #else
         const std::string narrow = path.string();
-        return Container::FString(narrow.c_str(), static_cast<usize>(narrow.size()));
+        return Core::Container::FString(narrow.c_str(), static_cast<usize>(narrow.size()));
 #endif
     }
 
@@ -90,569 +49,251 @@ namespace {
         return {};
     }
 
-    auto LoadDemoAssetRegistry(FEngineLoop& engineLoop) -> bool {
+    auto LoadDemoAssetRegistry(Launch::FEngineLoop& engineLoop) -> bool {
         const auto registryPath = FindAssetRegistryPath();
         if (registryPath.empty()) {
-            LogWarning(TEXT("Demo asset registry not found; ScriptAsset test will be skipped."));
+            LogWarning(TEXT("Demo asset registry not found."));
             return false;
         }
         if (!engineLoop.GetAssetRegistry().LoadFromJsonFile(ToFString(registryPath))) {
-            LogWarning(TEXT("Demo asset registry load failed; ScriptAsset test will be skipped."));
+            LogWarning(TEXT("Demo asset registry load failed."));
             return false;
+        }
+
+        const auto assetRoot = registryPath.parent_path().parent_path();
+        std::error_code ec;
+        std::filesystem::current_path(assetRoot, ec);
+        if (ec) {
+            const auto rootText = ToFString(assetRoot);
+            LogWarning(TEXT("Failed to set asset root to {}."), rootText.ToView());
         }
         return true;
     }
 
-#if AE_PLATFORM_WIN
-    namespace ShaderCompileHelpers {
-        using Microsoft::WRL::ComPtr;
-
-        auto ToFString(const std::filesystem::path& path) -> Container::FString {
-            Container::FString out;
-    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-            const auto wide = path.wstring();
-            if (!wide.empty()) {
-                out.Append(wide.c_str(), wide.size());
-            }
-    #else
-            const auto narrow = path.string();
-            if (!narrow.empty()) {
-                out.Append(narrow.c_str(), narrow.size());
-            }
-    #endif
-            return out;
-        }
-
-        auto ToFStringAscii(const char* text) -> Container::FString {
-            Container::FString out;
-            if (text == nullptr) {
-                return out;
-            }
-            const size_t length = std::strlen(text);
-            out.Reserve(length);
-            for (size_t i = 0; i < length; ++i) {
-                out.Append(static_cast<TChar>(text[i]));
-            }
-            return out;
-        }
-
-        auto ToAsciiString(const Container::FString& text) -> Container::FNativeString {
-            Container::FNativeString out;
-            const auto* data = text.GetData();
-            const auto  size = text.Length();
-            out.Reserve(size);
-            for (usize i = 0; i < size; ++i) {
-                const auto ch = data[i];
-                out.Append((static_cast<u32>(ch) <= 0x7fU) ? static_cast<char>(ch) : '?');
-            }
-            return out;
-        }
-
-        auto IsCompilerUnavailable(const Container::FString& diagnostics) -> bool {
-            const auto diag = ToAsciiString(diagnostics);
-            const auto view = diag.ToView();
-            if (view.Contains(Container::FNativeStringView("disabled"))) {
+    auto FindPositionAttribute(const Asset::TVector<Asset::FMeshVertexAttributeDesc>& attributes,
+        u32& outOffset, u32& outFormat) -> bool {
+        for (const auto& attr : attributes) {
+            if (attr.Semantic == Asset::kMeshSemanticPosition) {
+                outOffset = attr.AlignedOffset;
+                outFormat = attr.Format;
                 return true;
             }
-            if (view.Contains(Container::FNativeStringView("Failed to launch compiler process."))) {
-                return true;
-            }
-            if (view.Contains(Container::FNativeStringView("Process execution not supported"))) {
-                return true;
-            }
+        }
+        return false;
+    }
+
+    auto ReadPosition(const u8* vertexBase, u32 offset, u32 format) noexcept
+        -> Core::Math::FVector3f {
+        const auto* data = reinterpret_cast<const f32*>(vertexBase + offset);
+        switch (format) {
+            case Asset::kMeshVertexFormatR32Float:
+                return Core::Math::FVector3f(data[0], 0.0f, 0.0f);
+            case Asset::kMeshVertexFormatR32G32Float:
+                return Core::Math::FVector3f(data[0], data[1], 0.0f);
+            case Asset::kMeshVertexFormatR32G32B32Float:
+                return Core::Math::FVector3f(data[0], data[1], data[2]);
+            case Asset::kMeshVertexFormatR32G32B32A32Float:
+                return Core::Math::FVector3f(data[0], data[1], data[2]);
+            default:
+                break;
+        }
+        return Core::Math::FVector3f(0.0f);
+    }
+
+    auto BuildStaticMeshFromAsset(const Asset::FMeshAsset& asset,
+        RenderCore::Geometry::FStaticMeshData& outMesh) -> bool {
+        const auto& desc       = asset.GetDesc();
+        const auto& attributes = asset.GetAttributes();
+        const auto& subMeshes  = asset.GetSubMeshes();
+        const auto& vertices   = asset.GetVertexData();
+        const auto& indices    = asset.GetIndexData();
+
+        if (desc.VertexCount == 0U || desc.IndexCount == 0U || desc.VertexStride == 0U) {
             return false;
         }
 
-        auto GetEnvPath(const char* name, std::filesystem::path& outPath) -> bool {
-            if (name == nullptr) {
-                return false;
-            }
-            const char* value = std::getenv(name);
-            if (value == nullptr || value[0] == '\0') {
-                return false;
-            }
-            outPath = std::filesystem::path(value);
-            return true;
-        }
-
-        auto TryResolveDxcPath(std::filesystem::path& outPath) -> bool {
-            std::filesystem::path envPath;
-            if (GetEnvPath("AE_DXC_PATH", envPath) || GetEnvPath("DXC_PATH", envPath)) {
-                if (std::filesystem::exists(envPath)) {
-                    outPath = envPath;
-                    return true;
-                }
-            }
-
-            if (GetEnvPath("VULKAN_SDK", envPath)) {
-                auto candidate = envPath / "Bin" / "dxc.exe";
-                if (std::filesystem::exists(candidate)) {
-                    outPath = candidate;
-                    return true;
-                }
-            }
-
-            if (GetEnvPath("ProgramFiles(x86)", envPath) || GetEnvPath("ProgramFiles", envPath)) {
-                auto            kitsRoot = envPath / "Windows Kits" / "10" / "bin";
-                std::error_code ec;
-                if (std::filesystem::exists(kitsRoot, ec)) {
-                    std::filesystem::path bestPath;
-                    for (const auto& entry : std::filesystem::directory_iterator(kitsRoot, ec)) {
-                        if (ec || !entry.is_directory()) {
-                            continue;
-                        }
-                        auto candidate = entry.path() / "x64" / "dxc.exe";
-                        if (std::filesystem::exists(candidate)) {
-                            if (bestPath.empty() || candidate.string() > bestPath.string()) {
-                                bestPath = candidate;
-                            }
-                        }
-                    }
-                    if (!bestPath.empty()) {
-                        outPath = bestPath;
-                        return true;
-                    }
-                }
-            }
-
+        u32 positionOffset = 0U;
+        u32 positionFormat = 0U;
+        if (!FindPositionAttribute(attributes, positionOffset, positionFormat)) {
             return false;
         }
 
-        auto TryResolveSlangcPath(std::filesystem::path& outPath) -> bool {
-            std::filesystem::path envPath;
-            if (GetEnvPath("AE_SLANGC_PATH", envPath) || GetEnvPath("SLANGC_PATH", envPath)) {
-                if (std::filesystem::exists(envPath)) {
-                    outPath = envPath;
-                    return true;
-                }
+        const u32 positionBytes = [positionFormat]() -> u32 {
+            switch (positionFormat) {
+                case Asset::kMeshVertexFormatR32Float:
+                    return 4U;
+                case Asset::kMeshVertexFormatR32G32Float:
+                    return 8U;
+                case Asset::kMeshVertexFormatR32G32B32Float:
+                    return 12U;
+                case Asset::kMeshVertexFormatR32G32B32A32Float:
+                    return 16U;
+                default:
+                    return 0U;
             }
+        }();
 
-            if (GetEnvPath("VULKAN_SDK", envPath)) {
-                auto candidate = envPath / "Bin" / "slangc.exe";
-                if (std::filesystem::exists(candidate)) {
-                    outPath = candidate;
-                    return true;
-                }
-            }
-
+        if (positionBytes == 0U) {
             return false;
         }
 
-        auto CompileD3D11ShaderFxc(const char* source, const char* entryPoint,
-            const char* targetProfile, Shader::FShaderBytecode& outBytecode,
-            Container::FNativeString& outErrors)
-            -> bool {
-            if (!source || !entryPoint || !targetProfile) {
-                return false;
-            }
-
-            ComPtr<ID3DBlob> bytecode;
-            ComPtr<ID3DBlob> errors;
-            const UINT       flags = D3DCOMPILE_ENABLE_STRICTNESS;
-            const HRESULT    hr = D3DCompile(source, std::strlen(source), nullptr, nullptr, nullptr,
-                   entryPoint, targetProfile, flags, 0, &bytecode, &errors);
-
-            outErrors.Clear();
-            if (errors) {
-                const auto* data = static_cast<const char*>(errors->GetBufferPointer());
-                outErrors.Append(data, static_cast<usize>(errors->GetBufferSize()));
-            }
-
-            if (FAILED(hr) || !bytecode) {
-                return false;
-            }
-
-            const SIZE_T size = bytecode->GetBufferSize();
-            outBytecode.mData.Resize(static_cast<usize>(size));
-            std::memcpy(outBytecode.mData.Data(), bytecode->GetBufferPointer(), size);
-            return true;
-        }
-
-        auto WriteTempShaderFile(const char* prefix, const char* content,
-            Container::FNativeString& outErrors)
-            -> std::filesystem::path {
-            if (content == nullptr) {
-                outErrors = "Shader source is null.";
-                return {};
-            }
-
-            static std::atomic<unsigned int> counter{ 0 };
-            std::error_code                  ec;
-            auto                             dir = std::filesystem::temp_directory_path(ec);
-            if (ec) {
-                dir = std::filesystem::current_path();
-            }
-
-            dir /= "AltinaEngine";
-            dir /= "Demo";
-            dir /= "Minimal";
-            std::filesystem::create_directories(dir, ec);
-            if (ec) {
-                outErrors = "Failed to create shader temp directory.";
-                return {};
-            }
-
-            const auto            id = counter.fetch_add(1, std::memory_order_relaxed);
-            Container::FNativeString fileName(prefix);
-            fileName.Append("_");
-            fileName.AppendNumber(id);
-            fileName.Append(".hlsl");
-            std::filesystem::path path = dir / std::filesystem::path(fileName.CStr());
-
-            std::ofstream file(path, std::ios::binary | std::ios::trunc);
-            if (!file) {
-                outErrors = "Failed to open temp shader file for writing.";
-                return {};
-            }
-
-            file.write(content, static_cast<std::streamsize>(std::strlen(content)));
-            if (!file) {
-                outErrors = "Failed to write temp shader file.";
-                return {};
-            }
-
-            file.close();
-            return path;
-        }
-
-        auto CompileD3D11ShaderWithShaderCompiler(const char* source, const char* entryPoint,
-            Shader::EShaderStage stage, ShaderCompiler::EShaderSourceLanguage sourceLanguage,
-            Shader::FShaderBytecode& outBytecode, Shader::FShaderReflection& outReflection,
-            Container::FNativeString& outErrors, const char* targetProfile = nullptr) -> bool {
-            if (!source || !entryPoint) {
-                return false;
-            }
-
-            outErrors.Clear();
-            const auto shaderPath = WriteTempShaderFile("TriangleShader", source, outErrors);
-            if (shaderPath.empty()) {
-                return false;
-            }
-
-            ShaderCompiler::FShaderCompileRequest request;
-            request.mSource.mPath           = ToFString(shaderPath);
-            request.mSource.mEntryPoint     = ToFStringAscii(entryPoint);
-            request.mSource.mStage          = stage;
-            request.mSource.mLanguage       = sourceLanguage;
-            request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
-            if (targetProfile != nullptr && targetProfile[0] != '\0') {
-                request.mOptions.mTargetProfile = ToFStringAscii(targetProfile);
-            }
-
-            auto result = ShaderCompiler::GetShaderCompiler().Compile(request);
-            if ((!result.mSucceeded || result.mBytecode.IsEmpty())
-                && IsCompilerUnavailable(result.mDiagnostics)) {
-                std::filesystem::path compilerPath;
-                const bool            resolved =
-                    (sourceLanguage == ShaderCompiler::EShaderSourceLanguage::Slang)
-                               ? TryResolveSlangcPath(compilerPath)
-                               : TryResolveDxcPath(compilerPath);
-                if (resolved) {
-                    request.mOptions.mCompilerPathOverride = ToFString(compilerPath);
-                    result = ShaderCompiler::GetShaderCompiler().Compile(request);
-                }
-            }
-
-            std::error_code ec;
-            std::filesystem::remove(shaderPath, ec);
-
-            outErrors = ToAsciiString(result.mDiagnostics);
-            if (!result.mSucceeded || result.mBytecode.IsEmpty()) {
-                return false;
-            }
-
-            outBytecode.mData = AltinaEngine::Move(result.mBytecode);
-            outReflection     = AltinaEngine::Move(result.mReflection);
-            return true;
-        }
-
-        auto CreateShaderFromBytecode(Rhi::FRhiDevice& device, Shader::EShaderStage stage,
-            Shader::FShaderBytecode&& bytecode, Shader::FShaderReflection&& reflection)
-            -> Rhi::FRhiShaderRef {
-            Rhi::FRhiShaderDesc desc{};
-            desc.mStage      = stage;
-            desc.mBytecode   = AltinaEngine::Move(bytecode);
-            desc.mReflection = AltinaEngine::Move(reflection);
-            return device.CreateShader(desc);
-        }
-    } // namespace ShaderCompileHelpers
-#endif
-
-    constexpr const char* kTriangleShaderHlsl = R"(struct VSOut {
-    float4 pos : SV_POSITION;
-    float3 color : COLOR;
-};
-
-VSOut VSMain(uint vertexId : SV_VertexID) {
-    VSOut output;
-    float2 positions[3] = {
-        float2(0.0f, 0.5f),
-        float2(0.5f, -0.5f),
-        float2(-0.5f, -0.5f)
-    };
-    float3 colors[3] = {
-        float3(1.0f, 0.0f, 0.0f),
-        float3(0.0f, 1.0f, 0.0f),
-        float3(0.0f, 0.0f, 1.0f)
-    };
-    output.pos = float4(positions[vertexId], 0.0f, 1.0f);
-    output.color = colors[vertexId];
-    return output;
-}
-
-float4 PSMain(VSOut input) : SV_Target0 {
-    return float4(input.color, 1.0f);
-}
-)";
-
-    auto BuildDemoStaticMesh() -> RenderCore::Geometry::FStaticMeshData { return {}; }
-
-    class FTriangleRenderer {
-    public:
-        void Render(Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport, u32 width, u32 height) {
-#if AE_PLATFORM_WIN
-            if (!mInitialized) {
-                if (!Initialize(device)) {
-                    return;
-                }
-            }
-
-            if (width == 0U || height == 0U) {
-                return;
-            }
-
-            auto* backBuffer = viewport.GetBackBuffer();
-            if (backBuffer == nullptr || !mCommandContext || !mQueue) {
-                return;
-            }
-
-            auto* d3dContext = static_cast<Rhi::FRhiD3D11CommandContext*>(mCommandContext.Get());
-            Rhi::FRhiCmdContextAdapter adapter(*d3dContext);
-
-            adapter.Begin();
-            adapter.RHISetGraphicsPipeline(mPipeline.Get());
-
-            mCmdList.Reset();
-
-            Rhi::FRhiRenderTargetViewDesc rtvDesc{};
-            rtvDesc.mTexture   = backBuffer;
-            auto backBufferRtv = device.CreateRenderTargetView(rtvDesc);
-
-            Rhi::FRhiRenderPassColorAttachment colorAttachment{};
-            colorAttachment.mView       = backBufferRtv.Get();
-            colorAttachment.mLoadOp     = Rhi::ERhiLoadOp::Clear;
-            colorAttachment.mStoreOp    = Rhi::ERhiStoreOp::Store;
-            colorAttachment.mClearColor = Rhi::FRhiClearColor{ 0.08f, 0.08f, 0.12f, 1.0f };
-
-            Rhi::FRhiRenderPassDesc passDesc{};
-            passDesc.mColorAttachmentCount = 1U;
-            passDesc.mColorAttachments     = &colorAttachment;
-            mCmdList.Emplace<Rhi::FRhiCmdBeginRenderPass>(passDesc);
-            mCmdList.Emplace<Rhi::FRhiCmdSetPrimitiveTopology>(
-                Rhi::ERhiPrimitiveTopology::TriangleList);
-            mCmdList.Emplace<Rhi::FRhiCmdSetViewport>(Rhi::FRhiViewportRect{
-                0.0f, 0.0f, static_cast<f32>(width), static_cast<f32>(height), 0.0f, 1.0f });
-            mCmdList.Emplace<Rhi::FRhiCmdSetScissor>(Rhi::FRhiScissorRect{ 0, 0, width, height });
-            mCmdList.Emplace<Rhi::FRhiCmdSetIndexBuffer>(
-                Rhi::FRhiIndexBufferView{ mIndexBuffer.Get(), Rhi::ERhiIndexType::Uint16, 0U });
-            mCmdList.Emplace<Rhi::FRhiCmdDrawIndexed>(3U, 1U, 0U, 0, 0U);
-            mCmdList.Emplace<Rhi::FRhiCmdEndRenderPass>();
-
-            Rhi::FRhiCmdExecutor::Execute(mCmdList, adapter);
-            adapter.End();
-
-            auto* rhiCommandList = d3dContext->GetCommandList();
-            if (rhiCommandList == nullptr) {
-                return;
-            }
-
-            Rhi::FRhiCommandList* commandLists[] = { rhiCommandList };
-            Rhi::FRhiSubmitInfo   submit{};
-            submit.mCommandLists     = commandLists;
-            submit.mCommandListCount = 1U;
-            mQueue->Submit(submit);
-#else
-            (void)device;
-            (void)viewport;
-            (void)width;
-            (void)height;
-#endif
-        }
-
-        void Shutdown() {
-            mCmdList.Reset();
-            mQueue.Reset();
-            mCommandContext.Reset();
-            mIndexBuffer.Reset();
-            mPipeline.Reset();
-            mPixelShader.Reset();
-            mVertexShader.Reset();
-            mInitialized = false;
-        }
-
-    private:
-        bool Initialize(Rhi::FRhiDevice& device) {
-#if AE_PLATFORM_WIN
-            auto BuildShader = [&](const char* entryPoint, Shader::EShaderStage stage,
-                                   const char* targetProfile, const char* label,
-                                   Rhi::FRhiShaderRef& outShader) -> bool {
-                Shader::FShaderBytecode   bytecode;
-                Shader::FShaderReflection reflection;
-                Container::FNativeString  errors;
-
-                if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(kTriangleShaderHlsl,
-                        entryPoint, stage, ShaderCompiler::EShaderSourceLanguage::Hlsl, bytecode,
-                        reflection, errors, targetProfile)) {
-                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(device, stage,
-                        AltinaEngine::Move(bytecode), AltinaEngine::Move(reflection));
-                    if (outShader) {
-                        return true;
-                    }
-                    std::cerr << "[Triangle] " << label
-                              << " create failed for DXC output; trying Slang.\n";
-                } else if (!errors.IsEmptyString()) {
-                    std::cerr << "[Triangle] " << label << " DXC compile failed:\n"
-                              << errors.CStr() << "\n";
-                }
-
-                errors.Clear();
-                if (ShaderCompileHelpers::CompileD3D11ShaderWithShaderCompiler(kTriangleShaderHlsl,
-                        entryPoint, stage, ShaderCompiler::EShaderSourceLanguage::Slang, bytecode,
-                        reflection, errors, targetProfile)) {
-                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(device, stage,
-                        AltinaEngine::Move(bytecode), AltinaEngine::Move(reflection));
-                    if (outShader) {
-                        return true;
-                    }
-                    std::cerr << "[Triangle] " << label
-                              << " create failed for Slang output; trying D3DCompile.\n";
-                } else if (!errors.IsEmptyString()) {
-                    std::cerr << "[Triangle] " << label << " Slang compile failed:\n"
-                              << errors.CStr() << "\n";
-                }
-
-                errors.Clear();
-                Shader::FShaderBytecode fxcBytecode;
-                if (ShaderCompileHelpers::CompileD3D11ShaderFxc(
-                        kTriangleShaderHlsl, entryPoint, targetProfile, fxcBytecode, errors)) {
-                    outShader = ShaderCompileHelpers::CreateShaderFromBytecode(
-                        device, stage, AltinaEngine::Move(fxcBytecode), {});
-                    if (outShader) {
-                        std::cerr << "[Triangle] " << label
-                                  << " created via D3DCompile fallback.\n";
-                        return true;
-                    }
-                    std::cerr << "[Triangle] " << label << " create failed after D3DCompile.\n";
-                }
-
-                if (!errors.IsEmptyString()) {
-                    std::cerr << "[Triangle] " << label << " D3DCompile failed:\n"
-                              << errors.CStr() << "\n";
-                }
-                return false;
-            };
-
-            if (!BuildShader(
-                    "VSMain", Shader::EShaderStage::Vertex, "vs_5_0", "VS", mVertexShader)) {
-                return false;
-            }
-
-            if (!BuildShader("PSMain", Shader::EShaderStage::Pixel, "ps_5_0", "PS", mPixelShader)) {
-                return false;
-            }
-
-            Rhi::FRhiGraphicsPipelineDesc pipelineDesc{};
-            pipelineDesc.mVertexShader = mVertexShader.Get();
-            pipelineDesc.mPixelShader  = mPixelShader.Get();
-
-            mPipeline = device.CreateGraphicsPipeline(pipelineDesc);
-            if (!mPipeline) {
-                return false;
-            }
-
-            Rhi::FRhiBufferDesc indexDesc{};
-            indexDesc.mSizeBytes = sizeof(u16) * 3U;
-            indexDesc.mUsage     = Rhi::ERhiResourceUsage::Dynamic;
-            indexDesc.mBindFlags = Rhi::ERhiBufferBindFlags::Index;
-            indexDesc.mCpuAccess = Rhi::ERhiCpuAccess::Write;
-
-            mIndexBuffer = device.CreateBuffer(indexDesc);
-            if (!mIndexBuffer) {
-                return false;
-            }
-
-            const u16 indices[3] = { 0U, 1U, 2U };
-            auto      lock       = mIndexBuffer->Lock(
-                0ULL, indexDesc.mSizeBytes, Rhi::ERhiBufferLockMode::WriteDiscard);
-            if (lock.mData != nullptr) {
-                std::memcpy(lock.mData, indices, sizeof(indices));
-            }
-            mIndexBuffer->Unlock(lock);
-
-            Rhi::FRhiCommandContextDesc ctxDesc{};
-            ctxDesc.mQueueType = Rhi::ERhiQueueType::Graphics;
-            mCommandContext    = device.CreateCommandContext(ctxDesc);
-            mQueue             = device.GetQueue(Rhi::ERhiQueueType::Graphics);
-
-            mInitialized = mCommandContext && mQueue;
-            return mInitialized;
-#else
-            (void)device;
+        const u64 vertexBytes = static_cast<u64>(desc.VertexStride)
+            * static_cast<u64>(desc.VertexCount);
+        if (vertices.Size() < vertexBytes) {
             return false;
-#endif
         }
 
-        bool                       mInitialized = false;
-        Rhi::FRhiShaderRef         mVertexShader;
-        Rhi::FRhiShaderRef         mPixelShader;
-        Rhi::FRhiPipelineRef       mPipeline;
-        Rhi::FRhiBufferRef         mIndexBuffer;
-        Rhi::FRhiCommandContextRef mCommandContext;
-        Rhi::FRhiQueueRef          mQueue;
-        Rhi::FRhiCmdList           mCmdList;
-    };
+        const u64 posEnd = static_cast<u64>(positionOffset) + static_cast<u64>(positionBytes);
+        if (posEnd > desc.VertexStride) {
+            return false;
+        }
+
+        Core::Container::TVector<Core::Math::FVector3f> positions;
+        positions.Reserve(static_cast<usize>(desc.VertexCount));
+        for (u32 i = 0U; i < desc.VertexCount; ++i) {
+            const u64 base = static_cast<u64>(i) * static_cast<u64>(desc.VertexStride);
+            positions.PushBack(
+                ReadPosition(vertices.Data() + base, positionOffset, positionFormat));
+        }
+
+        Rhi::ERhiIndexType indexType = Rhi::ERhiIndexType::Uint16;
+        switch (desc.IndexType) {
+            case Asset::kMeshIndexTypeUint16:
+                indexType = Rhi::ERhiIndexType::Uint16;
+                break;
+            case Asset::kMeshIndexTypeUint32:
+                indexType = Rhi::ERhiIndexType::Uint32;
+                break;
+            default:
+                return false;
+        }
+
+        const u32 indexStride =
+            RenderCore::Geometry::FStaticMeshLodData::GetIndexStrideBytes(indexType);
+        if (indexStride == 0U) {
+            return false;
+        }
+
+        const u64 indexBytes =
+            static_cast<u64>(desc.IndexCount) * static_cast<u64>(indexStride);
+        if (indices.Size() < indexBytes) {
+            return false;
+        }
+
+        RenderCore::Geometry::FStaticMeshData mesh;
+        mesh.Lods.Reserve(1);
+        auto& lod = mesh.Lods.EmplaceBack();
+        lod.PrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
+        lod.SetPositions(positions.Data(), desc.VertexCount);
+        lod.SetIndices(indices.Data(), desc.IndexCount, indexType);
+
+        if (!subMeshes.IsEmpty()) {
+            lod.Sections.Reserve(subMeshes.Size());
+            for (const auto& subMesh : subMeshes) {
+                RenderCore::Geometry::FStaticMeshSection section{};
+                section.FirstIndex   = subMesh.IndexStart;
+                section.IndexCount   = subMesh.IndexCount;
+                section.BaseVertex   = subMesh.BaseVertex;
+                section.MaterialSlot = subMesh.MaterialSlot;
+                lod.Sections.PushBack(section);
+            }
+        } else {
+            RenderCore::Geometry::FStaticMeshSection section{};
+            section.FirstIndex   = 0U;
+            section.IndexCount   = desc.IndexCount;
+            section.BaseVertex   = 0;
+            section.MaterialSlot = 0U;
+            lod.Sections.PushBack(section);
+        }
+
+        lod.Bounds.Min = Core::Math::FVector3f(
+            desc.BoundsMin[0], desc.BoundsMin[1], desc.BoundsMin[2]);
+        lod.Bounds.Max = Core::Math::FVector3f(
+            desc.BoundsMax[0], desc.BoundsMax[1], desc.BoundsMax[2]);
+
+        mesh.Bounds = lod.Bounds;
+
+        if (!mesh.IsValid()) {
+            return false;
+        }
+
+        outMesh = AltinaEngine::Move(mesh);
+        return true;
+    }
 } // namespace
 
 int main(int argc, char** argv) {
-    Reflection::RegisterType<Neko>();
-    Reflection::RegisterPropertyField<&Neko::mMeow>("Meow");
-    Reflection::RegisterPropertyField<&Neko::mNya>("Nya");
-
-    auto                nyaMeta = TypeMeta::FMetaPropertyInfo::Create<&Neko::mNya>();
-    Reflection::FObject obj = Reflection::ConstructObject(TypeMeta::FMetaTypeInfo::Create<Neko>());
-    auto                propObj = Reflection::GetProperty(obj, nyaMeta);
-    auto&               nyaRef  = propObj.As<Container::TRef<int>>().Get();
-    nyaRef                      = 514;
-
-    auto& p = obj.As<Neko>();
-    LogError(TEXT("Neko mNya value after reflection set: {}"), p.mNya);
-
-    LogWarning(TEXT("Address for &(p.Nya) and &nyaRef: {}, {}"), (u64) & (p.mNya), (u64)&nyaRef);
-
-    Gameplay::FGameplayModule::ValidateReflection();
-
-    FStartupParameters StartupParams{};
+    FStartupParameters startupParams{};
     if (argc > 1) {
-        StartupParams.mCommandLine = argv[1];
+        startupParams.mCommandLine = argv[1];
     }
 
-    FEngineLoop EngineLoop(StartupParams);
-    if (!EngineLoop.PreInit()) {
+    Launch::FEngineLoop engineLoop(startupParams);
+    if (!engineLoop.PreInit()) {
         return 1;
     }
-    if (!EngineLoop.Init()) {
-        EngineLoop.Exit();
+    if (!engineLoop.Init()) {
+        engineLoop.Exit();
         return 1;
     }
 
-    const bool assetsReady = LoadDemoAssetRegistry(EngineLoop);
-    auto& worldManager = EngineLoop.GetWorldManager();
+    if (!LoadDemoAssetRegistry(engineLoop)) {
+        engineLoop.Exit();
+        return 1;
+    }
+
+    Asset::FAssetManager assetManager;
+    Asset::FMeshLoader   meshLoader;
+    Asset::FMaterialLoader materialLoader;
+    assetManager.SetRegistry(&engineLoop.GetAssetRegistry());
+    assetManager.RegisterLoader(&meshLoader);
+    assetManager.RegisterLoader(&materialLoader);
+
+    const auto meshHandle =
+        engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/triangle"));
+    const auto materialHandle =
+        engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/materials/purpledeferred"));
+    if (!meshHandle.IsValid() || !materialHandle.IsValid()) {
+        LogError(TEXT("Demo assets missing (mesh or material)."));
+        engineLoop.Exit();
+        return 1;
+    }
+
+    auto meshAsset = assetManager.Load(meshHandle);
+    auto* mesh = meshAsset ? static_cast<Asset::FMeshAsset*>(meshAsset.Get()) : nullptr;
+    if (mesh == nullptr) {
+        LogError(TEXT("Failed to load mesh asset."));
+        engineLoop.Exit();
+        return 1;
+    }
+
+    RenderCore::Geometry::FStaticMeshData meshData;
+    if (!BuildStaticMeshFromAsset(*mesh, meshData)) {
+        LogError(TEXT("Failed to build static mesh data from asset."));
+        engineLoop.Exit();
+        return 1;
+    }
+    for (auto& lod : meshData.Lods) {
+        lod.PositionBuffer.InitResource();
+        lod.IndexBuffer.InitResource();
+        lod.TangentBuffer.InitResource();
+        lod.UV0Buffer.InitResource();
+        lod.UV1Buffer.InitResource();
+
+        lod.PositionBuffer.WaitForInit();
+        lod.IndexBuffer.WaitForInit();
+        lod.TangentBuffer.WaitForInit();
+        lod.UV0Buffer.WaitForInit();
+        lod.UV1Buffer.WaitForInit();
+    }
+
+    auto& worldManager = engineLoop.GetWorldManager();
     const auto worldHandle = worldManager.CreateWorld();
     worldManager.SetActiveWorld(worldHandle);
     auto* world = worldManager.GetWorld(worldHandle);
     if (world == nullptr) {
         LogError(TEXT("Demo world creation failed."));
-        EngineLoop.Exit();
+        engineLoop.Exit();
         return 1;
     }
 
@@ -663,6 +304,11 @@ int main(int argc, char** argv) {
         auto& camera = world->ResolveComponent<GameScene::FCameraComponent>(cameraComponentId);
         camera.SetNearPlane(0.1f);
         camera.SetFarPlane(1000.0f);
+
+        auto cameraView = world->Object(cameraObject);
+        auto transform  = cameraView.GetWorldTransform();
+        transform.Translation = Core::Math::FVector3f(0.0f, 0.0f, -2.0f);
+        cameraView.SetWorldTransform(transform);
     }
 
     const auto meshObject = world->CreateGameObject(TEXT("TriangleMesh"));
@@ -670,158 +316,24 @@ int main(int argc, char** argv) {
         world->CreateComponent<GameScene::FStaticMeshFilterComponent>(meshObject);
     const auto materialComponentId =
         world->CreateComponent<GameScene::FMeshMaterialComponent>(meshObject);
+
     if (meshComponentId.IsValid()) {
         auto& meshComponent =
             world->ResolveComponent<GameScene::FStaticMeshFilterComponent>(meshComponentId);
-        meshComponent.SetStaticMesh(BuildDemoStaticMesh());
+        meshComponent.SetStaticMesh(AltinaEngine::Move(meshData));
     }
     if (materialComponentId.IsValid()) {
         auto& materialComponent =
             world->ResolveComponent<GameScene::FMeshMaterialComponent>(materialComponentId);
-        materialComponent.ClearMaterials();
+        materialComponent.SetMaterial(0U, materialHandle);
     }
 
-    {
-        const auto scriptObject = world->CreateGameObject(TEXT("ManagedScript"));
-        const auto scriptComponentId =
-            world->CreateComponent<GameScene::FScriptComponent>(scriptObject);
-        if (scriptComponentId.IsValid()) {
-            auto& scriptComponent =
-                world->ResolveComponent<GameScene::FScriptComponent>(scriptComponentId);
-
-            bool configured = false;
-            if (assetsReady) {
-                const auto scriptHandle =
-                    EngineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/scripts/demoscript"));
-                if (scriptHandle.IsValid()) {
-                    if (const auto* desc =
-                            EngineLoop.GetAssetRegistry().GetDesc(scriptHandle)) {
-                        if (!desc->Script.TypeName.IsEmptyString()) {
-                            scriptComponent.SetAssemblyPath(desc->Script.AssemblyPath.ToView());
-                            scriptComponent.SetTypeName(desc->Script.TypeName.ToView());
-                            configured = true;
-                        }
-                    }
-                } else {
-                    LogWarning(TEXT("ScriptAsset demo/minimal/scripts/demoscript not found."));
-                }
-            }
-
-            if (!configured) {
-                scriptComponent.SetAssemblyPath("AltinaEngine.Demo.Minimal.dll");
-                scriptComponent.SetTypeName(
-                    "AltinaEngine.Demo.Minimal.DemoScript, AltinaEngine.Demo.Minimal");
-                LogWarning(TEXT("ScriptComponent using fallback managed type."));
-            }
-        }
+    constexpr f32 kFixedDeltaTime = 1.0f / 60.0f;
+    for (i32 frameIndex = 0; frameIndex < 600; ++frameIndex) {
+        engineLoop.Tick(kFixedDeltaTime);
+        Core::Platform::Generic::PlatformSleepMilliseconds(16);
     }
 
-    Engine::FSceneViewBuilder  sceneViewBuilder;
-    Engine::FSceneBatchBuilder sceneBatchBuilder;
-    Engine::FMaterialCache     materialCache;
-    Engine::FRenderScene       renderScene;
-    RenderCore::Render::FDrawList drawList;
-    Engine::FSceneViewBuildParams  viewParams{};
-    Engine::FSceneBatchBuildParams batchParams{};
-
-    std::atomic<u32> renderWidth{ 1280U };
-    std::atomic<u32> renderHeight{ 720U };
-
-    FTriangleRenderer triangleRenderer;
-    EngineLoop.SetRenderCallback(
-        [&triangleRenderer, &renderWidth, &renderHeight](Rhi::FRhiDevice& device,
-            Rhi::FRhiViewport& viewport, u32 width, u32 height) {
-            renderWidth.store(width, std::memory_order_relaxed);
-            renderHeight.store(height, std::memory_order_relaxed);
-            triangleRenderer.Render(device, viewport, width, height);
-        });
-
-    constexpr f32 kFixedDeltaTime          = 1.0f / 60.0f;
-    constexpr f32 kMoveSpeedUnitsPerSecond = 300.0f;
-    f32           positionX                = 0.0f;
-    f32           positionY                = 0.0f;
-    i32           lastMoveX                = 0;
-    i32           lastMoveY                = 0;
-
-    for (i32 FrameIndex = 0; FrameIndex < 600; ++FrameIndex) {
-        EngineLoop.Tick(kFixedDeltaTime);
-
-        const u32 viewWidth  = renderWidth.load(std::memory_order_relaxed);
-        const u32 viewHeight = renderHeight.load(std::memory_order_relaxed);
-        if (viewWidth > 0U && viewHeight > 0U) {
-            viewParams.ViewRect = RenderCore::View::FViewRect{ 0, 0, viewWidth, viewHeight };
-            viewParams.RenderTargetExtent =
-                RenderCore::View::FRenderTargetExtent2D{ viewWidth, viewHeight };
-            viewParams.FrameIndex       = static_cast<u64>(FrameIndex);
-            viewParams.DeltaTimeSeconds = kFixedDeltaTime;
-
-            sceneViewBuilder.Build(*world, viewParams, renderScene);
-
-            for (auto& view : renderScene.Views) {
-                if (!world->IsAlive(view.CameraId)) {
-                    continue;
-                }
-                const auto& camera =
-                    world->ResolveComponent<GameScene::FCameraComponent>(view.CameraId);
-                view.View.Camera.Transform = world->Object(camera.GetOwner()).GetWorldTransform();
-                view.View.UpdateMatrices();
-            }
-
-            usize totalBatches = 0U;
-            for (const auto& view : renderScene.Views) {
-                sceneBatchBuilder.Build(renderScene, view, batchParams, materialCache, drawList);
-                totalBatches += drawList.Batches.Size();
-            }
-
-            if ((FrameIndex % 60) == 0) {
-                LogInfo(TEXT("SceneView: {} views, {} meshes, {} batches"),
-                    static_cast<u32>(renderScene.Views.Size()),
-                    static_cast<u32>(renderScene.StaticMeshes.Size()),
-                    static_cast<u32>(totalBatches));
-            }
-        }
-
-        if (const auto* inputSystem = EngineLoop.GetInputSystem()) {
-            i32 moveX = 0;
-            i32 moveY = 0;
-
-            if (inputSystem->IsKeyDown(Input::EKey::W)) {
-                moveY += 1;
-            }
-            if (inputSystem->IsKeyDown(Input::EKey::S)) {
-                moveY -= 1;
-            }
-            if (inputSystem->IsKeyDown(Input::EKey::A)) {
-                moveX -= 1;
-            }
-            if (inputSystem->IsKeyDown(Input::EKey::D)) {
-                moveX += 1;
-            }
-
-            if (moveX != 0 || moveY != 0) {
-                positionX += static_cast<f32>(moveX) * kMoveSpeedUnitsPerSecond * kFixedDeltaTime;
-                positionY += static_cast<f32>(moveY) * kMoveSpeedUnitsPerSecond * kFixedDeltaTime;
-            }
-
-            if (moveX != lastMoveX || moveY != lastMoveY) {
-                LogInfo(
-                    TEXT("Move input: ({}, {}), pos=({}, {})"), moveX, moveY, positionX, positionY);
-                lastMoveX = moveX;
-                lastMoveY = moveY;
-            }
-
-            if (inputSystem->WasKeyPressed(Input::EKey::Space)) {
-                LogInfo(TEXT("Space pressed."));
-            }
-        }
-
-        AltinaEngine::Core::Platform::Generic::PlatformSleepMilliseconds(16);
-
-        // LogError(TEXT("Frame {} processed."), FrameIndex);
-    }
-
-    EngineLoop.SetRenderCallback({});
-    triangleRenderer.Shutdown();
-    EngineLoop.Exit();
+    engineLoop.Exit();
     return 0;
 }

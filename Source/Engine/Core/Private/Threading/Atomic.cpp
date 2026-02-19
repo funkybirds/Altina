@@ -16,11 +16,26 @@ namespace AltinaEngine::Core::Threading {
         mImpl     = p;
     }
 
+    FAtomicInt32::FAtomicInt32(FAtomicInt32&& other) noexcept : mImpl(other.mImpl) {
+        other.mImpl = nullptr;
+    }
+
     FAtomicInt32::~FAtomicInt32() noexcept {
         if (mImpl) {
             ::operator delete(mImpl);
             mImpl = nullptr;
         }
+    }
+
+    auto FAtomicInt32::operator=(FAtomicInt32&& other) noexcept -> FAtomicInt32& {
+        if (this != &other) {
+            if (mImpl) {
+                ::operator delete(mImpl);
+            }
+            mImpl       = other.mImpl;
+            other.mImpl = nullptr;
+        }
+        return *this;
     }
 
     auto FAtomicInt32::Load() const noexcept -> i32 {
@@ -68,11 +83,26 @@ namespace AltinaEngine::Core::Threading {
         mImpl     = p;
     }
 
+    FAtomicInt64::FAtomicInt64(FAtomicInt64&& other) noexcept : mImpl(other.mImpl) {
+        other.mImpl = nullptr;
+    }
+
     FAtomicInt64::~FAtomicInt64() noexcept {
         if (mImpl) {
             ::operator delete(mImpl);
             mImpl = nullptr;
         }
+    }
+
+    auto FAtomicInt64::operator=(FAtomicInt64&& other) noexcept -> FAtomicInt64& {
+        if (this != &other) {
+            if (mImpl) {
+                ::operator delete(mImpl);
+            }
+            mImpl       = other.mImpl;
+            other.mImpl = nullptr;
+        }
+        return *this;
     }
 
     auto FAtomicInt64::Load() const noexcept -> i64 {

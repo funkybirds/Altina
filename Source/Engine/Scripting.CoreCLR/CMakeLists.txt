@@ -101,6 +101,7 @@ if(AE_DOTNET_HOST)
             -c $<IF:$<CONFIG:Debug>,Debug,Release>
             /t:Rebuild
             /p:NoIncremental=true
+            /p:MSBuildProjectExtensionsPath=${AE_MANAGED_OUT_DIR}/obj/
             /p:BaseIntermediateOutputPath=${AE_MANAGED_OUT_DIR}/obj/
             /p:IntermediateOutputPath=${AE_MANAGED_OUT_DIR}/obj/$<IF:$<CONFIG:Debug>,Debug,Release>/
         COMMAND ${CMAKE_COMMAND} -E touch ${AE_MANAGED_STAMP}

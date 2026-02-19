@@ -2,7 +2,13 @@
 
 #include "Input/InputMessageHandler.h"
 #include "Input/InputSystem.h"
+#include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
+#include "Engine/Runtime/SceneBatching.h"
+#include "Engine/Runtime/SceneView.h"
+#include "Rendering/BasicDeferredRenderer.h"
+#include "Rendering/BasicForwardRenderer.h"
+#include "Rendering/RenderingSettings.h"
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
     #include "Scripting/ScriptSystemCoreCLR.h"
@@ -11,8 +17,12 @@
 #include "Console/ConsoleVariable.h"
 #include "Logging/Log.h"
 #include "Threading/RenderingThread.h"
+#include "FrameGraph/FrameGraph.h"
 #include "Rhi/RhiInit.h"
+#include "Rhi/RhiCommandContext.h"
+#include "Rhi/RhiQueue.h"
 #include "Rhi/RhiStructs.h"
+#include "Rhi/Command/RhiCmdContextAdapter.h"
 
 #include <filesystem>
 #include <string>
@@ -66,6 +76,106 @@ namespace AltinaEngine::Launch {
             if (value < 0)
                 value = 0;
             return static_cast<u32>(value);
+        }
+
+        auto ResolveViewOutputTarget(const Engine::FSceneView& view,
+            Rhi::FRhiViewport* fallbackViewport) noexcept -> Rhi::FRhiTexture* {
+            using ETargetType = Engine::FSceneView::ETargetType;
+            switch (view.Target.Type) {
+                case ETargetType::Viewport:
+                    if (view.Target.Viewport != nullptr) {
+                        return view.Target.Viewport->GetBackBuffer();
+                    }
+                    break;
+                case ETargetType::TextureAsset:
+                    return nullptr;
+                default:
+                    break;
+            }
+
+            if (fallbackViewport != nullptr) {
+                return fallbackViewport->GetBackBuffer();
+            }
+            return nullptr;
+        }
+
+        void ExecuteFrameGraph(Rhi::FRhiDevice& device, RenderCore::FFrameGraph& graph) {
+            Rhi::FRhiCommandContextDesc ctxDesc{};
+            ctxDesc.mQueueType = Rhi::ERhiQueueType::Graphics;
+            auto commandContext = device.CreateCommandContext(ctxDesc);
+            if (!commandContext) {
+                return;
+            }
+
+            auto* ops = dynamic_cast<Rhi::IRhiCmdContextOps*>(commandContext.Get());
+            if (ops == nullptr) {
+                return;
+            }
+
+            Rhi::FRhiCmdContextAdapter adapter(*commandContext.Get(), *ops);
+            adapter.Begin();
+            graph.Execute(adapter);
+            adapter.End();
+
+            auto* commandList = commandContext->GetCommandList();
+            if (commandList == nullptr) {
+                return;
+            }
+
+            auto queue = device.GetQueue(Rhi::ERhiQueueType::Graphics);
+            if (!queue) {
+                return;
+            }
+
+            Rhi::FRhiCommandList* commandLists[] = { commandList };
+            Rhi::FRhiSubmitInfo   submit{};
+            submit.mCommandLists     = commandLists;
+            submit.mCommandListCount = 1U;
+            queue->Submit(submit);
+        }
+
+        void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
+            const Engine::FRenderScene& scene,
+            const Container::TVector<RenderCore::Render::FDrawList>& drawLists,
+            Rendering::ERendererType rendererType) {
+            if (scene.Views.IsEmpty()) {
+                return;
+            }
+
+            Rendering::FBasicDeferredRenderer deferredRenderer;
+            Rendering::FBasicForwardRenderer  forwardRenderer;
+            Rendering::IRenderer* renderer =
+                (rendererType == Rendering::ERendererType::Deferred)
+                    ? static_cast<Rendering::IRenderer*>(&deferredRenderer)
+                    : static_cast<Rendering::IRenderer*>(&forwardRenderer);
+
+            renderer->PrepareForRendering(device);
+
+            const usize viewCount = scene.Views.Size();
+            for (usize i = 0; i < viewCount; ++i) {
+                const auto& view = scene.Views[i];
+                if (!view.View.IsValid()) {
+                    continue;
+                }
+
+                auto* outputTarget = ResolveViewOutputTarget(view, defaultViewport);
+                if (outputTarget == nullptr) {
+                    continue;
+                }
+
+                Rendering::FRenderViewContext viewContext{};
+                viewContext.View         = &view.View;
+                viewContext.DrawList     = (i < drawLists.Size()) ? &drawLists[i] : nullptr;
+                viewContext.OutputTarget = outputTarget;
+                renderer->SetViewContext(viewContext);
+
+                RenderCore::FFrameGraph graph(device);
+                renderer->Render(graph);
+                graph.Compile();
+                ExecuteFrameGraph(device, graph);
+            }
+
+            renderer->FinalizeRendering();
         }
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
@@ -245,6 +355,7 @@ namespace AltinaEngine::Launch {
             mAssetManager.RegisterLoader(&mScriptLoader);
             mAssetManager.RegisterLoader(&mTexture2DLoader);
             GameScene::FScriptComponent::SetAssetManager(&mAssetManager);
+            mMaterialCache.SetAssetManager(&mAssetManager);
             mAssetReady = true;
         }
 
@@ -263,9 +374,14 @@ namespace AltinaEngine::Launch {
         initDesc.mAppName.Assign(TEXT("AltinaEngine"));
 #if AE_PLATFORM_WIN
         initDesc.mBackend = Rhi::ERhiBackend::DirectX11;
+        initDesc.mEnableDebugLayer = true;
 #endif
 
-        mRhiDevice = Rhi::RHIInit(*mRhiContext, initDesc);
+        Rhi::FRhiDeviceDesc deviceDesc{};
+        deviceDesc.mEnableDebugLayer    = initDesc.mEnableDebugLayer;
+        deviceDesc.mEnableGpuValidation = initDesc.mEnableGpuValidation;
+
+        mRhiDevice = Rhi::RHIInit(*mRhiContext, initDesc, deviceDesc);
         if (!mRhiDevice) {
             LogError(TEXT("FEngineLoop Init failed: RHIInit failed."));
             return false;
@@ -351,6 +467,7 @@ namespace AltinaEngine::Launch {
             return;
         }
 
+        mLastDeltaTimeSeconds = InDeltaTime;
         Core::Jobs::FJobSystem::ProcessGameThreadJobs();
 
         if (mInputSystem) {
@@ -372,6 +489,10 @@ namespace AltinaEngine::Launch {
             world->Tick(InDeltaTime);
         }
 
+        Draw();
+    }
+
+    void FEngineLoop::Draw() {
         u32  width        = 0U;
         u32  height       = 0U;
         bool shouldResize = false;
@@ -396,11 +517,78 @@ namespace AltinaEngine::Launch {
         auto      device     = mRhiDevice;
         auto      viewport   = mMainViewport;
         auto      callback   = mRenderCallback;
+        const auto rendererType = Rendering::GetRendererTypeSetting();
+        if (rendererType == Rendering::ERendererType::Deferred) {
+            mMaterialCache.SetDefaultTemplate(
+                Rendering::FBasicDeferredRenderer::GetDefaultMaterialTemplate());
+        }
+
+        Engine::FRenderScene renderScene;
+        Container::TVector<RenderCore::Render::FDrawList> drawLists;
+
+        if (width > 0U && height > 0U) {
+            if (auto* world = mEngineRuntime.GetWorldManager().GetActiveWorld()) {
+                Engine::FSceneViewBuildParams viewParams{};
+                viewParams.ViewRect =
+                    RenderCore::View::FViewRect{ 0, 0, width, height };
+                viewParams.RenderTargetExtent =
+                    RenderCore::View::FRenderTargetExtent2D{ width, height };
+                viewParams.FrameIndex       = frameIndex;
+                viewParams.DeltaTimeSeconds = mLastDeltaTimeSeconds;
+                viewParams.ViewTarget.Type  = Engine::FSceneView::ETargetType::Viewport;
+                viewParams.ViewTarget.Viewport = viewport.Get();
+
+                Engine::FSceneViewBuilder viewBuilder;
+                viewBuilder.Build(*world, viewParams, renderScene);
+
+                for (auto& view : renderScene.Views) {
+                    if (!world->IsAlive(view.CameraId)) {
+                        continue;
+                    }
+
+                    const auto& camera =
+                        world->ResolveComponent<GameScene::FCameraComponent>(view.CameraId);
+                    view.View.Camera.Transform =
+                        world->Object(camera.GetOwner()).GetWorldTransform();
+                    view.View.UpdateMatrices();
+                }
+
+                if (!renderScene.Views.IsEmpty()) {
+                    Engine::FSceneBatchBuilder  batchBuilder;
+                    Engine::FSceneBatchBuildParams batchParams{};
+                    batchParams.bAllowInstancing = false;
+                    drawLists.Resize(renderScene.Views.Size());
+                    for (usize i = 0; i < renderScene.Views.Size(); ++i) {
+                        batchBuilder.Build(
+                            renderScene, renderScene.Views[i], batchParams, mMaterialCache,
+                            drawLists[i]);
+                    }
+                    for (auto& drawList : drawLists) {
+                        for (const auto& batch : drawList.Batches) {
+                            if (batch.Material != nullptr) {
+                                auto* material =
+                                    const_cast<RenderCore::FMaterial*>(batch.Material);
+                                mMaterialCache.PrepareMaterialForRendering(*material);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        u32 totalBatches = 0U;
+        for (const auto& drawList : drawLists) {
+            totalBatches += static_cast<u32>(drawList.Batches.Size());
+        }
+        LogInfo(TEXT("Scene Batches: {} (Views: {})"), totalBatches,
+            static_cast<u32>(renderScene.Views.Size()));
 
         LogInfo(TEXT("GameThread Frame {}"), frameIndex);
 
         auto handle = RenderCore::EnqueueRenderTask(Container::FString(TEXT("RenderFrame")),
-            [device, viewport, callback, frameIndex, width, height, shouldResize]() mutable -> void {
+            [device, viewport, callback, frameIndex, width, height, shouldResize,
+                renderScene = Move(renderScene), drawLists = Move(drawLists), rendererType]()
+                mutable -> void {
                 if (!device)
                     return;
 
@@ -409,6 +597,11 @@ namespace AltinaEngine::Launch {
                 if (viewport && width > 0U && height > 0U) {
                     if (shouldResize) {
                         viewport->Resize(width, height);
+                    }
+
+                    if (!renderScene.Views.IsEmpty()) {
+                        SendSceneRenderingRequest(*device, viewport.Get(), renderScene, drawLists,
+                            rendererType);
                     }
 
                     if (callback) {
@@ -432,7 +625,6 @@ namespace AltinaEngine::Launch {
             mPendingRenderFrames.Push(handle);
             EnforceRenderLag(GetRenderThreadLagFrames());
         }
-
     }
 
     void FEngineLoop::Exit() {
@@ -445,6 +637,8 @@ namespace AltinaEngine::Launch {
         }
 
         if (mAssetReady) {
+            mMaterialCache.Clear();
+            mMaterialCache.SetAssetManager(nullptr);
             mAssetManager.ClearCache();
             mAssetManager.UnregisterLoader(&mTexture2DLoader);
             mAssetManager.UnregisterLoader(&mScriptLoader);

@@ -49,10 +49,6 @@ namespace AltinaEngine::Rendering {
             return;
         }
 
-        if (bindings.PerFrame != nullptr) {
-            ctx.RHISetBindGroup(bindings.PerFrameSetIndex, bindings.PerFrame, nullptr, 0U);
-        }
-
         for (const auto& batch : drawList.Batches) {
             const auto* mesh = batch.Static.Mesh;
             if (mesh == nullptr) {
@@ -74,6 +70,10 @@ namespace AltinaEngine::Rendering {
                 if (auto* pipeline = pipelineResolver(batch, passDesc, pipelineUserData)) {
                     ctx.RHISetGraphicsPipeline(pipeline);
                 }
+            }
+
+            if (bindings.PerFrame != nullptr) {
+                ctx.RHISetBindGroup(bindings.PerFrameSetIndex, bindings.PerFrame, nullptr, 0U);
             }
 
             if (batch.Material != nullptr) {

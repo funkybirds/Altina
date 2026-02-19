@@ -1,0 +1,5 @@
+{
+  "Name": "PurpleDeferred",
+  "BaseColor": [1.0, 0.0, 1.0, 1.0],
+  "Notes": "Deferred material placeholder; outputs purple."
+}

@@ -95,6 +95,7 @@ namespace AltinaEngine::Rhi {
         B8G8R8A8Unorm,
         B8G8R8A8UnormSrgb,
         R16G16B16A16Float,
+        R32G32B32Float,
         R32Float,
         D24UnormS8Uint,
         D32Float

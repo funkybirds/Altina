@@ -57,6 +57,8 @@ namespace AltinaEngine::Rhi {
                     return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
                 case ERhiFormat::R16G16B16A16Float:
                     return DXGI_FORMAT_R16G16B16A16_FLOAT;
+                case ERhiFormat::R32G32B32Float:
+                    return DXGI_FORMAT_R32G32B32_FLOAT;
                 case ERhiFormat::R32Float:
                     return DXGI_FORMAT_R32_FLOAT;
                 case ERhiFormat::D24UnormS8Uint:
@@ -89,6 +91,29 @@ namespace AltinaEngine::Rhi {
         }
 
         auto ClampExtent(u32 value) noexcept -> u32 { return (value > 0U) ? value : 1U; }
+
+        auto DxgiErrorToString(HRESULT hr) noexcept -> const TChar* {
+            switch (hr) {
+                case DXGI_ERROR_DEVICE_REMOVED:
+                    return TEXT("DXGI_ERROR_DEVICE_REMOVED");
+                case DXGI_ERROR_DEVICE_HUNG:
+                    return TEXT("DXGI_ERROR_DEVICE_HUNG");
+                case DXGI_ERROR_DEVICE_RESET:
+                    return TEXT("DXGI_ERROR_DEVICE_RESET");
+                case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
+                    return TEXT("DXGI_ERROR_DRIVER_INTERNAL_ERROR");
+                case DXGI_ERROR_INVALID_CALL:
+                    return TEXT("DXGI_ERROR_INVALID_CALL");
+                case DXGI_ERROR_ACCESS_LOST:
+                    return TEXT("DXGI_ERROR_ACCESS_LOST");
+                case DXGI_ERROR_WAS_STILL_DRAWING:
+                    return TEXT("DXGI_ERROR_WAS_STILL_DRAWING");
+                case DXGI_STATUS_OCCLUDED:
+                    return TEXT("DXGI_STATUS_OCCLUDED");
+                default:
+                    return TEXT("DXGI_ERROR_UNKNOWN");
+            }
+        }
 #endif
     } // namespace
 
@@ -242,6 +267,17 @@ namespace AltinaEngine::Rhi {
         const u32     syncInterval = info.mSyncInterval;
         const u32     flags        = ResolvePresentFlags(syncInterval, info.mFlags);
         const HRESULT hr           = mState->mSwapChain->Present(syncInterval, flags);
+        if (FAILED(hr)) {
+            LogError(TEXT("RHI(D3D11): Present failed (hr=0x{:08X}, {})."),
+                static_cast<u32>(hr), DxgiErrorToString(hr));
+            if (mState->mDevice) {
+                const HRESULT reason = mState->mDevice->GetDeviceRemovedReason();
+                if (reason != S_OK) {
+                    LogError(TEXT("RHI(D3D11): Device removed reason=0x{:08X} ({})."),
+                        static_cast<u32>(reason), DxgiErrorToString(reason));
+                }
+            }
+        }
         if (hr == DXGI_STATUS_OCCLUDED) {
             if (mState->mImmediateContext) {
                 mState->mImmediateContext->Flush();

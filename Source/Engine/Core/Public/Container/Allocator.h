@@ -58,7 +58,7 @@ namespace AltinaEngine::Core::Container {
         }
 
         template <typename... Args> void Construct(TPointer p, Args&&... args) {
-            ::new (static_cast<void*>(p)) TValueType(static_cast<Args&&>(args)...);
+            ::new (static_cast<void*>(p)) TValueType(Forward<Args>(args)...);
         }
 
         void Destroy(TPointer p) noexcept {

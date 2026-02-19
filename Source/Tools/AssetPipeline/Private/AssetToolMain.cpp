@@ -216,6 +216,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return "TextureImporter";
                 case Asset::EAssetType::Mesh:
                     return "MeshImporter";
+                case Asset::EAssetType::Material:
+                    return "MaterialImporter";
                 case Asset::EAssetType::Audio:
                     return "AudioImporter";
                 case Asset::EAssetType::Script:
@@ -237,6 +239,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return ext == ".fbx" || ext == ".obj" || ext == ".gltf" || ext == ".glb";
         }
 
+        auto IsMaterialExtension(const std::filesystem::path& path) -> bool {
+            std::string ext = path.extension().string();
+            ToLowerAscii(ext);
+            return ext == ".material";
+        }
+
         auto IsAudioExtension(const std::filesystem::path& path) -> bool {
             std::string ext = path.extension().string();
             ToLowerAscii(ext);
@@ -256,6 +264,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             if (IsMeshExtension(path)) {
                 return Asset::EAssetType::Mesh;
             }
+            if (IsMaterialExtension(path)) {
+                return Asset::EAssetType::Material;
+            }
             if (IsAudioExtension(path)) {
                 return Asset::EAssetType::Audio;
             }
@@ -263,6 +274,129 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return Asset::EAssetType::Script;
             }
             return Asset::EAssetType::Unknown;
+        }
+
+        constexpr u32 kMaterialParamFnvOffset32 = 2166136261u;
+        constexpr u32 kMaterialParamFnvPrime32  = 16777619u;
+
+        auto HashMaterialParamName(const std::string& name) -> u32 {
+            if (name.empty()) {
+                return 0U;
+            }
+            u32 hash = kMaterialParamFnvOffset32;
+            for (unsigned char ch : name) {
+                hash ^= static_cast<u32>(ch);
+                hash *= kMaterialParamFnvPrime32;
+            }
+            return hash;
+        }
+
+        auto ReadJsonVec4(const FJsonValue* value, f32 out[4]) -> bool {
+            if (value == nullptr || value->Type != EJsonType::Array) {
+                return false;
+            }
+            const usize count = value->Array.Size();
+            if (count < 3U) {
+                return false;
+            }
+            out[0] = 0.0f;
+            out[1] = 0.0f;
+            out[2] = 0.0f;
+            out[3] = 1.0f;
+            const usize limit = (count > 4U) ? 4U : count;
+            for (usize i = 0U; i < limit; ++i) {
+                const FJsonValue* entry = value->Array[i];
+                double            num   = 0.0;
+                if (!GetNumberValue(entry, num)) {
+                    return false;
+                }
+                out[i] = static_cast<f32>(num);
+            }
+            return true;
+        }
+
+        auto CookMaterial(const std::vector<u8>& sourceBytes, std::vector<u8>& outCooked) -> bool {
+            if (sourceBytes.empty()) {
+                return false;
+            }
+
+            std::string text(sourceBytes.begin(), sourceBytes.end());
+            FNativeString native;
+            native.Append(text.c_str(), text.size());
+            const FNativeStringView view(native.GetData(), native.Length());
+
+            FJsonDocument document;
+            if (!document.Parse(view)) {
+                return false;
+            }
+
+            const FJsonValue* root = document.GetRoot();
+            if (root == nullptr || root->Type != EJsonType::Object) {
+                return false;
+            }
+
+            f32 baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            if (const FJsonValue* colorValue =
+                    FindObjectValueInsensitive(*root, "BaseColor")) {
+                if (!ReadJsonVec4(colorValue, baseColor)) {
+                    return false;
+                }
+            }
+
+            Asset::FMaterialVectorParam baseColorParam{};
+            baseColorParam.NameHash = HashMaterialParamName("BaseColor");
+            baseColorParam.Value[0] = baseColor[0];
+            baseColorParam.Value[1] = baseColor[1];
+            baseColorParam.Value[2] = baseColor[2];
+            baseColorParam.Value[3] = baseColor[3];
+
+            const std::vector<Asset::FMaterialScalarParam> scalars;
+            const std::vector<Asset::FMaterialVectorParam> vectors = { baseColorParam };
+            const std::vector<Asset::FMaterialTextureParam> textures;
+
+            const u32 scalarBytes =
+                static_cast<u32>(scalars.size() * sizeof(Asset::FMaterialScalarParam));
+            const u32 vectorBytes =
+                static_cast<u32>(vectors.size() * sizeof(Asset::FMaterialVectorParam));
+            const u32 textureBytes =
+                static_cast<u32>(textures.size() * sizeof(Asset::FMaterialTextureParam));
+            const u32 dataBytes = scalarBytes + vectorBytes + textureBytes;
+
+            Asset::FAssetBlobHeader header{};
+            header.Type     = static_cast<u8>(Asset::EAssetType::Material);
+            header.DescSize = static_cast<u32>(sizeof(Asset::FMaterialBlobDesc));
+            header.DataSize = dataBytes;
+
+            Asset::FMaterialBlobDesc blobDesc{};
+            blobDesc.ScalarCount    = static_cast<u32>(scalars.size());
+            blobDesc.VectorCount    = static_cast<u32>(vectors.size());
+            blobDesc.TextureCount   = static_cast<u32>(textures.size());
+            blobDesc.ScalarsOffset  = 0U;
+            blobDesc.VectorsOffset  = scalarBytes;
+            blobDesc.TexturesOffset = scalarBytes + vectorBytes;
+
+            const usize totalSize =
+                sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FMaterialBlobDesc) + dataBytes;
+            outCooked.resize(totalSize);
+
+            u8* writePtr = outCooked.data();
+            std::memcpy(writePtr, &header, sizeof(header));
+            writePtr += sizeof(header);
+            std::memcpy(writePtr, &blobDesc, sizeof(blobDesc));
+            writePtr += sizeof(blobDesc);
+
+            u8* dataBase = writePtr;
+            if (scalarBytes != 0U) {
+                std::memcpy(dataBase + blobDesc.ScalarsOffset, scalars.data(), scalarBytes);
+            }
+            if (vectorBytes != 0U) {
+                std::memcpy(dataBase + blobDesc.VectorsOffset, vectors.data(), vectorBytes);
+            }
+            if (textureBytes != 0U) {
+                std::memcpy(dataBase + blobDesc.TexturesOffset, textures.data(), textureBytes);
+            }
+
+            return true;
         }
 
         auto ParseScriptDescriptor(const std::vector<u8>& bytes, std::string& outAssemblyPath,
@@ -2522,10 +2656,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 Asset::FTexture2DDesc textureDesc{};
                 Asset::FMeshDesc      meshDesc{};
                 Asset::FAudioDesc     audioDesc{};
-                const bool            isTexture = asset.Type == Asset::EAssetType::Texture2D;
-                const bool            isMesh    = asset.Type == Asset::EAssetType::Mesh;
-                const bool            isAudio   = asset.Type == Asset::EAssetType::Audio;
-                const bool            isScript  = asset.Type == Asset::EAssetType::Script;
+                  const bool            isTexture = asset.Type == Asset::EAssetType::Texture2D;
+                  const bool            isMesh    = asset.Type == Asset::EAssetType::Mesh;
+                  const bool            isMaterial = asset.Type == Asset::EAssetType::Material;
+                  const bool            isAudio   = asset.Type == Asset::EAssetType::Audio;
+                  const bool            isScript  = asset.Type == Asset::EAssetType::Script;
                 std::string           scriptAssemblyPath;
                 std::string           scriptTypeName;
                 bool                  hasScriptDesc = false;
@@ -2537,23 +2672,29 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     }
                     hasScriptDesc = true;
                 }
-                if (isTexture) {
-                    constexpr bool kDefaultSrgb = true;
-                    if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
-                        std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
-                                  << "\n";
-                        continue;
-                    }
-                } else if (isMesh) {
-                    if (!CookMesh(asset.SourcePath, cookedBytes, meshDesc, cookKeyExtras)) {
-                        std::cerr << "Failed to cook mesh: " << asset.SourcePath.string() << "\n";
-                        continue;
-                    }
-                } else if (isAudio) {
-                    if (!CookAudio(asset.SourcePath, bytes, cookedBytes, audioDesc)) {
-                        std::cerr << "Failed to cook audio: " << asset.SourcePath.string() << "\n";
-                        continue;
-                    }
+                  if (isTexture) {
+                      constexpr bool kDefaultSrgb = true;
+                      if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
+                          std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
+                                    << "\n";
+                          continue;
+                      }
+                  } else if (isMesh) {
+                      if (!CookMesh(asset.SourcePath, cookedBytes, meshDesc, cookKeyExtras)) {
+                          std::cerr << "Failed to cook mesh: " << asset.SourcePath.string() << "\n";
+                          continue;
+                      }
+                  } else if (isMaterial) {
+                      if (!CookMaterial(bytes, cookedBytes)) {
+                          std::cerr << "Failed to cook material: " << asset.SourcePath.string()
+                                    << "\n";
+                          continue;
+                      }
+                  } else if (isAudio) {
+                      if (!CookAudio(asset.SourcePath, bytes, cookedBytes, audioDesc)) {
+                          std::cerr << "Failed to cook audio: " << asset.SourcePath.string() << "\n";
+                          continue;
+                      }
                 } else {
                     cookedBytes = bytes;
                 }

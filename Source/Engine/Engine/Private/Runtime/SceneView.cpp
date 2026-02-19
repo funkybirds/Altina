@@ -27,6 +27,7 @@ namespace AltinaEngine::Engine {
 
             FSceneView sceneView{};
             sceneView.CameraId = id;
+            sceneView.Target   = params.ViewTarget;
 
             auto& viewData              = sceneView.View;
             viewData.Camera.ProjectionType =

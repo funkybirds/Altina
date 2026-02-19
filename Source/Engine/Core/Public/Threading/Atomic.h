@@ -22,6 +22,8 @@ namespace AltinaEngine::Core::Threading {
         // Non-copyable
         FAtomicInt32(const FAtomicInt32&)                    = delete;
         auto operator=(const FAtomicInt32&) -> FAtomicInt32& = delete;
+        FAtomicInt32(FAtomicInt32&&) noexcept;
+        auto operator=(FAtomicInt32&&) noexcept -> FAtomicInt32&;
 
     private:
         mutable void* mImpl; // Opaque pointer to platform storage
@@ -41,6 +43,8 @@ namespace AltinaEngine::Core::Threading {
 
         FAtomicInt64(const FAtomicInt64&)                    = delete;
         auto operator=(const FAtomicInt64&) -> FAtomicInt64& = delete;
+        FAtomicInt64(FAtomicInt64&&) noexcept;
+        auto operator=(FAtomicInt64&&) noexcept -> FAtomicInt64&;
 
     private:
         mutable void* mImpl;
@@ -92,6 +96,13 @@ namespace AltinaEngine::Core::Threading {
 
         TAtomic(const TAtomic&)                                  = delete;
         auto               operator=(const TAtomic&) -> TAtomic& = delete;
+        TAtomic(TAtomic&& other) noexcept : mImpl(AltinaEngine::Move(other.mImpl)) {}
+        auto operator=(TAtomic&& other) noexcept -> TAtomic& {
+            if (this != &other) {
+                mImpl = AltinaEngine::Move(other.mImpl);
+            }
+            return *this;
+        }
 
         [[nodiscard]] auto IsLockFree() const noexcept -> bool { return true; }
 

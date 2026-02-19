@@ -598,6 +598,8 @@ namespace AltinaEngine::Rhi {
                     return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
                 case ERhiFormat::R16G16B16A16Float:
                     return DXGI_FORMAT_R16G16B16A16_FLOAT;
+                case ERhiFormat::R32G32B32Float:
+                    return DXGI_FORMAT_R32G32B32_FLOAT;
                 case ERhiFormat::R32Float:
                     return DXGI_FORMAT_R32_FLOAT;
                 case ERhiFormat::D24UnormS8Uint:

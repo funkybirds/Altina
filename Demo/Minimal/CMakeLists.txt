@@ -33,6 +33,10 @@ target_compile_features(${TargetName}
 
 set(DemoBinaryDir ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)
 set(DemoAssetCookStamp ${CMAKE_BINARY_DIR}/Demo/Minimal/AssetCook/Minimal.cook.stamp)
+set(DemoAssetsRoot ${CMAKE_CURRENT_SOURCE_DIR}/Assets)
+file(GLOB_RECURSE DemoAssetSources CONFIGURE_DEPENDS
+    ${DemoAssetsRoot}/*
+)
 
 set_target_properties(${TargetName}
     PROPERTIES
@@ -65,6 +69,7 @@ if(AE_DOTNET_HOST)
             -c $<IF:$<CONFIG:Debug>,Debug,Release>
             /t:Rebuild
             /p:NoIncremental=true
+            /p:MSBuildProjectExtensionsPath=${AE_DEMO_MANAGED_OUT_DIR}/obj/
             /p:BaseIntermediateOutputPath=${AE_DEMO_MANAGED_OUT_DIR}/obj/
             /p:IntermediateOutputPath=${AE_DEMO_MANAGED_OUT_DIR}/obj/$<IF:$<CONFIG:Debug>,Debug,Release>/
         COMMAND ${CMAKE_COMMAND} -E touch ${AE_DEMO_MANAGED_STAMP}
@@ -121,6 +126,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E touch ${DemoAssetCookStamp}
     DEPENDS
         AltinaEngineAssetTool
+        ${DemoAssetSources}
         ${CMAKE_CURRENT_SOURCE_DIR}/Assets/Scripts/DemoScript.script
     COMMENT "Cooking Minimal demo assets"
     VERBATIM

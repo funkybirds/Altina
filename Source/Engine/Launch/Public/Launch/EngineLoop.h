@@ -19,6 +19,7 @@
 #include "Rhi/RhiRefs.h"
 #include "Rhi/RhiViewport.h"
 #include "Engine/Runtime/EngineRuntime.h"
+#include "Engine/Runtime/MaterialCache.h"
 
 using AltinaEngine::Core::Container::TFunction;
 using AltinaEngine::Core::Container::TOwner;
@@ -61,6 +62,7 @@ namespace AltinaEngine::Launch {
         [[nodiscard]] auto GetAssetRegistry() const noexcept -> const Asset::FAssetRegistry&;
 
     private:
+        void                                Draw();
         void                                FlushRenderFrames();
         void                                EnforceRenderLag(u32 maxLagFrames);
 
@@ -75,6 +77,7 @@ namespace AltinaEngine::Launch {
         u32                                                             mViewportWidth  = 0U;
         u32                                                             mViewportHeight = 0U;
         u64                                                             mFrameIndex     = 0ULL;
+        f32                                                             mLastDeltaTimeSeconds = 0.0f;
         FRenderCallback                                                 mRenderCallback;
         FStartupParameters                                              mStartupParameters{};
         bool                                                            mIsRunning  = false;
@@ -86,6 +89,7 @@ namespace AltinaEngine::Launch {
         Asset::FMeshLoader                                              mMeshLoader;
         Asset::FScriptLoader                                            mScriptLoader;
         Asset::FTexture2DLoader                                         mTexture2DLoader;
+        Engine::FMaterialCache                                          mMaterialCache;
         TOwner<RenderCore::FRenderingThread>                            mRenderingThread;
         TQueue<Core::Jobs::FJobHandle>                                  mPendingRenderFrames;
         Engine::FEngineRuntime                                          mEngineRuntime{};

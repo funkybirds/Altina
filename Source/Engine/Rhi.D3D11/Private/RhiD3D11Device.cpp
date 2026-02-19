@@ -19,6 +19,7 @@
 #include "Rhi/RhiSemaphore.h"
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiViewport.h"
+#include "Logging/Log.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
 
@@ -37,13 +38,16 @@
         #undef CreateSemaphore
     #endif
     #include <d3d11.h>
+    #include <d3d11_4.h>
     #include <d3d11_1.h>
+    #include <d3d11sdklayers.h>
     #include <wrl/client.h>
 #endif
 
 #include <vector>
 #include <type_traits>
 #include <limits>
+#include <iostream>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
@@ -55,6 +59,7 @@ namespace AltinaEngine::Rhi {
     struct FRhiD3D11Device::FState {
         ComPtr<ID3D11Device>         mDevice;
         ComPtr<ID3D11DeviceContext>  mImmediateContext;
+        ComPtr<ID3D11InfoQueue>      mInfoQueue;
         D3D_FEATURE_LEVEL            mFeatureLevel = D3D_FEATURE_LEVEL_11_0;
         FD3D11UploadBufferManager    mUploadManager;
         FD3D11StagingBufferManager   mStagingManager;
@@ -63,6 +68,7 @@ namespace AltinaEngine::Rhi {
         u32                          mFrameQueryIndex = 0U;
         TVector<ComPtr<ID3D11Query>> mFrameQueries;
         TVector<u64>                 mFrameQuerySerials;
+        bool                         mDeviceRemovedLogged = false;
     };
 
     struct FRhiD3D11CommandList::FState {
@@ -73,6 +79,9 @@ namespace AltinaEngine::Rhi {
         ComPtr<ID3D11Device>         mDevice;
         ComPtr<ID3D11DeviceContext>  mDeferredContext;
         ComPtr<ID3D11DeviceContext1> mDeferredContext1;
+        ComPtr<ID3D11DeviceContext>  mImmediateContext;
+        ComPtr<ID3D11DeviceContext1> mImmediateContext1;
+        bool                         mUseImmediate                                        = false;
         FRhiD3D11GraphicsPipeline*   mCurrentGraphicsPipeline                             = nullptr;
         FRhiD3D11ComputePipeline*    mCurrentComputePipeline                              = nullptr;
         bool                         mUseComputeBindings                                  = false;
@@ -152,17 +161,20 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        if (!mState->mDeferredContext) {
-            ComPtr<ID3D11DeviceContext> deferred;
-            if (SUCCEEDED(mState->mDevice->CreateDeferredContext(0, &deferred))) {
-                mState->mDeferredContext = Move(deferred);
-            }
+        if (!mState->mImmediateContext) {
+            ComPtr<ID3D11DeviceContext> immediate;
+            mState->mDevice->GetImmediateContext(&immediate);
+            mState->mImmediateContext = Move(immediate);
         }
 
-        if (mState->mDeferredContext) {
-            mState->mDeferredContext->ClearState();
-            mState->mDeferredContext1.Reset();
-            mState->mDeferredContext.As(&mState->mDeferredContext1);
+        mState->mDeferredContext.Reset();
+        mState->mDeferredContext1.Reset();
+        mState->mUseImmediate = mState->mImmediateContext != nullptr;
+
+        if (mState->mImmediateContext) {
+            mState->mImmediateContext->ClearState();
+            mState->mImmediateContext1.Reset();
+            mState->mImmediateContext.As(&mState->mImmediateContext1);
         }
 
         mState->mCurrentGraphicsPipeline = nullptr;
@@ -183,7 +195,7 @@ namespace AltinaEngine::Rhi {
 
     void FRhiD3D11CommandContext::End() {
 #if AE_PLATFORM_WIN
-        if (!mState || !mState->mDeferredContext) {
+        if (!mState || mState->mUseImmediate || !mState->mDeferredContext) {
             return;
         }
 
@@ -203,12 +215,17 @@ namespace AltinaEngine::Rhi {
     }
 
     auto FRhiD3D11CommandContext::GetCommandList() const noexcept -> FRhiCommandList* {
+        if (mState && mState->mUseImmediate) {
+            return nullptr;
+        }
         return mCommandList.Get();
     }
 
     namespace {
 #if AE_PLATFORM_WIN
-        auto IsComputeStage(EShaderStage stage) noexcept -> bool {
+        constexpr TChar kD3D11DebugCategory[] = TEXT("RHI.D3D11.Debug");
+
+        auto            IsComputeStage(EShaderStage stage) noexcept -> bool {
             return stage == EShaderStage::Compute;
         }
 
@@ -770,12 +787,17 @@ namespace AltinaEngine::Rhi {
                             ID3D11Buffer* nativeBuffer =
                                 buffer ? buffer->GetNativeBuffer() : nullptr;
                             ID3D11DeviceContext1* context1 = mState->mDeferredContext1.Get();
-                            bool                  hasDynamicOffset = false;
-                            const u64             dynamicOffsetBytes =
+                            if (!context1) {
+                                context1 = mState->mImmediateContext1.Get();
+                            }
+                            bool      hasDynamicOffset = false;
+                            const u64 dynamicOffsetBytes =
                                 getDynamicOffsetBytes(entry, hasDynamicOffset);
+                            const u64 bufferSizeBytes =
+                                buffer ? buffer->GetDesc().mSizeBytes : 0ULL;
 
-                            const bool wantsRange =
-                                hasDynamicOffset || entry.mOffset != 0ULL || entry.mSize != 0ULL;
+                            const bool wantsRange = hasDynamicOffset || entry.mOffset != 0ULL
+                                || (entry.mSize != 0ULL && entry.mSize != bufferSizeBytes);
 
                             if (context1 && wantsRange && buffer != nullptr) {
                                 const u64 bufferSizeBytes = buffer->GetDesc().mSizeBytes;
@@ -791,14 +813,18 @@ namespace AltinaEngine::Rhi {
                                 const bool validRange = (offsetBytes <= bufferSizeBytes)
                                     && (sizeBytes != 0ULL)
                                     && (sizeBytes <= (bufferSizeBytes - offsetBytes))
-                                    && (offsetBytes % 16ULL == 0ULL) && (sizeBytes % 16ULL == 0ULL);
+                                    && (offsetBytes % 16ULL == 0ULL)
+                                    && (sizeBytes % 16ULL == 0ULL);
 
                                 if (validRange) {
                                     const u64 firstConstant64 = offsetBytes / 16ULL;
                                     const u64 numConstants64  = sizeBytes / 16ULL;
                                     const u64 maxUint =
                                         static_cast<u64>(std::numeric_limits<UINT>::max());
-                                    if (firstConstant64 <= maxUint && numConstants64 <= maxUint) {
+                                    const bool alignedForSet1 =
+                                        (offsetBytes % 256ULL == 0ULL) && (sizeBytes % 256ULL == 0ULL);
+                                    if (firstConstant64 <= maxUint && numConstants64 <= maxUint
+                                        && alignedForSet1) {
                                         const UINT firstConstant =
                                             static_cast<UINT>(firstConstant64);
                                         const UINT numConstants = static_cast<UINT>(numConstants64);
@@ -895,6 +921,9 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
+        LogInfo(TEXT("RHI Draw: vtx={} inst={} firstV={} firstI={}"), vertexCount, instanceCount,
+            firstVertex, firstInstance);
+
         if (instanceCount == 1U) {
             context->Draw(vertexCount, firstVertex);
         } else {
@@ -915,6 +944,9 @@ namespace AltinaEngine::Rhi {
         if (!context) {
             return;
         }
+
+        LogInfo(TEXT("RHI DrawIndexed: idx={} inst={} firstIdx={} baseV={} firstI={}"), indexCount,
+            instanceCount, firstIndex, vertexOffset, firstInstance);
 
         const UINT idxCount      = static_cast<UINT>(indexCount);
         const UINT instCount     = static_cast<UINT>(instanceCount);
@@ -953,7 +985,13 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiD3D11CommandContext::GetDeferredContext() const noexcept -> ID3D11DeviceContext* {
 #if AE_PLATFORM_WIN
-        return mState ? mState->mDeferredContext.Get() : nullptr;
+        if (!mState) {
+            return nullptr;
+        }
+        if (mState->mDeferredContext) {
+            return mState->mDeferredContext.Get();
+        }
+        return mState->mImmediateContext.Get();
 #else
         return nullptr;
 #endif
@@ -963,6 +1001,169 @@ namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
         using Container::FString;
         using Container::TVector;
+
+        auto ToFStringFromAnsi(const char* text, usize length) -> FString {
+            FString out;
+            if (text == nullptr || length == 0U) {
+                return out;
+            }
+
+            if (text[length - 1] == '\0') {
+                length -= 1U;
+            }
+            if (length == 0U) {
+                return out;
+            }
+
+            out.Reserve(length);
+            for (usize i = 0; i < length; ++i) {
+                const auto ch = static_cast<unsigned char>(text[i]);
+                out.Append(static_cast<TChar>(ch));
+            }
+            return out;
+        }
+
+        auto SeverityToText(D3D11_MESSAGE_SEVERITY severity) noexcept -> const TChar* {
+            switch (severity) {
+                case D3D11_MESSAGE_SEVERITY_CORRUPTION:
+                    return TEXT("CORRUPTION");
+                case D3D11_MESSAGE_SEVERITY_ERROR:
+                    return TEXT("ERROR");
+                case D3D11_MESSAGE_SEVERITY_WARNING:
+                    return TEXT("WARNING");
+                case D3D11_MESSAGE_SEVERITY_INFO:
+                    return TEXT("INFO");
+                case D3D11_MESSAGE_SEVERITY_MESSAGE:
+                    return TEXT("MESSAGE");
+                default:
+                    return TEXT("UNKNOWN");
+            }
+        }
+
+        auto SeverityToLogLevel(D3D11_MESSAGE_SEVERITY severity) noexcept -> ELogLevel {
+            switch (severity) {
+                case D3D11_MESSAGE_SEVERITY_CORRUPTION:
+                case D3D11_MESSAGE_SEVERITY_ERROR:
+                    return ELogLevel::Error;
+                case D3D11_MESSAGE_SEVERITY_WARNING:
+                    return ELogLevel::Warning;
+                case D3D11_MESSAGE_SEVERITY_INFO:
+                case D3D11_MESSAGE_SEVERITY_MESSAGE:
+                default:
+                    return ELogLevel::Info;
+            }
+        }
+
+        auto ConsoleStreamForLevel(ELogLevel level) noexcept -> std::basic_ostream<TChar>& {
+            if (level >= ELogLevel::Warning) {
+                if constexpr (std::is_same_v<TChar, wchar_t>) {
+                    return std::wcerr;
+                } else {
+                    return std::cerr;
+                }
+            }
+
+            if constexpr (std::is_same_v<TChar, wchar_t>) {
+                return std::wcout;
+            } else {
+                return std::cout;
+            }
+        }
+
+        void WriteStdioFallback(ELogLevel level, const TChar* severityText, u32 messageId,
+            const Container::FStringView& messageText) noexcept {
+            auto& stream = ConsoleStreamForLevel(level);
+            stream << TEXT("D3D11 Debug [");
+            if (severityText != nullptr) {
+                stream << severityText;
+            }
+            stream << TEXT(":") << messageId << TEXT("] ");
+            if (!messageText.IsEmpty()) {
+                stream.write(
+                    messageText.Data(), static_cast<std::streamsize>(messageText.Length()));
+            }
+            stream << TEXT('\n');
+            stream.flush();
+        }
+
+        void EmitD3D11DebugMessage(D3D11_MESSAGE_SEVERITY severity, u32 messageId,
+            const Container::FStringView& messageText) noexcept {
+            const TChar* severityText = SeverityToText(severity);
+            const auto   level        = SeverityToLogLevel(severity);
+            bool         logged       = false;
+
+            try {
+                switch (level) {
+                    case ELogLevel::Error:
+                        LogErrorCat(kD3D11DebugCategory, TEXT("D3D11 Debug [{}:{}] {}"),
+                            severityText, messageId, messageText);
+                        break;
+                    case ELogLevel::Warning:
+                        LogWarningCat(kD3D11DebugCategory, TEXT("D3D11 Debug [{}:{}] {}"),
+                            severityText, messageId, messageText);
+                        break;
+                    case ELogLevel::Info:
+                    case ELogLevel::Debug:
+                    case ELogLevel::Trace:
+                    case ELogLevel::Fatal:
+                    default:
+                        LogInfoCat(kD3D11DebugCategory, TEXT("D3D11 Debug [{}:{}] {}"),
+                            severityText, messageId, messageText);
+                        break;
+                }
+                logged = true;
+            } catch (...) {
+                logged = false;
+            }
+
+            if (!logged) {
+                WriteStdioFallback(level, severityText, messageId, messageText);
+            }
+        }
+
+        void ConfigureInfoQueue(ID3D11InfoQueue* infoQueue) {
+            if (infoQueue == nullptr) {
+                return;
+            }
+
+            infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+            infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, TRUE);
+        }
+
+        void DumpInfoQueueMessages(ID3D11InfoQueue* infoQueue) {
+            if (infoQueue == nullptr) {
+                return;
+            }
+
+            const UINT64 messageCount = infoQueue->GetNumStoredMessagesAllowedByRetrievalFilter();
+            if (messageCount == 0) {
+                return;
+            }
+
+            for (UINT64 i = 0; i < messageCount; ++i) {
+                SIZE_T messageLength = 0;
+                if (FAILED(infoQueue->GetMessage(i, nullptr, &messageLength))
+                    || messageLength == 0U) {
+                    continue;
+                }
+
+                std::vector<char> messageBytes(messageLength);
+                auto*             message = reinterpret_cast<D3D11_MESSAGE*>(messageBytes.data());
+                if (FAILED(infoQueue->GetMessage(i, message, &messageLength))
+                    || message == nullptr) {
+                    continue;
+                }
+
+                const auto descriptionLength = static_cast<usize>(message->DescriptionByteLength);
+                const auto messageText =
+                    ToFStringFromAnsi(message->pDescription, descriptionLength);
+                const u32 messageId = static_cast<u32>(message->ID);
+
+                EmitD3D11DebugMessage(message->Severity, messageId, messageText.ToView());
+            }
+
+            infoQueue->ClearStoredMessages();
+        }
 
         auto ToD3D11Format(ERhiFormat format) noexcept -> DXGI_FORMAT {
             switch (format) {
@@ -976,6 +1177,8 @@ namespace AltinaEngine::Rhi {
                     return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
                 case ERhiFormat::R16G16B16A16Float:
                     return DXGI_FORMAT_R16G16B16A16_FLOAT;
+                case ERhiFormat::R32G32B32Float:
+                    return DXGI_FORMAT_R32G32B32_FLOAT;
                 case ERhiFormat::R32Float:
                     return DXGI_FORMAT_R32_FLOAT;
                 case ERhiFormat::D24UnormS8Uint:
@@ -1028,8 +1231,8 @@ namespace AltinaEngine::Rhi {
                     continue;
                 }
                 for (const auto& entry : groupDesc.mEntries) {
-                    if (entry.mBinding == binding) {
-                        return entry.mType == type;
+                    if (entry.mBinding == binding && entry.mType == type) {
+                        return true;
                     }
                 }
             }
@@ -1359,6 +1562,27 @@ namespace AltinaEngine::Rhi {
             mState->mFeatureLevel = static_cast<D3D_FEATURE_LEVEL>(featureLevel);
         }
 
+        if (mState && mState->mDevice) {
+            if (desc.mEnableDebugLayer || desc.mEnableGpuValidation) {
+                mState->mInfoQueue.Reset();
+                mState->mDevice.As(&mState->mInfoQueue);
+                ConfigureInfoQueue(mState->mInfoQueue.Get());
+            }
+        }
+
+        if (mState && mState->mImmediateContext
+            && (desc.mEnableDebugLayer || desc.mEnableGpuValidation)) {
+    #if defined(__ID3D11Multithread_INTERFACE_DEFINED__)
+            ComPtr<ID3D11Multithread> multithread;
+            if (SUCCEEDED(mState->mImmediateContext.As(&multithread)) && multithread) {
+                multithread->SetMultithreadProtected(TRUE);
+                LogInfo(TEXT("RHI(D3D11): Multithread protection enabled."));
+            }
+    #else
+            LogWarning(TEXT("RHI(D3D11): ID3D11Multithread not available; skipping protection."));
+    #endif
+        }
+
         FRhiSupportedLimits limits;
         limits.mMaxTextureDimension1D = D3D11_REQ_TEXTURE1D_U_DIMENSION;
         limits.mMaxTextureDimension2D = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
@@ -1663,6 +1887,21 @@ namespace AltinaEngine::Rhi {
                 mState->mImmediateContext->End(query.Get());
             }
             mState->mFrameQueryIndex = index + 1U;
+        }
+
+        if (mState->mInfoQueue) {
+            DumpInfoQueueMessages(mState->mInfoQueue.Get());
+        }
+
+        if (!mState->mDeviceRemovedLogged && mState->mDevice) {
+            const HRESULT reason = mState->mDevice->GetDeviceRemovedReason();
+            if (FAILED(reason)) {
+                mState->mDeviceRemovedLogged = true;
+                LogError(
+                    TEXT("RHI(D3D11): Device removed (hr=0x{:08X})."), static_cast<u32>(reason));
+                std::abort();
+                DumpInfoQueueMessages(mState->mInfoQueue.Get());
+            }
         }
 #endif
     }

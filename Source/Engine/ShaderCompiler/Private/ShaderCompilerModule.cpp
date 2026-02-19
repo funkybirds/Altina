@@ -63,7 +63,10 @@ namespace AltinaEngine::ShaderCompiler {
         Detail::IShaderCompilerBackend* primary  = nullptr;
         Detail::IShaderCompilerBackend* fallback = nullptr;
 
-        if (request.mOptions.mTargetBackend == Rhi::ERhiBackend::Vulkan) {
+        if (request.mOptions.mTargetBackend == Rhi::ERhiBackend::DirectX11) {
+            primary  = &mSlangBackend;
+            fallback = &mDxcBackend;
+        } else if (request.mOptions.mTargetBackend == Rhi::ERhiBackend::Vulkan) {
             primary  = &mSlangBackend;
             fallback = &mDxcBackend;
         } else if (request.mSource.mLanguage == EShaderSourceLanguage::Slang) {

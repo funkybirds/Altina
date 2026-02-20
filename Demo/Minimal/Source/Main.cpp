@@ -32,6 +32,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <iostream>
 
 #if AE_PLATFORM_WIN
     #ifdef TEXT
@@ -340,16 +341,15 @@ namespace {
         -> const Shader::FShaderConstantBuffer* {
         for (const auto& cbuffer : reflection.mConstantBuffers) {
             if (IsMaterialCBufferName(cbuffer.mName.ToView())) {
+                std::cout << "Addr=" << &cbuffer << std::endl;
                 return &cbuffer;
             }
         }
         return nullptr;
     }
 
-    auto BuildMaterialLayout(const Shader::FShaderReflection* vertex,
-        const Shader::FShaderReflection* pixel) -> RenderCore::FMaterialLayout {
-        RenderCore::FMaterialLayout layout;
-
+    auto SelectMaterialCBuffer(const Shader::FShaderReflection* vertex,
+        const Shader::FShaderReflection* pixel) -> const Shader::FShaderConstantBuffer* {
         const Shader::FShaderConstantBuffer* materialCBuffer = nullptr;
         if (pixel) {
             materialCBuffer = FindMaterialCBuffer(*pixel);
@@ -363,11 +363,60 @@ namespace {
         if (!materialCBuffer && vertex && !vertex->mConstantBuffers.IsEmpty()) {
             materialCBuffer = &vertex->mConstantBuffers[0];
         }
+        return materialCBuffer;
+    }
 
+    auto BuildMaterialLayout(const Shader::FShaderReflection* vertex,
+        const Shader::FShaderReflection* pixel) -> RenderCore::FMaterialLayout {
+        RenderCore::FMaterialLayout layout;
+        const auto* materialCBuffer = SelectMaterialCBuffer(vertex, pixel);
         if (materialCBuffer != nullptr) {
             layout.InitFromConstantBuffer(*materialCBuffer);
         }
         return layout;
+    }
+
+    void LogMaterialLayout(const RenderCore::FMaterialLayout& layout,
+        const Shader::FShaderConstantBuffer* materialCBuffer, const FString& passName) {
+        LogInfo(TEXT("Material Layout for pass {}"), passName.CStr());
+
+        if (!layout.PropertyBag.IsValid()) {
+            LogInfo(TEXT("  PropertyBag: <invalid>"));
+        } else {
+            LogInfo(TEXT("  PropertyBag: Name={} Size={} Set={} Binding={} Register={} Space={}"),
+                layout.PropertyBag.GetName().CStr(), layout.PropertyBag.GetSizeBytes(),
+                layout.PropertyBag.GetSet(), layout.PropertyBag.GetBinding(),
+                layout.PropertyBag.GetRegister(), layout.PropertyBag.GetSpace());
+        }
+
+        if (materialCBuffer == nullptr) {
+            LogWarning(TEXT("  Material CBuffer: <null>"));
+        } else {
+            LogInfo(TEXT("  Material CBuffer: Name={} Size={} Set={} Binding={} Register={} Space={}"),
+                materialCBuffer->mName.CStr(), materialCBuffer->mSizeBytes, materialCBuffer->mSet,
+                materialCBuffer->mBinding, materialCBuffer->mRegister, materialCBuffer->mSpace);
+
+            LogInfo(TEXT("  Properties: {}"), static_cast<u32>(materialCBuffer->mMembers.Size()));
+            for (const auto& member : materialCBuffer->mMembers) {
+                const auto nameHash = RenderCore::HashMaterialParamName(member.mName.ToView());
+                LogInfo(
+                    TEXT("    {} (hash=0x{:08X}) Offset={} Size={} ElemCount={} ElemStride={}"),
+                    member.mName.CStr(), nameHash, member.mOffset, member.mSize,
+                    member.mElementCount, member.mElementStride);
+            }
+        }
+
+        const usize textureCount = layout.TextureBindings.Size();
+        LogInfo(TEXT("  TextureBindings: {}"), static_cast<u32>(textureCount));
+        for (usize i = 0U; i < textureCount; ++i) {
+            const u32 nameHash = (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i]
+                                                                       : 0U;
+            const u32 samplerBinding =
+                (i < layout.SamplerBindings.Size()) ? layout.SamplerBindings[i]
+                                                    : RenderCore::kMaterialInvalidBinding;
+            LogInfo(TEXT("    [{}] NameHash=0x{:08X} TextureBinding={} SamplerBinding={}"),
+                static_cast<u32>(i), nameHash, layout.TextureBindings[i], samplerBinding);
+        }
     }
 
     auto WriteTempShaderFile(const FNativeStringView& source, const FUuid& uuid,
@@ -540,6 +589,8 @@ namespace {
             const Shader::FShaderReflection* pixelReflection =
                 hasPixelResult ? &pixelResult.mReflection : nullptr;
             passDesc.Layout = BuildMaterialLayout(vertexReflection, pixelReflection);
+            LogMaterialLayout(passDesc.Layout,
+                SelectMaterialCBuffer(vertexReflection, pixelReflection), pass.Name);
 
             auto* rasterSourceAsset = static_cast<Asset::FShaderAsset*>(nullptr);
             if (pass.HasPixel) {

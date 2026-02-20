@@ -6,6 +6,7 @@
 #include "Container/StringView.h"
 #include "Platform/PlatformFileSystem.h"
 #include "Platform/PlatformProcess.h"
+#include "Logging/Log.h"
 
 #include <cctype>
 #include <cstdlib>
@@ -423,14 +424,28 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             return false;
         }
 
-        auto NativeToFString(const FNativeString& value) -> FString;
-
-        auto ParseSlangTypeLayoutFields(const FJsonValue* layout, const FString& prefix,
-            u32 baseOffset, FShaderConstantBuffer& outCb) -> void {
-            if (layout == nullptr || layout->mType != EJsonType::Object) {
-                return;
+        auto GetBindingSizeBytes(const FJsonValue* binding, u32& out) -> bool {
+            if (binding == nullptr || binding->mType != EJsonType::Object) {
+                return false;
             }
-            const auto* fields = FindObjectValue(*layout, "fields");
+            if (GetNumberAsU32(FindObjectValue(*binding, "size"), out)) {
+                return true;
+            }
+            if (GetNumberAsU32(FindObjectValue(*binding, "byteSize"), out)) {
+                return true;
+            }
+            if (GetNumberAsU32(FindObjectValue(*binding, "uniformSize"), out)) {
+                return true;
+            }
+            return false;
+        }
+
+        auto NativeToFString(const FNativeString& value) -> FString;
+        auto ParseSlangTypeLayoutFields(const FJsonValue* layout, const FString& prefix,
+            u32 baseOffset, FShaderConstantBuffer& outCb) -> void;
+
+        auto ParseSlangFieldsArray(const FJsonValue* fields, const FString& prefix, u32 baseOffset,
+            FShaderConstantBuffer& outCb) -> void {
             if (fields == nullptr || fields->mType != EJsonType::Array) {
                 return;
             }
@@ -445,16 +460,22 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     continue;
                 }
 
-                u32         offsetBytes = 0U;
-                const auto* offsetValue = FindObjectValue(*field, "offset");
-                if (!GetLayoutOffsetBytes(offsetValue, offsetBytes)) {
-                    GetNumberAsU32(FindObjectValue(*field, "uniformOffset"), offsetBytes);
+                const auto* fieldBinding = FindObjectValue(*field, "binding");
+
+                u32 offsetBytes = 0U;
+                if (!GetLayoutOffsetBytes(fieldBinding, offsetBytes)) {
+                    const auto* offsetValue = FindObjectValue(*field, "offset");
+                    if (!GetLayoutOffsetBytes(offsetValue, offsetBytes)) {
+                        GetNumberAsU32(FindObjectValue(*field, "uniformOffset"), offsetBytes);
+                    }
                 }
 
                 const auto* fieldTypeLayout = FindObjectValue(*field, "typeLayout");
                 u32         sizeBytes       = 0U;
                 if (!GetLayoutSizeBytes(fieldTypeLayout, sizeBytes)) {
-                    GetNumberAsU32(FindObjectValue(*field, "size"), sizeBytes);
+                    if (!GetNumberAsU32(FindObjectValue(*field, "size"), sizeBytes)) {
+                        GetBindingSizeBytes(fieldBinding, sizeBytes);
+                    }
                 }
 
                 const auto*   fieldType = FindObjectValue(*field, "type");
@@ -470,8 +491,11 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     GetNumberAsU32(FindObjectValue(*fieldType, "elementCount"), elementCount);
                 }
 
-                const u32 elementStride =
+                u32 elementStride =
                     (elementCount > 0U && sizeBytes > 0U) ? (sizeBytes / elementCount) : 0U;
+                if (elementStride == 0U) {
+                    GetNumberAsU32(FindObjectValue(*fieldBinding, "elementStride"), elementStride);
+                }
 
                 FString fullName = prefix;
                 if (!fullName.IsEmptyString()) {
@@ -497,6 +521,24 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                         fieldTypeLayout, fullName, baseOffset + offsetBytes, outCb);
                 }
             }
+        }
+
+        auto ParseSlangTypeFieldsFromTypeObject(const FJsonValue* typeObj, const FString& prefix,
+            u32 baseOffset, FShaderConstantBuffer& outCb) -> void {
+            if (typeObj == nullptr || typeObj->mType != EJsonType::Object) {
+                return;
+            }
+            const auto* fields = FindObjectValue(*typeObj, "fields");
+            ParseSlangFieldsArray(fields, prefix, baseOffset, outCb);
+        }
+
+        auto ParseSlangTypeLayoutFields(const FJsonValue* layout, const FString& prefix,
+            u32 baseOffset, FShaderConstantBuffer& outCb) -> void {
+            if (layout == nullptr || layout->mType != EJsonType::Object) {
+                return;
+            }
+            const auto* fields = FindObjectValue(*layout, "fields");
+            ParseSlangFieldsArray(fields, prefix, baseOffset, outCb);
         }
 
         auto NativeToFString(const FNativeString& value) -> FString {
@@ -644,6 +686,41 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                         if (layout != nullptr && layout->mType == EJsonType::Object) {
                             GetLayoutSizeBytes(layout, cbInfo.mSizeBytes);
                             ParseSlangTypeLayoutFields(layout, FString{}, 0U, cbInfo);
+                        } else if (typeObj != nullptr && typeObj->mType == EJsonType::Object) {
+                            const auto* elementVarLayout =
+                                FindObjectValue(*typeObj, "elementVarLayout");
+                            if (elementVarLayout != nullptr
+                                && elementVarLayout->mType == EJsonType::Object) {
+                                const auto* elementBinding =
+                                    FindObjectValue(*elementVarLayout, "binding");
+                                GetBindingSizeBytes(elementBinding, cbInfo.mSizeBytes);
+
+                                const auto* elementType =
+                                    FindObjectValue(*elementVarLayout, "type");
+                                ParseSlangTypeFieldsFromTypeObject(
+                                    elementType, FString{}, 0U, cbInfo);
+                            }
+
+                            if (cbInfo.mMembers.IsEmpty()) {
+                                const auto* elementType = FindObjectValue(*typeObj, "elementType");
+                                ParseSlangTypeFieldsFromTypeObject(
+                                    elementType, FString{}, 0U, cbInfo);
+                            }
+
+                            if (cbInfo.mMembers.IsEmpty()) {
+                                ParseSlangTypeFieldsFromTypeObject(
+                                    typeObj, FString{}, 0U, cbInfo);
+                            }
+                        }
+                        if (cbInfo.mSizeBytes == 0U && !cbInfo.mMembers.IsEmpty()) {
+                            u32 maxEnd = 0U;
+                            for (const auto& member : cbInfo.mMembers) {
+                                const u32 end = member.mOffset + member.mSize;
+                                if (end > maxEnd) {
+                                    maxEnd = end;
+                                }
+                            }
+                            cbInfo.mSizeBytes = maxEnd;
                         }
 
                         outReflection.mConstantBuffers.PushBack(cbInfo);

@@ -23,6 +23,7 @@ if(WIN32)
         PRIVATE
             AltinaEngine::Rhi::D3D11
             d3dcompiler
+            dxguid
     )
 endif()
 

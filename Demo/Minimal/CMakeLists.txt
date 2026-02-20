@@ -35,6 +35,7 @@ target_compile_features(${TargetName}
 set(DemoBinaryDir ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)
 set(DemoAssetCookStamp ${CMAKE_BINARY_DIR}/Demo/Minimal/AssetCook/Minimal.cook.stamp)
 set(DemoAssetsRoot ${CMAKE_CURRENT_SOURCE_DIR}/Assets)
+set(DemoCookedRoot ${DemoBinaryDir}/Assets)
 file(GLOB_RECURSE DemoAssetSources CONFIGURE_DEPENDS
     ${DemoAssetsRoot}/*
 )
@@ -124,6 +125,7 @@ add_custom_command(
         --platform Win64
         --demo Minimal
         --build-root ${CMAKE_SOURCE_DIR}/build
+        --cook-root ${DemoCookedRoot}
     COMMAND ${CMAKE_COMMAND} -E touch ${DemoAssetCookStamp}
     DEPENDS
         AltinaEngineAssetTool

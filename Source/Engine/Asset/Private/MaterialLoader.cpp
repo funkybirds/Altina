@@ -3,32 +3,10 @@
 #include "Asset/MaterialAsset.h"
 #include "Types/Traits.h"
 #include "Utility/Json.h"
+#include "Utility/String/CodeConvert.h"
 #include "Utility/String/StringViewUtility.h"
 #include "Utility/String/UuidParser.h"
 #include "Utility/Uuid.h"
-
-#include <string>
-
-#if AE_PLATFORM_WIN
-    #ifdef TEXT
-        #undef TEXT
-    #endif
-    #ifndef WIN32_LEAN_AND_MEAN
-        #define WIN32_LEAN_AND_MEAN
-    #endif
-    #ifndef NOMINMAX
-        #define NOMINMAX
-    #endif
-    #include <windows.h>
-    #ifdef TEXT
-        #undef TEXT
-    #endif
-    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-        #define TEXT(str) L##str
-    #else
-        #define TEXT(str) str
-    #endif
-#endif
 
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
@@ -102,31 +80,6 @@ namespace AltinaEngine::Asset {
                 ptr, TPolymorphicDeleter<IAsset>(&DestroyPolymorphic<IAsset, TDerived>));
         }
 
-        auto FromUtf8(const Container::FNativeString& value) -> Container::FString {
-            Container::FString out;
-            if (value.IsEmptyString()) {
-                return out;
-            }
-#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-    #if AE_PLATFORM_WIN
-            int wideCount = MultiByteToWideChar(
-                CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()), nullptr, 0);
-            if (wideCount <= 0) {
-                return out;
-            }
-            std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-            MultiByteToWideChar(CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()),
-                wide.data(), wideCount);
-            out.Append(wide.c_str(), wide.size());
-    #else
-            out.Append(value.GetData(), value.Length());
-    #endif
-#else
-            out.Append(value.GetData(), value.Length());
-#endif
-            return out;
-        }
-
         auto ParseAssetTypeText(const FJsonValue* value, EAssetType& outType) -> bool {
             Container::FNativeString typeText;
             if (!GetStringValue(value, typeText)) {
@@ -178,7 +131,7 @@ namespace AltinaEngine::Asset {
 
             out.Asset.Uuid = uuid;
             out.Asset.Type = type;
-            out.Entry      = FromUtf8(entryText);
+            out.Entry      = Core::Utility::String::FromUtf8(entryText);
             return out.Asset.IsValid() && !out.Entry.IsEmptyString();
         }
 
@@ -187,7 +140,7 @@ namespace AltinaEngine::Asset {
             TVector<TVector<Container::FString>>& outVariants) -> bool {
             const FJsonValue* nameValue = FindObjectValueInsensitive(root, "Name");
             if (nameValue != nullptr && nameValue->Type == EJsonType::String) {
-                outName = FromUtf8(nameValue->String);
+                outName = Core::Utility::String::FromUtf8(nameValue->String);
             }
 
             const FJsonValue* passesValue = FindObjectValueInsensitive(root, "Passes");
@@ -201,7 +154,7 @@ namespace AltinaEngine::Asset {
                 }
 
                 FMaterialPassTemplate pass{};
-                pass.Name = FromUtf8(pair.Key);
+                pass.Name = Core::Utility::String::FromUtf8(pair.Key);
                 if (pass.Name.IsEmptyString()) {
                     continue;
                 }
@@ -244,7 +197,7 @@ namespace AltinaEngine::Asset {
                         if (item == nullptr || item->Type != EJsonType::String) {
                             continue;
                         }
-                        variant.PushBack(FromUtf8(item->String));
+                        variant.PushBack(Core::Utility::String::FromUtf8(item->String));
                     }
                     outVariants.PushBack(Move(variant));
                 }

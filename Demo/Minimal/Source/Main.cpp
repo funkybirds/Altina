@@ -28,32 +28,12 @@
 #include "Rhi/RhiInit.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
+#include "Utility/String/CodeConvert.h"
 
 #include <filesystem>
 #include <fstream>
 #include <string>
 #include <iostream>
-
-#if AE_PLATFORM_WIN
-    #ifdef TEXT
-        #undef TEXT
-    #endif
-    #ifndef WIN32_LEAN_AND_MEAN
-        #define WIN32_LEAN_AND_MEAN
-    #endif
-    #ifndef NOMINMAX
-        #define NOMINMAX
-    #endif
-    #include <windows.h>
-    #ifdef TEXT
-        #undef TEXT
-    #endif
-    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-        #define TEXT(str) L##str
-    #else
-        #define TEXT(str) str
-    #endif
-#endif
 
 using namespace AltinaEngine;
 
@@ -260,33 +240,6 @@ namespace {
 
         outMesh = AltinaEngine::Move(mesh);
         return true;
-    }
-
-    auto FromUtf8(FNativeStringView value) -> FString {
-        FString out;
-        if (value.Length() == 0) {
-            return out;
-        }
-#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-    #if AE_PLATFORM_WIN
-        const int wideCount =
-            MultiByteToWideChar(CP_UTF8, 0, value.Data(), static_cast<int>(value.Length()), nullptr, 0);
-        if (wideCount <= 0) {
-            return out;
-        }
-        std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, value.Data(), static_cast<int>(value.Length()), wide.data(),
-            wideCount);
-        out.Append(wide.c_str(), wide.size());
-    #else
-        for (usize i = 0; i < value.Length(); ++i) {
-            out.Append(static_cast<wchar_t>(static_cast<unsigned char>(value.Data()[i])));
-        }
-    #endif
-#else
-        out.Append(value.Data(), value.Length());
-#endif
-        return out;
     }
 
     auto TryParseMaterialPass(FStringView name, RenderCore::EMaterialPass& outPass) -> bool {
@@ -524,7 +477,8 @@ namespace {
     auto TryParseRasterState(const Asset::FShaderAsset& shader, Shader::FShaderRasterState& out)
         -> bool {
         ShaderCompiler::FShaderPermutationParseResult parse{};
-        const auto sourceText = FromUtf8(shader.GetSource());
+        const auto sourceText =
+            Core::Utility::String::FromUtf8(Container::FNativeString(shader.GetSource()));
         if (!ShaderCompiler::ParseShaderPermutationSource(sourceText.ToView(), parse)) {
             return false;
         }

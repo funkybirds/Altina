@@ -1,0 +1,9 @@
+{
+  "Uuid": "b2fcb5a0-2d4f-4f1c-9e24-1f2a91c8e9dd",
+  "Type": "Shader",
+  "VirtualPath": "demo/minimal/shaders/basicdeferred",
+  "SourcePath": "Demo/Minimal/Assets/Shaders/BasicDeferred.hlsl",
+  "Importer": "ShaderImporter",
+  "ImporterVersion": 1,
+  "Dependencies": []
+}

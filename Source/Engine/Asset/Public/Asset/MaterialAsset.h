@@ -1,41 +1,50 @@
 #pragma once
 
-#include "Asset/AssetBinary.h"
 #include "Asset/AssetLoader.h"
+#include "Asset/AssetTypes.h"
+#include "Container/String.h"
 #include "Container/Vector.h"
 
 namespace AltinaEngine::Asset {
     namespace Container = Core::Container;
     using Container::TVector;
 
-    struct AE_ASSET_API FMaterialRuntimeDesc {
-        u32 ShadingModel = 0;
-        u32 BlendMode    = 0;
-        u32 Flags        = 0;
-        f32 AlphaCutoff  = 0.0f;
+    using Container::FString;
+
+    struct AE_ASSET_API FMaterialShaderSource {
+        FAssetHandle Asset{};
+        FString      Entry;
+    };
+
+    struct AE_ASSET_API FMaterialPassTemplate {
+        FString               Name;
+        bool                  HasVertex  = false;
+        bool                  HasPixel   = false;
+        bool                  HasCompute = false;
+        FMaterialShaderSource Vertex;
+        FMaterialShaderSource Pixel;
+        FMaterialShaderSource Compute;
     };
 
     class AE_ASSET_API FMaterialAsset final : public IAsset {
     public:
-        FMaterialAsset(FMaterialRuntimeDesc desc, TVector<FMaterialScalarParam> scalars,
-            TVector<FMaterialVectorParam> vectors, TVector<FMaterialTextureParam> textures);
+        FMaterialAsset(FString name, TVector<FMaterialPassTemplate> passes,
+            TVector<TVector<FString>> precompileVariants);
 
-        [[nodiscard]] auto GetDesc() const noexcept -> const FMaterialRuntimeDesc& { return mDesc; }
-        [[nodiscard]] auto GetScalars() const noexcept -> const TVector<FMaterialScalarParam>& {
-            return mScalars;
+        [[nodiscard]] auto GetName() const noexcept -> const FString& { return mName; }
+        [[nodiscard]] auto GetPasses() const noexcept
+            -> const TVector<FMaterialPassTemplate>& {
+            return mPasses;
         }
-        [[nodiscard]] auto GetVectors() const noexcept -> const TVector<FMaterialVectorParam>& {
-            return mVectors;
-        }
-        [[nodiscard]] auto GetTextures() const noexcept -> const TVector<FMaterialTextureParam>& {
-            return mTextures;
+        [[nodiscard]] auto GetPrecompileVariants() const noexcept
+            -> const TVector<TVector<FString>>& {
+            return mPrecompileVariants;
         }
 
     private:
-        FMaterialRuntimeDesc           mDesc{};
-        TVector<FMaterialScalarParam>  mScalars;
-        TVector<FMaterialVectorParam>  mVectors;
-        TVector<FMaterialTextureParam> mTextures;
+        FString                       mName;
+        TVector<FMaterialPassTemplate> mPasses;
+        TVector<TVector<FString>>     mPrecompileVariants;
     };
 
 } // namespace AltinaEngine::Asset

@@ -1,6 +1,6 @@
 {
   "Uuid": "c07dad37-d4e6-4f8f-ad35-46163b534428",
-  "Type": "Material",
+  "Type": "MaterialTemplate",
   "VirtualPath": "demo/minimal/materials/purpledeferred",
   "SourcePath": "Demo/Minimal/Assets/Materials/PurpleDeferred.material",
   "Importer": "MaterialImporter",

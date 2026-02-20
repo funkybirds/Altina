@@ -11,6 +11,7 @@
 #include "Asset/AudioLoader.h"
 #include "Asset/MaterialLoader.h"
 #include "Asset/MeshLoader.h"
+#include "Asset/ShaderLoader.h"
 #include "Asset/ScriptLoader.h"
 #include "Asset/Texture2DLoader.h"
 #include "Jobs/JobSystem.h"
@@ -87,6 +88,7 @@ namespace AltinaEngine::Launch {
         Asset::FAudioLoader                  mAudioLoader;
         Asset::FMaterialLoader               mMaterialLoader;
         Asset::FMeshLoader                   mMeshLoader;
+        Asset::FShaderLoader                 mShaderLoader;
         Asset::FScriptLoader                 mScriptLoader;
         Asset::FTexture2DLoader              mTexture2DLoader;
         Engine::FMaterialCache               mMaterialCache;

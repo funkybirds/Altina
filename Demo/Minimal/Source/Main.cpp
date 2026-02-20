@@ -1,10 +1,14 @@
 #include "Base/AltinaBase.h"
+#include "Algorithm/CStringUtils.h"
 #include "Asset/AssetBinary.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
+#include "Asset/MaterialAsset.h"
 #include "Asset/MaterialLoader.h"
 #include "Asset/MeshAsset.h"
 #include "Asset/MeshLoader.h"
+#include "Asset/ShaderAsset.h"
+#include "Asset/ShaderLoader.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
@@ -12,24 +16,61 @@
 #include "Geometry/StaticMeshData.h"
 #include "Launch/EngineLoop.h"
 #include "Logging/Log.h"
+#include "Material/Material.h"
+#include "Container/SmartPtr.h"
 #include "Math/LinAlg/SpatialTransform.h"
 #include "Math/Vector.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
+#include "Rendering/BasicDeferredRenderer.h"
+#include "ShaderCompiler/ShaderCompiler.h"
+#include "ShaderCompiler/ShaderPermutationParser.h"
+#include "ShaderCompiler/ShaderRhiBindings.h"
+#include "Rhi/RhiInit.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
 
 #include <filesystem>
+#include <fstream>
+#include <string>
+
+#if AE_PLATFORM_WIN
+    #ifdef TEXT
+        #undef TEXT
+    #endif
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h>
+    #ifdef TEXT
+        #undef TEXT
+    #endif
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        #define TEXT(str) L##str
+    #else
+        #define TEXT(str) str
+    #endif
+#endif
 
 using namespace AltinaEngine;
 
 namespace {
-    auto ToFString(const std::filesystem::path& path) -> Core::Container::FString {
+    namespace Container = Core::Container;
+    using Container::FNativeString;
+    using Container::FNativeStringView;
+    using Container::FString;
+    using Container::FStringView;
+    using Container::TVector;
+
+    auto ToFString(const std::filesystem::path& path) -> FString {
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
         const std::wstring wide = path.wstring();
-        return Core::Container::FString(wide.c_str(), static_cast<usize>(wide.size()));
+        return FString(wide.c_str(), static_cast<usize>(wide.size()));
 #else
         const std::string narrow = path.string();
-        return Core::Container::FString(narrow.c_str(), static_cast<usize>(narrow.size()));
+        return FString(narrow.c_str(), static_cast<usize>(narrow.size()));
 #endif
     }
 
@@ -148,7 +189,7 @@ namespace {
             return false;
         }
 
-        Core::Container::TVector<Core::Math::FVector3f> positions;
+        TVector<Core::Math::FVector3f> positions;
         positions.Reserve(static_cast<usize>(desc.VertexCount));
         for (u32 i = 0U; i < desc.VertexCount; ++i) {
             const u64 base = static_cast<u64>(i) * static_cast<u64>(desc.VertexStride);
@@ -219,6 +260,321 @@ namespace {
         outMesh = AltinaEngine::Move(mesh);
         return true;
     }
+
+    auto FromUtf8(FNativeStringView value) -> FString {
+        FString out;
+        if (value.Length() == 0) {
+            return out;
+        }
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+    #if AE_PLATFORM_WIN
+        const int wideCount =
+            MultiByteToWideChar(CP_UTF8, 0, value.Data(), static_cast<int>(value.Length()), nullptr, 0);
+        if (wideCount <= 0) {
+            return out;
+        }
+        std::wstring wide(static_cast<size_t>(wideCount), L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, value.Data(), static_cast<int>(value.Length()), wide.data(),
+            wideCount);
+        out.Append(wide.c_str(), wide.size());
+    #else
+        for (usize i = 0; i < value.Length(); ++i) {
+            out.Append(static_cast<wchar_t>(static_cast<unsigned char>(value.Data()[i])));
+        }
+    #endif
+#else
+        out.Append(value.Data(), value.Length());
+#endif
+        return out;
+    }
+
+    auto TryParseMaterialPass(FStringView name, RenderCore::EMaterialPass& outPass) -> bool {
+        auto EqualsI = [](FStringView lhs, const TChar* rhs) -> bool {
+            if (rhs == nullptr) {
+                return false;
+            }
+            const FStringView rhsView(rhs);
+            if (lhs.Length() != rhsView.Length()) {
+                return false;
+            }
+            for (usize i = 0; i < lhs.Length(); ++i) {
+                if (Core::Algorithm::ToLowerChar(lhs[i]) != Core::Algorithm::ToLowerChar(rhsView[i])) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        if (EqualsI(name, TEXT("BasePass"))) {
+            outPass = RenderCore::EMaterialPass::BasePass;
+            return true;
+        }
+        if (EqualsI(name, TEXT("DepthPass"))) {
+            outPass = RenderCore::EMaterialPass::DepthPass;
+            return true;
+        }
+        if (EqualsI(name, TEXT("ShadowPass"))) {
+            outPass = RenderCore::EMaterialPass::ShadowPass;
+            return true;
+        }
+        return false;
+    }
+
+    auto IsMaterialCBufferName(FStringView name) -> bool {
+        if (name.IsEmpty()) {
+            return false;
+        }
+        const FStringView target(TEXT("MaterialConstants"));
+        if (name.Length() < target.Length()) {
+            return false;
+        }
+        for (usize i = 0U; i < target.Length(); ++i) {
+            if (Core::Algorithm::ToLowerChar(name[i]) != Core::Algorithm::ToLowerChar(target[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    auto FindMaterialCBuffer(const Shader::FShaderReflection& reflection)
+        -> const Shader::FShaderConstantBuffer* {
+        for (const auto& cbuffer : reflection.mConstantBuffers) {
+            if (IsMaterialCBufferName(cbuffer.mName.ToView())) {
+                return &cbuffer;
+            }
+        }
+        return nullptr;
+    }
+
+    auto BuildMaterialLayout(const Shader::FShaderReflection* vertex,
+        const Shader::FShaderReflection* pixel) -> RenderCore::FMaterialLayout {
+        RenderCore::FMaterialLayout layout;
+
+        const Shader::FShaderConstantBuffer* materialCBuffer = nullptr;
+        if (pixel) {
+            materialCBuffer = FindMaterialCBuffer(*pixel);
+        }
+        if (!materialCBuffer && vertex) {
+            materialCBuffer = FindMaterialCBuffer(*vertex);
+        }
+        if (!materialCBuffer && pixel && !pixel->mConstantBuffers.IsEmpty()) {
+            materialCBuffer = &pixel->mConstantBuffers[0];
+        }
+        if (!materialCBuffer && vertex && !vertex->mConstantBuffers.IsEmpty()) {
+            materialCBuffer = &vertex->mConstantBuffers[0];
+        }
+
+        if (materialCBuffer != nullptr) {
+            layout.InitFromConstantBuffer(*materialCBuffer);
+        }
+        return layout;
+    }
+
+    auto WriteTempShaderFile(const FNativeStringView& source, const FUuid& uuid,
+        ShaderCompiler::EShaderSourceLanguage language, std::filesystem::path& outPath) -> bool {
+        std::error_code ec;
+        std::filesystem::path tempRoot = std::filesystem::temp_directory_path(ec);
+        if (ec) {
+            return false;
+        }
+        tempRoot /= "AltinaEngine";
+        tempRoot /= "Shaders";
+        std::filesystem::create_directories(tempRoot, ec);
+        if (ec) {
+            return false;
+        }
+
+        const auto uuidText = uuid.ToNativeString();
+        std::string fileName(uuidText.GetData(), uuidText.Length());
+        fileName += (language == ShaderCompiler::EShaderSourceLanguage::Slang) ? ".slang" : ".hlsl";
+        outPath = tempRoot / fileName;
+
+        std::ofstream file(outPath, std::ios::binary | std::ios::trunc);
+        if (!file.good()) {
+            return false;
+        }
+        if (source.Length() > 0) {
+            file.write(source.Data(), static_cast<std::streamsize>(source.Length()));
+        }
+        return file.good();
+    }
+
+    auto CompileShaderFromAsset(const Asset::FAssetHandle& handle, FStringView entry,
+        Shader::EShaderStage stage, Asset::FAssetRegistry& registry, Asset::FAssetManager& manager,
+        RenderCore::FShaderRegistry::FShaderKey& outKey,
+        ShaderCompiler::FShaderCompileResult& outResult) -> bool {
+        const auto* desc = registry.GetDesc(handle);
+        if (desc == nullptr) {
+            LogError(TEXT("Shader asset desc missing."));
+            return false;
+        }
+
+        auto asset = manager.Load(handle);
+        auto* shaderAsset = asset ? static_cast<Asset::FShaderAsset*>(asset.Get()) : nullptr;
+        if (shaderAsset == nullptr) {
+            LogError(TEXT("Failed to load shader asset."));
+            return false;
+        }
+
+        ShaderCompiler::EShaderSourceLanguage language = ShaderCompiler::EShaderSourceLanguage::Hlsl;
+        if (shaderAsset->GetLanguage() == Asset::kShaderLanguageSlang) {
+            language = ShaderCompiler::EShaderSourceLanguage::Slang;
+        }
+
+        std::filesystem::path tempPath;
+        if (!WriteTempShaderFile(shaderAsset->GetSource(), handle.Uuid, language, tempPath)) {
+            LogError(TEXT("Failed to write temp shader file."));
+            return false;
+        }
+
+        ShaderCompiler::FShaderCompileRequest request{};
+        request.mSource.mPath.Assign(ToFString(tempPath).ToView());
+        request.mSource.mEntryPoint.Assign(entry);
+        request.mSource.mStage    = stage;
+        request.mSource.mLanguage = language;
+        if (tempPath.has_parent_path()) {
+            request.mSource.mIncludeDirs.PushBack(ToFString(tempPath.parent_path()));
+        }
+        request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
+        request.mOptions.mOptimization  = ShaderCompiler::EShaderOptimization::Default;
+        request.mOptions.mDebugInfo     = false;
+
+        auto& compiler = ShaderCompiler::GetShaderCompiler();
+        outResult      = compiler.Compile(request);
+
+        std::error_code removeEc;
+        std::filesystem::remove(tempPath, removeEc);
+
+        if (!outResult.mSucceeded) {
+            LogError(TEXT("Shader compile failed: {}"), outResult.mDiagnostics.ToView());
+            return false;
+        }
+
+        auto* device = Rhi::RHIGetDevice();
+        if (!device) {
+            LogError(TEXT("RHI device missing for shader creation."));
+            return false;
+        }
+
+        auto shaderDesc = ShaderCompiler::BuildRhiShaderDesc(outResult);
+        shaderDesc.mDebugName.Assign(entry);
+        auto shader = device->CreateShader(shaderDesc);
+        if (!shader) {
+            LogError(TEXT("Failed to create RHI shader."));
+            return false;
+        }
+
+        outKey = RenderCore::FShaderRegistry::MakeAssetKey(desc->VirtualPath.ToView(), entry, stage);
+        if (!Rendering::FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
+            LogError(TEXT("Failed to register shader for {}."), outKey.Name.ToView());
+            return false;
+        }
+        return true;
+    }
+
+    auto TryParseRasterState(const Asset::FShaderAsset& shader, Shader::FShaderRasterState& out)
+        -> bool {
+        ShaderCompiler::FShaderPermutationParseResult parse{};
+        const auto sourceText = FromUtf8(shader.GetSource());
+        if (!ShaderCompiler::ParseShaderPermutationSource(sourceText.ToView(), parse)) {
+            return false;
+        }
+        if (!parse.mHasRasterState) {
+            return false;
+        }
+        out = parse.mRasterState;
+        return true;
+    }
+
+    auto BuildMaterialTemplateFromAsset(const Asset::FMaterialAsset& asset,
+        Asset::FAssetRegistry& registry, Asset::FAssetManager& manager)
+        -> Container::TShared<RenderCore::FMaterialTemplate> {
+        auto templ = Container::MakeShared<RenderCore::FMaterialTemplate>();
+
+        for (const auto& pass : asset.GetPasses()) {
+            RenderCore::EMaterialPass passType{};
+            if (!TryParseMaterialPass(pass.Name.ToView(), passType)) {
+                continue;
+            }
+
+            RenderCore::FMaterialPassDesc passDesc{};
+            ShaderCompiler::FShaderCompileResult vertexResult{};
+            ShaderCompiler::FShaderCompileResult pixelResult{};
+            bool                               hasVertexResult = false;
+            bool                               hasPixelResult  = false;
+            Shader::FShaderRasterState          rasterState{};
+            bool                               hasRasterState  = false;
+
+            if (pass.HasVertex) {
+                RenderCore::FShaderRegistry::FShaderKey key{};
+                if (!CompileShaderFromAsset(pass.Vertex.Asset, pass.Vertex.Entry.ToView(),
+                        Shader::EShaderStage::Vertex, registry, manager, key, vertexResult)) {
+                    return {};
+                }
+                passDesc.Shaders.Vertex = key;
+                hasVertexResult         = true;
+            }
+
+            if (pass.HasPixel) {
+                RenderCore::FShaderRegistry::FShaderKey key{};
+                if (!CompileShaderFromAsset(pass.Pixel.Asset, pass.Pixel.Entry.ToView(),
+                        Shader::EShaderStage::Pixel, registry, manager, key, pixelResult)) {
+                    return {};
+                }
+                passDesc.Shaders.Pixel = key;
+                hasPixelResult         = true;
+            }
+
+            if (pass.HasCompute) {
+                RenderCore::FShaderRegistry::FShaderKey key{};
+                ShaderCompiler::FShaderCompileResult     computeResult{};
+                if (!CompileShaderFromAsset(pass.Compute.Asset, pass.Compute.Entry.ToView(),
+                        Shader::EShaderStage::Compute, registry, manager, key, computeResult)) {
+                    return {};
+                }
+                passDesc.Shaders.Compute = key;
+            }
+
+            const Shader::FShaderReflection* vertexReflection =
+                hasVertexResult ? &vertexResult.mReflection : nullptr;
+            const Shader::FShaderReflection* pixelReflection =
+                hasPixelResult ? &pixelResult.mReflection : nullptr;
+            passDesc.Layout = BuildMaterialLayout(vertexReflection, pixelReflection);
+
+            auto* rasterSourceAsset = static_cast<Asset::FShaderAsset*>(nullptr);
+            if (pass.HasPixel) {
+                auto assetRef = manager.Load(pass.Pixel.Asset);
+                rasterSourceAsset =
+                    assetRef ? static_cast<Asset::FShaderAsset*>(assetRef.Get()) : nullptr;
+            }
+            if (rasterSourceAsset == nullptr && pass.HasVertex) {
+                auto assetRef = manager.Load(pass.Vertex.Asset);
+                rasterSourceAsset =
+                    assetRef ? static_cast<Asset::FShaderAsset*>(assetRef.Get()) : nullptr;
+            }
+            if (rasterSourceAsset != nullptr) {
+                hasRasterState = TryParseRasterState(*rasterSourceAsset, rasterState);
+            }
+
+            if (passType == RenderCore::EMaterialPass::BasePass
+                || passType == RenderCore::EMaterialPass::DepthPass
+                || passType == RenderCore::EMaterialPass::ShadowPass) {
+                passDesc.State.Depth.mDepthEnable  = true;
+                passDesc.State.Depth.mDepthWrite   = true;
+                passDesc.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::LessEqual;
+            }
+
+            if (hasRasterState) {
+                passDesc.State.ApplyRasterState(rasterState);
+            }
+
+            templ->SetPassDesc(passType, Move(passDesc));
+        }
+        if (templ->GetPasses().empty()) {
+            return {};
+        }
+        return templ;
+    }
 } // namespace
 
 int main(int argc, char** argv) {
@@ -244,15 +600,19 @@ int main(int argc, char** argv) {
     Asset::FAssetManager   assetManager;
     Asset::FMeshLoader     meshLoader;
     Asset::FMaterialLoader materialLoader;
+    Asset::FShaderLoader   shaderLoader;
     assetManager.SetRegistry(&engineLoop.GetAssetRegistry());
     assetManager.RegisterLoader(&meshLoader);
     assetManager.RegisterLoader(&materialLoader);
+    assetManager.RegisterLoader(&shaderLoader);
 
     const auto meshHandle = engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/triangle"));
     const auto materialHandle =
         engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/materials/purpledeferred"));
-    if (!meshHandle.IsValid() || !materialHandle.IsValid()) {
-        LogError(TEXT("Demo assets missing (mesh or material)."));
+    const auto shaderHandle =
+        engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/shaders/basicdeferred"));
+    if (!meshHandle.IsValid() || !materialHandle.IsValid() || !shaderHandle.IsValid()) {
+        LogError(TEXT("Demo assets missing (mesh, material, or shader)."));
         engineLoop.Exit();
         return 1;
     }
@@ -284,6 +644,47 @@ int main(int argc, char** argv) {
         lod.UV0Buffer.WaitForInit();
         lod.UV1Buffer.WaitForInit();
     }
+
+    auto  materialAsset = assetManager.Load(materialHandle);
+    auto* materialTemplateAsset =
+        materialAsset ? static_cast<Asset::FMaterialAsset*>(materialAsset.Get()) : nullptr;
+    if (materialTemplateAsset == nullptr) {
+        LogError(TEXT("Failed to load material template asset."));
+        engineLoop.Exit();
+        return 1;
+    }
+
+    auto materialTemplate =
+        BuildMaterialTemplateFromAsset(*materialTemplateAsset, engineLoop.GetAssetRegistry(),
+            assetManager);
+    if (!materialTemplate) {
+        LogError(TEXT("Failed to build material template."));
+        engineLoop.Exit();
+        return 1;
+    }
+
+    RenderCore::FShaderRegistry::FShaderKey outputVS{};
+    RenderCore::FShaderRegistry::FShaderKey outputPS{};
+    ShaderCompiler::FShaderCompileResult    outputVsResult{};
+    ShaderCompiler::FShaderCompileResult    outputPsResult{};
+    if (!CompileShaderFromAsset(shaderHandle, FStringView(TEXT("VSComposite")),
+            Shader::EShaderStage::Vertex, engineLoop.GetAssetRegistry(), assetManager, outputVS,
+            outputVsResult)
+        || !CompileShaderFromAsset(shaderHandle, FStringView(TEXT("PSComposite")),
+            Shader::EShaderStage::Pixel, engineLoop.GetAssetRegistry(), assetManager, outputPS,
+            outputPsResult)) {
+        LogError(TEXT("Failed to compile output shaders."));
+        engineLoop.Exit();
+        return 1;
+    }
+
+    Rendering::FBasicDeferredRenderer::SetDefaultMaterialTemplate(materialTemplate);
+    Rendering::FBasicDeferredRenderer::SetOutputShaderKeys(outputVS, outputPS);
+
+    auto material = Container::MakeShared<RenderCore::FMaterial>();
+    material->SetTemplate(materialTemplate);
+    const auto baseColorId = RenderCore::HashMaterialParamName(TEXT("BaseColor"));
+    material->SetVector(baseColorId, Core::Math::FVector4f(1.0f, 0.0f, 1.0f, 1.0f));
 
     auto&      worldManager = engineLoop.GetWorldManager();
     const auto worldHandle  = worldManager.CreateWorld();
@@ -323,7 +724,7 @@ int main(int argc, char** argv) {
     if (materialComponentId.IsValid()) {
         auto& materialComponent =
             world->ResolveComponent<GameScene::FMeshMaterialComponent>(materialComponentId);
-        materialComponent.SetMaterial(0U, materialHandle);
+        materialComponent.SetMaterial(0U, material);
     }
 
     constexpr f32 kFixedDeltaTime = 1.0f / 60.0f;

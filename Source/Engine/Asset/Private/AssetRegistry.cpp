@@ -88,8 +88,14 @@ namespace AltinaEngine::Asset {
             if (EqualLiteralI(text, "mesh")) {
                 return EAssetType::Mesh;
             }
-            if (EqualLiteralI(text, "material")) {
-                return EAssetType::Material;
+            if (EqualLiteralI(text, "material") || EqualLiteralI(text, "materialtemplate")) {
+                return EAssetType::MaterialTemplate;
+            }
+            if (EqualLiteralI(text, "materialinstance")) {
+                return EAssetType::MaterialInstance;
+            }
+            if (EqualLiteralI(text, "shader")) {
+                return EAssetType::Shader;
             }
             if (EqualLiteralI(text, "audio")) {
                 return EAssetType::Audio;
@@ -161,45 +167,6 @@ namespace AltinaEngine::Asset {
             out = flag;
         }
 
-        void ReadTextureBindings(const FJsonValue& object, TVector<FAssetHandle>& outBindings) {
-            const FJsonValue* bindings = FindObjectValueInsensitive(object, "TextureBindings");
-            if (bindings == nullptr || bindings->Type != EJsonType::Array) {
-                return;
-            }
-
-            for (const auto* item : bindings->Array) {
-                if (item == nullptr) {
-                    continue;
-                }
-
-                if (item->Type == EJsonType::String) {
-                    FUuid uuid;
-                    if (ParseUuid(item->String, uuid)) {
-                        outBindings.PushBack({ uuid, EAssetType::Texture2D });
-                    }
-                    continue;
-                }
-
-                if (item->Type == EJsonType::Object) {
-                    FNativeString uuidText;
-                    if (!GetStringValue(FindObjectValueInsensitive(*item, "Uuid"), uuidText)) {
-                        continue;
-                    }
-                    FUuid uuid;
-                    if (!ParseUuid(uuidText, uuid)) {
-                        continue;
-                    }
-                    EAssetType    type = EAssetType::Texture2D;
-                    FNativeString typeText;
-                    if (GetStringValue(FindObjectValueInsensitive(*item, "Type"), typeText)) {
-                        type = ParseAssetType(
-                            FNativeStringView(typeText.GetData(), typeText.Length()));
-                    }
-                    outBindings.PushBack({ uuid, type });
-                }
-            }
-        }
-
         void ReadDescFields(const FJsonValue& descObject, FAssetDesc& desc) {
             switch (desc.Handle.Type) {
                 case EAssetType::Texture2D:
@@ -214,12 +181,13 @@ namespace AltinaEngine::Asset {
                     ReadU32Field(descObject, "IndexFormat", desc.Mesh.IndexFormat);
                     ReadU32Field(descObject, "SubMeshCount", desc.Mesh.SubMeshCount);
                     break;
-                case EAssetType::Material:
-                    ReadU32Field(descObject, "ShadingModel", desc.Material.ShadingModel);
-                    ReadU32Field(descObject, "BlendMode", desc.Material.BlendMode);
-                    ReadU32Field(descObject, "Flags", desc.Material.Flags);
-                    ReadFloatField(descObject, "AlphaCutoff", desc.Material.AlphaCutoff);
-                    ReadTextureBindings(descObject, desc.Material.TextureBindings);
+                case EAssetType::MaterialTemplate:
+                    ReadU32Field(descObject, "PassCount", desc.Material.PassCount);
+                    ReadU32Field(descObject, "ShaderCount", desc.Material.ShaderCount);
+                    ReadU32Field(descObject, "VariantCount", desc.Material.VariantCount);
+                    break;
+                case EAssetType::Shader:
+                    ReadU32Field(descObject, "Language", desc.Shader.Language);
                     break;
                 case EAssetType::Audio:
                     ReadU32Field(descObject, "Codec", desc.Audio.Codec);

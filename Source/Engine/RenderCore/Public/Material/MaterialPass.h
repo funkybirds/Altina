@@ -52,11 +52,12 @@ namespace AltinaEngine::RenderCore {
 
         THashMap<FMaterialParamId, Shader::FShaderPropertyBag::FPropertyDesc> PropertyMap;
 
-        void                                                                  Reset();
-        void               InitFromConstantBuffer(const Shader::FShaderConstantBuffer& cbuffer);
-        void               AddTextureBinding(FMaterialParamId nameHash, u32 textureBinding,
-                          u32 samplerBinding = kMaterialInvalidBinding);
-        void               SortTextureBindings();
+        AE_RENDER_CORE_API void Reset();
+        AE_RENDER_CORE_API void InitFromConstantBuffer(
+            const Shader::FShaderConstantBuffer& cbuffer);
+        AE_RENDER_CORE_API void AddTextureBinding(FMaterialParamId nameHash, u32 textureBinding,
+            u32 samplerBinding = kMaterialInvalidBinding);
+        AE_RENDER_CORE_API void SortTextureBindings();
 
         [[nodiscard]] auto FindProperty(FMaterialParamId id) const noexcept
             -> const Shader::FShaderPropertyBag::FPropertyDesc*;
@@ -84,7 +85,8 @@ namespace AltinaEngine::RenderCore {
         Rhi::FRhiDepthStateDesc  Depth;
         Rhi::FRhiBlendStateDesc  Blend;
 
-        void                     ApplyRasterState(const Shader::FShaderRasterState& state) noexcept;
+        AE_RENDER_CORE_API void ApplyRasterState(
+            const Shader::FShaderRasterState& state) noexcept;
     };
 
     struct FMaterialPassDesc {

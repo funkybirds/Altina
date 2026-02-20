@@ -2700,9 +2700,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::cout << "AssetTool commands:\n";
             std::cout << "  import   --root <repoRoot> [--demo <DemoName>]\n";
             std::cout << "  cook     --root <repoRoot> --platform <Platform> [--demo <DemoName>]";
-            std::cout << " [--build-root <BuildRoot>]\n";
+            std::cout << " [--build-root <BuildRoot>] [--cook-root <CookRoot>]\n";
             std::cout << "  bundle   --root <repoRoot> --platform <Platform> [--demo <DemoName>]";
-            std::cout << " [--build-root <BuildRoot>]\n";
+            std::cout << " [--build-root <BuildRoot>] [--cook-root <CookRoot>]\n";
             std::cout << "  validate --registry <PathToAssetRegistry.json>\n";
             std::cout << "  clean    --root <repoRoot> [--build-root <BuildRoot>] --cache\n";
         }
@@ -2723,9 +2723,14 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             FToolPaths paths{};
-            paths.Root          = std::filesystem::absolute(root);
-            paths.BuildRoot     = std::filesystem::absolute(buildRoot);
-            paths.CookedRoot    = paths.BuildRoot / "Cooked" / platform;
+            paths.Root      = std::filesystem::absolute(root);
+            paths.BuildRoot = std::filesystem::absolute(buildRoot);
+            auto cookedIt   = command.Options.find("cook-root");
+            if (cookedIt != command.Options.end()) {
+                paths.CookedRoot = std::filesystem::absolute(std::filesystem::path(cookedIt->second));
+            } else {
+                paths.CookedRoot = paths.BuildRoot / "Cooked" / platform;
+            }
             paths.CacheRoot     = paths.BuildRoot / "Cache";
             paths.CookCachePath = paths.CacheRoot / "CookKeys.json";
             return paths;

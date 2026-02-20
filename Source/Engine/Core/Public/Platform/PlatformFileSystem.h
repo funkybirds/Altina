@@ -13,4 +13,6 @@ namespace AltinaEngine::Core::Platform {
     AE_CORE_API auto ReadFileBytes(const FString& path, TVector<u8>& outBytes) -> bool;
     AE_CORE_API auto ReadFileTextUtf8(const FString& path, FNativeString& outText) -> bool;
     AE_CORE_API void RemoveFileIfExists(const FString& path);
+    AE_CORE_API auto GetExecutableDir() -> FString;
+    AE_CORE_API auto IsPathExist(const FString& path) -> bool;
 } // namespace AltinaEngine::Core::Platform

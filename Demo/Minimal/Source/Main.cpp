@@ -21,6 +21,7 @@
 #include "Math/LinAlg/SpatialTransform.h"
 #include "Math/Vector.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
+#include "Platform/PlatformFileSystem.h"
 #include "Rendering/BasicDeferredRenderer.h"
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "ShaderCompiler/ShaderPermutationParser.h"
@@ -56,19 +57,17 @@ namespace {
     }
 
     auto FindAssetRegistryPath() -> std::filesystem::path {
-        std::filesystem::path probe = std::filesystem::current_path();
-        for (int depth = 0; depth < 6; ++depth) {
-            const auto candidate =
-                probe / "build" / "Cooked" / "Win64" / "Registry" / "AssetRegistry.json";
-            if (std::filesystem::exists(candidate)) {
-                return candidate;
-            }
-            if (!probe.has_parent_path()) {
-                break;
-            }
-            probe = probe.parent_path();
+        const auto baseDir = Core::Platform::GetExecutableDir();
+        if (baseDir.IsEmptyString()) {
+            return {};
         }
-        return {};
+        FString candidate = baseDir;
+        candidate.Append(TEXT("/Assets/Registry/AssetRegistry.json"));
+        if (!Core::Platform::IsPathExist(candidate)) {
+            return {};
+        }
+        auto path = std::filesystem::path(candidate.CStr());
+        return path;
     }
 
     auto LoadDemoAssetRegistry(Launch::FEngineLoop& engineLoop) -> bool {
@@ -252,7 +251,8 @@ namespace {
                 return false;
             }
             for (usize i = 0; i < lhs.Length(); ++i) {
-                if (Core::Algorithm::ToLowerChar(lhs[i]) != Core::Algorithm::ToLowerChar(rhsView[i])) {
+                if (Core::Algorithm::ToLowerChar(lhs[i])
+                    != Core::Algorithm::ToLowerChar(rhsView[i])) {
                     return false;
                 }
             }
@@ -322,7 +322,7 @@ namespace {
     auto BuildMaterialLayout(const Shader::FShaderReflection* vertex,
         const Shader::FShaderReflection* pixel) -> RenderCore::FMaterialLayout {
         RenderCore::FMaterialLayout layout;
-        const auto* materialCBuffer = SelectMaterialCBuffer(vertex, pixel);
+        const auto*                 materialCBuffer = SelectMaterialCBuffer(vertex, pixel);
         if (materialCBuffer != nullptr) {
             layout.InitFromConstantBuffer(*materialCBuffer);
         }
@@ -345,15 +345,15 @@ namespace {
         if (materialCBuffer == nullptr) {
             LogWarning(TEXT("  Material CBuffer: <null>"));
         } else {
-            LogInfo(TEXT("  Material CBuffer: Name={} Size={} Set={} Binding={} Register={} Space={}"),
+            LogInfo(
+                TEXT("  Material CBuffer: Name={} Size={} Set={} Binding={} Register={} Space={}"),
                 materialCBuffer->mName.CStr(), materialCBuffer->mSizeBytes, materialCBuffer->mSet,
                 materialCBuffer->mBinding, materialCBuffer->mRegister, materialCBuffer->mSpace);
 
             LogInfo(TEXT("  Properties: {}"), static_cast<u32>(materialCBuffer->mMembers.Size()));
             for (const auto& member : materialCBuffer->mMembers) {
                 const auto nameHash = RenderCore::HashMaterialParamName(member.mName.ToView());
-                LogInfo(
-                    TEXT("    {} (hash=0x{:08X}) Offset={} Size={} ElemCount={} ElemStride={}"),
+                LogInfo(TEXT("    {} (hash=0x{:08X}) Offset={} Size={} ElemCount={} ElemStride={}"),
                     member.mName.CStr(), nameHash, member.mOffset, member.mSize,
                     member.mElementCount, member.mElementStride);
             }
@@ -362,11 +362,11 @@ namespace {
         const usize textureCount = layout.TextureBindings.Size();
         LogInfo(TEXT("  TextureBindings: {}"), static_cast<u32>(textureCount));
         for (usize i = 0U; i < textureCount; ++i) {
-            const u32 nameHash = (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i]
-                                                                       : 0U;
-            const u32 samplerBinding =
-                (i < layout.SamplerBindings.Size()) ? layout.SamplerBindings[i]
-                                                    : RenderCore::kMaterialInvalidBinding;
+            const u32 nameHash =
+                (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i] : 0U;
+            const u32 samplerBinding = (i < layout.SamplerBindings.Size())
+                ? layout.SamplerBindings[i]
+                : RenderCore::kMaterialInvalidBinding;
             LogInfo(TEXT("    [{}] NameHash=0x{:08X} TextureBinding={} SamplerBinding={}"),
                 static_cast<u32>(i), nameHash, layout.TextureBindings[i], samplerBinding);
         }
@@ -374,7 +374,7 @@ namespace {
 
     auto WriteTempShaderFile(const FNativeStringView& source, const FUuid& uuid,
         ShaderCompiler::EShaderSourceLanguage language, std::filesystem::path& outPath) -> bool {
-        std::error_code ec;
+        std::error_code       ec;
         std::filesystem::path tempRoot = std::filesystem::temp_directory_path(ec);
         if (ec) {
             return false;
@@ -386,7 +386,7 @@ namespace {
             return false;
         }
 
-        const auto uuidText = uuid.ToNativeString();
+        const auto  uuidText = uuid.ToNativeString();
         std::string fileName(uuidText.GetData(), uuidText.Length());
         fileName += (language == ShaderCompiler::EShaderSourceLanguage::Slang) ? ".slang" : ".hlsl";
         outPath = tempRoot / fileName;
@@ -404,21 +404,22 @@ namespace {
     auto CompileShaderFromAsset(const Asset::FAssetHandle& handle, FStringView entry,
         Shader::EShaderStage stage, Asset::FAssetRegistry& registry, Asset::FAssetManager& manager,
         RenderCore::FShaderRegistry::FShaderKey& outKey,
-        ShaderCompiler::FShaderCompileResult& outResult) -> bool {
+        ShaderCompiler::FShaderCompileResult&    outResult) -> bool {
         const auto* desc = registry.GetDesc(handle);
         if (desc == nullptr) {
             LogError(TEXT("Shader asset desc missing."));
             return false;
         }
 
-        auto asset = manager.Load(handle);
+        auto  asset       = manager.Load(handle);
         auto* shaderAsset = asset ? static_cast<Asset::FShaderAsset*>(asset.Get()) : nullptr;
         if (shaderAsset == nullptr) {
             LogError(TEXT("Failed to load shader asset."));
             return false;
         }
 
-        ShaderCompiler::EShaderSourceLanguage language = ShaderCompiler::EShaderSourceLanguage::Hlsl;
+        ShaderCompiler::EShaderSourceLanguage language =
+            ShaderCompiler::EShaderSourceLanguage::Hlsl;
         if (shaderAsset->GetLanguage() == Asset::kShaderLanguageSlang) {
             language = ShaderCompiler::EShaderSourceLanguage::Slang;
         }
@@ -466,7 +467,8 @@ namespace {
             return false;
         }
 
-        outKey = RenderCore::FShaderRegistry::MakeAssetKey(desc->VirtualPath.ToView(), entry, stage);
+        outKey =
+            RenderCore::FShaderRegistry::MakeAssetKey(desc->VirtualPath.ToView(), entry, stage);
         if (!Rendering::FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
             LogError(TEXT("Failed to register shader for {}."), outKey.Name.ToView());
             return false;
@@ -477,7 +479,7 @@ namespace {
     auto TryParseRasterState(const Asset::FShaderAsset& shader, Shader::FShaderRasterState& out)
         -> bool {
         ShaderCompiler::FShaderPermutationParseResult parse{};
-        const auto sourceText =
+        const auto                                    sourceText =
             Core::Utility::String::FromUtf8(Container::FNativeString(shader.GetSource()));
         if (!ShaderCompiler::ParseShaderPermutationSource(sourceText.ToView(), parse)) {
             return false;
@@ -500,13 +502,13 @@ namespace {
                 continue;
             }
 
-            RenderCore::FMaterialPassDesc passDesc{};
+            RenderCore::FMaterialPassDesc        passDesc{};
             ShaderCompiler::FShaderCompileResult vertexResult{};
             ShaderCompiler::FShaderCompileResult pixelResult{};
-            bool                               hasVertexResult = false;
-            bool                               hasPixelResult  = false;
-            Shader::FShaderRasterState          rasterState{};
-            bool                               hasRasterState  = false;
+            bool                                 hasVertexResult = false;
+            bool                                 hasPixelResult  = false;
+            Shader::FShaderRasterState           rasterState{};
+            bool                                 hasRasterState = false;
 
             if (pass.HasVertex) {
                 RenderCore::FShaderRegistry::FShaderKey key{};
@@ -530,7 +532,7 @@ namespace {
 
             if (pass.HasCompute) {
                 RenderCore::FShaderRegistry::FShaderKey key{};
-                ShaderCompiler::FShaderCompileResult     computeResult{};
+                ShaderCompiler::FShaderCompileResult    computeResult{};
                 if (!CompileShaderFromAsset(pass.Compute.Asset, pass.Compute.Entry.ToView(),
                         Shader::EShaderStage::Compute, registry, manager, key, computeResult)) {
                     return {};
@@ -659,9 +661,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto materialTemplate =
-        BuildMaterialTemplateFromAsset(*materialTemplateAsset, engineLoop.GetAssetRegistry(),
-            assetManager);
+    auto materialTemplate = BuildMaterialTemplateFromAsset(
+        *materialTemplateAsset, engineLoop.GetAssetRegistry(), assetManager);
     if (!materialTemplate) {
         LogError(TEXT("Failed to build material template."));
         engineLoop.Exit();

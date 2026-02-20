@@ -150,10 +150,12 @@ namespace AltinaEngine::Engine {
             const u32 sectionCount = static_cast<u32>(lod.Sections.Size());
             for (u32 sectionIndex = 0U; sectionIndex < sectionCount; ++sectionIndex) {
                 const auto& section  = lod.Sections[sectionIndex];
-                const auto* handle   = (entry.Materials != nullptr)
-                      ? entry.Materials->GetMaterial(section.MaterialSlot)
-                      : nullptr;
-                const auto* material = materialCache.Resolve(handle);
+                const auto* material = (entry.Materials != nullptr)
+                    ? entry.Materials->GetMaterial(section.MaterialSlot)
+                    : nullptr;
+                if (material == nullptr) {
+                    material = materialCache.ResolveDefault();
+                }
 
                 FDrawItem   item{};
                 item.MeshType            = RenderCore::Render::EDrawMeshType::StaticMesh;

@@ -5,16 +5,10 @@
 
 #include "FrameGraph/FrameGraph.h"
 #include "Material/MaterialPass.h"
-#include "Shader/ShaderReflection.h"
-#include "Shader/ShaderTypes.h"
-#include "ShaderCompiler/ShaderCompiler.h"
-#include "ShaderCompiler/ShaderRhiBindings.h"
 #include "View/ViewData.h"
 
 #include "Container/HashMap.h"
 #include "Container/SmartPtr.h"
-#include "Container/String.h"
-#include "Container/StringView.h"
 #include "Container/Vector.h"
 #include "Logging/Log.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
@@ -29,21 +23,14 @@
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiTexture.h"
 
-#include <filesystem>
-#include <mutex>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rendering {
     namespace {
         namespace Container = Core::Container;
-        using Container::FString;
-        using Container::FStringView;
         using Container::THashMap;
         using Container::TVector;
         using RenderCore::EMaterialPass;
-
-        constexpr const TChar* kBasePassName   = TEXT("BasicDeferred.BasePass");
-        constexpr const TChar* kOutputPassName = TEXT("BasicDeferred.Output");
 
         struct FPerFrameConstants {
             Core::Math::FMatrix4x4f ViewProjection;
@@ -54,12 +41,7 @@ namespace AltinaEngine::Rendering {
         };
 
         struct FDeferredSharedResources {
-            bool                                              bInitialized  = false;
-            bool                                              bShadersReady = false;
-            FString                                           ShaderPath;
             RenderCore::FShaderRegistry                       Registry;
-            RenderCore::FShaderRegistry::FShaderKey           BaseVSKey;
-            RenderCore::FShaderRegistry::FShaderKey           BasePSKey;
             RenderCore::FShaderRegistry::FShaderKey           OutputVSKey;
             RenderCore::FShaderRegistry::FShaderKey           OutputPSKey;
             RenderCore::FMaterialPassDesc                     DefaultPassDesc;
@@ -83,31 +65,6 @@ namespace AltinaEngine::Rendering {
             return resources;
         }
 
-        auto ToFString(const std::filesystem::path& path) -> FString {
-#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-            const std::wstring wide = path.wstring();
-            return FString(wide.c_str(), static_cast<usize>(wide.size()));
-#else
-            const std::string narrow = path.string();
-            return FString(narrow.c_str(), static_cast<usize>(narrow.size()));
-#endif
-        }
-
-        auto ResolveShaderPath() -> std::filesystem::path {
-            std::filesystem::path probe = std::filesystem::current_path();
-            for (int depth = 0; depth < 8; ++depth) {
-                const auto candidate =
-                    probe / "Source" / "Engine" / "Rendering" / "Shaders" / "BasicDeferred.hlsl";
-                if (std::filesystem::exists(candidate)) {
-                    return candidate;
-                }
-                if (!probe.has_parent_path()) {
-                    break;
-                }
-                probe = probe.parent_path();
-            }
-            return {};
-        }
         auto BuildLayoutHash(const TVector<Rhi::FRhiBindGroupLayoutEntry>& entries, u32 setIndex)
             -> u64 {
             constexpr u64 kOffset = 1469598103934665603ULL;
@@ -126,138 +83,37 @@ namespace AltinaEngine::Rendering {
             return hash;
         }
 
-        auto BuildMaterialLayout() -> RenderCore::FMaterialLayout {
-            RenderCore::FMaterialLayout   layout;
-
-            Shader::FShaderConstantBuffer cbuffer{};
-            cbuffer.mName.Assign(TEXT("MaterialConstants"));
-            cbuffer.mSizeBytes = static_cast<u32>(sizeof(Core::Math::FVector4f));
-            cbuffer.mSet       = 0U;
-            cbuffer.mBinding   = 2U;
-            cbuffer.mRegister  = 2U;
-            cbuffer.mSpace     = 0U;
-
-            Shader::FShaderConstantBufferMember member{};
-            member.mName.Assign(TEXT("BaseColor"));
-            member.mOffset        = 0U;
-            member.mSize          = static_cast<u32>(sizeof(Core::Math::FVector4f));
-            member.mElementCount  = 0U;
-            member.mElementStride = 0U;
-            cbuffer.mMembers.PushBack(member);
-
-            layout.PropertyBag.Init(cbuffer);
-            layout.PropertyMap.clear();
-            for (const auto& cbufferMember : cbuffer.mMembers) {
-                Shader::FShaderPropertyBag::FPropertyDesc desc{};
-                desc.mOffset        = cbufferMember.mOffset;
-                desc.mSize          = cbufferMember.mSize;
-                desc.mElementCount  = cbufferMember.mElementCount;
-                desc.mElementStride = cbufferMember.mElementStride;
-                const auto hash = RenderCore::HashMaterialParamName(cbufferMember.mName.ToView());
-                if (hash != 0U) {
-                    layout.PropertyMap[hash] = desc;
-                }
+        void UpdateDefaultPassDesc(FDeferredSharedResources& resources) {
+            if (!resources.DefaultTemplate) {
+                return;
             }
-            return layout;
+            const auto* baseDesc = resources.DefaultTemplate->FindPassDesc(EMaterialPass::BasePass);
+            const auto* anyDesc  = baseDesc ? baseDesc : resources.DefaultTemplate->FindAnyPassDesc();
+            if (anyDesc != nullptr) {
+                resources.DefaultPassDesc = *anyDesc;
+            }
         }
 
         void EnsureDefaultTemplate(FDeferredSharedResources& resources) {
-            static std::once_flag initFlag;
-            std::call_once(initFlag, [&resources]() {
-                if (resources.DefaultTemplate) {
-                    return;
-                }
-
-                resources.BaseVSKey = RenderCore::FShaderRegistry::MakeKey(
-                    kBasePassName, Shader::EShaderStage::Vertex);
-                resources.BasePSKey = RenderCore::FShaderRegistry::MakeKey(
-                    kBasePassName, Shader::EShaderStage::Pixel);
-                resources.OutputVSKey = RenderCore::FShaderRegistry::MakeKey(
-                    kOutputPassName, Shader::EShaderStage::Vertex);
-                resources.OutputPSKey = RenderCore::FShaderRegistry::MakeKey(
-                    kOutputPassName, Shader::EShaderStage::Pixel);
-
-                RenderCore::FMaterialPassDesc passDesc{};
-                passDesc.Shaders.Vertex            = resources.BaseVSKey;
-                passDesc.Shaders.Pixel             = resources.BasePSKey;
-                passDesc.Layout                    = BuildMaterialLayout();
-                passDesc.State.Depth.mDepthEnable  = true;
-                passDesc.State.Depth.mDepthWrite   = true;
-                passDesc.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::LessEqual;
-                passDesc.State.Raster.mCullMode    = Rhi::ERhiRasterCullMode::None;
-
-                resources.DefaultPassDesc = passDesc;
-
-                auto templ = Container::MakeShared<RenderCore::FMaterialTemplate>();
-                templ->SetPassDesc(EMaterialPass::BasePass, passDesc);
-                resources.DefaultTemplate = Move(templ);
-            });
+            UpdateDefaultPassDesc(resources);
         }
 
-        auto CompileShader(Rhi::FRhiDevice& device, const std::filesystem::path& shaderPath,
-            FStringView entryPoint, Shader::EShaderStage stage) -> Rhi::FRhiShaderRef {
-            ShaderCompiler::FShaderCompileRequest request{};
-            const auto                            shaderPathText = ToFString(shaderPath);
-            request.mSource.mPath.Assign(shaderPathText.ToView());
-            request.mSource.mEntryPoint.Assign(entryPoint);
-            request.mSource.mStage    = stage;
-            request.mSource.mLanguage = ShaderCompiler::EShaderSourceLanguage::Hlsl;
-
-            if (shaderPath.has_parent_path()) {
-                request.mSource.mIncludeDirs.PushBack(ToFString(shaderPath.parent_path()));
+        auto EnsureOutputPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)
+            -> bool {
+            if (resources.OutputPipeline) {
+                return true;
             }
 
-            request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
-            request.mOptions.mOptimization  = ShaderCompiler::EShaderOptimization::Default;
-            request.mOptions.mDebugInfo     = false;
-
-            auto& compiler = ShaderCompiler::GetShaderCompiler();
-            auto  result   = compiler.Compile(request);
-            if (!result.mSucceeded) {
-                LogError(TEXT("Shader compile failed: {}"), result.mDiagnostics.ToView());
-                return {};
-            }
-
-            auto shaderDesc = ShaderCompiler::BuildRhiShaderDesc(result);
-            shaderDesc.mDebugName.Assign(entryPoint);
-            return device.CreateShader(shaderDesc);
-        }
-        auto EnsureShaders(Rhi::FRhiDevice& device, FDeferredSharedResources& resources) -> bool {
-            if (resources.bInitialized) {
-                return resources.bShadersReady;
-            }
-            resources.bInitialized = true;
-
-            const auto shaderPath = ResolveShaderPath();
-            if (shaderPath.empty()) {
-                LogError(TEXT("Deferred shader path not found."));
-                resources.bShadersReady = false;
-                return false;
-            }
-            resources.ShaderPath = ToFString(shaderPath);
-
-            auto baseVs = CompileShader(
-                device, shaderPath, FStringView(TEXT("VSBase")), Shader::EShaderStage::Vertex);
-            auto basePs = CompileShader(
-                device, shaderPath, FStringView(TEXT("PSBase")), Shader::EShaderStage::Pixel);
-            auto outputVs = CompileShader(
-                device, shaderPath, FStringView(TEXT("VSComposite")), Shader::EShaderStage::Vertex);
-            auto outputPs = CompileShader(
-                device, shaderPath, FStringView(TEXT("PSComposite")), Shader::EShaderStage::Pixel);
-
-            if (!baseVs || !basePs || !outputVs || !outputPs) {
-                resources.bShadersReady = false;
+            if (!resources.OutputVSKey.IsValid() || !resources.OutputPSKey.IsValid()) {
+                LogError(TEXT("Deferred output shaders are not configured."));
                 return false;
             }
 
-            const bool baseVsOk = resources.Registry.RegisterShader(resources.BaseVSKey, baseVs);
-            const bool basePsOk = resources.Registry.RegisterShader(resources.BasePSKey, basePs);
-            const bool outputVsOk =
-                resources.Registry.RegisterShader(resources.OutputVSKey, outputVs);
-            const bool outputPsOk =
-                resources.Registry.RegisterShader(resources.OutputPSKey, outputPs);
-            if (!baseVsOk || !basePsOk || !outputVsOk || !outputPsOk) {
-                LogWarning(TEXT("Shader registry insert failed for deferred passes."));
+            auto outputVs = resources.Registry.FindShader(resources.OutputVSKey);
+            auto outputPs = resources.Registry.FindShader(resources.OutputPSKey);
+            if (!outputVs || !outputPs) {
+                LogError(TEXT("Deferred output shaders are not registered."));
+                return false;
             }
 
             Rhi::FRhiGraphicsPipelineDesc outputDesc{};
@@ -268,8 +124,7 @@ namespace AltinaEngine::Rendering {
             outputDesc.mVertexLayout   = {};
             resources.OutputPipeline   = device.CreateGraphicsPipeline(outputDesc);
 
-            resources.bShadersReady = resources.OutputPipeline.Get() != nullptr;
-            return resources.bShadersReady;
+            return resources.OutputPipeline.Get() != nullptr;
         }
 
         void EnsureLayouts(Rhi::FRhiDevice& device, FDeferredSharedResources& resources) {
@@ -294,7 +149,7 @@ namespace AltinaEngine::Rendering {
 
             if (!resources.PerDrawLayout) {
                 Rhi::FRhiBindGroupLayoutEntry entry{};
-                entry.mBinding    = 1U;
+                entry.mBinding    = 4U;
                 entry.mType       = Rhi::ERhiBindingType::ConstantBuffer;
                 entry.mVisibility = Rhi::ERhiShaderStageFlags::All;
 
@@ -478,12 +333,38 @@ namespace AltinaEngine::Rendering {
         return resources.DefaultTemplate;
     }
 
+    void FBasicDeferredRenderer::SetDefaultMaterialTemplate(
+        Core::Container::TShared<RenderCore::FMaterialTemplate> templ) noexcept {
+        auto& resources           = GetSharedResources();
+        resources.DefaultTemplate = Move(templ);
+        resources.DefaultPassDesc = {};
+        resources.MaterialLayout.Reset();
+        resources.BasePipelineLayout.Reset();
+        resources.BasePipelines.clear();
+        EnsureDefaultTemplate(resources);
+    }
+
+    void FBasicDeferredRenderer::SetOutputShaderKeys(
+        const RenderCore::FShaderRegistry::FShaderKey& vs,
+        const RenderCore::FShaderRegistry::FShaderKey& ps) noexcept {
+        auto& resources = GetSharedResources();
+        resources.OutputVSKey = vs;
+        resources.OutputPSKey = ps;
+        resources.OutputPipeline.Reset();
+    }
+
+    auto FBasicDeferredRenderer::RegisterShader(
+        const RenderCore::FShaderRegistry::FShaderKey& key, Rhi::FRhiShaderRef shader) -> bool {
+        auto& resources = GetSharedResources();
+        return resources.Registry.RegisterShader(key, Move(shader));
+    }
+
     void FBasicDeferredRenderer::PrepareForRendering(Rhi::FRhiDevice& device) {
         auto& resources = GetSharedResources();
         EnsureDefaultTemplate(resources);
         EnsureVertexLayout(resources);
         EnsureLayouts(device, resources);
-        if (!EnsureShaders(device, resources)) {
+        if (!EnsureOutputPipeline(device, resources)) {
             return;
         }
 
@@ -535,7 +416,7 @@ namespace AltinaEngine::Rendering {
             groupDesc.mLayout = resources.PerDrawLayout.Get();
 
             Rhi::FRhiBindGroupEntry entry{};
-            entry.mBinding = 1U;
+            entry.mBinding = 4U;
             entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
             entry.mBuffer  = mPerDrawBuffer.Get();
             entry.mOffset  = 0ULL;

@@ -97,6 +97,33 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             return text.Substr(pos, tokenView.Length()) == tokenView;
         }
 
+        auto IsPreprocessorLine(FNativeStringView text, usize pos) -> bool {
+            if (pos >= text.Length()) {
+                return false;
+            }
+
+            usize lineStart = pos;
+            while (lineStart > 0U) {
+                const char ch = text[lineStart - 1];
+                if (ch == '\n' || ch == '\r') {
+                    break;
+                }
+                --lineStart;
+            }
+
+            usize cursor = lineStart;
+            while (cursor < text.Length()) {
+                const char ch = text[cursor];
+                if (ch == ' ' || ch == '\t') {
+                    ++cursor;
+                    continue;
+                }
+                break;
+            }
+
+            return cursor < text.Length() && text[cursor] == '#';
+        }
+
         auto GetRegisterChar(EAutoBindingResource resource) -> char {
             switch (resource) {
                 case EAutoBindingResource::CBuffer:
@@ -349,6 +376,12 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
 
             output.Append(input.Data() + cursor, found - cursor);
+
+            if (IsPreprocessorLine(input, found)) {
+                output.Append(input[found]);
+                cursor = found + 1U;
+                continue;
+            }
 
             FMarker marker{};
             if (!TryParseMarker(input, found, marker)) {

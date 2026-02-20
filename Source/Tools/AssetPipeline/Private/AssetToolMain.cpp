@@ -69,10 +69,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
             Asset::EAssetType     Type = Asset::EAssetType::Unknown;
             std::string           VirtualPath;
             std::string           CookedPath;
+            std::vector<Asset::FAssetHandle> Dependencies;
             Asset::FTexture2DDesc TextureDesc{};
             bool                  HasTextureDesc = false;
             Asset::FMeshDesc      MeshDesc{};
             bool                  HasMeshDesc = false;
+            Asset::FMaterialDesc  MaterialDesc{};
+            bool                  HasMaterialDesc = false;
+            Asset::FShaderDesc    ShaderDesc{};
+            bool                  HasShaderDesc = false;
             Asset::FAudioDesc     AudioDesc{};
             bool                  HasAudioDesc = false;
             std::string           ScriptAssemblyPath;
@@ -174,14 +179,18 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return "Texture2D";
                 case Asset::EAssetType::Mesh:
                     return "Mesh";
-                case Asset::EAssetType::Material:
-                    return "Material";
+                case Asset::EAssetType::MaterialTemplate:
+                    return "MaterialTemplate";
+                case Asset::EAssetType::Shader:
+                    return "Shader";
                 case Asset::EAssetType::Audio:
                     return "Audio";
                 case Asset::EAssetType::Script:
                     return "Script";
                 case Asset::EAssetType::Redirector:
                     return "Redirector";
+                case Asset::EAssetType::MaterialInstance:
+                    return "MaterialInstance";
                 default:
                     return "Unknown";
             }
@@ -195,8 +204,14 @@ namespace AltinaEngine::Tools::AssetPipeline {
             if (value == "mesh") {
                 return Asset::EAssetType::Mesh;
             }
-            if (value == "material") {
-                return Asset::EAssetType::Material;
+            if (value == "material" || value == "materialtemplate") {
+                return Asset::EAssetType::MaterialTemplate;
+            }
+            if (value == "materialinstance") {
+                return Asset::EAssetType::MaterialInstance;
+            }
+            if (value == "shader") {
+                return Asset::EAssetType::Shader;
             }
             if (value == "audio") {
                 return Asset::EAssetType::Audio;
@@ -216,12 +231,16 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return "TextureImporter";
                 case Asset::EAssetType::Mesh:
                     return "MeshImporter";
-                case Asset::EAssetType::Material:
+                case Asset::EAssetType::MaterialTemplate:
                     return "MaterialImporter";
+                case Asset::EAssetType::Shader:
+                    return "ShaderImporter";
                 case Asset::EAssetType::Audio:
                     return "AudioImporter";
                 case Asset::EAssetType::Script:
                     return "ScriptImporter";
+                case Asset::EAssetType::MaterialInstance:
+                    return "MaterialInstanceImporter";
                 default:
                     return "UnknownImporter";
             }
@@ -245,6 +264,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return ext == ".material";
         }
 
+        auto IsShaderExtension(const std::filesystem::path& path) -> bool {
+            std::string ext = path.extension().string();
+            ToLowerAscii(ext);
+            return ext == ".hlsl" || ext == ".slang";
+        }
+
         auto IsAudioExtension(const std::filesystem::path& path) -> bool {
             std::string ext = path.extension().string();
             ToLowerAscii(ext);
@@ -265,7 +290,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return Asset::EAssetType::Mesh;
             }
             if (IsMaterialExtension(path)) {
-                return Asset::EAssetType::Material;
+                return Asset::EAssetType::MaterialTemplate;
+            }
+            if (IsShaderExtension(path)) {
+                return Asset::EAssetType::Shader;
             }
             if (IsAudioExtension(path)) {
                 return Asset::EAssetType::Audio;
@@ -276,47 +304,66 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return Asset::EAssetType::Unknown;
         }
 
-        constexpr u32 kMaterialParamFnvOffset32 = 2166136261u;
-        constexpr u32 kMaterialParamFnvPrime32  = 16777619u;
-
-        auto          HashMaterialParamName(const std::string& name) -> u32 {
-            if (name.empty()) {
-                return 0U;
-            }
-            u32 hash = kMaterialParamFnvOffset32;
-            for (unsigned char ch : name) {
-                hash ^= static_cast<u32>(ch);
-                hash *= kMaterialParamFnvPrime32;
-            }
-            return hash;
-        }
-
-        auto ReadJsonVec4(const FJsonValue* value, f32 out[4]) -> bool {
-            if (value == nullptr || value->Type != EJsonType::Array) {
-                return false;
-            }
-            const usize count = value->Array.Size();
-            if (count < 3U) {
-                return false;
-            }
-            out[0]            = 0.0f;
-            out[1]            = 0.0f;
-            out[2]            = 0.0f;
-            out[3]            = 1.0f;
-            const usize limit = (count > 4U) ? 4U : count;
-            for (usize i = 0U; i < limit; ++i) {
-                const FJsonValue* entry = value->Array[i];
-                double            num   = 0.0;
-                if (!GetNumberValue(entry, num)) {
-                    return false;
+        auto NormalizeVirtualPath(std::string value) -> std::string {
+            for (auto& ch : value) {
+                if (ch == '\\') {
+                    ch = '/';
                 }
-                out[i] = static_cast<f32>(num);
             }
-            return true;
+            ToLowerAscii(value);
+            if (value.rfind("./", 0) == 0) {
+                value.erase(0, 2U);
+            }
+            return value;
         }
 
-        auto CookMaterial(const std::vector<u8>& sourceBytes, std::vector<u8>& outCooked) -> bool {
+        struct FMaterialShaderRef {
+            std::string        AssetPath;
+            std::string        Entry;
+            Asset::FAssetHandle Handle{};
+        };
+
+        struct FMaterialPassSource {
+            std::string     Name;
+            bool            HasVertex  = false;
+            bool            HasPixel   = false;
+            bool            HasCompute = false;
+            FMaterialShaderRef Vertex;
+            FMaterialShaderRef Pixel;
+            FMaterialShaderRef Compute;
+        };
+
+        struct FMaterialTemplateSource {
+            std::string                     Name;
+            std::vector<FMaterialPassSource> Passes;
+            std::vector<std::vector<std::string>> Variants;
+        };
+
+        auto ParseShaderStageRef(const FJsonValue& value, FMaterialShaderRef& out) -> bool {
+            if (value.Type != EJsonType::Object) {
+                return false;
+            }
+
+            FNativeString assetText;
+            if (!GetStringValue(FindObjectValueInsensitive(value, "Asset"), assetText)) {
+                return false;
+            }
+
+            FNativeString entryText;
+            if (!GetStringValue(FindObjectValueInsensitive(value, "Entry"), entryText)) {
+                return false;
+            }
+
+            out.AssetPath = NormalizeVirtualPath(ToStdString(assetText));
+            out.Entry     = ToStdString(entryText);
+            return !out.AssetPath.empty() && !out.Entry.empty();
+        }
+
+        auto ParseMaterialSource(const std::vector<u8>& sourceBytes,
+            FMaterialTemplateSource& out, std::string& outError) -> bool {
+            out = {};
             if (sourceBytes.empty()) {
+                outError = "Material source empty.";
                 return false;
             }
 
@@ -325,74 +372,369 @@ namespace AltinaEngine::Tools::AssetPipeline {
             native.Append(text.c_str(), text.size());
             const FNativeStringView view(native.GetData(), native.Length());
 
-            FJsonDocument           document;
+            FJsonDocument document;
             if (!document.Parse(view)) {
+                outError = "Material JSON parse failed.";
                 return false;
             }
 
             const FJsonValue* root = document.GetRoot();
             if (root == nullptr || root->Type != EJsonType::Object) {
+                outError = "Material JSON root invalid.";
                 return false;
             }
 
-            f32 baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-            if (const FJsonValue* colorValue = FindObjectValueInsensitive(*root, "BaseColor")) {
-                if (!ReadJsonVec4(colorValue, baseColor)) {
+            FNativeString nameText;
+            if (GetStringValue(FindObjectValueInsensitive(*root, "Name"), nameText)) {
+                out.Name = ToStdString(nameText);
+            }
+
+            const FJsonValue* passesValue = FindObjectValueInsensitive(*root, "Passes");
+            if (passesValue == nullptr || passesValue->Type != EJsonType::Object) {
+                outError = "Material Passes missing.";
+                return false;
+            }
+
+            for (const auto& pair : passesValue->Object) {
+                if (pair.Value == nullptr || pair.Value->Type != EJsonType::Object) {
+                    continue;
+                }
+
+                FMaterialPassSource pass{};
+                pass.Name = ToStdString(pair.Key);
+                if (pass.Name.empty()) {
+                    continue;
+                }
+
+                const FJsonValue* shadersValue =
+                    FindObjectValueInsensitive(*pair.Value, "Shaders");
+                if (shadersValue == nullptr || shadersValue->Type != EJsonType::Object) {
+                    outError = "Material Pass shaders missing.";
+                    return false;
+                }
+
+                if (const FJsonValue* vsValue =
+                        FindObjectValueInsensitive(*shadersValue, "vs")) {
+                    pass.HasVertex = ParseShaderStageRef(*vsValue, pass.Vertex);
+                }
+                if (const FJsonValue* psValue =
+                        FindObjectValueInsensitive(*shadersValue, "ps")) {
+                    pass.HasPixel = ParseShaderStageRef(*psValue, pass.Pixel);
+                }
+                if (const FJsonValue* csValue =
+                        FindObjectValueInsensitive(*shadersValue, "cs")) {
+                    pass.HasCompute = ParseShaderStageRef(*csValue, pass.Compute);
+                }
+
+                if (!pass.HasVertex && !pass.HasCompute) {
+                    outError = "Material Pass requires at least VS or CS.";
+                    return false;
+                }
+
+                out.Passes.push_back(Move(pass));
+            }
+
+            const FJsonValue* variantsValue =
+                FindObjectValueInsensitive(*root, "Precompile_Variants");
+            if (variantsValue != nullptr && variantsValue->Type == EJsonType::Array) {
+                for (const auto* variantValue : variantsValue->Array) {
+                    if (variantValue == nullptr || variantValue->Type != EJsonType::Array) {
+                        continue;
+                    }
+                    std::vector<std::string> variant;
+                    for (const auto* item : variantValue->Array) {
+                        if (item == nullptr || item->Type != EJsonType::String) {
+                            continue;
+                        }
+                        const std::string name = ToStdString(item->String);
+                        if (!name.empty()) {
+                            variant.push_back(name);
+                        }
+                    }
+                    out.Variants.push_back(Move(variant));
+                }
+            }
+
+            return !out.Passes.empty();
+        }
+
+        auto ResolveMaterialDependencies(FMaterialTemplateSource& material,
+            const std::unordered_map<std::string, const FAssetRecord*>& assetsByPath,
+            std::vector<Asset::FAssetHandle>& outDeps, Asset::FMaterialDesc& outDesc,
+            std::string& outError) -> bool {
+            outDeps.clear();
+            outDesc = {};
+
+            std::unordered_set<std::string> seen;
+
+            u32 shaderCount = 0U;
+            for (auto& pass : material.Passes) {
+                auto resolve = [&](FMaterialShaderRef& shaderRef) -> bool {
+                    const auto it = assetsByPath.find(shaderRef.AssetPath);
+                    if (it == assetsByPath.end()) {
+                        outError = "Material shader asset not found: " + shaderRef.AssetPath;
+                        return false;
+                    }
+                    const auto* record = it->second;
+                    if (record == nullptr || record->Type != Asset::EAssetType::Shader) {
+                        outError = "Material shader asset invalid: " + shaderRef.AssetPath;
+                        return false;
+                    }
+
+                    shaderRef.Handle.Uuid = record->Uuid;
+                    shaderRef.Handle.Type = record->Type;
+                    ++shaderCount;
+
+                    const std::string uuidText = ToStdString(record->Uuid.ToNativeString());
+                    if (seen.insert(uuidText).second) {
+                        outDeps.push_back(shaderRef.Handle);
+                    }
+                    return true;
+                };
+
+                if (pass.HasVertex && !resolve(pass.Vertex)) {
+                    return false;
+                }
+                if (pass.HasPixel && !resolve(pass.Pixel)) {
+                    return false;
+                }
+                if (pass.HasCompute && !resolve(pass.Compute)) {
                     return false;
                 }
             }
 
-            Asset::FMaterialVectorParam baseColorParam{};
-            baseColorParam.NameHash = HashMaterialParamName("BaseColor");
-            baseColorParam.Value[0] = baseColor[0];
-            baseColorParam.Value[1] = baseColor[1];
-            baseColorParam.Value[2] = baseColor[2];
-            baseColorParam.Value[3] = baseColor[3];
+            outDesc.PassCount    = static_cast<u32>(material.Passes.size());
+            outDesc.ShaderCount  = shaderCount;
+            outDesc.VariantCount = static_cast<u32>(material.Variants.size());
+            return true;
+        }
 
-            const std::vector<Asset::FMaterialScalarParam>  scalars;
-            const std::vector<Asset::FMaterialVectorParam>  vectors = { baseColorParam };
-            const std::vector<Asset::FMaterialTextureParam> textures;
-
-            const u32                                       scalarBytes =
-                static_cast<u32>(scalars.size() * sizeof(Asset::FMaterialScalarParam));
-            const u32 vectorBytes =
-                static_cast<u32>(vectors.size() * sizeof(Asset::FMaterialVectorParam));
-            const u32 textureBytes =
-                static_cast<u32>(textures.size() * sizeof(Asset::FMaterialTextureParam));
-            const u32               dataBytes = scalarBytes + vectorBytes + textureBytes;
-
-            Asset::FAssetBlobHeader header{};
-            header.Type     = static_cast<u8>(Asset::EAssetType::Material);
-            header.DescSize = static_cast<u32>(sizeof(Asset::FMaterialBlobDesc));
-            header.DataSize = dataBytes;
-
-            Asset::FMaterialBlobDesc blobDesc{};
-            blobDesc.ScalarCount    = static_cast<u32>(scalars.size());
-            blobDesc.VectorCount    = static_cast<u32>(vectors.size());
-            blobDesc.TextureCount   = static_cast<u32>(textures.size());
-            blobDesc.ScalarsOffset  = 0U;
-            blobDesc.VectorsOffset  = scalarBytes;
-            blobDesc.TexturesOffset = scalarBytes + vectorBytes;
-
-            const usize totalSize =
-                sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FMaterialBlobDesc) + dataBytes;
-            outCooked.resize(totalSize);
-
-            u8* writePtr = outCooked.data();
-            std::memcpy(writePtr, &header, sizeof(header));
-            writePtr += sizeof(header);
-            std::memcpy(writePtr, &blobDesc, sizeof(blobDesc));
-            writePtr += sizeof(blobDesc);
-
-            u8* dataBase = writePtr;
-            if (scalarBytes != 0U) {
-                std::memcpy(dataBase + blobDesc.ScalarsOffset, scalars.data(), scalarBytes);
+        auto WriteMaterialCookedJson(const FMaterialTemplateSource& material,
+            std::string& outJson) -> bool {
+            std::ostringstream stream;
+            stream << "{\n";
+            if (!material.Name.empty()) {
+                stream << "  \"Name\": \"" << EscapeJson(material.Name) << "\",\n";
             }
-            if (vectorBytes != 0U) {
-                std::memcpy(dataBase + blobDesc.VectorsOffset, vectors.data(), vectorBytes);
+            stream << "  \"Passes\": {\n";
+            for (size_t passIndex = 0; passIndex < material.Passes.size(); ++passIndex) {
+                const auto& pass = material.Passes[passIndex];
+                stream << "    \"" << EscapeJson(pass.Name) << "\": {\n";
+                stream << "      \"Shaders\": {\n";
+
+                auto WriteShader = [&](const char* key, const FMaterialShaderRef& ref,
+                                       bool emit, bool isLast) {
+                    if (!emit) {
+                        return;
+                    }
+                    const std::string uuidText = ToStdString(ref.Handle.Uuid.ToNativeString());
+                    stream << "        \"" << key << "\": { \"Uuid\": \"" << EscapeJson(uuidText)
+                           << "\", \"Type\": \"" << AssetTypeToString(ref.Handle.Type)
+                           << "\", \"Entry\": \"" << EscapeJson(ref.Entry) << "\" }";
+                    if (!isLast) {
+                        stream << ",";
+                    }
+                    stream << "\n";
+                };
+
+                const bool hasVs = pass.HasVertex;
+                const bool hasPs = pass.HasPixel;
+                const bool hasCs = pass.HasCompute;
+                const bool vsLast = !hasPs && !hasCs;
+                const bool psLast = !hasCs;
+
+                if (hasVs) {
+                    WriteShader("vs", pass.Vertex, true, vsLast);
+                }
+                if (hasPs) {
+                    WriteShader("ps", pass.Pixel, true, psLast);
+                }
+                if (hasCs) {
+                    WriteShader("cs", pass.Compute, true, true);
+                }
+
+                stream << "      }\n";
+                stream << "    }";
+                if (passIndex + 1 < material.Passes.size()) {
+                    stream << ",";
+                }
+                stream << "\n";
             }
-            if (textureBytes != 0U) {
-                std::memcpy(dataBase + blobDesc.TexturesOffset, textures.data(), textureBytes);
+            stream << "  },\n";
+            stream << "  \"Precompile_Variants\": [\n";
+            for (size_t variantIndex = 0; variantIndex < material.Variants.size(); ++variantIndex) {
+                const auto& variant = material.Variants[variantIndex];
+                stream << "    [";
+                for (size_t valueIndex = 0; valueIndex < variant.size(); ++valueIndex) {
+                    stream << "\"" << EscapeJson(variant[valueIndex]) << "\"";
+                    if (valueIndex + 1 < variant.size()) {
+                        stream << ", ";
+                    }
+                }
+                stream << "]";
+                if (variantIndex + 1 < material.Variants.size()) {
+                    stream << ",";
+                }
+                stream << "\n";
+            }
+            stream << "  ]\n";
+            stream << "}\n";
+
+            outJson = stream.str();
+            return true;
+        }
+
+        auto CookMaterial(const std::vector<u8>& sourceBytes,
+            const std::unordered_map<std::string, const FAssetRecord*>& assetsByPath,
+            std::vector<Asset::FAssetHandle>& outDeps, Asset::FMaterialDesc& outDesc,
+            std::vector<u8>& outCooked) -> bool {
+            std::string             error;
+            FMaterialTemplateSource material;
+            if (!ParseMaterialSource(sourceBytes, material, error)) {
+                return false;
+            }
+
+            if (!ResolveMaterialDependencies(material, assetsByPath, outDeps, outDesc, error)) {
+                return false;
+            }
+
+            std::string cookedJson;
+            if (!WriteMaterialCookedJson(material, cookedJson)) {
+                return false;
+            }
+
+            outCooked.assign(cookedJson.begin(), cookedJson.end());
+            return true;
+        }
+
+        auto ExtractIncludePath(const std::string& line, std::string& outPath) -> bool {
+            const auto firstNonSpace = line.find_first_not_of(" \t");
+            if (firstNonSpace == std::string::npos) {
+                return false;
+            }
+            if (line.compare(firstNonSpace, 8, "#include") != 0) {
+                return false;
+            }
+
+            const auto hashPos = firstNonSpace;
+
+            const auto quotePos = line.find_first_of("\"<", hashPos);
+            if (quotePos == std::string::npos) {
+                return false;
+            }
+
+            const char endChar = (line[quotePos] == '<') ? '>' : '"';
+            const auto endPos  = line.find(endChar, quotePos + 1);
+            if (endPos == std::string::npos || endPos <= quotePos + 1) {
+                return false;
+            }
+
+            outPath = line.substr(quotePos + 1, endPos - quotePos - 1);
+            return !outPath.empty();
+        }
+
+        auto ReadTextFileBytes(const std::filesystem::path& path, std::string& outText) -> bool {
+            std::ifstream file(path, std::ios::binary);
+            if (!file) {
+                return false;
+            }
+            std::ostringstream buffer;
+            buffer << file.rdbuf();
+            outText = buffer.str();
+            return true;
+        }
+
+        auto PreprocessShaderText(const std::string& text, const std::filesystem::path& currentDir,
+            const std::vector<std::filesystem::path>& includeDirs,
+            std::vector<std::filesystem::path>& includeStack, std::string& outText) -> bool {
+            std::istringstream stream(text);
+            std::string        line;
+            while (std::getline(stream, line)) {
+                std::string includePath;
+                if (ExtractIncludePath(line, includePath)) {
+                    std::filesystem::path resolved;
+
+                    auto TryResolve = [&](const std::filesystem::path& dir) -> bool {
+                        std::filesystem::path candidate = dir / includePath;
+                        std::error_code       ec;
+                        if (std::filesystem::exists(candidate, ec)) {
+                            resolved = candidate;
+                            return true;
+                        }
+                        return false;
+                    };
+
+                    if (!TryResolve(currentDir)) {
+                        for (const auto& dir : includeDirs) {
+                            if (TryResolve(dir)) {
+                                break;
+                            }
+                        }
+                    }
+
+                    if (resolved.empty()) {
+                        return false;
+                    }
+
+                    resolved = resolved.lexically_normal();
+                    for (const auto& stackEntry : includeStack) {
+                        if (stackEntry == resolved) {
+                            return false;
+                        }
+                    }
+
+                    std::string includeText;
+                    if (!ReadTextFileBytes(resolved, includeText)) {
+                        return false;
+                    }
+
+                    includeStack.push_back(resolved);
+                    if (!PreprocessShaderText(
+                            includeText, resolved.parent_path(), includeDirs, includeStack,
+                            outText)) {
+                        return false;
+                    }
+                    includeStack.pop_back();
+                    outText.push_back('\n');
+                } else {
+                    outText.append(line);
+                    outText.push_back('\n');
+                }
+            }
+            return true;
+        }
+
+        auto CookShader(const std::filesystem::path& sourcePath, const std::vector<u8>& sourceBytes,
+            const std::filesystem::path& repoRoot, std::vector<u8>& outCooked,
+            Asset::FShaderDesc& outDesc) -> bool {
+            std::string text(sourceBytes.begin(), sourceBytes.end());
+
+            std::vector<std::filesystem::path> includeDirs;
+            includeDirs.push_back(sourcePath.parent_path());
+
+            std::filesystem::path shaderRoot = repoRoot / "Source" / "Shader";
+            std::error_code       ec;
+            if (std::filesystem::exists(shaderRoot, ec)) {
+                includeDirs.push_back(shaderRoot);
+            }
+
+            std::vector<std::filesystem::path> includeStack;
+            includeStack.push_back(sourcePath);
+
+            std::string output;
+            if (!PreprocessShaderText(text, sourcePath.parent_path(), includeDirs, includeStack,
+                    output)) {
+                return false;
+            }
+
+            outCooked.assign(output.begin(), output.end());
+
+            std::string ext = sourcePath.extension().string();
+            ToLowerAscii(ext);
+            if (ext == ".slang") {
+                outDesc.Language = Asset::kShaderLanguageSlang;
+            } else {
+                outDesc.Language = Asset::kShaderLanguageHlsl;
             }
 
             return true;
@@ -2510,6 +2852,30 @@ namespace AltinaEngine::Tools::AssetPipeline {
             stream << "  \"SchemaVersion\": 1,\n";
             stream << "  \"Assets\": [\n";
 
+            auto WriteDependencies = [&](const std::vector<Asset::FAssetHandle>& deps) {
+                stream << "      \"Dependencies\": [";
+                if (!deps.empty()) {
+                    stream << "\n";
+                    for (size_t depIndex = 0; depIndex < deps.size(); ++depIndex) {
+                        const auto& dep = deps[depIndex];
+                        stream << "        ";
+                        const std::string depUuid = ToStdString(dep.Uuid.ToNativeString());
+                        if (dep.Type == Asset::EAssetType::Unknown) {
+                            stream << "\"" << EscapeJson(depUuid) << "\"";
+                        } else {
+                            stream << "{ \"Uuid\": \"" << EscapeJson(depUuid)
+                                   << "\", \"Type\": \"" << AssetTypeToString(dep.Type) << "\" }";
+                        }
+                        if (depIndex + 1 < deps.size()) {
+                            stream << ",";
+                        }
+                        stream << "\n";
+                    }
+                    stream << "      ";
+                }
+                stream << "],\n";
+            };
+
             for (size_t index = 0; index < assets.size(); ++index) {
                 const auto& entry = assets[index];
                 stream << "    {\n";
@@ -2517,7 +2883,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 stream << "      \"Type\": \"" << AssetTypeToString(entry.Type) << "\",\n";
                 stream << "      \"VirtualPath\": \"" << EscapeJson(entry.VirtualPath) << "\",\n";
                 stream << "      \"CookedPath\": \"" << EscapeJson(entry.CookedPath) << "\",\n";
-                stream << "      \"Dependencies\": [],\n";
+                WriteDependencies(entry.Dependencies);
                 stream << "      \"Desc\": {";
 
                 switch (entry.Type) {
@@ -2543,9 +2909,21 @@ namespace AltinaEngine::Tools::AssetPipeline {
                                 << "\"VertexFormat\": 0, \"IndexFormat\": 0, \"SubMeshCount\": 0";
                         }
                         break;
-                    case Asset::EAssetType::Material:
-                        stream << "\"ShadingModel\": 0, \"BlendMode\": 0, \"Flags\": 0, "
-                               << "\"AlphaCutoff\": 0, \"TextureBindings\": []";
+                    case Asset::EAssetType::MaterialTemplate:
+                        if (entry.HasMaterialDesc) {
+                            stream << "\"PassCount\": " << entry.MaterialDesc.PassCount
+                                   << ", \"ShaderCount\": " << entry.MaterialDesc.ShaderCount
+                                   << ", \"VariantCount\": " << entry.MaterialDesc.VariantCount;
+                        } else {
+                            stream << "\"PassCount\": 0, \"ShaderCount\": 0, \"VariantCount\": 0";
+                        }
+                        break;
+                    case Asset::EAssetType::Shader:
+                        if (entry.HasShaderDesc) {
+                            stream << "\"Language\": " << entry.ShaderDesc.Language;
+                        } else {
+                            stream << "\"Language\": 0";
+                        }
                         break;
                     case Asset::EAssetType::Audio:
                         if (entry.HasAudioDesc) {
@@ -2600,6 +2978,21 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return 1;
             }
 
+            for (auto& asset : assets) {
+                if (!EnsureMeta(asset, EMetaWriteMode::MissingOnly)) {
+                    std::cerr << "Failed to ensure meta: " << asset.MetaPath.string() << "\n";
+                    asset.Type = Asset::EAssetType::Unknown;
+                }
+            }
+
+            std::unordered_map<std::string, const FAssetRecord*> assetsByVirtualPath;
+            assetsByVirtualPath.reserve(assets.size());
+            for (const auto& asset : assets) {
+                if (asset.Type != Asset::EAssetType::Unknown && !asset.VirtualPath.empty()) {
+                    assetsByVirtualPath[asset.VirtualPath] = &asset;
+                }
+            }
+
             size_t written = 0U;
             for (auto& asset : assets) {
                 if (!EnsureMeta(asset, EMetaWriteMode::Always)) {
@@ -2627,6 +3020,21 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return 1;
             }
 
+            for (auto& asset : assets) {
+                if (!EnsureMeta(asset, EMetaWriteMode::MissingOnly)) {
+                    std::cerr << "Failed to ensure meta: " << asset.MetaPath.string() << "\n";
+                    asset.Type = Asset::EAssetType::Unknown;
+                }
+            }
+
+            std::unordered_map<std::string, const FAssetRecord*> assetsByVirtualPath;
+            assetsByVirtualPath.reserve(assets.size());
+            for (const auto& asset : assets) {
+                if (asset.Type != Asset::EAssetType::Unknown && !asset.VirtualPath.empty()) {
+                    assetsByVirtualPath[asset.VirtualPath] = &asset;
+                }
+            }
+
             std::unordered_map<std::string, FCookCacheEntry> cacheEntries;
             if (!LoadCookCache(paths.CookCachePath, cacheEntries)) {
                 std::cerr << "Failed to read cook cache: " << paths.CookCachePath.string() << "\n";
@@ -2638,8 +3046,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             size_t cookedCount = 0U;
             for (auto& asset : assets) {
-                if (!EnsureMeta(asset, EMetaWriteMode::MissingOnly)) {
-                    std::cerr << "Failed to ensure meta: " << asset.MetaPath.string() << "\n";
+                if (asset.Type == Asset::EAssetType::Unknown) {
                     continue;
                 }
 
@@ -2653,15 +3060,20 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 std::vector<u8>       cookKeyExtras;
                 Asset::FTexture2DDesc textureDesc{};
                 Asset::FMeshDesc      meshDesc{};
+                Asset::FMaterialDesc  materialDesc{};
+                Asset::FShaderDesc    shaderDesc{};
                 Asset::FAudioDesc     audioDesc{};
                 const bool            isTexture  = asset.Type == Asset::EAssetType::Texture2D;
                 const bool            isMesh     = asset.Type == Asset::EAssetType::Mesh;
-                const bool            isMaterial = asset.Type == Asset::EAssetType::Material;
+                const bool            isMaterial =
+                    asset.Type == Asset::EAssetType::MaterialTemplate;
                 const bool            isAudio    = asset.Type == Asset::EAssetType::Audio;
                 const bool            isScript   = asset.Type == Asset::EAssetType::Script;
+                const bool            isShader   = asset.Type == Asset::EAssetType::Shader;
                 std::string           scriptAssemblyPath;
                 std::string           scriptTypeName;
                 bool                  hasScriptDesc = false;
+                std::vector<Asset::FAssetHandle> materialDeps;
                 if (isScript) {
                     if (!ParseScriptDescriptor(bytes, scriptAssemblyPath, scriptTypeName)) {
                         std::cerr << "Failed to read script descriptor: "
@@ -2683,11 +3095,21 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         continue;
                     }
                 } else if (isMaterial) {
-                    if (!CookMaterial(bytes, cookedBytes)) {
+                    if (!CookMaterial(bytes, assetsByVirtualPath, materialDeps, materialDesc,
+                            cookedBytes)) {
                         std::cerr << "Failed to cook material: " << asset.SourcePath.string()
                                   << "\n";
                         continue;
                     }
+                    cookKeyExtras = cookedBytes;
+                } else if (isShader) {
+                    if (!CookShader(
+                            asset.SourcePath, bytes, paths.Root, cookedBytes, shaderDesc)) {
+                        std::cerr << "Failed to cook shader: " << asset.SourcePath.string()
+                                  << "\n";
+                        continue;
+                    }
+                    cookKeyExtras = cookedBytes;
                 } else if (isAudio) {
                     if (!CookAudio(asset.SourcePath, bytes, cookedBytes, audioDesc)) {
                         std::cerr << "Failed to cook audio: " << asset.SourcePath.string() << "\n";
@@ -2702,7 +3124,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 const std::filesystem::path cookedPath =
                     paths.CookedRoot / "Assets" / (uuid + ".bin");
 
-                const std::string cookKey = isMesh
+                const std::string cookKey =
+                    (!cookKeyExtras.empty() || isMesh)
                     ? BuildCookKeyWithExtras(bytes, cookKeyExtras, asset, platform)
                     : BuildCookKey(bytes, asset, platform);
 
@@ -2744,6 +3167,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 } else if (isMesh) {
                     registryEntry.MeshDesc    = meshDesc;
                     registryEntry.HasMeshDesc = true;
+                } else if (isMaterial) {
+                    registryEntry.MaterialDesc    = materialDesc;
+                    registryEntry.HasMaterialDesc = true;
+                    registryEntry.Dependencies    = Move(materialDeps);
+                } else if (isShader) {
+                    registryEntry.ShaderDesc    = shaderDesc;
+                    registryEntry.HasShaderDesc = true;
                 } else if (isAudio) {
                     registryEntry.AudioDesc    = audioDesc;
                     registryEntry.HasAudioDesc = true;

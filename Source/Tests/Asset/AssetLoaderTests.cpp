@@ -42,6 +42,7 @@ namespace {
     using AltinaEngine::Asset::GetAudioBytesPerSample;
     using AltinaEngine::Asset::GetMeshIndexStride;
     using AltinaEngine::Asset::GetTextureBytesPerPixel;
+    using Container::FNativeStringView;
     using Container::FString;
     using Container::TVector;
 
@@ -234,102 +235,54 @@ TEST_CASE("Asset.Mesh.EngineFormat.Load") {
     manager.SetRegistry(nullptr);
 }
 
-TEST_CASE("Asset.Material.EngineFormat.Load") {
-    AltinaEngine::FUuid::FBytes uuidBytes{};
-    uuidBytes[0]  = 0x11;
-    uuidBytes[1]  = 0x22;
-    uuidBytes[2]  = 0x33;
-    uuidBytes[3]  = 0x44;
-    uuidBytes[15] = 0x55;
-    AltinaEngine::FUuid textureUuid(uuidBytes);
+TEST_CASE("Asset.MaterialTemplate.Json.Load") {
+    constexpr const char* kShaderUuid = "11111111-2222-3333-4444-555555555555";
+    AltinaEngine::FUuid   shaderUuid;
+    REQUIRE(AltinaEngine::FUuid::TryParse(FNativeStringView(kShaderUuid), shaderUuid));
 
-    FAssetHandle        textureHandle{};
-    textureHandle.Uuid = textureUuid;
-    textureHandle.Type = AltinaEngine::Asset::EAssetType::Texture2D;
-
-    AltinaEngine::Asset::FMaterialBlobDesc blobDesc{};
-    blobDesc.ShadingModel = 1;
-    blobDesc.BlendMode    = 2;
-    blobDesc.Flags        = 0x4;
-    blobDesc.AlphaCutoff  = 0.5f;
-    blobDesc.ScalarCount  = 2;
-    blobDesc.VectorCount  = 1;
-    blobDesc.TextureCount = 1;
-
-    const u32 scalarBytes =
-        blobDesc.ScalarCount * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialScalarParam));
-    const u32 vectorBytes =
-        blobDesc.VectorCount * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialVectorParam));
-    const u32 textureBytes = blobDesc.TextureCount
-        * static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialTextureParam));
-
-    blobDesc.ScalarsOffset  = 0;
-    blobDesc.VectorsOffset  = scalarBytes;
-    blobDesc.TexturesOffset = scalarBytes + vectorBytes;
-
-    AltinaEngine::Asset::FAssetBlobHeader header{};
-    header.Type     = static_cast<u8>(AltinaEngine::Asset::EAssetType::Material);
-    header.DescSize = static_cast<u32>(sizeof(AltinaEngine::Asset::FMaterialBlobDesc));
-    header.DataSize = scalarBytes + vectorBytes + textureBytes;
+    AltinaEngine::Core::Container::FNativeString json;
+    json.Append("{\"name\":\"TestMaterial\",\"passes\":{\"BasePass\":{\"shaders\":{");
+    json.Append("\"vs\":{\"uuid\":\"");
+    json.Append(kShaderUuid);
+    json.Append("\",\"type\":\"shader\",\"entry\":\"VSMain\"},");
+    json.Append("\"ps\":{\"uuid\":\"");
+    json.Append(kShaderUuid);
+    json.Append("\",\"type\":\"shader\",\"entry\":\"PSMain\"}");
+    json.Append("}}},\"precompile_variants\":[[\"PARAM_A\",\"PARAM_B\"]]}");
 
     TVector<u8> cooked;
-    cooked.Resize(sizeof(header) + sizeof(blobDesc) + header.DataSize);
-
-    u8* writePtr = cooked.Data();
-    std::memcpy(writePtr, &header, sizeof(header));
-    writePtr += sizeof(header);
-    std::memcpy(writePtr, &blobDesc, sizeof(blobDesc));
-    writePtr += sizeof(blobDesc);
-
-    AltinaEngine::Asset::FMaterialScalarParam scalars[2]{};
-    scalars[0].NameHash = 0x1111U;
-    scalars[0].Value    = 0.25f;
-    scalars[1].NameHash = 0x2222U;
-    scalars[1].Value    = 0.75f;
-
-    AltinaEngine::Asset::FMaterialVectorParam vectors[1]{};
-    vectors[0].NameHash = 0x3333U;
-    vectors[0].Value[0] = 0.1f;
-    vectors[0].Value[1] = 0.2f;
-    vectors[0].Value[2] = 0.3f;
-    vectors[0].Value[3] = 0.4f;
-
-    AltinaEngine::Asset::FMaterialTextureParam textures[1]{};
-    textures[0].NameHash     = 0x4444U;
-    textures[0].Texture      = textureHandle;
-    textures[0].SamplerFlags = 0x1U;
-
-    std::memcpy(writePtr + blobDesc.ScalarsOffset, scalars, sizeof(scalars));
-    std::memcpy(writePtr + blobDesc.VectorsOffset, vectors, sizeof(vectors));
-    std::memcpy(writePtr + blobDesc.TexturesOffset, textures, sizeof(textures));
+    cooked.Resize(json.Length());
+    std::memcpy(cooked.Data(), json.GetData(), static_cast<size_t>(json.Length()));
 
     FTestAssetStream stream(cooked);
     FMaterialLoader  loader;
 
-    FAssetDesc       desc{};
-    desc.Material.ShadingModel = blobDesc.ShadingModel;
-    desc.Material.TextureBindings.PushBack(textureHandle);
-
-    auto asset = loader.Load(desc, stream);
+    FAssetDesc desc{};
+    auto      asset = loader.Load(desc, stream);
     REQUIRE(asset);
 
     auto* material = static_cast<FMaterialAsset*>(asset.Get());
     REQUIRE(material != nullptr);
+    REQUIRE_EQ(material->GetName(), FString(TEXT("TestMaterial")));
 
-    const auto& runtime = material->GetDesc();
-    REQUIRE_EQ(runtime.ShadingModel, blobDesc.ShadingModel);
-    REQUIRE_EQ(runtime.BlendMode, blobDesc.BlendMode);
-    REQUIRE_EQ(runtime.Flags, blobDesc.Flags);
-    REQUIRE_EQ(runtime.AlphaCutoff, blobDesc.AlphaCutoff);
+    const auto& passes = material->GetPasses();
+    REQUIRE_EQ(passes.Size(), static_cast<usize>(1));
+    const auto& pass = passes[0];
+    REQUIRE_EQ(pass.Name, FString(TEXT("BasePass")));
+    REQUIRE(pass.HasVertex);
+    REQUIRE(pass.HasPixel);
+    REQUIRE_EQ(pass.Vertex.Asset.Uuid, shaderUuid);
+    REQUIRE_EQ(pass.Vertex.Asset.Type, AltinaEngine::Asset::EAssetType::Shader);
+    REQUIRE_EQ(pass.Vertex.Entry, FString(TEXT("VSMain")));
+    REQUIRE_EQ(pass.Pixel.Asset.Uuid, shaderUuid);
+    REQUIRE_EQ(pass.Pixel.Asset.Type, AltinaEngine::Asset::EAssetType::Shader);
+    REQUIRE_EQ(pass.Pixel.Entry, FString(TEXT("PSMain")));
 
-    REQUIRE_EQ(material->GetScalars().Size(), static_cast<usize>(blobDesc.ScalarCount));
-    REQUIRE_EQ(material->GetVectors().Size(), static_cast<usize>(blobDesc.VectorCount));
-    REQUIRE_EQ(material->GetTextures().Size(), static_cast<usize>(blobDesc.TextureCount));
-
-    REQUIRE_EQ(material->GetScalars()[0].NameHash, scalars[0].NameHash);
-    REQUIRE_EQ(material->GetScalars()[1].NameHash, scalars[1].NameHash);
-    REQUIRE_EQ(material->GetVectors()[0].NameHash, vectors[0].NameHash);
-    REQUIRE_EQ(material->GetTextures()[0].Texture, textureHandle);
+    const auto& variants = material->GetPrecompileVariants();
+    REQUIRE_EQ(variants.Size(), static_cast<usize>(1));
+    REQUIRE_EQ(variants[0].Size(), static_cast<usize>(2));
+    REQUIRE_EQ(variants[0][0], FString(TEXT("PARAM_A")));
+    REQUIRE_EQ(variants[0][1], FString(TEXT("PARAM_B")));
 }
 
 TEST_CASE("Asset.Bundle.RoundTrip") {

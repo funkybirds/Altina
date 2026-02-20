@@ -353,9 +353,9 @@ namespace AltinaEngine::Launch {
             mAssetManager.RegisterLoader(&mMaterialLoader);
             mAssetManager.RegisterLoader(&mMeshLoader);
             mAssetManager.RegisterLoader(&mScriptLoader);
+            mAssetManager.RegisterLoader(&mShaderLoader);
             mAssetManager.RegisterLoader(&mTexture2DLoader);
             GameScene::FScriptComponent::SetAssetManager(&mAssetManager);
-            mMaterialCache.SetAssetManager(&mAssetManager);
             mAssetReady = true;
         }
 
@@ -634,9 +634,9 @@ namespace AltinaEngine::Launch {
 
         if (mAssetReady) {
             mMaterialCache.Clear();
-            mMaterialCache.SetAssetManager(nullptr);
             mAssetManager.ClearCache();
             mAssetManager.UnregisterLoader(&mTexture2DLoader);
+            mAssetManager.UnregisterLoader(&mShaderLoader);
             mAssetManager.UnregisterLoader(&mScriptLoader);
             mAssetManager.UnregisterLoader(&mMeshLoader);
             mAssetManager.UnregisterLoader(&mMaterialLoader);

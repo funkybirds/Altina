@@ -15,13 +15,15 @@ namespace AltinaEngine::Asset {
     using Container::TVector;
 
     enum class EAssetType : u8 {
-        Unknown = 0,
-        Texture2D,
-        Mesh,
-        Material,
-        Audio,
-        Script,
-        Redirector,
+        Unknown          = 0,
+        Texture2D        = 1,
+        Mesh             = 2,
+        MaterialTemplate = 3,
+        Audio            = 4,
+        Script           = 5,
+        Redirector       = 6,
+        MaterialInstance = 7,
+        Shader           = 8,
     };
 
     struct AE_ASSET_API FAssetHandle {
@@ -62,12 +64,17 @@ namespace AltinaEngine::Asset {
     };
 
     struct AE_ASSET_API FMaterialDesc {
-        u32                   ShadingModel = 0;
-        u32                   BlendMode    = 0;
-        u32                   Flags        = 0;
-        f32                   AlphaCutoff  = 0.0f;
-        TVector<FAssetHandle> TextureBindings;
+        u32 PassCount    = 0;
+        u32 ShaderCount  = 0;
+        u32 VariantCount = 0;
     };
+
+    struct AE_ASSET_API FShaderDesc {
+        u32 Language = 0;
+    };
+
+    constexpr u32 kShaderLanguageHlsl  = 0;
+    constexpr u32 kShaderLanguageSlang = 1;
 
     struct AE_ASSET_API FAudioDesc {
         u32 Codec           = 0;
@@ -90,6 +97,7 @@ namespace AltinaEngine::Asset {
         FTexture2DDesc        Texture;
         FMeshDesc             Mesh;
         FMaterialDesc         Material;
+        FShaderDesc           Shader;
         FAudioDesc            Audio;
         FScriptDesc           Script;
     };

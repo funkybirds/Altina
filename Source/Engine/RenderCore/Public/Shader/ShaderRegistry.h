@@ -48,6 +48,8 @@ namespace AltinaEngine::RenderCore {
 
         static auto        MakeKey(FStringView name, EShaderStage stage,
                    FShaderPermutationId permutation = {}) -> FShaderKey;
+        static auto        MakeAssetKey(FStringView assetPath, FStringView entry, EShaderStage stage,
+                   FShaderPermutationId permutation = {}) -> FShaderKey;
 
     private:
         struct FShaderKeyHash {

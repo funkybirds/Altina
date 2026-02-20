@@ -12,6 +12,17 @@ namespace AltinaEngine::RenderCore {
         return key;
     }
 
+    auto FShaderRegistry::MakeAssetKey(FStringView assetPath, FStringView entry, EShaderStage stage,
+        FShaderPermutationId permutation) -> FShaderKey {
+        FString name;
+        name.Assign(assetPath);
+        if (!entry.IsEmpty()) {
+            name.Append(TEXT(":"));
+            name.Append(entry);
+        }
+        return MakeKey(name.ToView(), stage, permutation);
+    }
+
     void FShaderRegistry::Clear() {
         FScopedLock lock(mMutex);
         mEntries.clear();

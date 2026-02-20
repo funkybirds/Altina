@@ -1,34 +1,13 @@
 #include "Asset/AssetRegistry.h"
 
-#include "Algorithm/CStringUtils.h"
 #include "Platform/PlatformFileSystem.h"
 #include "Types/Traits.h"
 #include "Utility/Json.h"
+#include "Utility/String/CodeConvert.h"
+#include "Utility/String/StringViewUtility.h"
+#include "Utility/String/UuidParser.h"
 
-#include <cstring>
 #include <limits>
-#include <string>
-
-#if AE_PLATFORM_WIN
-    #ifdef TEXT
-        #undef TEXT
-    #endif
-    #ifndef WIN32_LEAN_AND_MEAN
-        #define WIN32_LEAN_AND_MEAN
-    #endif
-    #ifndef NOMINMAX
-        #define NOMINMAX
-    #endif
-    #include <windows.h>
-    #ifdef TEXT
-        #undef TEXT
-    #endif
-    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-        #define TEXT(str) L##str
-    #else
-        #define TEXT(str) str
-    #endif
-#endif
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Asset {
@@ -41,97 +20,33 @@ namespace AltinaEngine::Asset {
         using Core::Utility::Json::GetNumberValue;
         using Core::Utility::Json::GetStringValue;
 
-        auto EqualPathI(FStringView left, FStringView right) -> bool {
-            if (left.Length() != right.Length()) {
-                return false;
-            }
-
-            for (usize i = 0; i < left.Length(); ++i) {
-                if (Core::Algorithm::ToLowerChar(left[i])
-                    != Core::Algorithm::ToLowerChar(right[i])) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        auto EqualLiteralI(FNativeStringView text, const char* literal) -> bool {
-            if (literal == nullptr) {
-                return false;
-            }
-            const usize length = static_cast<usize>(std::strlen(literal));
-            if (text.Length() != length) {
-                return false;
-            }
-            for (usize i = 0; i < length; ++i) {
-                if (Core::Algorithm::ToLowerChar(text[i])
-                    != Core::Algorithm::ToLowerChar(literal[i])) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        auto ParseUuid(const FNativeString& text, FUuid& out) -> bool {
-            if (text.IsEmptyString()) {
-                return false;
-            }
-            FNativeStringView view(text.GetData(), text.Length());
-            return FUuid::TryParse(view, out);
-        }
-
         auto ParseAssetType(FNativeStringView text) -> EAssetType {
-            if (EqualLiteralI(text, "texture2d")) {
+            if (Core::Utility::String::EqualLiteralI(text, "texture2d")) {
                 return EAssetType::Texture2D;
             }
-            if (EqualLiteralI(text, "mesh")) {
+            if (Core::Utility::String::EqualLiteralI(text, "mesh")) {
                 return EAssetType::Mesh;
             }
-            if (EqualLiteralI(text, "material") || EqualLiteralI(text, "materialtemplate")) {
+            if (Core::Utility::String::EqualLiteralI(text, "material")
+                || Core::Utility::String::EqualLiteralI(text, "materialtemplate")) {
                 return EAssetType::MaterialTemplate;
             }
-            if (EqualLiteralI(text, "materialinstance")) {
+            if (Core::Utility::String::EqualLiteralI(text, "materialinstance")) {
                 return EAssetType::MaterialInstance;
             }
-            if (EqualLiteralI(text, "shader")) {
+            if (Core::Utility::String::EqualLiteralI(text, "shader")) {
                 return EAssetType::Shader;
             }
-            if (EqualLiteralI(text, "audio")) {
+            if (Core::Utility::String::EqualLiteralI(text, "audio")) {
                 return EAssetType::Audio;
             }
-            if (EqualLiteralI(text, "script")) {
+            if (Core::Utility::String::EqualLiteralI(text, "script")) {
                 return EAssetType::Script;
             }
-            if (EqualLiteralI(text, "redirector")) {
+            if (Core::Utility::String::EqualLiteralI(text, "redirector")) {
                 return EAssetType::Redirector;
             }
             return EAssetType::Unknown;
-        }
-
-        auto FromUtf8(const FNativeString& value) -> FString {
-            FString out;
-            if (value.IsEmptyString()) {
-                return out;
-            }
-#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-    #if AE_PLATFORM_WIN
-            int wideCount = MultiByteToWideChar(
-                CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()), nullptr, 0);
-            if (wideCount <= 0) {
-                return out;
-            }
-            std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-            MultiByteToWideChar(CP_UTF8, 0, value.GetData(), static_cast<int>(value.Length()),
-                wide.data(), wideCount);
-            out.Append(wide.c_str(), wide.size());
-    #else
-            out.Append(value.GetData(), value.Length());
-    #endif
-#else
-            out.Append(value.GetData(), value.Length());
-#endif
-            return out;
         }
 
         void ReadU32Field(const FJsonValue& object, const char* key, u32& out) {
@@ -254,7 +169,7 @@ namespace AltinaEngine::Asset {
 
                 if (item->Type == EJsonType::String) {
                     FUuid uuid;
-                    if (ParseUuid(item->String, uuid)) {
+                    if (Core::Utility::String::ParseUuid(item->String, uuid)) {
                         outDependencies.PushBack({ uuid, EAssetType::Unknown });
                     }
                     continue;
@@ -266,7 +181,7 @@ namespace AltinaEngine::Asset {
                         continue;
                     }
                     FUuid uuid;
-                    if (!ParseUuid(uuidText, uuid)) {
+                    if (!Core::Utility::String::ParseUuid(uuidText, uuid)) {
                         continue;
                     }
 
@@ -317,7 +232,7 @@ namespace AltinaEngine::Asset {
                 }
 
                 FUuid uuid;
-                if (!ParseUuid(uuidText, uuid)) {
+                if (!Core::Utility::String::ParseUuid(uuidText, uuid)) {
                     outError = "Asset Uuid invalid.";
                     return false;
                 }
@@ -332,11 +247,11 @@ namespace AltinaEngine::Asset {
                 FAssetDesc desc;
                 desc.Handle.Uuid = uuid;
                 desc.Handle.Type = type;
-                desc.VirtualPath = FromUtf8(virtualPathText);
+                desc.VirtualPath = Core::Utility::String::FromUtf8(virtualPathText);
 
                 if (GetStringValue(
                         FindObjectValueInsensitive(*assetValue, "CookedPath"), cookedPathText)) {
-                    desc.CookedPath = FromUtf8(cookedPathText);
+                    desc.CookedPath = Core::Utility::String::FromUtf8(cookedPathText);
                 }
 
                 if (!ParseDependencies(*assetValue, desc.Dependencies)) {
@@ -381,7 +296,8 @@ namespace AltinaEngine::Asset {
 
                     FUuid oldUuid;
                     FUuid newUuid;
-                    if (!ParseUuid(oldUuidText, oldUuid) || !ParseUuid(newUuidText, newUuid)) {
+                    if (!Core::Utility::String::ParseUuid(oldUuidText, oldUuid)
+                        || !Core::Utility::String::ParseUuid(newUuidText, newUuid)) {
                         outError = "Redirector UUID invalid.";
                         return false;
                     }
@@ -389,7 +305,7 @@ namespace AltinaEngine::Asset {
                     FAssetRedirector redirector;
                     redirector.OldUuid        = oldUuid;
                     redirector.NewUuid        = newUuid;
-                    redirector.OldVirtualPath = FromUtf8(oldPathText);
+                    redirector.OldVirtualPath = Core::Utility::String::FromUtf8(oldPathText);
                     redirector.OldVirtualPath.ToLower();
                     outRedirectors.PushBack(Move(redirector));
                 }
@@ -463,13 +379,13 @@ namespace AltinaEngine::Asset {
 
     auto FAssetRegistry::FindByPath(FStringView path) const noexcept -> FAssetHandle {
         for (const auto& asset : mAssets) {
-            if (EqualPathI(path, asset.VirtualPath.ToView())) {
+            if (Core::Utility::String::EqualsIgnoreCase(path, asset.VirtualPath.ToView())) {
                 return asset.Handle;
             }
         }
 
         for (const auto& redirector : mRedirectors) {
-            if (EqualPathI(path, redirector.OldVirtualPath.ToView())) {
+            if (Core::Utility::String::EqualsIgnoreCase(path, redirector.OldVirtualPath.ToView())) {
                 return FindByUuid(redirector.NewUuid);
             }
         }

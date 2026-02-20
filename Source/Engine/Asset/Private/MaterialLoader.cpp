@@ -1,12 +1,12 @@
 #include "Asset/MaterialLoader.h"
 
 #include "Asset/MaterialAsset.h"
-#include "Algorithm/CStringUtils.h"
 #include "Types/Traits.h"
 #include "Utility/Json.h"
+#include "Utility/String/StringViewUtility.h"
+#include "Utility/String/UuidParser.h"
 #include "Utility/Uuid.h"
 
-#include <cstring>
 #include <string>
 
 #if AE_PLATFORM_WIN
@@ -127,47 +127,23 @@ namespace AltinaEngine::Asset {
             return out;
         }
 
-        auto ParseUuid(const Container::FNativeString& text, FUuid& out) -> bool {
-            if (text.IsEmptyString()) {
-                return false;
-            }
-            return FUuid::TryParse(
-                Container::FNativeStringView(text.GetData(), text.Length()), out);
-        }
-
         auto ParseAssetTypeText(const FJsonValue* value, EAssetType& outType) -> bool {
             Container::FNativeString typeText;
             if (!GetStringValue(value, typeText)) {
                 return false;
             }
 
-            auto EqualLiteralI = [](Container::FNativeStringView text, const char* literal) {
-                if (literal == nullptr) {
-                    return false;
-                }
-                const usize length = static_cast<usize>(std::strlen(literal));
-                if (text.Length() != length) {
-                    return false;
-                }
-                for (usize i = 0; i < length; ++i) {
-                    if (Core::Algorithm::ToLowerChar(text[i])
-                        != Core::Algorithm::ToLowerChar(literal[i])) {
-                        return false;
-                    }
-                }
-                return true;
-            };
-
             Container::FNativeStringView view(typeText.GetData(), typeText.Length());
-            if (EqualLiteralI(view, "shader")) {
+            if (Core::Utility::String::EqualLiteralI(view, "shader")) {
                 outType = EAssetType::Shader;
                 return true;
             }
-            if (EqualLiteralI(view, "materialtemplate") || EqualLiteralI(view, "material")) {
+            if (Core::Utility::String::EqualLiteralI(view, "materialtemplate")
+                || Core::Utility::String::EqualLiteralI(view, "material")) {
                 outType = EAssetType::MaterialTemplate;
                 return true;
             }
-            if (EqualLiteralI(view, "materialinstance")) {
+            if (Core::Utility::String::EqualLiteralI(view, "materialinstance")) {
                 outType = EAssetType::MaterialInstance;
                 return true;
             }
@@ -185,7 +161,7 @@ namespace AltinaEngine::Asset {
             }
 
             FUuid uuid;
-            if (!ParseUuid(uuidText, uuid)) {
+            if (!Core::Utility::String::ParseUuid(uuidText, uuid)) {
                 return false;
             }
 

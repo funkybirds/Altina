@@ -4,21 +4,22 @@
 #include "Asset/ScriptAsset.h"
 #include "Logging/Log.h"
 
+using AltinaEngine::Core::Container::FNativeStringView;
+using AltinaEngine::Core::Container::FString;
+
 namespace AltinaEngine::GameScene {
     namespace {
         AltinaEngine::Asset::FAssetManager* gScriptAssetManager = nullptr;
 
-        auto ToFStringFromUtf8(Core::Container::FNativeStringView text)
-            -> Core::Container::FString {
-            Core::Container::FString out;
+        auto                                ToFStringFromUtf8(FNativeStringView text) -> FString {
+            FString out;
             if (text.IsEmpty()) {
                 return out;
             }
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
             out.Reserve(text.Length());
-            for (AltinaEngine::usize i = 0; i < text.Length(); ++i) {
-                out.Append(
-                    static_cast<AltinaEngine::TChar>(static_cast<unsigned char>(text.Data()[i])));
+            for (usize i = 0; i < text.Length(); ++i) {
+                out.Append(static_cast<TChar>(static_cast<unsigned char>(text.Data()[i])));
             }
 #else
             out.Append(text.Data(), text.Length());
@@ -35,12 +36,12 @@ namespace AltinaEngine::GameScene {
         return gScriptAssetManager;
     }
 
-    void FScriptComponent::SetAssemblyPath(Core::Container::FNativeStringView path) {
+    void FScriptComponent::SetAssemblyPath(FNativeStringView path) {
         mAssemblyPath.Assign(path);
         mAssetResolved = false;
     }
 
-    void FScriptComponent::SetTypeName(Core::Container::FNativeStringView typeName) {
+    void FScriptComponent::SetTypeName(FNativeStringView typeName) {
         mTypeName.Assign(typeName);
         mAssetResolved = false;
     }
@@ -50,11 +51,11 @@ namespace AltinaEngine::GameScene {
         mAssetResolved = false;
     }
 
-    auto FScriptComponent::GetAssemblyPath() const noexcept -> Core::Container::FNativeStringView {
+    auto FScriptComponent::GetAssemblyPath() const noexcept -> FNativeStringView {
         return mAssemblyPath.ToView();
     }
 
-    auto FScriptComponent::GetTypeName() const noexcept -> Core::Container::FNativeStringView {
+    auto FScriptComponent::GetTypeName() const noexcept -> FNativeStringView {
         return mTypeName.ToView();
     }
 

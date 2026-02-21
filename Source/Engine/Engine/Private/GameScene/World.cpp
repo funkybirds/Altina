@@ -3,20 +3,86 @@
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
+#include "Reflection/Serializer.h"
 
 using AltinaEngine::Move;
 using AltinaEngine::Core::Container::FStringView;
+using AltinaEngine::Core::Container::MakeUnique;
 namespace AltinaEngine::GameScene {
     namespace {
         Core::Threading::TAtomic<u32> gNextWorldId(1);
 
         auto                          AcquireWorldId() -> u32 { return gNextWorldId.FetchAdd(1); }
+        void                          BumpWorldId(u32 worldId) {
+            u32 current = gNextWorldId.Load();
+            while (current <= worldId) {
+                if (gNextWorldId.CompareExchangeStrong(current, worldId + 1U)) {
+                    break;
+                }
+            }
+        }
 
         const FComponentTypeHash kCameraComponentType = GetComponentTypeHash<FCameraComponent>();
         const FComponentTypeHash kStaticMeshComponentType =
             GetComponentTypeHash<FStaticMeshFilterComponent>();
         const FComponentTypeHash kMeshMaterialComponentType =
             GetComponentTypeHash<FMeshMaterialComponent>();
+
+        constexpr u32 kWorldSerializationVersion = 1U;
+
+        auto          WriteTransform(Core::Reflection::ISerializer& serializer,
+                     const Core::Math::LinAlg::FSpatialTransform&   transform) -> void {
+            serializer.Write(transform.Rotation.x);
+            serializer.Write(transform.Rotation.y);
+            serializer.Write(transform.Rotation.z);
+            serializer.Write(transform.Rotation.w);
+
+            serializer.Write(transform.Translation.mComponents[0]);
+            serializer.Write(transform.Translation.mComponents[1]);
+            serializer.Write(transform.Translation.mComponents[2]);
+
+            serializer.Write(transform.Scale.mComponents[0]);
+            serializer.Write(transform.Scale.mComponents[1]);
+            serializer.Write(transform.Scale.mComponents[2]);
+        }
+
+        auto ReadTransform(Core::Reflection::IDeserializer& deserializer)
+            -> Core::Math::LinAlg::FSpatialTransform {
+            Core::Math::LinAlg::FSpatialTransform transform{};
+            transform.Rotation.x = deserializer.Read<f32>();
+            transform.Rotation.y = deserializer.Read<f32>();
+            transform.Rotation.z = deserializer.Read<f32>();
+            transform.Rotation.w = deserializer.Read<f32>();
+
+            transform.Translation.mComponents[0] = deserializer.Read<f32>();
+            transform.Translation.mComponents[1] = deserializer.Read<f32>();
+            transform.Translation.mComponents[2] = deserializer.Read<f32>();
+
+            transform.Scale.mComponents[0] = deserializer.Read<f32>();
+            transform.Scale.mComponents[1] = deserializer.Read<f32>();
+            transform.Scale.mComponents[2] = deserializer.Read<f32>();
+            return transform;
+        }
+
+        auto WriteString(Core::Reflection::ISerializer& serializer, FStringView value) -> void {
+            serializer.Write(static_cast<u32>(value.Length()));
+            for (usize i = 0U; i < value.Length(); ++i) {
+                serializer.Write(value.Data()[i]);
+            }
+        }
+
+        auto ReadString(Core::Reflection::IDeserializer& deserializer) -> Core::Container::FString {
+            const u32 length = deserializer.Read<u32>();
+            if (length == 0U) {
+                return {};
+            }
+            Core::Container::TVector<TChar> buffer;
+            buffer.Resize(length);
+            for (u32 i = 0U; i < length; ++i) {
+                buffer[i] = deserializer.Read<TChar>();
+            }
+            return Core::Container::FString(buffer.Data(), static_cast<usize>(length));
+        }
     } // namespace
 
     FWorld::FWorld() : mWorldId(AcquireWorldId()) {}
@@ -85,6 +151,49 @@ namespace AltinaEngine::GameScene {
         obj->SetName(name);
         obj->SetActive(true);
         return id;
+    }
+
+    auto FWorld::CreateGameObjectWithId(FGameObjectId id) -> FGameObject* {
+        if (!id.IsValid()) {
+            return nullptr;
+        }
+
+        const u32 index = id.Index;
+        if (index >= static_cast<u32>(mGameObjects.Size())) {
+            mGameObjects.Resize(static_cast<usize>(index) + 1U);
+        }
+
+        auto handle = mGameObjectPool.Allocate();
+        if (!handle) {
+            return nullptr;
+        }
+
+        auto& slot      = mGameObjects[index];
+        slot.Handle     = Move(handle);
+        slot.Alive      = true;
+        slot.Generation = (id.Generation == 0U) ? 1U : id.Generation;
+
+        FGameObjectId fixedId = id;
+        fixedId.Generation    = slot.Generation;
+        fixedId.WorldId       = mWorldId;
+
+        auto* obj = slot.Handle.Get();
+        obj->SetWorld(this);
+        obj->SetId(fixedId);
+        obj->SetActive(true);
+
+        const auto count = static_cast<u32>(mFreeGameObjects.Size());
+        for (u32 i = 0U; i < count; ++i) {
+            if (mFreeGameObjects[i] == index) {
+                if (i + 1U < count) {
+                    mFreeGameObjects[i] = mFreeGameObjects[count - 1U];
+                }
+                mFreeGameObjects.PopBack();
+                break;
+            }
+        }
+
+        return obj;
     }
 
     void FWorld::DestroyGameObject(FGameObjectView object) {
@@ -229,6 +338,172 @@ namespace AltinaEngine::GameScene {
 
     auto FWorld::GetActiveMeshMaterialComponents() const noexcept -> const TVector<FComponentId>& {
         return mActiveMeshMaterialComponents;
+    }
+
+    void FWorld::Serialize(Core::Reflection::ISerializer& serializer) const {
+        serializer.Write(kWorldSerializationVersion);
+        serializer.Write(mWorldId);
+
+        u32 aliveCount = 0;
+        for (const auto& slot : mGameObjects) {
+            if (slot.Alive && slot.Handle) {
+                ++aliveCount;
+            }
+        }
+        serializer.Write(aliveCount);
+
+        auto& registry = GetComponentRegistry();
+
+        for (u32 index = 0; index < static_cast<u32>(mGameObjects.Size()); ++index) {
+            const auto& slot = mGameObjects[index];
+            if (!slot.Alive || !slot.Handle) {
+                continue;
+            }
+
+            FGameObjectId id{};
+            id.Index      = index;
+            id.Generation = slot.Generation;
+            id.WorldId    = mWorldId;
+
+            const auto* obj = slot.Handle.Get();
+            if (obj == nullptr) {
+                continue;
+            }
+
+            serializer.Write(id.Index);
+            serializer.Write(id.Generation);
+
+            WriteString(serializer, obj->GetName().ToView());
+            serializer.Write(obj->IsActive());
+
+            const auto parent = obj->GetParent();
+            serializer.Write(parent.IsValid());
+            if (parent.IsValid()) {
+                serializer.Write(parent.Index);
+                serializer.Write(parent.Generation);
+            }
+
+            WriteTransform(serializer, obj->GetLocalTransform());
+
+            TVector<FComponentId> serializableComponents;
+            for (const auto& componentId : obj->GetAllComponents()) {
+                const auto* entry = registry.Find(componentId.Type);
+                if (entry == nullptr || entry->Serialize == nullptr
+                    || entry->Deserialize == nullptr) {
+                    continue;
+                }
+                serializableComponents.PushBack(componentId);
+            }
+
+            serializer.Write(static_cast<u32>(serializableComponents.Size()));
+            for (const auto& componentId : serializableComponents) {
+                const auto* component = ResolveComponentBase(componentId);
+                const bool  enabled   = component ? component->IsEnabled() : true;
+
+                serializer.Write(componentId.Type);
+                serializer.Write(enabled);
+                registry.Serialize(const_cast<FWorld&>(*this), componentId, serializer);
+            }
+        }
+    }
+
+    auto FWorld::Deserialize(Core::Reflection::IDeserializer& deserializer) -> TOwner<FWorld> {
+        const u32 version = deserializer.Read<u32>();
+        const u32 worldId = deserializer.Read<u32>();
+        if (version != kWorldSerializationVersion) {
+            return {};
+        }
+
+        auto worldPtr = MakeUnique<FWorld>(worldId);
+        if (!worldPtr) {
+            return {};
+        }
+        auto& world = *worldPtr;
+        BumpWorldId(worldId);
+
+        const u32 objectCount = deserializer.Read<u32>();
+        world.mGameObjects.Clear();
+        world.mFreeGameObjects.Clear();
+
+        struct FParentLink {
+            FGameObjectId Child{};
+            FGameObjectId Parent{};
+        };
+        TVector<FParentLink> parentLinks;
+        parentLinks.Reserve(objectCount);
+
+        auto& registry = GetComponentRegistry();
+
+        for (u32 i = 0; i < objectCount; ++i) {
+            FGameObjectId id{};
+            id.Index      = deserializer.Read<u32>();
+            id.Generation = deserializer.Read<u32>();
+            id.WorldId    = worldId;
+
+            const auto    name   = ReadString(deserializer);
+            const bool    active = deserializer.Read<bool>();
+
+            const bool    hasParent = deserializer.Read<bool>();
+            FGameObjectId parent{};
+            if (hasParent) {
+                parent.Index      = deserializer.Read<u32>();
+                parent.Generation = deserializer.Read<u32>();
+                parent.WorldId    = worldId;
+            }
+
+            const auto localTransform = ReadTransform(deserializer);
+
+            if (id.Index >= static_cast<u32>(world.mGameObjects.Size())) {
+                const usize oldSize = world.mGameObjects.Size();
+                const usize newSize = static_cast<usize>(id.Index) + 1U;
+                world.mGameObjects.Resize(newSize);
+                world.mFreeGameObjects.Reserve(newSize);
+                for (u32 idx = static_cast<u32>(oldSize); idx < static_cast<u32>(newSize); ++idx) {
+                    world.mFreeGameObjects.PushBack(idx);
+                }
+            }
+
+            auto* obj = world.CreateGameObjectWithId(id);
+            if (obj != nullptr) {
+                obj->SetName(name.ToView());
+                obj->SetLocalTransform(localTransform);
+            }
+
+            if (!active) {
+                world.SetGameObjectActive(id, false);
+            }
+
+            if (hasParent) {
+                parentLinks.PushBack({ id, parent });
+            }
+
+            const u32 componentCount = deserializer.Read<u32>();
+            for (u32 c = 0; c < componentCount; ++c) {
+                const auto   typeHash = deserializer.Read<FComponentTypeHash>();
+                const bool   enabled  = deserializer.Read<bool>();
+
+                FComponentId componentId = world.CreateComponent(id, typeHash);
+                if (componentId.IsValid()) {
+                    registry.Deserialize(world, componentId, deserializer);
+                    if (!enabled) {
+                        if (auto* component = world.ResolveComponentBase(componentId)) {
+                            component->SetEnabled(false);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (const auto& link : parentLinks) {
+            auto* obj = world.ResolveGameObject(link.Child);
+            if (obj == nullptr) {
+                continue;
+            }
+            obj->SetParent(link.Parent);
+        }
+
+        world.UpdateTransforms();
+        return worldPtr;
     }
 
     void FWorld::AddActiveComponent(TVector<FComponentId>& list, FComponentId id) {
@@ -395,6 +670,28 @@ namespace AltinaEngine::GameScene {
             return nullptr;
         }
         return mGameObjects[id.Index].Handle.Get();
+    }
+
+    auto FWorld::ResolveComponentBase(FComponentId id) -> FComponent* {
+        if (!id.IsValid()) {
+            return nullptr;
+        }
+        auto* storage = FindComponentStorage(id.Type);
+        if (storage == nullptr) {
+            return nullptr;
+        }
+        return storage->ResolveBase(id);
+    }
+
+    auto FWorld::ResolveComponentBase(FComponentId id) const -> const FComponent* {
+        if (!id.IsValid()) {
+            return nullptr;
+        }
+        auto* storage = FindComponentStorage(id.Type);
+        if (storage == nullptr) {
+            return nullptr;
+        }
+        return storage->ResolveBase(id);
     }
 
     auto FWorld::UpdateTransformRecursive(FGameObjectId id, u32 updateId) -> bool {

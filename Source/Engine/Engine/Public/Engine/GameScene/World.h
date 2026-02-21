@@ -16,6 +16,10 @@ using AltinaEngine::CClassBaseOf;
 using AltinaEngine::Move;
 using AltinaEngine::Core::Container::FStringView;
 using AltinaEngine::Core::Container::MakeUniqueAs;
+namespace AltinaEngine::Core::Reflection {
+    class ISerializer;
+    class IDeserializer;
+} // namespace AltinaEngine::Core::Reflection
 namespace AltinaEngine::GameScene {
     namespace Container = Core::Container;
     using Container::THashMap;
@@ -79,8 +83,12 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto GetActiveMeshMaterialComponents() const noexcept
             -> const TVector<FComponentId>&;
 
+        void        Serialize(Core::Reflection::ISerializer& serializer) const;
+        static auto Deserialize(Core::Reflection::IDeserializer& deserializer) -> TOwner<FWorld>;
+
     private:
         [[nodiscard]] auto CreateGameObjectId(FStringView name = {}) -> FGameObjectId;
+        [[nodiscard]] auto CreateGameObjectWithId(FGameObjectId id) -> FGameObject*;
         void               DestroyGameObjectById(FGameObjectId id);
 
         struct FGameObjectSlot {
@@ -93,10 +101,12 @@ namespace AltinaEngine::GameScene {
         public:
             virtual ~FComponentStorageBase() = default;
 
-            virtual void               Destroy(FWorld& world, FComponentId id) = 0;
-            [[nodiscard]] virtual auto IsAlive(FComponentId id) const -> bool  = 0;
-            virtual void               Tick(FWorld& world, float deltaTime)    = 0;
-            virtual void               DestroyAll(FWorld& world)               = 0;
+            virtual void               Destroy(FWorld& world, FComponentId id)                 = 0;
+            [[nodiscard]] virtual auto IsAlive(FComponentId id) const -> bool                  = 0;
+            virtual void               Tick(FWorld& world, float deltaTime)                    = 0;
+            virtual void               DestroyAll(FWorld& world)                               = 0;
+            [[nodiscard]] virtual auto ResolveBase(FComponentId id) -> FComponent*             = 0;
+            [[nodiscard]] virtual auto ResolveBase(FComponentId id) const -> const FComponent* = 0;
         };
 
         template <typename T> class TComponentStorage final : public FComponentStorageBase {
@@ -210,6 +220,12 @@ namespace AltinaEngine::GameScene {
             [[nodiscard]] auto Resolve(FComponentId id) const -> const T& {
                 return *mSlots[id.Index].Handle.Get();
             }
+            [[nodiscard]] auto ResolveBase(FComponentId id) -> FComponent* override {
+                return mSlots[id.Index].Handle.Get();
+            }
+            [[nodiscard]] auto ResolveBase(FComponentId id) const -> const FComponent* override {
+                return mSlots[id.Index].Handle.Get();
+            }
 
         private:
             struct FSlot {
@@ -259,6 +275,8 @@ namespace AltinaEngine::GameScene {
 
         [[nodiscard]] auto ResolveGameObject(FGameObjectId id) -> FGameObject*;
         [[nodiscard]] auto ResolveGameObject(FGameObjectId id) const -> const FGameObject*;
+        [[nodiscard]] auto ResolveComponentBase(FComponentId id) -> FComponent*;
+        [[nodiscard]] auto ResolveComponentBase(FComponentId id) const -> const FComponent*;
 
         [[nodiscard]] auto UpdateTransformRecursive(FGameObjectId id, u32 updateId) -> bool;
 

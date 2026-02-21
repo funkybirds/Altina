@@ -7,22 +7,24 @@
 
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     #if AE_PLATFORM_WIN
-        #ifdef TEXT
-            #undef TEXT
-        #endif
         #ifndef WIN32_LEAN_AND_MEAN
             #define WIN32_LEAN_AND_MEAN
         #endif
         #ifndef NOMINMAX
             #define NOMINMAX
         #endif
+        #ifndef VK_USE_PLATFORM_WIN32_KHR
+            #define VK_USE_PLATFORM_WIN32_KHR
+        #endif
         #include <Windows.h>
         #ifdef CreateSemaphore
             #undef CreateSemaphore
         #endif
-        #include <vulkan/vulkan_win32.h>
     #endif
     #include <vulkan/vulkan.h>
+    #if AE_PLATFORM_WIN
+        #include <vulkan/vulkan_win32.h>
+    #endif
 #endif
 
 namespace AltinaEngine::Rhi::Vulkan::Detail {

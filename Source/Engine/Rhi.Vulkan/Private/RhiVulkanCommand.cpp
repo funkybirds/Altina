@@ -845,3 +845,4 @@ namespace AltinaEngine::Rhi {
         mState->mInRenderPass = false;
 #endif
     }
+} // namespace AltinaEngine::Rhi

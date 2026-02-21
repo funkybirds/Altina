@@ -1,7 +1,29 @@
 #pragma once
 
 #include "RhiVulkanAPI.h"
+
+#ifdef CreateSemaphore
+    #undef CreateSemaphore
+#endif
+#ifdef CreateSemaphoreA
+    #undef CreateSemaphoreA
+#endif
+#ifdef CreateSemaphoreW
+    #undef CreateSemaphoreW
+#endif
+
 #include "Rhi/RhiDevice.h"
+
+// Some Windows headers included by dependencies may reintroduce these macros.
+#ifdef CreateSemaphore
+    #undef CreateSemaphore
+#endif
+#ifdef CreateSemaphoreA
+    #undef CreateSemaphoreA
+#endif
+#ifdef CreateSemaphoreW
+    #undef CreateSemaphoreW
+#endif
 
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     #include <vulkan/vulkan.h>
@@ -66,6 +88,15 @@ namespace AltinaEngine::Rhi {
         auto CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef override;
 
         auto CreateFence(u64 initialValue) -> FRhiFenceRef override;
+#ifdef CreateSemaphore
+    #undef CreateSemaphore
+#endif
+#ifdef CreateSemaphoreA
+    #undef CreateSemaphoreA
+#endif
+#ifdef CreateSemaphoreW
+    #undef CreateSemaphoreW
+#endif
         auto CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef override;
 
         auto CreateCommandPool(const FRhiCommandPoolDesc& desc) -> FRhiCommandPoolRef override;

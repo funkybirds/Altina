@@ -9,12 +9,25 @@ namespace AltinaEngine::Launch {
     public:
         virtual ~FGameClient() = default;
 
-        virtual auto OnPreInit(FEngineLoop& engineLoop) -> bool { return true; }
-        virtual auto OnInit(FEngineLoop& engineLoop) -> bool { return true; }
-        virtual auto OnTick(FEngineLoop& engineLoop, float deltaSeconds) -> bool { return true; }
-        virtual void OnShutdown(FEngineLoop& engineLoop) {}
-        [[nodiscard]] virtual auto GetFixedDeltaTimeSeconds() const -> float { return 1.0f / 60.0f; }
+        virtual auto OnPreInit(FEngineLoop& engineLoop) -> bool {
+            (void)engineLoop;
+            return true;
+        }
+        virtual auto OnInit(FEngineLoop& engineLoop) -> bool {
+            (void)engineLoop;
+            return true;
+        }
+        virtual auto OnTick(FEngineLoop& engineLoop, float deltaSeconds) -> bool {
+            (void)engineLoop;
+            (void)deltaSeconds;
+            return true;
+        }
+        virtual void               OnShutdown(FEngineLoop& engineLoop) { (void)engineLoop; }
+        [[nodiscard]] virtual auto GetFixedDeltaTimeSeconds() const -> float {
+            return 1.0f / 60.0f;
+        }
     };
 
-    AE_LAUNCH_API auto RunGameClient(FGameClient& client, const FStartupParameters& startupParameters) -> int;
+    AE_LAUNCH_API auto RunGameClient(
+        FGameClient& client, const FStartupParameters& startupParameters) -> int;
 } // namespace AltinaEngine::Launch

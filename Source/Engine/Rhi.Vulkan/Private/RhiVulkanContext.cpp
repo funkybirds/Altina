@@ -4,9 +4,11 @@
 #include "Container/SmartPtr.h"
 #include "Logging/Log.h"
 #include "Types/Aliases.h"
+#include "Types/CheckedCast.h"
 #include "Types/Traits.h"
 
 #include "RhiVulkanInternal.h"
+#include "CoreMinimal.h"
 
 #include <type_traits>
 
@@ -67,9 +69,11 @@ namespace AltinaEngine::Rhi {
 
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         auto GetVulkanVersion() -> u32 {
-            u32 version = VK_API_VERSION_1_0;
-            if (vkEnumerateInstanceVersion) {
-                vkEnumerateInstanceVersion(&version);
+            u32   version   = VK_API_VERSION_1_0;
+            auto* enumerate = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
+                vkGetInstanceProcAddr(nullptr, "vkEnumerateInstanceVersion"));
+            if (enumerate) {
+                enumerate(&version);
             }
             return version;
         }
@@ -233,7 +237,7 @@ namespace AltinaEngine::Rhi {
     auto FRhiVulkanContext::AdjustProjectionMatrix(
         const Core::Math::FMatrix4x4f& matrix) const noexcept -> Core::Math::FMatrix4x4f {
         Core::Math::FMatrix4x4f result = matrix;
-        result.m[1][1] *= -1.0f;
+        result[1][1] *= -1.0f;
         return result;
     }
 
@@ -439,17 +443,6 @@ namespace AltinaEngine::Rhi {
         // Enable commonly used core features if supported.
         enabledFeatures.features.samplerAnisotropy = features2.features.samplerAnisotropy;
         enabledFeatures.features.fillModeNonSolid  = features2.features.fillModeNonSolid;
-
-        // Descriptor indexing (bindless) support
-        descIndex.shaderSampledImageArrayNonUniformIndexing =
-            descIndex.shaderSampledImageArrayNonUniformIndexing;
-        descIndex.shaderStorageBufferArrayNonUniformIndexing =
-            descIndex.shaderStorageBufferArrayNonUniformIndexing;
-        descIndex.descriptorBindingPartiallyBound  = descIndex.descriptorBindingPartiallyBound;
-        descIndex.descriptorBindingUpdateAfterBind = descIndex.descriptorBindingUpdateAfterBind;
-        descIndex.runtimeDescriptorArray           = descIndex.runtimeDescriptorArray;
-        descIndex.descriptorBindingVariableDescriptorCount =
-            descIndex.descriptorBindingVariableDescriptorCount;
 
         timeline.timelineSemaphore = timeline.timelineSemaphore;
         sync2.synchronization2     = sync2.synchronization2;

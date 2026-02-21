@@ -25,6 +25,9 @@ function(ae_add_test_target TargetName)
     endif()
 
     add_test(NAME ${TargetName} COMMAND $<TARGET_FILE:${TargetName}>)
+
+    # Track test targets for a single aggregate build target.
+    set_property(GLOBAL APPEND PROPERTY AE_TEST_TARGETS ${TargetName})
 endfunction()
 
 file(GLOB_RECURSE AE_TEST_CORE_SOURCES
@@ -75,6 +78,11 @@ if(WIN32)
             AltinaEngine::Rhi::D3D11
             d3dcompiler
     )
+endif()
+
+get_property(AE_ALL_TEST_TARGETS GLOBAL PROPERTY AE_TEST_TARGETS)
+if(AE_ALL_TEST_TARGETS)
+    add_custom_target(AltinaEngineTests DEPENDS ${AE_ALL_TEST_TARGETS})
 endif()
 
 file(GLOB_RECURSE AE_TEST_SHADER_COMPILER_SOURCES

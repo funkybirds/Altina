@@ -3,6 +3,8 @@
 #include "RhiVulkanAPI.h"
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiPipelineLayout.h"
+#include "Rhi/RhiBindGroup.h"
+#include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiRefs.h"
 
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE

@@ -169,9 +169,18 @@ namespace AltinaEngine::Rhi {
 
         mState->mDeferredContext.Reset();
         mState->mDeferredContext1.Reset();
-        mState->mUseImmediate = mState->mImmediateContext != nullptr;
 
-        if (mState->mImmediateContext) {
+        if (mState->mDevice) {
+            ComPtr<ID3D11DeviceContext> deferred;
+            if (SUCCEEDED(mState->mDevice->CreateDeferredContext(0, &deferred))) {
+                mState->mDeferredContext = Move(deferred);
+                mState->mUseImmediate    = false;
+                mState->mDeferredContext.As(&mState->mDeferredContext1);
+            }
+        }
+
+        if (!mState->mDeferredContext && mState->mImmediateContext) {
+            mState->mUseImmediate = true;
             mState->mImmediateContext->ClearState();
             mState->mImmediateContext1.Reset();
             mState->mImmediateContext.As(&mState->mImmediateContext1);

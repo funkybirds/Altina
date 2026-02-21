@@ -69,11 +69,14 @@ namespace AltinaEngine::Core::Reflection::Detail {
     }
 
     AE_CORE_API void RegisterType(const FTypeInfo& stdTypeInfo, const FMetaTypeInfo& meta) {
-        auto&      manager  = GetReflectionManager();
-        const auto metaHash = meta.GetHash();
+        auto&               manager  = GetReflectionManager();
+        const auto          metaHash = meta.GetHash();
 
+        FReflectionDumpData dump;
+        dump.mTypeInfo = &meta;
+        dump.mTypeHash = metaHash;
         if (ReflectionAssert(!manager.mRegistry.HasKey(metaHash),
-                EReflectionErrorCode::TypeHashConflict, FReflectionDumpData{})) [[likely]] {
+                EReflectionErrorCode::TypeHashConflict, dump)) [[likely]] {
             manager.mRttiIdMap[GetRttiTypeObjectHash(stdTypeInfo)] = metaHash;
             manager.mRegistry[metaHash] = FReflectionTypeMetaInfo::CreateEntry(meta);
         }
@@ -81,11 +84,16 @@ namespace AltinaEngine::Core::Reflection::Detail {
 
     AE_CORE_API void RegisterPolymorphicRelation(
         FTypeMetaHash baseType, FTypeMetaHash derivedType, TFnPolymorphismUpCaster upCaster) {
-        auto& manager            = GetReflectionManager();
-        auto  bBaseRegistered    = ReflectionAssert(manager.mRegistry.HasKey(baseType),
-                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{});
-        auto  bDerivedRegistered = ReflectionAssert(manager.mRegistry.HasKey(derivedType),
-             EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{});
+        auto&               manager = GetReflectionManager();
+        FReflectionDumpData baseDump;
+        baseDump.mTypeHash   = baseType;
+        auto bBaseRegistered = ReflectionAssert(
+            manager.mRegistry.HasKey(baseType), EReflectionErrorCode::TypeUnregistered, baseDump);
+
+        FReflectionDumpData derivedDump;
+        derivedDump.mTypeHash   = derivedType;
+        auto bDerivedRegistered = ReflectionAssert(manager.mRegistry.HasKey(derivedType),
+            EReflectionErrorCode::TypeUnregistered, derivedDump);
         if (bBaseRegistered && bDerivedRegistered) [[likely]] {
             auto& baseEntry    = manager.mRegistry[baseType];
             auto& derivedEntry = manager.mRegistry[derivedType];
@@ -105,16 +113,24 @@ namespace AltinaEngine::Core::Reflection::Detail {
 
     AE_CORE_API void RegisterPropertyField(const FMetaPropertyInfo& propMeta,
         FNativeStringView name, TFnMemberPropertyAccessor accessor) {
-        auto& manager           = GetReflectionManager();
-        auto  classTypeMetaHash = propMeta.GetClassTypeMetadata().GetHash();
+        auto&               manager           = GetReflectionManager();
+        auto                classTypeMetaHash = propMeta.GetClassTypeMetadata().GetHash();
+        FReflectionDumpData typeDump;
+        typeDump.mTypeHash     = classTypeMetaHash;
+        typeDump.mPropertyInfo = &propMeta;
+        typeDump.mPropertyHash = propMeta.GetHash();
         if (!ReflectionAssert(manager.mRegistry.HasKey(classTypeMetaHash),
-                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+                EReflectionErrorCode::TypeUnregistered, typeDump)) [[unlikely]] {
             Utility::CompilerHint::Unreachable();
         }
-        auto& tpMeta   = manager.mRegistry[classTypeMetaHash];
-        auto  propHash = propMeta.GetHash();
+        auto&               tpMeta   = manager.mRegistry[classTypeMetaHash];
+        auto                propHash = propMeta.GetHash();
+        FReflectionDumpData propDump;
+        propDump.mTypeHash     = classTypeMetaHash;
+        propDump.mPropertyInfo = &propMeta;
+        propDump.mPropertyHash = propHash;
         if (ReflectionAssert(!tpMeta.mProperties.HasKey(propHash),
-                EReflectionErrorCode::TypeHashConflict, FReflectionDumpData{})) [[likely]] {
+                EReflectionErrorCode::TypeHashConflict, propDump)) [[likely]] {
             tpMeta.mProperties[propHash] = FPropertyField(name, propMeta, accessor);
             return;
         }
@@ -122,16 +138,24 @@ namespace AltinaEngine::Core::Reflection::Detail {
     }
     AE_CORE_API void RegisterMethodField(const FMetaMethodInfo& methodMeta, FNativeStringView name,
         TFnMemberFunctionInvoker invoker) {
-        auto& manager           = GetReflectionManager();
-        auto  classTypeMetaHash = methodMeta.GetClassTypeMetadata().GetHash();
+        auto&               manager           = GetReflectionManager();
+        auto                classTypeMetaHash = methodMeta.GetClassTypeMetadata().GetHash();
+        FReflectionDumpData typeDump;
+        typeDump.mTypeHash   = classTypeMetaHash;
+        typeDump.mMethodInfo = &methodMeta;
+        typeDump.mMethodHash = methodMeta.GetHash();
         if (!ReflectionAssert(manager.mRegistry.HasKey(classTypeMetaHash),
-                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+                EReflectionErrorCode::TypeUnregistered, typeDump)) [[unlikely]] {
             Utility::CompilerHint::Unreachable();
         }
-        auto& tpMeta     = manager.mRegistry[classTypeMetaHash];
-        auto  methodHash = methodMeta.GetHash();
+        auto&               tpMeta     = manager.mRegistry[classTypeMetaHash];
+        auto                methodHash = methodMeta.GetHash();
+        FReflectionDumpData methodDump;
+        methodDump.mTypeHash   = classTypeMetaHash;
+        methodDump.mMethodInfo = &methodMeta;
+        methodDump.mMethodHash = methodHash;
         if (ReflectionAssert(!tpMeta.mMethods.HasKey(methodHash),
-                EReflectionErrorCode::TypeHashConflict, FReflectionDumpData{})) [[likely]] {
+                EReflectionErrorCode::TypeHashConflict, methodDump)) [[likely]] {
             tpMeta.mMethods[methodHash] = FMethodField(name, methodMeta, invoker);
             return;
         }
@@ -139,9 +163,11 @@ namespace AltinaEngine::Core::Reflection::Detail {
     }
 
     AE_CORE_API auto ConstructObject(FTypeMetaHash classHash) -> FObject {
-        auto& manager = GetReflectionManager();
+        auto&               manager = GetReflectionManager();
+        FReflectionDumpData dump;
+        dump.mTypeHash = classHash;
         if (ReflectionAssert(manager.mRegistry.HasKey(classHash),
-                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[likely]] {
+                EReflectionErrorCode::TypeUnregistered, dump)) [[likely]] {
             const auto& tpMeta = manager.mRegistry[classHash];
             void*       objPtr = tpMeta.mMeta.CallDefaultConstructor();
             auto        obj    = FObject::CreateFromMetadata(objPtr, tpMeta.mMeta);
@@ -151,14 +177,22 @@ namespace AltinaEngine::Core::Reflection::Detail {
     }
     AE_CORE_API auto GetProperty(FObject& object, FTypeMetaHash propHash, FTypeMetaHash classHash)
         -> FObject {
-        auto& manager = GetReflectionManager();
+        auto&               manager = GetReflectionManager();
+        FReflectionDumpData typeDump;
+        typeDump.mTypeHash       = classHash;
+        typeDump.mPropertyHash   = propHash;
+        typeDump.mObjectTypeHash = object.GetTypeHash();
         if (!ReflectionAssert(manager.mRegistry.HasKey(classHash),
-                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+                EReflectionErrorCode::TypeUnregistered, typeDump)) [[unlikely]] {
             Utility::CompilerHint::Unreachable();
         }
-        auto& tpMeta = manager.mRegistry[classHash];
+        auto&               tpMeta = manager.mRegistry[classHash];
+        FReflectionDumpData propDump;
+        propDump.mTypeHash       = classHash;
+        propDump.mPropertyHash   = propHash;
+        propDump.mObjectTypeHash = object.GetTypeHash();
         if (!ReflectionAssert(tpMeta.mProperties.HasKey(propHash),
-                EReflectionErrorCode::PropertyUnregistered, FReflectionDumpData{})) [[unlikely]] {
+                EReflectionErrorCode::PropertyUnregistered, propDump)) [[unlikely]] {
             Utility::CompilerHint::Unreachable();
         }
         auto& entry = tpMeta.mProperties[propHash];
@@ -166,15 +200,23 @@ namespace AltinaEngine::Core::Reflection::Detail {
     }
     AE_CORE_API auto InvokeMethod(FObject& object, FTypeMetaHash methodHash, TSpan<FObject> args)
         -> FObject {
-        auto& manager   = GetReflectionManager();
-        auto  classHash = object.GetTypeHash();
+        auto&               manager   = GetReflectionManager();
+        auto                classHash = object.GetTypeHash();
+        FReflectionDumpData typeDump;
+        typeDump.mTypeHash       = classHash;
+        typeDump.mMethodHash     = methodHash;
+        typeDump.mObjectTypeHash = object.GetTypeHash();
         if (!ReflectionAssert(manager.mRegistry.HasKey(classHash),
-                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+                EReflectionErrorCode::TypeUnregistered, typeDump)) [[unlikely]] {
             Utility::CompilerHint::Unreachable();
         }
-        auto& tpMeta = manager.mRegistry[classHash];
+        auto&               tpMeta = manager.mRegistry[classHash];
+        FReflectionDumpData methodDump;
+        methodDump.mTypeHash       = classHash;
+        methodDump.mMethodHash     = methodHash;
+        methodDump.mObjectTypeHash = object.GetTypeHash();
         if (!ReflectionAssert(tpMeta.mMethods.HasKey(methodHash),
-                EReflectionErrorCode::PropertyUnregistered, FReflectionDumpData{})) [[unlikely]] {
+                EReflectionErrorCode::PropertyUnregistered, methodDump)) [[unlikely]] {
             Utility::CompilerHint::Unreachable();
         }
         auto& entry = tpMeta.mMethods[methodHash];
@@ -204,11 +246,14 @@ namespace AltinaEngine::Core::Reflection::Detail {
     }
 
     AE_CORE_API void DynamicSerializeInvokerImpl(void* ptr, ISerializer& serializer, u64 hash) {
-        auto& manager = GetReflectionManager();
+        auto&               manager = GetReflectionManager();
 
         // Check if hash is registered
+        FReflectionDumpData typeDump;
+        typeDump.mTypeHash  = hash;
+        typeDump.mObjectPtr = ptr;
         if (!ReflectionAssert(manager.mRegistry.HasKey(hash),
-                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+                EReflectionErrorCode::TypeUnregistered, typeDump)) [[unlikely]] {
             Utility::CompilerHint::Unreachable();
         }
 
@@ -232,11 +277,14 @@ namespace AltinaEngine::Core::Reflection::Detail {
 
     AE_CORE_API void DynamicDeserializeInvokerImpl(
         void* ptr, IDeserializer& deserializer, u64 hash) {
-        auto& manager = GetReflectionManager();
+        auto&               manager = GetReflectionManager();
 
         // Check if hash is registered
+        FReflectionDumpData typeDump;
+        typeDump.mTypeHash  = hash;
+        typeDump.mObjectPtr = ptr;
         if (!ReflectionAssert(manager.mRegistry.HasKey(hash),
-                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+                EReflectionErrorCode::TypeUnregistered, typeDump)) [[unlikely]] {
             Utility::CompilerHint::Unreachable();
         }
 
@@ -251,9 +299,14 @@ namespace AltinaEngine::Core::Reflection::Detail {
 
         // Read field AE_REFLHASH and verify type hash
         if (deserializer.TryReadFieldName("AE_REFLHASH")) {
-            u64 readHash = deserializer.Read<u64>();
-            ReflectionAssert(readHash == hash, EReflectionErrorCode::ObjectAndTypeMismatch,
-                FReflectionDumpData{});
+            u64                 readHash = deserializer.Read<u64>();
+            FReflectionDumpData mismatchDump;
+            mismatchDump.mTypeHash         = hash;
+            mismatchDump.mExpectedTypeHash = hash;
+            mismatchDump.mReadTypeHash     = readHash;
+            mismatchDump.mObjectPtr        = ptr;
+            ReflectionAssert(
+                readHash == hash, EReflectionErrorCode::ObjectAndTypeMismatch, mismatchDump);
         }
 
         // End object once
@@ -282,8 +335,11 @@ namespace AltinaEngine::Core::Reflection {
         auto                   classHash = object.GetTypeHash();
         TVector<FPropertyDesc> result;
 
+        FReflectionDumpData    dump;
+        dump.mTypeHash       = classHash;
+        dump.mObjectTypeHash = classHash;
         if (!ReflectionAssert(manager.mRegistry.HasKey(classHash),
-                EReflectionErrorCode::TypeUnregistered, FReflectionDumpData{})) [[unlikely]] {
+                EReflectionErrorCode::TypeUnregistered, dump)) [[unlikely]] {
             return result;
         }
 

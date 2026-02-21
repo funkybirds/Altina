@@ -22,8 +22,21 @@ namespace AltinaEngine::Core::Reflection {
     };
 
     struct FReflectionDumpData {
-        void*            mObjInfo;
-        FMetaMethodInfo* mMethodInfo;
+        const void*              mObjectPtr             = nullptr;
+        const FMetaTypeInfo*     mTypeInfo              = nullptr;
+        const FMetaTypeInfo*     mExpectedTypeInfo      = nullptr;
+        const FMetaPropertyInfo* mPropertyInfo          = nullptr;
+        const FMetaMethodInfo*   mMethodInfo            = nullptr;
+        FTypeMetaHash            mTypeHash              = 0;
+        FTypeMetaHash            mExpectedTypeHash      = 0;
+        FTypeMetaHash            mObjectTypeHash        = 0;
+        FTypeMetaHash            mPropertyHash          = 0;
+        FTypeMetaHash            mMethodHash            = 0;
+        FTypeMetaHash            mReadTypeHash          = 0;
+        usize                    mArgumentCount         = 0;
+        usize                    mExpectedArgumentCount = 0;
+        usize                    mArchiveOffset         = 0;
+        usize                    mArchiveSize           = 0;
     };
 
     [[noreturn]] AE_CORE_API void ReflectionAbort(

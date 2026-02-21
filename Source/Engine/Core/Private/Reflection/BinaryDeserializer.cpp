@@ -10,8 +10,10 @@ namespace AltinaEngine::Core::Reflection {
         }
 
         if (mPosition + size > mBuffer.Size()) {
-            ReflectionAssert(
-                false, EReflectionErrorCode::DeserializeCorruptedArchive, FReflectionDumpData{});
+            FReflectionDumpData dump;
+            dump.mArchiveOffset = mPosition;
+            dump.mArchiveSize   = mBuffer.Size();
+            ReflectionAssert(false, EReflectionErrorCode::DeserializeCorruptedArchive, dump);
             return;
         }
 

@@ -44,40 +44,77 @@ namespace AltinaEngine::Core::Reflection {
         }
 
         template <typename T, typename R, typename... Args>
-        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...), T& obj, TSpan<FObject> vec) -> R {
+        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...), T& obj, TSpan<FObject> vec,
+            const FMetaMethodInfo* methodMeta) -> R {
+            FReflectionDumpData dump;
+            dump.mObjectPtr             = &obj;
+            dump.mMethodInfo            = methodMeta;
+            dump.mArgumentCount         = vec.Size();
+            dump.mExpectedArgumentCount = sizeof...(Args);
+            if (methodMeta != nullptr) {
+                dump.mTypeInfo   = &methodMeta->GetClassTypeMetadata();
+                dump.mTypeHash   = methodMeta->GetClassTypeMetadata().GetHash();
+                dump.mMethodHash = methodMeta->GetHash();
+            }
             if (ReflectionAssert(vec.Size() == sizeof...(Args),
-                    EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
-                [[likely]] {
+                    EReflectionErrorCode::MismatchedArgumentNumber, dump)) [[likely]] {
                 return MemberFunctorInvokerWrapperImpl(f, obj, vec, TIndexSequenceFor<Args...>{});
             }
             Utility::CompilerHint::Unreachable();
         }
         template <typename T, typename R, typename... Args>
-        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) const, const T& obj, TSpan<FObject> vec)
-            -> R {
+        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) const, const T& obj, TSpan<FObject> vec,
+            const FMetaMethodInfo* methodMeta) -> R {
+            FReflectionDumpData dump;
+            dump.mObjectPtr             = &obj;
+            dump.mMethodInfo            = methodMeta;
+            dump.mArgumentCount         = vec.Size();
+            dump.mExpectedArgumentCount = sizeof...(Args);
+            if (methodMeta != nullptr) {
+                dump.mTypeInfo   = &methodMeta->GetClassTypeMetadata();
+                dump.mTypeHash   = methodMeta->GetClassTypeMetadata().GetHash();
+                dump.mMethodHash = methodMeta->GetHash();
+            }
             if (ReflectionAssert(vec.Size() == sizeof...(Args),
-                    EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
-                [[likely]] {
+                    EReflectionErrorCode::MismatchedArgumentNumber, dump)) [[likely]] {
                 return MemberFunctorInvokerWrapperImpl(f, obj, vec, TIndexSequenceFor<Args...>{});
             }
             Utility::CompilerHint::Unreachable();
         }
         template <typename T, typename R, typename... Args>
-        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) noexcept, T& obj, TSpan<FObject> vec)
-            -> R {
+        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) noexcept, T& obj, TSpan<FObject> vec,
+            const FMetaMethodInfo* methodMeta) -> R {
+            FReflectionDumpData dump;
+            dump.mObjectPtr             = &obj;
+            dump.mMethodInfo            = methodMeta;
+            dump.mArgumentCount         = vec.Size();
+            dump.mExpectedArgumentCount = sizeof...(Args);
+            if (methodMeta != nullptr) {
+                dump.mTypeInfo   = &methodMeta->GetClassTypeMetadata();
+                dump.mTypeHash   = methodMeta->GetClassTypeMetadata().GetHash();
+                dump.mMethodHash = methodMeta->GetHash();
+            }
             if (ReflectionAssert(vec.Size() == sizeof...(Args),
-                    EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
-                [[likely]] {
+                    EReflectionErrorCode::MismatchedArgumentNumber, dump)) [[likely]] {
                 return MemberFunctorInvokerWrapperImpl(f, obj, vec, TIndexSequenceFor<Args...>{});
             }
             Utility::CompilerHint::Unreachable();
         }
         template <typename T, typename R, typename... Args>
-        auto MemberFunctorInvokerWrapper(
-            R (T::*f)(Args...) const noexcept, const T& obj, TSpan<FObject> vec) -> R {
+        auto MemberFunctorInvokerWrapper(R (T::*f)(Args...) const noexcept, const T& obj,
+            TSpan<FObject> vec, const FMetaMethodInfo* methodMeta) -> R {
+            FReflectionDumpData dump;
+            dump.mObjectPtr             = &obj;
+            dump.mMethodInfo            = methodMeta;
+            dump.mArgumentCount         = vec.Size();
+            dump.mExpectedArgumentCount = sizeof...(Args);
+            if (methodMeta != nullptr) {
+                dump.mTypeInfo   = &methodMeta->GetClassTypeMetadata();
+                dump.mTypeHash   = methodMeta->GetClassTypeMetadata().GetHash();
+                dump.mMethodHash = methodMeta->GetHash();
+            }
             if (ReflectionAssert(vec.Size() == sizeof...(Args),
-                    EReflectionErrorCode::MismatchedArgumentNumber, FReflectionDumpData{}))
-                [[likely]] {
+                    EReflectionErrorCode::MismatchedArgumentNumber, dump)) [[likely]] {
                 return MemberFunctorInvokerWrapperImpl(f, obj, vec, TIndexSequenceFor<Args...>{});
             }
             Utility::CompilerHint::Unreachable();
@@ -105,11 +142,13 @@ namespace AltinaEngine::Core::Reflection {
             static auto GetInvoker() -> TFnMemberFunctionInvoker {
                 return [](FObject& classObject, TSpan<FObject> args) -> FObject {
                     auto& obj = classObject.As<typename TSuper::TClassType>();
+                    static const FMetaMethodInfo kMethodMeta = FMetaMethodInfo::Create<Member>();
                     if constexpr (CVoid<typename TSuper::TReturnType>) {
-                        MemberFunctorInvokerWrapper(Member, obj, args);
+                        MemberFunctorInvokerWrapper(Member, obj, args, &kMethodMeta);
                         return FObject::Create<void>();
                     } else {
-                        return FObject::CreateClone(MemberFunctorInvokerWrapper(Member, obj, args));
+                        return FObject::CreateClone(
+                            MemberFunctorInvokerWrapper(Member, obj, args, &kMethodMeta));
                     }
                 };
             };

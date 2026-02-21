@@ -22,13 +22,11 @@
 #include "Rendering/BasicDeferredRenderer.h"
 #include "RenderAsset/MeshAssetConversion.h"
 #include "RenderAsset/MaterialShaderAssetLoader.h"
+#include "Reflection/JsonSerializer.h"
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "Rhi/RhiInit.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
-
-#include <filesystem>
-#include <string>
 
 using namespace AltinaEngine;
 
@@ -148,6 +146,12 @@ namespace {
             if (materialComponent.IsValid()) {
                 materialComponent.Get().SetMaterialTemplate(0U, materialHandle);
                 materialComponent.Get().SetMaterialParameters(0U, materialParams);
+            }
+
+            {
+                Core::Reflection::FJsonSerializer serializer;
+                world->SerializeJson(serializer);
+                LogInfo(TEXT("World JSON: {}"), serializer.GetString().CStr());
             }
 
             return true;

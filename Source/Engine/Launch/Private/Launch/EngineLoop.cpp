@@ -2,6 +2,7 @@
 
 #include "Input/InputMessageHandler.h"
 #include "Input/InputSystem.h"
+#include "Engine/EngineReflection.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
 #include "Engine/Runtime/SceneBatching.h"
@@ -26,6 +27,7 @@
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiStructs.h"
 #include "Rhi/Command/RhiCmdContextAdapter.h"
+#include "Reflection/Reflection.h"
 
 #if AE_PLATFORM_WIN
     #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
@@ -65,6 +67,14 @@ using AltinaEngine::Core::Logging::LogWarningCat;
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
     namespace {
+        void EnsureEngineReflectionRegistered() {
+            static bool sRegistered = false;
+            if (!sRegistered) {
+                Engine::RegisterEngineReflection();
+                sRegistered = true;
+            }
+        }
+
         auto GetRenderThreadLagFrames() noexcept -> u32 {
             int value = RenderCore::gRenderingThreadLagFrames.Get();
             if (value < 0)
@@ -245,6 +255,8 @@ namespace AltinaEngine::Launch {
         if (mApplication) {
             return true;
         }
+
+        EnsureEngineReflectionRegistered();
 
         if (!mInputSystem) {
             mInputSystem = MakeUnique<Input::FInputSystem>();

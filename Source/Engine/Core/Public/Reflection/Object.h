@@ -58,8 +58,12 @@ namespace AltinaEngine::Core::Reflection {
 
         // Casting
         template <CDecayed T> auto As() -> T& {
-            ReflectionAssert(
-                mPtr != nullptr, EReflectionErrorCode::DereferenceNullptr, FReflectionDumpData{});
+            FReflectionDumpData nullDump;
+            nullDump.mObjectPtr      = mPtr;
+            nullDump.mTypeInfo       = &mMetadata;
+            nullDump.mTypeHash       = mMetadata.GetHash();
+            nullDump.mObjectTypeHash = mMetadata.GetHash();
+            ReflectionAssert(mPtr != nullptr, EReflectionErrorCode::DereferenceNullptr, nullDump);
             if (mMetadata.GetTypeInfo() == typeid(T) && mPtr) [[likely]] {
                 return *static_cast<T*>(mPtr);
             }
@@ -67,12 +71,24 @@ namespace AltinaEngine::Core::Reflection {
                     mPtr, mMetadata.GetHash(), FMetaTypeInfo::Create<T>().GetHash())) {
                 return *static_cast<T*>(casted);
             }
-            ReflectionAssert(false, EReflectionErrorCode::CorruptedAnyCast, FReflectionDumpData{});
+            FMetaTypeInfo       expected = FMetaTypeInfo::Create<T>();
+            FReflectionDumpData castDump;
+            castDump.mObjectPtr        = mPtr;
+            castDump.mTypeInfo         = &mMetadata;
+            castDump.mExpectedTypeInfo = &expected;
+            castDump.mTypeHash         = mMetadata.GetHash();
+            castDump.mExpectedTypeHash = expected.GetHash();
+            castDump.mObjectTypeHash   = mMetadata.GetHash();
+            ReflectionAssert(false, EReflectionErrorCode::CorruptedAnyCast, castDump);
             Utility::CompilerHint::Unreachable();
         }
         template <CDecayed T> auto As() const -> const T& {
-            ReflectionAssert(
-                mPtr != nullptr, EReflectionErrorCode::DereferenceNullptr, FReflectionDumpData{});
+            FReflectionDumpData nullDump;
+            nullDump.mObjectPtr      = mPtr;
+            nullDump.mTypeInfo       = &mMetadata;
+            nullDump.mTypeHash       = mMetadata.GetHash();
+            nullDump.mObjectTypeHash = mMetadata.GetHash();
+            ReflectionAssert(mPtr != nullptr, EReflectionErrorCode::DereferenceNullptr, nullDump);
             if (mMetadata.GetTypeInfo() == typeid(T) && mPtr) [[likely]] {
                 return *static_cast<const T*>(mPtr);
             }
@@ -80,7 +96,15 @@ namespace AltinaEngine::Core::Reflection {
                     mPtr, mMetadata.GetHash(), FMetaTypeInfo::Create<T>().GetHash())) {
                 return *static_cast<const T*>(casted);
             }
-            ReflectionAssert(false, EReflectionErrorCode::CorruptedAnyCast, FReflectionDumpData{});
+            FMetaTypeInfo       expected = FMetaTypeInfo::Create<T>();
+            FReflectionDumpData castDump;
+            castDump.mObjectPtr        = mPtr;
+            castDump.mTypeInfo         = &mMetadata;
+            castDump.mExpectedTypeInfo = &expected;
+            castDump.mTypeHash         = mMetadata.GetHash();
+            castDump.mExpectedTypeHash = expected.GetHash();
+            castDump.mObjectTypeHash   = mMetadata.GetHash();
+            ReflectionAssert(false, EReflectionErrorCode::CorruptedAnyCast, castDump);
             Utility::CompilerHint::Unreachable();
         }
         // Metadata
@@ -125,17 +149,26 @@ namespace AltinaEngine::Core::Reflection {
             mMetadata = FMetaTypeInfo::Create<T>();
         }
         void ConstructFromMetadataCopyCtor(const FObject& rhs) {
+            FReflectionDumpData dump;
+            dump.mObjectPtr      = rhs.mPtr;
+            dump.mTypeInfo       = &mMetadata;
+            dump.mTypeHash       = mMetadata.GetHash();
+            dump.mObjectTypeHash = mMetadata.GetHash();
             if (ReflectionAssert(mMetadata.IsCopyConstructible(),
-                    EReflectionErrorCode::TypeNotCopyConstructible, FReflectionDumpData{}))
-                [[likely]] {
+                    EReflectionErrorCode::TypeNotCopyConstructible, dump)) [[likely]] {
                 mPtr = mMetadata.CallCopyConstructor(rhs.mPtr);
             }
         }
         void DestructFromMetadata() const {
             if (mPtr == nullptr)
                 return;
+            FReflectionDumpData dump;
+            dump.mObjectPtr      = mPtr;
+            dump.mTypeInfo       = &mMetadata;
+            dump.mTypeHash       = mMetadata.GetHash();
+            dump.mObjectTypeHash = mMetadata.GetHash();
             if (ReflectionAssert(mMetadata.IsDestructible(),
-                    EReflectionErrorCode::TypeNotDestructible, FReflectionDumpData{})) [[likely]] {
+                    EReflectionErrorCode::TypeNotDestructible, dump)) [[likely]] {
                 mMetadata.CallDestructor(mPtr);
             }
         }

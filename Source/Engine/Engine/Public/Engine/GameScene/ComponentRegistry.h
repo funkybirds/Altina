@@ -5,6 +5,7 @@
 #include "Engine/GameScene/Ids.h"
 #include "Container/HashMap.h"
 #include "Reflection/Serializer.h"
+#include "Reflection/Serialization.h"
 #include "Types/Traits.h"
 
 using AltinaEngine::CClassBaseOf;
@@ -64,6 +65,12 @@ namespace AltinaEngine::GameScene {
         template <typename T>
         auto CreateComponentThunk(FComponentCreateContext& ctx) -> FComponentId;
         template <typename T> void DestroyComponentThunk(FWorld& world, FComponentId id);
+        template <typename T>
+        void SerializeComponentThunk(
+            FWorld& world, FComponentId id, Core::Reflection::ISerializer& s);
+        template <typename T>
+        void DeserializeComponentThunk(
+            FWorld& world, FComponentId id, Core::Reflection::IDeserializer& d);
     } // namespace Detail
 
     template <typename T>
@@ -71,9 +78,11 @@ namespace AltinaEngine::GameScene {
         static_assert(CClassBaseOf<FComponent, T>, "Component types must derive from FComponent.");
 
         FComponentTypeEntry entry{};
-        entry.TypeHash = GetComponentTypeHash<T>();
-        entry.Create   = &Detail::CreateComponentThunk<T>;
-        entry.Destroy  = &Detail::DestroyComponentThunk<T>;
+        entry.TypeHash    = GetComponentTypeHash<T>();
+        entry.Create      = &Detail::CreateComponentThunk<T>;
+        entry.Destroy     = &Detail::DestroyComponentThunk<T>;
+        entry.Serialize   = &Detail::SerializeComponentThunk<T>;
+        entry.Deserialize = &Detail::DeserializeComponentThunk<T>;
         return entry;
     }
 

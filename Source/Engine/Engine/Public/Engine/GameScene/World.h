@@ -9,6 +9,7 @@
 #include "Container/SmartPtr.h"
 #include "Container/Vector.h"
 #include "Memory/ObjectPool.h"
+#include "Reflection/Serialization.h"
 #include "Threading/Atomic.h"
 #include "Types/Traits.h"
 
@@ -84,6 +85,7 @@ namespace AltinaEngine::GameScene {
             -> const TVector<FComponentId>&;
 
         void        Serialize(Core::Reflection::ISerializer& serializer) const;
+        void        SerializeJson(Core::Reflection::ISerializer& serializer) const;
         static auto Deserialize(Core::Reflection::IDeserializer& deserializer) -> TOwner<FWorld>;
 
     private:
@@ -311,6 +313,20 @@ namespace AltinaEngine::GameScene {
 
         template <typename T> void DestroyComponentThunk(FWorld& world, FComponentId id) {
             world.DestroyComponent(id);
+        }
+
+        template <typename T>
+        void SerializeComponentThunk(
+            FWorld& world, FComponentId id, Core::Reflection::ISerializer& s) {
+            auto& component = world.ResolveComponent<T>(id);
+            Core::Reflection::SerializeInvoker(component, s);
+        }
+
+        template <typename T>
+        void DeserializeComponentThunk(
+            FWorld& world, FComponentId id, Core::Reflection::IDeserializer& d) {
+            auto& component = world.ResolveComponent<T>(id);
+            Core::Reflection::DeserializeInvokerImpl(&component, d);
         }
     } // namespace Detail
 

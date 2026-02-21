@@ -258,106 +258,67 @@ namespace AltinaEngine::RenderCore {
         }
     }
 
+    void FMaterial::SetSchema(TShared<FMaterialSchema> schema) noexcept { mSchema = Move(schema); }
+
     auto FMaterial::SetScalar(FMaterialParamId id, f32 value) -> bool {
-        if (id == 0U) {
+        if (id == 0U || !IsSchemaTypeMatch(id, EMaterialParamType::Scalar)) {
             return false;
         }
 
-        bool changed = false;
-        for (auto& param : mScalars) {
-            if (param.NameHash == id) {
-                if (param.Value != value) {
-                    param.Value = value;
-                    changed     = true;
-                }
-                if (changed && IsInitialized()) {
-                    mDirtyCBuffer = true;
-                    UpdateResource();
-                }
-                return changed;
-            }
+        const bool changed = mParameters.SetScalar(id, value);
+        if (changed) {
+            mDirtyCBuffer = true;
         }
-
-        mScalars.PushBack({ id, value });
-        mDirtyCBuffer = true;
         if (IsInitialized()) {
             UpdateResource();
         }
-        return true;
+        return changed;
     }
 
     auto FMaterial::SetVector(FMaterialParamId id, const Math::FVector4f& value) -> bool {
-        if (id == 0U) {
+        if (id == 0U || !IsSchemaTypeMatch(id, EMaterialParamType::Vector)) {
             return false;
         }
 
-        bool changed = false;
-        for (auto& param : mVectors) {
-            if (param.NameHash == id) {
-                bool differs = false;
-                for (u32 i = 0U; i < 4U; ++i) {
-                    if (param.Value.mComponents[i] != value.mComponents[i]) {
-                        differs = true;
-                        break;
-                    }
-                }
-                if (differs) {
-                    param.Value = value;
-                    changed     = true;
-                }
-                if (changed && IsInitialized()) {
-                    mDirtyCBuffer = true;
-                    UpdateResource();
-                }
-                return changed;
-            }
+        const bool changed = mParameters.SetVector(id, value);
+        if (changed) {
+            mDirtyCBuffer = true;
         }
-
-        mVectors.PushBack({ id, value });
-        mDirtyCBuffer = true;
         if (IsInitialized()) {
             UpdateResource();
         }
-        return true;
+        return changed;
+    }
+
+    auto FMaterial::SetMatrix(FMaterialParamId id, const Math::FMatrix4x4f& value) -> bool {
+        if (id == 0U || !IsSchemaTypeMatch(id, EMaterialParamType::Matrix)) {
+            return false;
+        }
+
+        const bool changed = mParameters.SetMatrix(id, value);
+        if (changed) {
+            mDirtyCBuffer = true;
+        }
+        if (IsInitialized()) {
+            UpdateResource();
+        }
+        return changed;
     }
 
     auto FMaterial::SetTexture(FMaterialParamId id, Rhi::FRhiShaderResourceViewRef srv,
         Rhi::FRhiSamplerRef sampler, u32 samplerFlags) -> bool {
-        if (id == 0U) {
+        if (id == 0U || !IsSchemaTypeMatch(id, EMaterialParamType::Texture)) {
             return false;
         }
 
-        bool changed = false;
-        for (auto& param : mTextures) {
-            if (param.NameHash == id) {
-                const bool sameSrv     = (param.SRV.Get() == srv.Get());
-                const bool sameSampler = (param.Sampler.Get() == sampler.Get());
-                if (!sameSrv || !sameSampler || param.SamplerFlags != samplerFlags) {
-                    param.SRV          = Move(srv);
-                    param.Sampler      = Move(sampler);
-                    param.SamplerFlags = samplerFlags;
-                    changed            = true;
-                }
-                if (changed && IsInitialized()) {
-                    mDirtyBindings = true;
-                    UpdateResource();
-                }
-                return changed;
-            }
+        const bool changed = mParameters.SetTexture(id, Move(srv), Move(sampler), samplerFlags);
+        if (changed) {
+            mDirtyBindings = true;
         }
-
-        FMaterialTextureParam param{};
-        param.NameHash     = id;
-        param.SRV          = Move(srv);
-        param.Sampler      = Move(sampler);
-        param.SamplerFlags = samplerFlags;
-        mTextures.PushBack(Move(param));
-
-        mDirtyBindings = true;
         if (IsInitialized()) {
             UpdateResource();
         }
-        return true;
+        return changed;
     }
 
     auto FMaterial::FindPassDesc(EMaterialPass pass) const noexcept -> const FMaterialPassDesc* {
@@ -438,14 +399,16 @@ namespace AltinaEngine::RenderCore {
         mDirtyBindings = false;
     }
 
-    auto FMaterial::FindTextureParam(FMaterialParamId id) const noexcept
-        -> const FMaterialTextureParam* {
-        for (const auto& param : mTextures) {
-            if (param.NameHash == id) {
-                return &param;
-            }
+    auto FMaterial::IsSchemaTypeMatch(FMaterialParamId id, EMaterialParamType type) const noexcept
+        -> bool {
+        if (!mSchema) {
+            return true;
         }
-        return nullptr;
+        const auto* desc = mSchema->Find(id);
+        if (!desc) {
+            return false;
+        }
+        return desc->Type == type;
     }
 
     void FMaterial::UpdateCBuffer(
@@ -500,11 +463,14 @@ namespace AltinaEngine::RenderCore {
             Memcpy(mCBufferData.Data() + prop->mOffset, data, copySize);
         };
 
-        for (const auto& scalar : mScalars) {
+        for (const auto& scalar : mParameters.GetScalars()) {
             applyParam(scalar.NameHash, &scalar.Value, sizeof(scalar.Value));
         }
-        for (const auto& vector : mVectors) {
+        for (const auto& vector : mParameters.GetVectors()) {
             applyParam(vector.NameHash, vector.Value.mComponents, sizeof(vector.Value));
+        }
+        for (const auto& matrix : mParameters.GetMatrices()) {
+            applyParam(matrix.NameHash, &matrix.Value.mElements[0][0], sizeof(matrix.Value));
         }
 
         auto lock = mCBuffer->Lock(
@@ -610,7 +576,8 @@ namespace AltinaEngine::RenderCore {
             for (usize i = 0U; i < texCount; ++i) {
                 const auto nameHash =
                     (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i] : 0U;
-                const auto* param = (nameHash != 0U) ? FindTextureParam(nameHash) : nullptr;
+                const auto* param =
+                    (nameHash != 0U) ? mParameters.FindTextureParam(nameHash) : nullptr;
 
                 Rhi::FRhiBindGroupEntry texEntry{};
                 texEntry.mBinding = layout.TextureBindings[i];

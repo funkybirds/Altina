@@ -33,17 +33,19 @@ namespace {
 TEST_CASE("GameScene.World.GameObjectId.GenerationAndReuse") {
     FWorld              world;
 
-    const FGameObjectId first = world.CreateGameObject();
-    REQUIRE(first.IsValid());
+    const auto firstView = world.CreateGameObject();
+    REQUIRE(firstView.IsValid());
+    const FGameObjectId first = firstView.GetId();
 
     const u32 firstIndex = first.Index;
     const u32 firstGen   = first.Generation;
 
-    world.DestroyGameObject(first);
+    world.DestroyGameObject(firstView);
     REQUIRE(!world.IsAlive(first));
 
-    const FGameObjectId second = world.CreateGameObject();
-    REQUIRE(second.IsValid());
+    const auto          secondView = world.CreateGameObject();
+    REQUIRE(secondView.IsValid());
+    const FGameObjectId second = secondView.GetId();
     REQUIRE_EQ(second.Index, firstIndex);
     REQUIRE(second.Generation != firstGen);
     REQUIRE_EQ(second.WorldId, world.GetWorldId());
@@ -59,11 +61,11 @@ TEST_CASE("GameScene.World.ComponentId.GenerationAndReuse") {
     ResetCounters();
 
     FWorld world;
-    auto   objectId = world.CreateGameObject();
-    REQUIRE(objectId.IsValid());
+    auto objectView = world.CreateGameObject();
+    REQUIRE(objectView.IsValid());
 
-    auto view = world.Object(objectId);
-    auto comp = view.Add<FTestComponent>();
+    const auto objectId = objectView.GetId();
+    auto       comp     = objectView.AddComponent<FTestComponent>();
     REQUIRE(comp.IsValid());
 
     const FComponentId first = comp.GetId();
@@ -77,7 +79,8 @@ TEST_CASE("GameScene.World.ComponentId.GenerationAndReuse") {
     REQUIRE_EQ(FTestComponent::sDestroyCount, 1);
 
     const FComponentTypeHash typeHash = GetComponentTypeHash<FTestComponent>();
-    const FComponentId       second   = world.Object(objectId).Add<FTestComponent>().GetId();
+    const FComponentId       second   =
+        world.Object(objectId).AddComponent<FTestComponent>().GetId();
     REQUIRE(second.IsValid());
     REQUIRE_EQ(second.Type, typeHash);
     REQUIRE_EQ(second.Index, first.Index);
@@ -89,17 +92,17 @@ TEST_CASE("GameScene.World.DestroyGameObjectDestroysComponents") {
     ResetCounters();
 
     FWorld world;
-    auto   objectId = world.CreateGameObject();
-    REQUIRE(objectId.IsValid());
+    auto objectView = world.CreateGameObject();
+    REQUIRE(objectView.IsValid());
 
-    auto view = world.Object(objectId);
-    auto comp = view.Add<FTestComponent>();
+    const auto objectId = objectView.GetId();
+    auto       comp     = objectView.AddComponent<FTestComponent>();
     REQUIRE(comp.IsValid());
 
     const FComponentId compId = comp.GetId();
     REQUIRE(world.IsAlive(compId));
 
-    world.DestroyGameObject(objectId);
+    world.DestroyGameObject(objectView);
     REQUIRE(!world.IsAlive(objectId));
     REQUIRE(!world.IsAlive(compId));
     REQUIRE_EQ(FTestComponent::sDestroyCount, 1);

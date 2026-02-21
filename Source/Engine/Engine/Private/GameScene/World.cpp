@@ -32,7 +32,7 @@ namespace AltinaEngine::GameScene {
             id.Index      = index;
             id.Generation = mGameObjects[index].Generation;
             id.WorldId    = mWorldId;
-            DestroyGameObject(id);
+            DestroyGameObjectById(id);
         }
 
         for (auto& entry : mComponentStorage) {
@@ -46,7 +46,12 @@ namespace AltinaEngine::GameScene {
         mFreeGameObjects.Clear();
     }
 
-    auto FWorld::CreateGameObject(FStringView name) -> FGameObjectId {
+    auto FWorld::CreateGameObject(FStringView name) -> FGameObjectView {
+        const auto id = CreateGameObjectId(name);
+        return Object(id);
+    }
+
+    auto FWorld::CreateGameObjectId(FStringView name) -> FGameObjectId {
         u32 index = 0;
         if (!mFreeGameObjects.IsEmpty()) {
             index = mFreeGameObjects.Back();
@@ -82,7 +87,11 @@ namespace AltinaEngine::GameScene {
         return id;
     }
 
-    void FWorld::DestroyGameObject(FGameObjectId id) {
+    void FWorld::DestroyGameObject(FGameObjectView object) {
+        DestroyGameObjectById(object.GetId());
+    }
+
+    void FWorld::DestroyGameObjectById(FGameObjectId id) {
         auto* obj = ResolveGameObject(id);
         if (obj == nullptr) {
             return;

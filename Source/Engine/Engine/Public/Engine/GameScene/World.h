@@ -39,8 +39,8 @@ namespace AltinaEngine::GameScene {
 
         [[nodiscard]] auto GetWorldId() const noexcept -> u32 { return mWorldId; }
 
-        [[nodiscard]] auto CreateGameObject(FStringView name = {}) -> FGameObjectId;
-        void               DestroyGameObject(FGameObjectId id);
+        [[nodiscard]] auto CreateGameObject(FStringView name = {}) -> FGameObjectView;
+        void               DestroyGameObject(FGameObjectView object);
         [[nodiscard]] auto IsAlive(FGameObjectId id) const noexcept -> bool;
 
         template <typename T>
@@ -55,10 +55,6 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto GetComponent(FGameObjectId owner) const -> FComponentId;
         [[nodiscard]] auto GetAllComponents(FGameObjectId owner) const -> TVector<FComponentId>;
 
-        /**
-         * @brief Resolve a component reference by ID.
-         * @note Caller must ensure the ID is valid and matches the requested type.
-         */
         template <typename T> [[nodiscard]] auto ResolveComponent(FComponentId id) -> T&;
         template <typename T>
         [[nodiscard]] auto ResolveComponent(FComponentId id) const -> const T&;
@@ -84,6 +80,9 @@ namespace AltinaEngine::GameScene {
             -> const TVector<FComponentId>&;
 
     private:
+        [[nodiscard]] auto CreateGameObjectId(FStringView name = {}) -> FGameObjectId;
+        void               DestroyGameObjectById(FGameObjectId id);
+
         struct FGameObjectSlot {
             Core::Memory::TObjectPoolHandle<FGameObject> Handle{};
             u32                                          Generation = 1;
@@ -394,7 +393,7 @@ namespace AltinaEngine::GameScene {
     }
 
     // FGameObjectView inline methods
-    template <typename T> inline auto FGameObjectView::Add() -> TComponentRef<T> {
+    template <typename T> inline auto FGameObjectView::AddComponent() -> TComponentRef<T> {
         if (mWorld == nullptr) {
             return {};
         }
@@ -402,11 +401,11 @@ namespace AltinaEngine::GameScene {
         return TComponentRef<T>(mWorld, id);
     }
 
-    template <typename T> inline auto FGameObjectView::Has() const -> bool {
+    template <typename T> inline auto FGameObjectView::HasComponent() const -> bool {
         return mWorld != nullptr && mWorld->HasComponent<T>(mId);
     }
 
-    template <typename T> inline auto FGameObjectView::Get() const -> TComponentRef<T> {
+    template <typename T> inline auto FGameObjectView::GetComponent() const -> TComponentRef<T> {
         if (mWorld == nullptr) {
             return {};
         }
@@ -414,7 +413,7 @@ namespace AltinaEngine::GameScene {
         return TComponentRef<T>(mWorld, id);
     }
 
-    template <typename T> inline void FGameObjectView::Remove() {
+    template <typename T> inline void FGameObjectView::RemoveComponent() {
         if (mWorld == nullptr) {
             return;
         }

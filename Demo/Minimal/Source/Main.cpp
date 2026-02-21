@@ -4,11 +4,8 @@
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
 #include "Asset/MaterialAsset.h"
-#include "Asset/MaterialLoader.h"
 #include "Asset/MeshAsset.h"
-#include "Asset/MeshLoader.h"
 #include "Asset/ShaderAsset.h"
-#include "Asset/ShaderLoader.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
@@ -54,41 +51,6 @@ namespace {
         const std::string narrow = path.string();
         return FString(narrow.c_str(), static_cast<usize>(narrow.size()));
 #endif
-    }
-
-    auto FindAssetRegistryPath() -> std::filesystem::path {
-        const auto baseDir = Core::Platform::GetExecutableDir();
-        if (baseDir.IsEmptyString()) {
-            return {};
-        }
-        FString candidate = baseDir;
-        candidate.Append(TEXT("/Assets/Registry/AssetRegistry.json"));
-        if (!Core::Platform::IsPathExist(candidate)) {
-            return {};
-        }
-        auto path = std::filesystem::path(candidate.CStr());
-        return path;
-    }
-
-    auto LoadDemoAssetRegistry(Launch::FEngineLoop& engineLoop) -> bool {
-        const auto registryPath = FindAssetRegistryPath();
-        if (registryPath.empty()) {
-            LogWarning(TEXT("Demo asset registry not found."));
-            return false;
-        }
-        if (!engineLoop.GetAssetRegistry().LoadFromJsonFile(ToFString(registryPath))) {
-            LogWarning(TEXT("Demo asset registry load failed."));
-            return false;
-        }
-
-        const auto      assetRoot = registryPath.parent_path().parent_path();
-        std::error_code ec;
-        std::filesystem::current_path(assetRoot, ec);
-        if (ec) {
-            const auto rootText = ToFString(assetRoot);
-            LogWarning(TEXT("Failed to set asset root to {}."), rootText.ToView());
-        }
-        return true;
     }
 
     auto FindPositionAttribute(const Asset::TVector<Asset::FMeshVertexAttributeDesc>& attributes,
@@ -599,19 +561,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (!LoadDemoAssetRegistry(engineLoop)) {
-        engineLoop.Exit();
-        return 1;
-    }
-
-    Asset::FAssetManager   assetManager;
-    Asset::FMeshLoader     meshLoader;
-    Asset::FMaterialLoader materialLoader;
-    Asset::FShaderLoader   shaderLoader;
-    assetManager.SetRegistry(&engineLoop.GetAssetRegistry());
-    assetManager.RegisterLoader(&meshLoader);
-    assetManager.RegisterLoader(&materialLoader);
-    assetManager.RegisterLoader(&shaderLoader);
+    auto& assetManager = engineLoop.GetAssetManager();
 
     const auto meshHandle = engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/triangle"));
     const auto materialHandle =

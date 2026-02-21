@@ -16,6 +16,7 @@
 
 #include "Console/ConsoleVariable.h"
 #include "Logging/Log.h"
+#include "Platform/PlatformFileSystem.h"
 #include "Threading/RenderingThread.h"
 #include "FrameGraph/FrameGraph.h"
 #include "Rhi/RhiInit.h"
@@ -357,6 +358,10 @@ namespace AltinaEngine::Launch {
             mAssetManager.RegisterLoader(&mTexture2DLoader);
             GameScene::FScriptComponent::SetAssetManager(&mAssetManager);
             mAssetReady = true;
+        }
+
+        if (!LoadDemoAssetRegistry()) {
+            LogWarning(TEXT("Demo asset registry not loaded."));
         }
 
 #if AE_PLATFORM_WIN
@@ -705,6 +710,41 @@ namespace AltinaEngine::Launch {
 
     auto FEngineLoop::GetAssetRegistry() const noexcept -> const Asset::FAssetRegistry& {
         return mAssetRegistry;
+    }
+
+    auto FEngineLoop::GetAssetManager() noexcept -> Asset::FAssetManager& {
+        return mAssetManager;
+    }
+
+    auto FEngineLoop::GetAssetManager() const noexcept -> const Asset::FAssetManager& {
+        return mAssetManager;
+    }
+
+    auto FEngineLoop::LoadDemoAssetRegistry() -> bool {
+        const auto baseDir = Core::Platform::GetExecutableDir();
+        if (baseDir.IsEmptyString()) {
+            return false;
+        }
+
+        Container::FString registryPath = baseDir;
+        registryPath.Append(TEXT("/Assets/Registry/AssetRegistry.json"));
+        if (!Core::Platform::IsPathExist(registryPath)) {
+            return false;
+        }
+
+        if (!mAssetRegistry.LoadFromJsonFile(registryPath)) {
+            return false;
+        }
+
+        const auto assetRoot =
+            std::filesystem::path(registryPath.CStr()).parent_path().parent_path();
+        std::error_code ec;
+        std::filesystem::current_path(assetRoot, ec);
+        if (ec) {
+            const auto rootText = ToFString(assetRoot);
+            LogWarning(TEXT("Failed to set asset root to {}."), rootText.ToView());
+        }
+        return true;
     }
 
     void FEngineLoop::FlushRenderFrames() {

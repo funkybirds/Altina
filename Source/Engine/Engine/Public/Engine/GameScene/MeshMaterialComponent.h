@@ -7,6 +7,8 @@
 #include "Container/Function.h"
 #include "Container/Vector.h"
 #include "Types/Traits.h"
+#include "Reflection/ReflectionAnnotations.h"
+#include "Reflection/ReflectionFwd.h"
 
 namespace AltinaEngine::RenderCore {
     class FMaterial;
@@ -22,7 +24,7 @@ namespace AltinaEngine::GameScene {
     /**
      * @brief Component holding mesh material bindings.
      */
-    class AE_ENGINE_API FMeshMaterialComponent : public FComponent {
+    class ACLASS() AE_ENGINE_API FMeshMaterialComponent : public FComponent {
     public:
         struct FMaterialSlot {
             Asset::FAssetHandle                Template;
@@ -87,6 +89,11 @@ namespace AltinaEngine::GameScene {
         static FAssetToRenderMaterialConverter AssetToRenderMaterialConverter;
 
     private:
+        template <auto Member>
+        friend struct AltinaEngine::Core::Reflection::Detail::TAutoMemberAccessor;
+
+    public:
+        APROPERTY()
         TVector<FMaterialSlot> mMaterials{};
     };
 } // namespace AltinaEngine::GameScene

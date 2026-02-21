@@ -84,9 +84,9 @@ namespace AltinaEngine::Core::Reflection {
         }
 
         // Accessors
-        template <auto Member>
-            requires CMemberPointer<decltype(Member)>
-        struct TAutoMemberAccessor : TMemberType<decltype(Member)> {
+        template <auto Member> struct TAutoMemberAccessor : TMemberType<decltype(Member)> {
+            static_assert(
+                CMemberPointer<decltype(Member)>, "TAutoMemberAccessor requires a member pointer.");
             using TSuper = TMemberType<decltype(Member)>;
             static auto Get(TSuper::TClassType& object) -> TSuper::TBaseType& {
                 return object.*Member;

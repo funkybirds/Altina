@@ -6,6 +6,8 @@
 #include "Container/StringView.h"
 #include "Asset/AssetTypes.h"
 #include "Scripting/ManagedInterop.h"
+#include "Reflection/ReflectionAnnotations.h"
+#include "Reflection/ReflectionFwd.h"
 
 namespace AltinaEngine::Asset {
     class FAssetManager;
@@ -13,7 +15,7 @@ namespace AltinaEngine::Asset {
 
 namespace AltinaEngine::GameScene {
 
-    class AE_ENGINE_API FScriptComponent final : public FComponent {
+    class ACLASS() AE_ENGINE_API FScriptComponent final : public FComponent {
     public:
         FScriptComponent() = default;
 
@@ -35,13 +37,23 @@ namespace AltinaEngine::GameScene {
         void                      Tick(float dt) override;
 
     private:
-        auto                              TryCreateInstance() -> bool;
-        auto                              RefreshFromAsset() -> bool;
-        void                              EnsureOnCreateInvoked();
+        template <auto Member>
+        friend struct AltinaEngine::Core::Reflection::Detail::TAutoMemberAccessor;
 
-        Core::Container::FNativeString    mAssemblyPath{};
-        Core::Container::FNativeString    mTypeName{};
+        auto TryCreateInstance() -> bool;
+        auto RefreshFromAsset() -> bool;
+        void EnsureOnCreateInvoked();
+
+    public:
+        APROPERTY()
+        Core::Container::FNativeString mAssemblyPath{};
+
+        APROPERTY()
+        Core::Container::FNativeString mTypeName{};
+
+        APROPERTY()
         AltinaEngine::Asset::FAssetHandle mScriptAsset{};
+
         u64                               mManagedHandle        = 0;
         bool                              mCreatedCalled        = false;
         bool                              mOnCreateInvoked      = false;

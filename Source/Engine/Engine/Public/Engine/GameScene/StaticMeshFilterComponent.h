@@ -4,6 +4,8 @@
 #include "Engine/GameScene/Component.h"
 #include "Geometry/StaticMeshData.h"
 #include "Types/Traits.h"
+#include "Reflection/ReflectionAnnotations.h"
+#include "Reflection/ReflectionFwd.h"
 
 namespace AltinaEngine::GameScene {
     namespace Geometry = RenderCore::Geometry;
@@ -11,7 +13,7 @@ namespace AltinaEngine::GameScene {
     /**
      * @brief Component holding static mesh render data.
      */
-    class AE_ENGINE_API FStaticMeshFilterComponent : public FComponent {
+    class ACLASS() AE_ENGINE_API FStaticMeshFilterComponent : public FComponent {
     public:
         [[nodiscard]] auto GetStaticMesh() noexcept -> Geometry::FStaticMeshData& {
             return mStaticMesh;
@@ -22,6 +24,11 @@ namespace AltinaEngine::GameScene {
         void SetStaticMesh(Geometry::FStaticMeshData&& mesh) noexcept { mStaticMesh = Move(mesh); }
 
     private:
+        template <auto Member>
+        friend struct AltinaEngine::Core::Reflection::Detail::TAutoMemberAccessor;
+
+    public:
+        APROPERTY()
         Geometry::FStaticMeshData mStaticMesh{};
     };
 } // namespace AltinaEngine::GameScene

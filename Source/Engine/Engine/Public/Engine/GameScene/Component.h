@@ -2,6 +2,8 @@
 
 #include "Engine/EngineAPI.h"
 #include "Engine/GameScene/Ids.h"
+#include "Reflection/ReflectionAnnotations.h"
+#include "Reflection/ReflectionFwd.h"
 
 namespace AltinaEngine::GameScene {
     class FWorld;
@@ -9,7 +11,7 @@ namespace AltinaEngine::GameScene {
     /**
      * @brief Base class for scene components.
      */
-    class AE_ENGINE_API FComponent {
+    class ACLASS(Abstract) AE_ENGINE_API FComponent {
     public:
         virtual ~FComponent() = default;
 
@@ -30,6 +32,8 @@ namespace AltinaEngine::GameScene {
 
     private:
         friend class FWorld;
+        template <auto Member>
+        friend struct AltinaEngine::Core::Reflection::Detail::TAutoMemberAccessor;
 
         void Initialize(FWorld* world, FComponentId id, FGameObjectId owner) noexcept {
             mWorld = world;
@@ -37,9 +41,16 @@ namespace AltinaEngine::GameScene {
             mOwner = owner;
         }
 
-        FComponentId  mId{};
+        FWorld* mWorld = nullptr;
+
+    public:
+        APROPERTY()
+        FComponentId mId{};
+
+        APROPERTY()
         FGameObjectId mOwner{};
-        FWorld*       mWorld   = nullptr;
-        bool          mEnabled = true;
+
+        APROPERTY()
+        bool mEnabled = true;
     };
 } // namespace AltinaEngine::GameScene

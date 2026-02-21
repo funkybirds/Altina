@@ -4,7 +4,7 @@
 #include "Types/Concepts.h"
 #include "../Base/CoreAPI.h"
 
-#include "../Platform/Generic/PlatformIntrinsicGeneric.h"
+#include "../Platform/PlatformIntrinsic.h"
 
 namespace AltinaEngine::Core::Math {
     // Details

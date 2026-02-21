@@ -16,6 +16,7 @@ namespace AltinaEngine::Core::Reflection {
         using TFnMemberFunctionInvoker  = FObject (*)(FObject&, TSpan<FObject>);
         using TFnMemberPropertyAccessor = FObject (*)(FObject&);
         using TFnPolymorphismUpCaster   = void* (*)(void*);
+        template <auto Member> struct TAutoMemberAccessor;
 
         AE_CORE_API void RegisterType(const FTypeInfo& stdTypeInfo, const FMetaTypeInfo& meta);
         AE_CORE_API void RegisterPolymorphicRelation(

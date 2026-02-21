@@ -90,6 +90,7 @@ namespace {
         std::string                  Include;
         Loc                          Location;
         bool                         HasClassAnnotation = false;
+        std::string                  ClassAnnotation;
         std::vector<AnnotationEntry> Properties;
         std::vector<AnnotationEntry> Methods;
     };
@@ -129,6 +130,10 @@ namespace {
 
     static auto ToStdString(FNativeStringView view) -> std::string {
         return std::string(view.Data(), view.Length());
+    }
+
+    static auto IsSameLocation(const Loc& lhs, const Loc& rhs) -> bool {
+        return lhs.Line == rhs.Line && lhs.Col == rhs.Col && lhs.File == rhs.File;
     }
 
     static auto ReadFileText(const std::filesystem::path& path, std::string& out) -> bool {
@@ -1534,6 +1539,13 @@ namespace {
                         record.QualifiedName = entry.QualifiedName;
                     }
                     if (record.HasClassAnnotation) {
+                        if (IsSameLocation(record.Location, entry.Location)) {
+                            continue;
+                        }
+                        if (!record.ClassAnnotation.empty()
+                            && record.ClassAnnotation == entry.Annotation) {
+                            continue;
+                        }
                         AppendError(outErrors,
                             "Duplicate class annotation for " + entry.QualifiedName,
                             entry.Location);
@@ -1541,6 +1553,7 @@ namespace {
                     }
                     record.HasClassAnnotation = true;
                     record.Location           = entry.Location;
+                    record.ClassAnnotation    = entry.Annotation;
 
                     std::string include;
                     std::string includeError;

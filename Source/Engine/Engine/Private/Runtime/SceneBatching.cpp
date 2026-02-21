@@ -149,15 +149,19 @@ namespace AltinaEngine::Engine {
 
             const u32 sectionCount = static_cast<u32>(lod.Sections.Size());
             for (u32 sectionIndex = 0U; sectionIndex < sectionCount; ++sectionIndex) {
-                const auto& section  = lod.Sections[sectionIndex];
-                const auto* material = (entry.Materials != nullptr)
-                    ? entry.Materials->GetMaterial(section.MaterialSlot)
-                    : nullptr;
+                const auto&            section  = lod.Sections[sectionIndex];
+                RenderCore::FMaterial* material = nullptr;
+                if (entry.Materials != nullptr) {
+                    const auto* slot = entry.Materials->GetMaterialSlot(section.MaterialSlot);
+                    if (slot != nullptr) {
+                        material = materialCache.ResolveMaterial(slot->Template, slot->Parameters);
+                    }
+                }
                 if (material == nullptr) {
                     material = materialCache.ResolveDefault();
                 }
 
-                FDrawItem   item{};
+                FDrawItem item{};
                 item.MeshType            = RenderCore::Render::EDrawMeshType::StaticMesh;
                 item.Pass                = params.Pass;
                 item.Material            = material;

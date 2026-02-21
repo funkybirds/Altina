@@ -5,12 +5,15 @@
 #include "Container/String.h"
 #include "Logging/Log.h"
 #include "Material/Material.h"
+#include "Asset/AssetBinary.h"
+#include "Asset/Texture2DAsset.h"
 #include "Rhi/RhiInit.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
 #include "Rendering/BasicDeferredRenderer.h"
 #include "Shader/ShaderPermutation.h"
 #include "Shader/ShaderReflection.h"
 #include "ShaderCompiler/ShaderPermutationParser.h"
+#include "ShaderCompiler/ShaderCompiler.h"
 #include "ShaderCompiler/ShaderRhiBindings.h"
 #include "Types/Traits.h"
 #include "Utility/String/CodeConvert.h"
@@ -80,7 +83,8 @@ namespace AltinaEngine::Rendering {
                 return false;
             }
             for (usize i = 0U; i < target.Length(); ++i) {
-                if (Core::Algorithm::ToLowerChar(name[i]) != Core::Algorithm::ToLowerChar(target[i])) {
+                if (Core::Algorithm::ToLowerChar(name[i])
+                    != Core::Algorithm::ToLowerChar(target[i])) {
                     return false;
                 }
             }
@@ -110,8 +114,8 @@ namespace AltinaEngine::Rendering {
             return materialCBuffer;
         }
 
-        auto FindSamplerBinding(const Shader::FShaderReflection& reflection,
-            const FStringView& textureName) -> u32 {
+        auto FindSamplerBinding(
+            const Shader::FShaderReflection& reflection, const FStringView& textureName) -> u32 {
             for (const auto& resource : reflection.mResources) {
                 if (resource.mType != Shader::EShaderResourceType::Sampler) {
                     continue;
@@ -185,7 +189,8 @@ namespace AltinaEngine::Rendering {
             if (!layout.PropertyBag.IsValid()) {
                 LogInfo(TEXT("  PropertyBag: <invalid>"));
             } else {
-                LogInfo(TEXT("  PropertyBag: Name={} Size={} Set={} Binding={} Register={} Space={}"),
+                LogInfo(
+                    TEXT("  PropertyBag: Name={} Size={} Set={} Binding={} Register={} Space={}"),
                     layout.PropertyBag.GetName().CStr(), layout.PropertyBag.GetSizeBytes(),
                     layout.PropertyBag.GetSet(), layout.PropertyBag.GetBinding(),
                     layout.PropertyBag.GetRegister(), layout.PropertyBag.GetSpace());
@@ -195,13 +200,14 @@ namespace AltinaEngine::Rendering {
                 LogWarning(TEXT("  Material CBuffer: <null>"));
             } else {
                 LogInfo(
-                    TEXT("  Material CBuffer: Name={} Size={} Set={} Binding={} Register={} Space={}"),
+                    TEXT(
+                        "  Material CBuffer: Name={} Size={} Set={} Binding={} Register={} Space={}"),
                     materialCBuffer->mName.CStr(), materialCBuffer->mSizeBytes,
                     materialCBuffer->mSet, materialCBuffer->mBinding, materialCBuffer->mRegister,
                     materialCBuffer->mSpace);
 
-                LogInfo(TEXT("  Properties: {}"),
-                    static_cast<u32>(materialCBuffer->mMembers.Size()));
+                LogInfo(
+                    TEXT("  Properties: {}"), static_cast<u32>(materialCBuffer->mMembers.Size()));
                 for (const auto& member : materialCBuffer->mMembers) {
                     const auto nameHash = RenderCore::HashMaterialParamName(member.mName.ToView());
                     LogInfo(
@@ -269,12 +275,56 @@ namespace AltinaEngine::Rendering {
             out = parse.mRasterState;
             return true;
         }
+
+        auto ToRhiFormat(const Asset::FTexture2DDesc& desc) -> Rhi::ERhiFormat {
+            const bool srgb = desc.SRGB;
+            switch (desc.Format) {
+                case Asset::kTextureFormatRGBA8:
+                    return srgb ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
+                                : Rhi::ERhiFormat::R8G8B8A8Unorm;
+                case Asset::kTextureFormatR8:
+                case Asset::kTextureFormatRGB8:
+                default:
+                    return srgb ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
+                                : Rhi::ERhiFormat::R8G8B8A8Unorm;
+            }
+        }
+
+        auto CreateTextureSrv(const Asset::FTexture2DAsset& asset)
+            -> Rhi::FRhiShaderResourceViewRef {
+            auto* device = Rhi::RHIGetDevice();
+            if (device == nullptr) {
+                return {};
+            }
+
+            const auto&          assetDesc = asset.GetDesc();
+            Rhi::FRhiTextureDesc texDesc{};
+            texDesc.mWidth     = assetDesc.Width;
+            texDesc.mHeight    = assetDesc.Height;
+            texDesc.mMipLevels = (assetDesc.MipCount > 0U) ? assetDesc.MipCount : 1U;
+            texDesc.mFormat    = ToRhiFormat(assetDesc);
+            texDesc.mBindFlags = Rhi::ERhiTextureBindFlags::ShaderResource;
+
+            auto texture = Rhi::RHICreateTexture(texDesc);
+            if (!texture) {
+                return {};
+            }
+
+            Rhi::FRhiShaderResourceViewDesc viewDesc{};
+            viewDesc.mTexture                      = texture.Get();
+            viewDesc.mFormat                       = texDesc.mFormat;
+            viewDesc.mTextureRange.mBaseMip        = 0U;
+            viewDesc.mTextureRange.mMipCount       = texDesc.mMipLevels;
+            viewDesc.mTextureRange.mBaseArrayLayer = 0U;
+            viewDesc.mTextureRange.mLayerCount     = texDesc.mArrayLayers;
+            return device->CreateShaderResourceView(viewDesc);
+        }
     } // namespace
 
     auto CompileShaderFromAsset(const Asset::FAssetHandle& handle, FStringView entry,
         Shader::EShaderStage stage, Asset::FAssetRegistry& registry, Asset::FAssetManager& manager,
         RenderCore::FShaderRegistry::FShaderKey& outKey,
-        ShaderCompiler::FShaderCompileResult& outResult) -> bool {
+        ShaderCompiler::FShaderCompileResult&    outResult) -> bool {
         const auto* desc = registry.GetDesc(handle);
         if (desc == nullptr) {
             LogError(TEXT("Shader asset desc missing."));
@@ -436,5 +486,75 @@ namespace AltinaEngine::Rendering {
             return {};
         }
         return templ;
+    }
+
+    auto BuildRenderMaterialFromAsset(const Asset::FAssetHandle& handle,
+        const Asset::FMeshMaterialParameterBlock& parameters, Asset::FAssetRegistry& registry,
+        Asset::FAssetManager& manager) -> RenderCore::FMaterial {
+        RenderCore::FMaterial material;
+        if (!handle.IsValid() || handle.Type != Asset::EAssetType::MaterialTemplate) {
+            return material;
+        }
+
+        auto  assetRef = manager.Load(handle);
+        auto* materialAsset =
+            assetRef ? static_cast<Asset::FMaterialAsset*>(assetRef.Get()) : nullptr;
+        if (materialAsset == nullptr) {
+            LogError(TEXT("Failed to load material template asset."));
+            return material;
+        }
+
+        auto templ = BuildMaterialTemplateFromAsset(*materialAsset, registry, manager);
+        if (!templ) {
+            LogError(TEXT("Failed to build material template from asset."));
+            return material;
+        }
+
+        material.SetTemplate(templ);
+
+        auto schema = Container::MakeShared<RenderCore::FMaterialSchema>();
+        for (const auto& param : parameters.GetScalars()) {
+            schema->AddScalar(param.NameHash);
+        }
+        for (const auto& param : parameters.GetVectors()) {
+            schema->AddVector(param.NameHash);
+        }
+        for (const auto& param : parameters.GetMatrices()) {
+            schema->AddMatrix(param.NameHash);
+        }
+        for (const auto& param : parameters.GetTextures()) {
+            schema->AddTexture(param.NameHash);
+        }
+        material.SetSchema(Move(schema));
+
+        for (const auto& param : parameters.GetScalars()) {
+            material.SetScalar(param.NameHash, param.Value);
+        }
+        for (const auto& param : parameters.GetVectors()) {
+            material.SetVector(param.NameHash, param.Value);
+        }
+        for (const auto& param : parameters.GetMatrices()) {
+            material.SetMatrix(param.NameHash, param.Value);
+        }
+        for (const auto& param : parameters.GetTextures()) {
+            Rhi::FRhiShaderResourceViewRef srv{};
+            if (param.Texture.IsValid()
+                && param.Type == Asset::EMeshMaterialTextureType::Texture2D) {
+                auto  textureAssetRef = manager.Load(param.Texture);
+                auto* textureAsset    = textureAssetRef
+                       ? static_cast<Asset::FTexture2DAsset*>(textureAssetRef.Get())
+                       : nullptr;
+                if (textureAsset != nullptr) {
+                    srv = CreateTextureSrv(*textureAsset);
+                }
+            }
+
+            Rhi::FRhiSamplerDesc samplerDesc{};
+            samplerDesc.mDebugName.Assign(TEXT("MeshMaterialSampler"));
+            auto sampler = Rhi::RHICreateSampler(samplerDesc);
+            material.SetTexture(param.NameHash, Move(srv), Move(sampler), param.SamplerFlags);
+        }
+
+        return material;
     }
 } // namespace AltinaEngine::Rendering

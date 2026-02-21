@@ -4,6 +4,7 @@
 #include "Asset/AssetRegistry.h"
 #include "Asset/MaterialAsset.h"
 #include "Asset/MeshAsset.h"
+#include "Asset/MeshMaterialParameterBlock.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
@@ -12,7 +13,7 @@
 #include "Launch/EngineLoop.h"
 #include "Launch/GameClient.h"
 #include "Logging/Log.h"
-#include "Material/Material.h"
+#include "Material/MaterialPass.h"
 #include "Container/SmartPtr.h"
 #include "Math/LinAlg/SpatialTransform.h"
 #include "Math/Vector.h"
@@ -112,10 +113,9 @@ namespace {
             Rendering::FBasicDeferredRenderer::SetDefaultMaterialTemplate(materialTemplate);
             Rendering::FBasicDeferredRenderer::SetOutputShaderKeys(outputVS, outputPS);
 
-            auto material = Container::MakeShared<RenderCore::FMaterial>();
-            material->SetTemplate(materialTemplate);
             const auto baseColorId = RenderCore::HashMaterialParamName(TEXT("BaseColor"));
-            material->SetVector(baseColorId, Core::Math::FVector4f(1.0f, 0.0f, 1.0f, 1.0f));
+            Asset::FMeshMaterialParameterBlock materialParams;
+            materialParams.SetVector(baseColorId, Core::Math::FVector4f(1.0f, 0.0f, 1.0f, 1.0f));
 
             auto&      worldManager = engineLoop.GetWorldManager();
             const auto worldHandle  = worldManager.CreateWorld();
@@ -146,7 +146,8 @@ namespace {
                 meshComponent.Get().SetStaticMesh(AltinaEngine::Move(meshData));
             }
             if (materialComponent.IsValid()) {
-                materialComponent.Get().SetMaterial(0U, material);
+                materialComponent.Get().SetMaterialTemplate(0U, materialHandle);
+                materialComponent.Get().SetMaterialParameters(0U, materialParams);
             }
 
             return true;

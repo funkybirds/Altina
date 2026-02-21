@@ -54,8 +54,8 @@ namespace AltinaEngine::Core::Platform {
                 return out;
             }
             std::wstring wide(static_cast<size_t>(wideCount), L'\0');
-            MultiByteToWideChar(CP_UTF8, 0, value.Data(), static_cast<int>(value.Length()),
-                wide.data(), wideCount);
+            MultiByteToWideChar(
+                CP_UTF8, 0, value.Data(), static_cast<int>(value.Length()), wide.data(), wideCount);
             out.Append(wide.c_str(), wide.size());
     #else
             for (usize i = 0; i < value.Length(); ++i) {
@@ -68,14 +68,28 @@ namespace AltinaEngine::Core::Platform {
             return out;
         }
 
+        auto FromPath(const std::filesystem::path& value) -> FString {
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+    #if AE_PLATFORM_WIN
+            const auto wide = value.wstring();
+            return FString(wide.c_str(), static_cast<usize>(wide.size()));
+    #else
+            const auto utf8 = value.string();
+            return FromUtf8(Container::FNativeStringView(utf8.c_str(), utf8.size()));
+    #endif
+#else
+            const auto utf8 = value.string();
+            return FString(utf8.c_str(), static_cast<usize>(utf8.size()));
+#endif
+        }
+
 #if AE_PLATFORM_WIN
         auto ToUtf8(const std::wstring& value) -> std::string {
             if (value.empty()) {
                 return {};
             }
-            const int utf8Count = WideCharToMultiByte(
-                CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()), nullptr, 0, nullptr,
-                nullptr);
+            const int utf8Count = WideCharToMultiByte(CP_UTF8, 0, value.c_str(),
+                static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
             if (utf8Count <= 0) {
                 return {};
             }
@@ -172,12 +186,12 @@ namespace AltinaEngine::Core::Platform {
             buffer.resize(buffer.size() * 2);
         }
         const auto dir = std::filesystem::path(buffer).parent_path().wstring();
-#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
         return FString(dir.c_str(), static_cast<usize>(dir.size()));
-#else
+    #else
         const auto utf8 = ToUtf8(dir);
         return FromUtf8(Container::FNativeStringView(utf8.c_str(), utf8.size()));
-#endif
+    #endif
 #elif AE_PLATFORM_MACOS
         uint32_t size = 0;
         if (_NSGetExecutablePath(nullptr, &size) != -1 || size == 0) {
@@ -204,6 +218,72 @@ namespace AltinaEngine::Core::Platform {
             buffer.resize(buffer.size() * 2);
         }
 #endif
+    }
+
+    auto GetPathSeparator() -> TChar {
+#if AE_PLATFORM_WIN
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        return static_cast<TChar>(L'\\');
+    #else
+        return static_cast<TChar>('\\');
+    #endif
+#else
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        return static_cast<TChar>(L'/');
+    #else
+        return static_cast<TChar>('/');
+    #endif
+#endif
+    }
+
+    auto IsPathSeparator(TChar value) -> bool {
+#if AE_PLATFORM_WIN
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        return value == static_cast<TChar>(L'\\') || value == static_cast<TChar>(L'/');
+    #else
+        return value == static_cast<TChar>('\\') || value == static_cast<TChar>('/');
+    #endif
+#else
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        return value == static_cast<TChar>(L'/');
+    #else
+        return value == static_cast<TChar>('/');
+    #endif
+#endif
+    }
+
+    auto IsAbsolutePath(FStringView path) -> bool {
+        if (path.IsEmpty()) {
+            return false;
+        }
+        const FString               temp(path);
+        const std::filesystem::path fsPath = ToPath(temp);
+        return fsPath.is_absolute();
+    }
+
+    auto NormalizePath(FStringView path) -> FString {
+        if (path.IsEmpty()) {
+            return {};
+        }
+        const FString temp(path);
+        auto          fsPath = ToPath(temp);
+        fsPath               = fsPath.lexically_normal();
+        fsPath.make_preferred();
+        return FromPath(fsPath);
+    }
+
+    auto GetRootLength(FStringView path) -> usize {
+        if (path.IsEmpty()) {
+            return 0;
+        }
+        const FString temp(path);
+        const auto    fsPath = ToPath(temp);
+        const auto    root   = fsPath.root_path();
+        if (root.empty()) {
+            return 0;
+        }
+        const auto rootText = FromPath(root);
+        return rootText.Length();
     }
 
 } // namespace AltinaEngine::Core::Platform

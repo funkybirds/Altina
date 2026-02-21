@@ -25,6 +25,8 @@
 #include "Rhi/RhiViewport.h"
 #include "Engine/Runtime/EngineRuntime.h"
 #include "Engine/Runtime/MaterialCache.h"
+#include "Engine/GameScene/MeshMaterialComponent.h"
+#include "RenderAsset/MaterialShaderAssetLoader.h"
 
 using AltinaEngine::Core::Container::TFunction;
 using AltinaEngine::Core::Container::TOwner;
@@ -70,6 +72,16 @@ namespace AltinaEngine::Launch {
         auto               LoadDemoAssetRegistry() -> bool;
 
     private:
+        static void BindMeshMaterialConverter(
+            Asset::FAssetRegistry& registry, Asset::FAssetManager& manager) {
+            GameScene::FMeshMaterialComponent::AssetToRenderMaterialConverter =
+                [&registry, &manager](const Asset::FAssetHandle& handle,
+                    const Asset::FMeshMaterialParameterBlock& parameters) -> RenderCore::FMaterial {
+                return Rendering::BuildRenderMaterialFromAsset(
+                    handle, parameters, registry, manager);
+            };
+        }
+
         void                                Draw();
         void                                FlushRenderFrames();
         void                                EnforceRenderLag(u32 maxLagFrames);

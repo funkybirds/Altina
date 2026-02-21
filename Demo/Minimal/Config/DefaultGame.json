@@ -1,0 +1,6 @@
+{
+    "Graphics":{
+        "PreferredApis":["DX11","Vulkan"],
+        "DebugMode":true
+    }
+}

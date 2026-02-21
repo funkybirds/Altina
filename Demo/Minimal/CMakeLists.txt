@@ -35,6 +35,7 @@ target_compile_features(${TargetName}
 set(DemoBinaryDir ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)
 set(DemoAssetCookStamp ${CMAKE_BINARY_DIR}/Demo/Minimal/AssetCook/Minimal.cook.stamp)
 set(DemoAssetsRoot ${CMAKE_CURRENT_SOURCE_DIR}/Assets)
+set(DemoConfigRoot ${CMAKE_CURRENT_SOURCE_DIR}/Config)
 set(DemoCookedRoot ${DemoBinaryDir}/Assets)
 file(GLOB_RECURSE DemoAssetSources CONFIGURE_DEPENDS
     ${DemoAssetsRoot}/*
@@ -53,6 +54,8 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:${TargetName}>
         ${DemoBinaryDir}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}/Assets/Config
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${DemoConfigRoot} ${DemoBinaryDir}/Assets/Config
     COMMENT "Staging Minimal demo executable"
 )
 

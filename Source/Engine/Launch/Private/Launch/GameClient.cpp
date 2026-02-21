@@ -1,7 +1,11 @@
 #include "Launch/GameClient.h"
 
+#include "Utility/EngineConfig/EngineConfig.h"
+
 namespace AltinaEngine::Launch {
     auto RunGameClient(FGameClient& client, const FStartupParameters& startupParameters) -> int {
+        Core::Utility::EngineConfig::InitializeGlobalConfig(startupParameters);
+
         FEngineLoop engineLoop(startupParameters);
         if (!engineLoop.PreInit()) {
             return 1;
@@ -23,8 +27,7 @@ namespace AltinaEngine::Launch {
         }
 
         const float fixedDeltaSeconds = client.GetFixedDeltaTimeSeconds();
-        while (client.OnTick(engineLoop, fixedDeltaSeconds)) {
-        }
+        while (client.OnTick(engineLoop, fixedDeltaSeconds)) {}
 
         client.OnShutdown(engineLoop);
         engineLoop.Exit();

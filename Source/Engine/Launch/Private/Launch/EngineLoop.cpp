@@ -357,6 +357,7 @@ namespace AltinaEngine::Launch {
             mAssetManager.RegisterLoader(&mShaderLoader);
             mAssetManager.RegisterLoader(&mTexture2DLoader);
             GameScene::FScriptComponent::SetAssetManager(&mAssetManager);
+            BindMeshMaterialConverter(mAssetRegistry, mAssetManager);
             mAssetReady = true;
         }
 
@@ -648,7 +649,8 @@ namespace AltinaEngine::Launch {
             mAssetManager.UnregisterLoader(&mAudioLoader);
             mAssetManager.SetRegistry(nullptr);
             GameScene::FScriptComponent::SetAssetManager(nullptr);
-            mAssetReady = false;
+            GameScene::FMeshMaterialComponent::AssetToRenderMaterialConverter = {};
+            mAssetReady                                                       = false;
         }
 
         if (mMainViewport) {
@@ -712,9 +714,7 @@ namespace AltinaEngine::Launch {
         return mAssetRegistry;
     }
 
-    auto FEngineLoop::GetAssetManager() noexcept -> Asset::FAssetManager& {
-        return mAssetManager;
-    }
+    auto FEngineLoop::GetAssetManager() noexcept -> Asset::FAssetManager& { return mAssetManager; }
 
     auto FEngineLoop::GetAssetManager() const noexcept -> const Asset::FAssetManager& {
         return mAssetManager;

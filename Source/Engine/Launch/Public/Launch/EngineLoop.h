@@ -61,6 +61,9 @@ namespace AltinaEngine::Launch {
         [[nodiscard]] auto GetWorldManager() const noexcept -> const GameScene::FWorldManager&;
         [[nodiscard]] auto GetAssetRegistry() noexcept -> Asset::FAssetRegistry&;
         [[nodiscard]] auto GetAssetRegistry() const noexcept -> const Asset::FAssetRegistry&;
+        [[nodiscard]] auto GetAssetManager() noexcept -> Asset::FAssetManager&;
+        [[nodiscard]] auto GetAssetManager() const noexcept -> const Asset::FAssetManager&;
+        auto               LoadDemoAssetRegistry() -> bool;
 
     private:
         void                                Draw();

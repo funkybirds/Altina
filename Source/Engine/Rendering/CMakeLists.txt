@@ -47,6 +47,7 @@ target_include_directories(${TargetName}
 
 target_link_libraries(${TargetName}
     PUBLIC
+        AltinaEngine::Asset
         AltinaEngine::RenderCore
     PRIVATE
         AltinaEngine::ShaderCompiler

@@ -20,10 +20,10 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto IsValid() const noexcept -> bool;
         [[nodiscard]] auto GetId() const noexcept -> FGameObjectId { return mId; }
 
-        template <typename T> [[nodiscard]] auto Add() -> TComponentRef<T>;
-        template <typename T> [[nodiscard]] auto Has() const -> bool;
-        template <typename T> [[nodiscard]] auto Get() const -> TComponentRef<T>;
-        template <typename T> void               Remove();
+        template <typename T> [[nodiscard]] auto AddComponent() -> TComponentRef<T>;
+        template <typename T> [[nodiscard]] auto HasComponent() const -> bool;
+        template <typename T> [[nodiscard]] auto GetComponent() const -> TComponentRef<T>;
+        template <typename T> void               RemoveComponent();
 
         void                                     SetActive(bool active);
         [[nodiscard]] auto                       IsActive() const -> bool;

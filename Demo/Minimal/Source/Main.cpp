@@ -561,7 +561,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto& assetManager = engineLoop.GetAssetManager();
+    auto&      assetManager = engineLoop.GetAssetManager();
 
     const auto meshHandle = engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/triangle"));
     const auto materialHandle =
@@ -652,35 +652,27 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const auto cameraObject = world->CreateGameObject(TEXT("Camera"));
-    const auto cameraComponentId =
-        world->CreateComponent<GameScene::FCameraComponent>(cameraObject);
-    if (cameraComponentId.IsValid()) {
-        auto& camera = world->ResolveComponent<GameScene::FCameraComponent>(cameraComponentId);
+    auto cameraObject    = world->CreateGameObject(TEXT("Camera"));
+    auto cameraComponent = cameraObject.AddComponent<GameScene::FCameraComponent>();
+    if (cameraComponent.IsValid()) {
+        auto& camera = cameraComponent.Get();
         camera.SetNearPlane(0.1f);
         camera.SetFarPlane(1000.0f);
 
-        auto cameraView       = world->Object(cameraObject);
-        auto transform        = cameraView.GetWorldTransform();
+        auto transform        = cameraObject.GetWorldTransform();
         transform.Translation = Core::Math::FVector3f(0.0f, 0.0f, -2.0f);
-        cameraView.SetWorldTransform(transform);
+        cameraObject.SetWorldTransform(transform);
     }
 
-    const auto meshObject = world->CreateGameObject(TEXT("TriangleMesh"));
-    const auto meshComponentId =
-        world->CreateComponent<GameScene::FStaticMeshFilterComponent>(meshObject);
-    const auto materialComponentId =
-        world->CreateComponent<GameScene::FMeshMaterialComponent>(meshObject);
+    auto meshObject        = world->CreateGameObject(TEXT("TriangleMesh"));
+    auto meshComponent     = meshObject.AddComponent<GameScene::FStaticMeshFilterComponent>();
+    auto materialComponent = meshObject.AddComponent<GameScene::FMeshMaterialComponent>();
 
-    if (meshComponentId.IsValid()) {
-        auto& meshComponent =
-            world->ResolveComponent<GameScene::FStaticMeshFilterComponent>(meshComponentId);
-        meshComponent.SetStaticMesh(AltinaEngine::Move(meshData));
+    if (meshComponent.IsValid()) {
+        meshComponent.Get().SetStaticMesh(AltinaEngine::Move(meshData));
     }
-    if (materialComponentId.IsValid()) {
-        auto& materialComponent =
-            world->ResolveComponent<GameScene::FMeshMaterialComponent>(materialComponentId);
-        materialComponent.SetMaterial(0U, material);
+    if (materialComponent.IsValid()) {
+        materialComponent.Get().SetMaterial(0U, material);
     }
 
     constexpr f32 kFixedDeltaTime = 1.0f / 60.0f;

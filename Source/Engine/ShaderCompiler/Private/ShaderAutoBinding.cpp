@@ -2,10 +2,11 @@
 
 #include "Platform/PlatformFileSystem.h"
 #include "ShaderCompilerUtils.h"
+#include "Utility/Filesystem/Path.h"
+#include "Utility/String/CodeConvert.h"
 
 #include <cctype>
 #include <cstring>
-#include <filesystem>
 #include <fstream>
 #include <type_traits>
 
@@ -22,31 +23,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         constexpr u32 kDx11SamplerBase[kGroupCount] = { 0U, 4U, 8U };
         constexpr u32 kDx11UavBase[kGroupCount]     = { 0U, 4U, 8U };
 
-        template <typename CharT>
-        auto ToPathImpl(const TBasicString<CharT>& value) -> std::filesystem::path {
-            return std::filesystem::path(value.CStr());
-        }
-
-        auto ToPath(const FString& value) -> std::filesystem::path { return ToPathImpl(value); }
-
-        template <typename CharT>
-        auto FromPathImpl(const std::filesystem::path& path) -> TBasicString<CharT> {
-            TBasicString<CharT> out;
-            if constexpr (std::is_same_v<CharT, wchar_t>) {
-                const auto native = path.wstring();
-                out.Append(native.c_str(), native.size());
-            } else {
-                const auto native = path.string();
-                out.Append(native.c_str(), native.size());
-            }
-            return out;
-        }
-
-        auto FromPath(const std::filesystem::path& path) -> FString {
-            return FromPathImpl<TChar>(path);
-        }
-
-        auto Trim(FNativeStringView text) -> FNativeString {
+        auto          Trim(FNativeStringView text) -> FNativeString {
             const FNativeStringView whitespace(" \t\r\n");
             const auto              first = text.FindFirstNotOf(whitespace);
             if (first == FNativeStringView::npos) {
@@ -406,12 +383,12 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             return true;
         }
 
-        std::filesystem::path       originalPath = ToPath(sourcePath);
-        const std::filesystem::path extension    = originalPath.extension();
+        Core::Utility::Filesystem::FPath originalPath(sourcePath);
+        const auto                       extension = originalPath.Extension();
 
-        FString                     extensionText;
-        if (!extension.empty()) {
-            extensionText = FromPath(extension);
+        FString                          extensionText;
+        if (!extension.IsEmpty()) {
+            extensionText = FString(extension);
         } else {
             extensionText = FString(TEXT(".hlsl"));
         }
@@ -419,7 +396,8 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         const FString tempPath =
             BuildTempOutputPath(sourcePath, FString(TEXT("autobind")), extensionText);
 
-        std::ofstream file(ToPath(tempPath), std::ios::binary | std::ios::trunc);
+        const auto    tempPathUtf8 = Core::Utility::String::ToUtf8Bytes(tempPath);
+        std::ofstream file(tempPathUtf8.CStr(), std::ios::binary | std::ios::trunc);
         if (!file) {
             AppendDiagnosticLine(
                 diagnostics, TEXT("AutoBinding: failed to write preprocessed shader."));
@@ -428,9 +406,14 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         FNativeString header;
         header.Append("// AutoBinding generated\n#line 1 \"");
-        const auto generic = originalPath.generic_string();
-        if (!generic.empty()) {
-            header.Append(generic.c_str(), generic.size());
+        auto originalUtf8 = Core::Utility::String::ToUtf8Bytes(originalPath.GetString());
+        if (!originalUtf8.IsEmptyString()) {
+            for (usize i = 0; i < originalUtf8.Length(); ++i) {
+                if (originalUtf8[i] == '\\') {
+                    originalUtf8[i] = '/';
+                }
+            }
+            header.Append(originalUtf8.GetData(), originalUtf8.Length());
         }
         header.Append("\"\n");
         file.write(header.GetData(), static_cast<std::streamsize>(header.Length()));

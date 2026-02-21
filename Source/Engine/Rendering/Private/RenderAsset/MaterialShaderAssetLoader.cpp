@@ -17,11 +17,10 @@
 #include "ShaderCompiler/ShaderRhiBindings.h"
 #include "Types/Traits.h"
 #include "Utility/String/CodeConvert.h"
+#include "Utility/Filesystem/Path.h"
+#include "Utility/Filesystem/PathUtils.h"
 
-#include <filesystem>
 #include <fstream>
-#include <iostream>
-#include <string>
 
 using namespace AltinaEngine;
 
@@ -30,16 +29,6 @@ namespace AltinaEngine::Rendering {
         namespace Container = Core::Container;
         using Container::FString;
         using Container::FStringView;
-
-        auto ToFString(const std::filesystem::path& path) -> FString {
-#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-            const std::wstring wide = path.wstring();
-            return FString(wide.c_str(), static_cast<usize>(wide.size()));
-#else
-            const std::string narrow = path.string();
-            return FString(narrow.c_str(), static_cast<usize>(narrow.size()));
-#endif
-        }
 
         auto TryParseMaterialPass(FStringView name, RenderCore::EMaterialPass& outPass) -> bool {
             auto EqualsI = [](FStringView lhs, const TChar* rhs) -> bool {
@@ -95,7 +84,6 @@ namespace AltinaEngine::Rendering {
             -> const Shader::FShaderConstantBuffer* {
             for (const auto& cbuffer : reflection.mConstantBuffers) {
                 if (IsMaterialCBufferName(cbuffer.mName.ToView())) {
-                    std::cout << "Addr=" << &cbuffer << std::endl;
                     return &cbuffer;
                 }
             }
@@ -231,27 +219,27 @@ namespace AltinaEngine::Rendering {
         }
 
         auto WriteTempShaderFile(const Container::FNativeStringView& source, const FUuid& uuid,
-            ShaderCompiler::EShaderSourceLanguage language, std::filesystem::path& outPath)
-            -> bool {
-            std::error_code       ec;
-            std::filesystem::path tempRoot = std::filesystem::temp_directory_path(ec);
-            if (ec) {
+            ShaderCompiler::EShaderSourceLanguage language,
+            Core::Utility::Filesystem::FPath&     outPath) -> bool {
+            auto tempRoot = Core::Utility::Filesystem::GetTempDirectory();
+            if (tempRoot.IsEmpty()) {
                 return false;
             }
-            tempRoot /= "AltinaEngine";
-            tempRoot /= "Shaders";
-            std::filesystem::create_directories(tempRoot, ec);
-            if (ec) {
+            tempRoot /= TEXT("AltinaEngine");
+            tempRoot /= TEXT("Shaders");
+            if (!Core::Platform::CreateDirectories(tempRoot.GetString())) {
                 return false;
             }
 
-            const auto  uuidText = uuid.ToNativeString();
-            std::string fileName(uuidText.GetData(), uuidText.Length());
-            fileName +=
-                (language == ShaderCompiler::EShaderSourceLanguage::Slang) ? ".slang" : ".hlsl";
-            outPath = tempRoot / fileName;
+            const auto               uuidText = uuid.ToNativeString();
+            Container::FNativeString fileName(uuidText.GetData(), uuidText.Length());
+            fileName.Append(
+                (language == ShaderCompiler::EShaderSourceLanguage::Slang) ? ".slang" : ".hlsl");
+            const auto fileNameText = Core::Utility::String::FromUtf8(fileName);
+            outPath                 = tempRoot / fileNameText;
 
-            std::ofstream file(outPath, std::ios::binary | std::ios::trunc);
+            const auto    outPathUtf8 = Core::Utility::String::ToUtf8Bytes(outPath.GetString());
+            std::ofstream file(outPathUtf8.CStr(), std::ios::binary | std::ios::trunc);
             if (!file.good()) {
                 return false;
             }
@@ -344,19 +332,19 @@ namespace AltinaEngine::Rendering {
             language = ShaderCompiler::EShaderSourceLanguage::Slang;
         }
 
-        std::filesystem::path tempPath;
+        Core::Utility::Filesystem::FPath tempPath;
         if (!WriteTempShaderFile(shaderAsset->GetSource(), handle.Uuid, language, tempPath)) {
             LogError(TEXT("Failed to write temp shader file."));
             return false;
         }
 
         ShaderCompiler::FShaderCompileRequest request{};
-        request.mSource.mPath.Assign(ToFString(tempPath).ToView());
+        request.mSource.mPath.Assign(tempPath.GetString().ToView());
         request.mSource.mEntryPoint.Assign(entry);
         request.mSource.mStage    = stage;
         request.mSource.mLanguage = language;
-        if (tempPath.has_parent_path()) {
-            request.mSource.mIncludeDirs.PushBack(ToFString(tempPath.parent_path()));
+        if (!tempPath.ParentPath().IsEmpty()) {
+            request.mSource.mIncludeDirs.PushBack(tempPath.ParentPath().GetString());
         }
         request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
         request.mOptions.mOptimization  = ShaderCompiler::EShaderOptimization::Default;
@@ -365,8 +353,7 @@ namespace AltinaEngine::Rendering {
         auto& compiler = ShaderCompiler::GetShaderCompiler();
         outResult      = compiler.Compile(request);
 
-        std::error_code removeEc;
-        std::filesystem::remove(tempPath, removeEc);
+        Core::Platform::RemoveFileIfExists(tempPath.GetString());
 
         if (!outResult.mSucceeded) {
             LogError(TEXT("Shader compile failed: {}"), outResult.mDiagnostics.ToView());

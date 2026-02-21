@@ -17,6 +17,8 @@
 #include "Console/ConsoleVariable.h"
 #include "Logging/Log.h"
 #include "Platform/PlatformFileSystem.h"
+#include "Utility/Filesystem/Path.h"
+#include "Utility/Filesystem/PathUtils.h"
 #include "Threading/RenderingThread.h"
 #include "FrameGraph/FrameGraph.h"
 #include "Rhi/RhiInit.h"
@@ -24,11 +26,6 @@
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiStructs.h"
 #include "Rhi/Command/RhiCmdContextAdapter.h"
-
-#include <filesystem>
-#include <string>
-#include <system_error>
-#include <vector>
 
 #if AE_PLATFORM_WIN
     #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
@@ -56,13 +53,9 @@
 #elif AE_PLATFORM_MACOS
     #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
         #include <mach-o/dyld.h>
-        #include <unistd.h>
     #endif
 #else
     #include "RhiMock/RhiMockContext.h"
-    #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
-        #include <unistd.h>
-    #endif
 #endif
 
 using AltinaEngine::Move;
@@ -189,79 +182,30 @@ namespace AltinaEngine::Launch {
             TEXT("AltinaEngine.Managed.ManagedStartupDelegate, AltinaEngine.Managed");
 
         struct FManagedPathResolve {
-            std::filesystem::path mPath;
-            bool                  mExists = false;
+            Core::Utility::Filesystem::FPath mPath;
+            bool                             mExists = false;
         };
 
-        auto GetExecutableDir() -> std::filesystem::path {
-    #if AE_PLATFORM_WIN
-            std::wstring buffer(260, L'\0');
-            DWORD        length = 0;
-            while (true) {
-                length =
-                    GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
-                if (length == 0) {
-                    return {};
-                }
-                if (length < buffer.size() - 1) {
-                    buffer.resize(length);
-                    break;
-                }
-                buffer.resize(buffer.size() * 2);
-            }
-            return std::filesystem::path(buffer).parent_path();
-    #elif AE_PLATFORM_MACOS
-            uint32_t size = 0;
-            if (_NSGetExecutablePath(nullptr, &size) != -1 || size == 0) {
-                return {};
-            }
-            std::vector<char> buffer(size, '\0');
-            if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
-                return {};
-            }
-            return std::filesystem::path(buffer.data()).parent_path();
-    #else
-            std::vector<char> buffer(1024, '\0');
-            while (true) {
-                const ssize_t length = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
-                if (length <= 0) {
-                    return {};
-                }
-                if (static_cast<size_t>(length) < buffer.size() - 1) {
-                    buffer[static_cast<size_t>(length)] = '\0';
-                    return std::filesystem::path(buffer.data()).parent_path();
-                }
-                buffer.resize(buffer.size() * 2);
-            }
-    #endif
+        auto ToFString(const Core::Utility::Filesystem::FPath& path) -> Container::FString {
+            return path.GetString();
         }
 
-        auto ToFString(const std::filesystem::path& path) -> Container::FString {
-    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
-            const std::wstring wide = path.wstring();
-            return Container::FString(wide.c_str(), static_cast<usize>(wide.size()));
-    #else
-            const std::string narrow = path.string();
-            return Container::FString(narrow.c_str(), static_cast<usize>(narrow.size()));
-    #endif
-        }
-
-        auto ResolveManagedPath(const std::filesystem::path& exeDir, const TChar* fileName)
-            -> FManagedPathResolve {
+        auto ResolveManagedPath(const Core::Utility::Filesystem::FPath& exeDir,
+            const TChar* fileName) -> FManagedPathResolve {
+            using Core::Utility::Filesystem::FPath;
             FManagedPathResolve result{};
             if (fileName == nullptr || fileName[0] == static_cast<TChar>(0)) {
                 return result;
             }
 
-            const std::filesystem::path filePart(fileName);
-            std::error_code             ec;
+            const FPath filePart(fileName);
 
-            auto TryCandidate = [&](const std::filesystem::path& root) -> bool {
-                if (root.empty()) {
+            auto        TryCandidate = [&](const FPath& root) -> bool {
+                if (root.IsEmpty()) {
                     return false;
                 }
-                const auto candidate = root / filePart;
-                if (std::filesystem::exists(candidate, ec)) {
+                const auto candidate = root / filePart.ToView();
+                if (candidate.Exists()) {
                     result.mPath   = candidate;
                     result.mExists = true;
                     return true;
@@ -273,20 +217,19 @@ namespace AltinaEngine::Launch {
                 return result;
             }
 
-            if (!exeDir.empty()) {
-                const auto parent = exeDir.parent_path();
+            if (!exeDir.IsEmpty()) {
+                const auto parent = exeDir.ParentPath();
                 if (TryCandidate(parent)) {
                     return result;
                 }
             }
 
-            ec             = {};
-            const auto cwd = std::filesystem::current_path(ec);
-            if (!ec && TryCandidate(cwd)) {
+            const auto cwd = Core::Utility::Filesystem::GetCurrentWorkingDir();
+            if (TryCandidate(cwd)) {
                 return result;
             }
 
-            result.mPath = exeDir.empty() ? filePart : (exeDir / filePart);
+            result.mPath = exeDir.IsEmpty() ? filePart : (exeDir / filePart.ToView());
             return result;
         }
 #endif
@@ -427,9 +370,10 @@ namespace AltinaEngine::Launch {
         }
         if (mScriptSystem) {
             Scripting::FScriptRuntimeConfig runtimeConfig{};
-            const auto                      exeDir = GetExecutableDir();
+            const auto                      exeDir =
+                Core::Utility::Filesystem::FPath(Core::Platform::GetExecutableDir());
             const auto runtimePath = ResolveManagedPath(exeDir, kManagedRuntimeConfig);
-            if (runtimePath.mPath.empty()) {
+            if (runtimePath.mPath.IsEmpty()) {
                 runtimeConfig.mRuntimeConfigPath.Assign(kManagedRuntimeConfig);
             } else {
                 runtimeConfig.mRuntimeConfigPath = ToFString(runtimePath.mPath);
@@ -441,7 +385,7 @@ namespace AltinaEngine::Launch {
 
             Scripting::CoreCLR::FManagedRuntimeConfig managedConfig{};
             const auto assemblyPath = ResolveManagedPath(exeDir, kManagedAssembly);
-            if (assemblyPath.mPath.empty()) {
+            if (assemblyPath.mPath.IsEmpty()) {
                 managedConfig.mAssemblyPath.Assign(kManagedAssembly);
             } else {
                 managedConfig.mAssemblyPath = ToFString(assemblyPath.mPath);
@@ -737,10 +681,8 @@ namespace AltinaEngine::Launch {
         }
 
         const auto assetRoot =
-            std::filesystem::path(registryPath.CStr()).parent_path().parent_path();
-        std::error_code ec;
-        std::filesystem::current_path(assetRoot, ec);
-        if (ec) {
+            Core::Utility::Filesystem::FPath(registryPath).ParentPath().ParentPath();
+        if (!Core::Utility::Filesystem::SetCurrentWorkingDir(assetRoot)) {
             const auto rootText = ToFString(assetRoot);
             LogWarning(TEXT("Failed to set asset root to {}."), rootText.ToView());
         }

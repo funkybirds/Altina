@@ -53,4 +53,45 @@ namespace AltinaEngine::Core::Utility::String {
 #endif
         return out;
     }
+
+    [[nodiscard]] inline auto FromUtf8Bytes(const char* data, usize length)
+        -> Core::Container::FString {
+        if (data == nullptr || length == 0) {
+            return {};
+        }
+        Core::Container::FNativeString temp(data, length);
+        return FromUtf8(temp);
+    }
+
+    [[nodiscard]] inline auto ToUtf8Bytes(const Core::Container::FString& value)
+        -> Core::Container::FNativeString {
+        if (value.IsEmptyString()) {
+            return {};
+        }
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+    #if AE_PLATFORM_WIN
+        const int utf8Count = WideCharToMultiByte(CP_UTF8, 0, value.CStr(),
+            static_cast<int>(value.Length()), nullptr, 0, nullptr, nullptr);
+        if (utf8Count <= 0) {
+            return {};
+        }
+        Core::Container::FNativeString utf8;
+        utf8.Resize(static_cast<usize>(utf8Count));
+        WideCharToMultiByte(CP_UTF8, 0, value.CStr(), static_cast<int>(value.Length()),
+            utf8.GetData(), utf8Count, nullptr, nullptr);
+        return utf8;
+    #else
+        Core::Container::FNativeString out;
+        out.Reserve(value.Length());
+        for (usize i = 0; i < value.Length(); ++i) {
+            out.Append(static_cast<char>(value[i]));
+        }
+        return out;
+    #endif
+#else
+        Core::Container::FNativeString out;
+        out.Append(value.GetData(), value.Length());
+        return out;
+#endif
+    }
 } // namespace AltinaEngine::Core::Utility::String

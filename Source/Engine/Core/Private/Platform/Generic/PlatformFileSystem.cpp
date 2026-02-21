@@ -1,5 +1,8 @@
 #include "Platform/PlatformFileSystem.h"
+#include "Utility/String/CodeConvert.h"
 
+#include <cerrno>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -218,6 +221,104 @@ namespace AltinaEngine::Core::Platform {
             buffer.resize(buffer.size() * 2);
         }
 #endif
+    }
+
+    auto GetCurrentWorkingDir() -> FString {
+#if AE_PLATFORM_WIN
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        std::wstring buffer(260, L'\0');
+        DWORD        length = 0;
+        while (true) {
+            length = GetCurrentDirectoryW(static_cast<DWORD>(buffer.size()), buffer.data());
+            if (length == 0) {
+                return {};
+            }
+            if (length < buffer.size()) {
+                buffer.resize(length);
+                break;
+            }
+            buffer.resize(buffer.size() * 2);
+        }
+        return FString(buffer.c_str(), static_cast<usize>(buffer.size()));
+    #else
+        Container::TVector<char> buffer;
+        buffer.Resize(260);
+        DWORD length = 0;
+        while (true) {
+            length = GetCurrentDirectoryA(static_cast<DWORD>(buffer.Size()), buffer.Data());
+            if (length == 0) {
+                return {};
+            }
+            if (length < buffer.Size()) {
+                buffer.Resize(length);
+                break;
+            }
+            buffer.Resize(buffer.Size() * 2);
+        }
+        return FString(buffer.Data(), static_cast<usize>(buffer.Size()));
+    #endif
+#else
+        Container::TVector<char> buffer;
+        buffer.Resize(256);
+        while (true) {
+            if (getcwd(buffer.Data(), buffer.Size()) != nullptr) {
+                const auto length = std::strlen(buffer.Data());
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+                return Utility::String::FromUtf8Bytes(buffer.Data(), static_cast<usize>(length));
+    #else
+                return FString(buffer.Data(), static_cast<usize>(length));
+    #endif
+            }
+            if (errno == ERANGE) {
+                buffer.Resize(buffer.Size() * 2);
+                continue;
+            }
+            return {};
+        }
+#endif
+    }
+
+    auto SetCurrentWorkingDir(const FString& path) -> bool {
+        if (path.IsEmptyString()) {
+            return false;
+        }
+#if AE_PLATFORM_WIN
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        return SetCurrentDirectoryW(path.CStr()) != 0;
+    #else
+        return SetCurrentDirectoryA(path.CStr()) != 0;
+    #endif
+#else
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        const auto utf8 = Utility::String::ToUtf8Bytes(path);
+        return chdir(utf8.CStr()) == 0;
+    #else
+        return chdir(path.CStr()) == 0;
+    #endif
+#endif
+    }
+
+    auto GetTempDirectory() -> FString {
+        std::error_code       ec;
+        std::filesystem::path tempPath;
+        try {
+            tempPath = std::filesystem::temp_directory_path();
+        } catch (...) {
+            tempPath = std::filesystem::current_path(ec);
+        }
+        if (tempPath.empty()) {
+            return {};
+        }
+        return FromPath(tempPath);
+    }
+
+    auto CreateDirectories(const FString& path) -> bool {
+        if (path.IsEmptyString()) {
+            return false;
+        }
+        std::error_code ec;
+        std::filesystem::create_directories(ToPath(path), ec);
+        return !ec;
     }
 
     auto GetPathSeparator() -> TChar {

@@ -20,6 +20,8 @@
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiViewport.h"
 #include "Logging/Log.h"
+#include "Container/HashMap.h"
+#include "Threading/Mutex.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
 
@@ -48,13 +50,71 @@
 #include <type_traits>
 #include <limits>
 #include <iostream>
+#include <functional>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
+    using Container::THashMap;
     using Container::TVector;
+    using Core::Threading::FMutex;
+    using Core::Threading::FScopedLock;
 #if AE_PLATFORM_WIN
     using Microsoft::WRL::ComPtr;
+
+    struct FD3D11SamplerCacheKey {
+        D3D11_SAMPLER_DESC mDesc = {};
+    };
+
+    struct FD3D11SamplerCacheHash {
+        auto operator()(const FD3D11SamplerCacheKey& key) const noexcept -> usize {
+            auto hashCombine = [](usize seed, usize value) -> usize {
+                return seed ^ (value + 0x9e3779b9U + (seed << 6U) + (seed >> 2U));
+            };
+
+            usize hash = 0U;
+            hash       = hashCombine(hash, std::hash<u32>{}(static_cast<u32>(key.mDesc.Filter)));
+            hash       = hashCombine(hash, std::hash<u32>{}(static_cast<u32>(key.mDesc.AddressU)));
+            hash       = hashCombine(hash, std::hash<u32>{}(static_cast<u32>(key.mDesc.AddressV)));
+            hash       = hashCombine(hash, std::hash<u32>{}(static_cast<u32>(key.mDesc.AddressW)));
+            hash       = hashCombine(hash, std::hash<f32>{}(key.mDesc.MipLODBias));
+            hash       = hashCombine(hash, std::hash<u32>{}(key.mDesc.MaxAnisotropy));
+            hash = hashCombine(hash, std::hash<u32>{}(static_cast<u32>(key.mDesc.ComparisonFunc)));
+            for (u32 i = 0U; i < 4U; ++i) {
+                hash = hashCombine(hash, std::hash<f32>{}(key.mDesc.BorderColor[i]));
+            }
+            hash = hashCombine(hash, std::hash<f32>{}(key.mDesc.MinLOD));
+            hash = hashCombine(hash, std::hash<f32>{}(key.mDesc.MaxLOD));
+            return hash;
+        }
+    };
+
+    struct FD3D11SamplerCacheEqual {
+        auto operator()(
+            const FD3D11SamplerCacheKey& a, const FD3D11SamplerCacheKey& b) const noexcept -> bool {
+            if (a.mDesc.Filter != b.mDesc.Filter) {
+                return false;
+            }
+            if (a.mDesc.AddressU != b.mDesc.AddressU || a.mDesc.AddressV != b.mDesc.AddressV
+                || a.mDesc.AddressW != b.mDesc.AddressW) {
+                return false;
+            }
+            if (a.mDesc.MipLODBias != b.mDesc.MipLODBias
+                || a.mDesc.MaxAnisotropy != b.mDesc.MaxAnisotropy
+                || a.mDesc.ComparisonFunc != b.mDesc.ComparisonFunc) {
+                return false;
+            }
+            for (u32 i = 0U; i < 4U; ++i) {
+                if (a.mDesc.BorderColor[i] != b.mDesc.BorderColor[i]) {
+                    return false;
+                }
+            }
+            if (a.mDesc.MinLOD != b.mDesc.MinLOD || a.mDesc.MaxLOD != b.mDesc.MaxLOD) {
+                return false;
+            }
+            return true;
+        }
+    };
 
     struct FRhiD3D11Device::FState {
         ComPtr<ID3D11Device>         mDevice;
@@ -68,7 +128,11 @@ namespace AltinaEngine::Rhi {
         u32                          mFrameQueryIndex = 0U;
         TVector<ComPtr<ID3D11Query>> mFrameQueries;
         TVector<u64>                 mFrameQuerySerials;
-        bool                         mDeviceRemovedLogged = false;
+        THashMap<FD3D11SamplerCacheKey, ComPtr<ID3D11SamplerState>, FD3D11SamplerCacheHash,
+            FD3D11SamplerCacheEqual>
+               mSamplerCache;
+        FMutex mSamplerCacheMutex;
+        bool   mDeviceRemovedLogged = false;
     };
 
     struct FRhiD3D11CommandList::FState {
@@ -1714,6 +1778,55 @@ namespace AltinaEngine::Rhi {
 #else
         (void)desc;
         return {};
+#endif
+    }
+
+    auto FRhiD3D11Device::CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef {
+#if AE_PLATFORM_WIN
+        ID3D11Device* device = GetNativeDevice();
+        if (device == nullptr || mState == nullptr) {
+            return {};
+        }
+
+        D3D11_SAMPLER_DESC samplerDesc = {};
+        samplerDesc.Filter             = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        samplerDesc.AddressU           = D3D11_TEXTURE_ADDRESS_WRAP;
+        samplerDesc.AddressV           = D3D11_TEXTURE_ADDRESS_WRAP;
+        samplerDesc.AddressW           = D3D11_TEXTURE_ADDRESS_WRAP;
+        samplerDesc.MipLODBias         = 0.0f;
+        samplerDesc.MaxAnisotropy      = 1;
+        samplerDesc.ComparisonFunc     = D3D11_COMPARISON_ALWAYS;
+        samplerDesc.BorderColor[0]     = 0.0f;
+        samplerDesc.BorderColor[1]     = 0.0f;
+        samplerDesc.BorderColor[2]     = 0.0f;
+        samplerDesc.BorderColor[3]     = 0.0f;
+        samplerDesc.MinLOD             = 0.0f;
+        samplerDesc.MaxLOD             = D3D11_FLOAT32_MAX;
+
+        FD3D11SamplerCacheKey cacheKey{};
+        cacheKey.mDesc = samplerDesc;
+
+        {
+            FScopedLock lock(mState->mSamplerCacheMutex);
+            auto        it = mState->mSamplerCache.find(cacheKey);
+            if (it != mState->mSamplerCache.end()) {
+                ID3D11SamplerState* cached = it->second.Get();
+                if (cached) {
+                    cached->AddRef();
+                }
+                return MakeResource<FRhiD3D11Sampler>(desc, cached);
+            }
+
+            ComPtr<ID3D11SamplerState> sampler;
+            const HRESULT              hr = device->CreateSamplerState(&samplerDesc, &sampler);
+            if (FAILED(hr) || (sampler == nullptr)) {
+                return {};
+            }
+            mState->mSamplerCache.emplace(cacheKey, sampler);
+            return MakeResource<FRhiD3D11Sampler>(desc, sampler.Detach());
+        }
+#else
+        return MakeResource<FRhiD3D11Sampler>(desc);
 #endif
     }
 

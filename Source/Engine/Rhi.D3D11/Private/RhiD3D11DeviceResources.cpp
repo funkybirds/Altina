@@ -1060,38 +1060,4 @@ namespace AltinaEngine::Rhi {
         return MakeResource<FRhiD3D11Texture>(desc);
 #endif
     }
-
-    auto FRhiD3D11Device::CreateSampler(const FRhiSamplerDesc& desc) -> FRhiSamplerRef {
-#if AE_PLATFORM_WIN
-        ID3D11Device* device = GetNativeDevice();
-        if (device == nullptr) {
-            return {};
-        }
-
-        D3D11_SAMPLER_DESC samplerDesc = {};
-        samplerDesc.Filter             = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-        samplerDesc.AddressU           = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.AddressV           = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.AddressW           = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.MipLODBias         = 0.0f;
-        samplerDesc.MaxAnisotropy      = 1;
-        samplerDesc.ComparisonFunc     = D3D11_COMPARISON_ALWAYS;
-        samplerDesc.BorderColor[0]     = 0.0f;
-        samplerDesc.BorderColor[1]     = 0.0f;
-        samplerDesc.BorderColor[2]     = 0.0f;
-        samplerDesc.BorderColor[3]     = 0.0f;
-        samplerDesc.MinLOD             = 0.0f;
-        samplerDesc.MaxLOD             = D3D11_FLOAT32_MAX;
-
-        ComPtr<ID3D11SamplerState> sampler;
-        const HRESULT              hr = device->CreateSamplerState(&samplerDesc, &sampler);
-        if (FAILED(hr) || (sampler == nullptr)) {
-            return {};
-        }
-
-        return MakeResource<FRhiD3D11Sampler>(desc, sampler.Detach());
-#else
-        return MakeResource<FRhiD3D11Sampler>(desc);
-#endif
-    }
 } // namespace AltinaEngine::Rhi

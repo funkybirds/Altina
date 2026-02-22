@@ -1,6 +1,6 @@
 #include "TestHarness.h"
 
-#include "../../Engine/Core/Public/Jobs/JobSystem.h"
+#include "../../Runtime/Core/Public/Jobs/JobSystem.h"
 
 #include <atomic>
 #include <random>

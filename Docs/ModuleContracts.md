@@ -4,9 +4,9 @@ The AltinaEngine project is organized into self-contained modules. Each module d
 
 ## Dependency Tiers
 
-1. **Core Tier** – Foundational services (`Engine/Core`, `Engine/Platform`). These modules do not depend on higher tiers and should remain free of rendering or gameplay knowledge.
-2. **Systems Tier** – Subsystems that build on the core (e.g., `Engine/Render`, `Engine/Audio`, `Engine/Input`). These may depend on Core but not on Runtime or Demo modules.
-3. **Runtime Tier** – Launchers and gameplay glue under `Runtime/`. They depend on systems as needed but never the reverse.
+1. **Core Tier** – Foundational services (`Runtime/Core`, `Runtime/Platform`). These modules do not depend on higher tiers and should remain free of rendering or gameplay knowledge.
+2. **Systems Tier** – Subsystems that build on the core (e.g., `Runtime/Render`, `Runtime/Audio`, `Runtime/Input`). These may depend on Core but not on Launch or Demo modules.
+3. **Runtime Tier** – Launchers and gameplay glue under `Runtime/Launch`. They depend on systems as needed but never the reverse.
 4. **Demo Tier** – Projects in `Demo/` that showcase engine features. Demos may depend on any runtime or engine module but must not export code back into the engine.
 
 ## Rules of Engagement

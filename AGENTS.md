@@ -12,14 +12,13 @@
 AltinaEngine/
 ├─ CMakeLists.txt                # Root build entry point
 ├─ Source/
-│  ├─ Engine/
+│  ├─ Runtime/
 │  │  ├─ Core/
 │  │  │  ├─ Public/              # Headers shared with other modules
 │  │  │  └─ Private/             # Private headers + sources for Core
 │  │  ├─ Render/
+│  │  ├─ Launch/                 # Game/application entry modules
 │  │  └─ ...
-│  ├─ Runtime/
-│  │  └─ Launch/                 # Game/application entry modules
 │  ├─ Tools/
 │  │  └─ Editor/
 │  └─ Tests/
@@ -41,7 +40,7 @@ AltinaEngine/
 - `Private/` hosts implementation headers and all `.cpp` files. Subfolders can mirror `Public/` for clarity.
 - Use `ModuleName/Public` as the include root for other modules: `#include "Core/Application/Application.h"`.
 - Limit friend includes via CMake `target_link_libraries` to express allowed module dependencies.
-- `Engine/Core` acts as the foundation; organise its public API into subfolders such as `Types/` (aliases + concepts),
+- `Runtime/Core` acts as the foundation; organise its public API into subfolders such as `Types/` (aliases + concepts),
   `Containers/`, and `Math/` for low-level primitives.
 
 ### Cross-Module Include Strategy
@@ -81,7 +80,7 @@ AltinaEngine/
 - Use per-demo `CMakeLists.txt` that consume the engine via `add_subdirectory(..\\..\\Source)` or through installed
   packages to mirror end-user integration.
 - Engine modules post-build copy their outputs into demo `Binaries/` directories (see
-  `Source/Engine/Core/CMakeLists.txt`).
+  `Source/Runtime/Core/CMakeLists.txt`).
 
 ## Build & Toolchain Strategy
 

@@ -1,7 +1,7 @@
 #include "TestHarness.h"
 
-#include "../../Engine/Core/Public/Jobs/JobSystem.h"
-#include "../../Engine/Core/Public/Instrumentation/Instrumentation.h"
+#include "../../Runtime/Core/Public/Jobs/JobSystem.h"
+#include "../../Runtime/Core/Public/Instrumentation/Instrumentation.h"
 
 #include <mutex>
 #include <string>

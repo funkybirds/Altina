@@ -33,7 +33,7 @@ target_compile_features(${TargetName}
 )
 
 set(DemoBinaryDir ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)
-set(DemoAssetCookStamp ${CMAKE_BINARY_DIR}/Demo/Minimal/AssetCook/Minimal.cook.stamp)
+set(DemoAssetCookOutput ${DemoBinaryDir}/Assets/Registry/AssetRegistry.json)
 set(DemoAssetsRoot ${CMAKE_CURRENT_SOURCE_DIR}/Assets)
 set(DemoConfigRoot ${CMAKE_CURRENT_SOURCE_DIR}/Config)
 set(DemoCookedRoot ${DemoBinaryDir}/Assets)
@@ -58,6 +58,19 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${DemoConfigRoot} ${DemoBinaryDir}/Assets/Config
     COMMENT "Staging Minimal demo executable"
 )
+
+if(WIN32)
+    add_custom_command(
+        TARGET ${TargetName}
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:${TargetName}>
+            ${DemoBinaryDir}
+        COMMAND_EXPAND_LISTS
+        COMMENT "Staging Minimal demo runtime DLLs"
+    )
+endif()
 
 find_program(AE_DOTNET_HOST dotnet)
 if(AE_DOTNET_HOST)
@@ -121,15 +134,13 @@ else()
 endif()
 
 add_custom_command(
-    OUTPUT ${DemoAssetCookStamp}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Demo/Minimal/AssetCook
+    OUTPUT ${DemoAssetCookOutput}
     COMMAND $<TARGET_FILE:AltinaEngineAssetTool> cook
         --root ${CMAKE_SOURCE_DIR}
         --platform Win64
         --demo Minimal
-        --build-root ${CMAKE_SOURCE_DIR}/build
+        --build-root ${CMAKE_BINARY_DIR}
         --cook-root ${DemoCookedRoot}
-    COMMAND ${CMAKE_COMMAND} -E touch ${DemoAssetCookStamp}
     DEPENDS
         AltinaEngineAssetTool
         ${DemoAssetSources}
@@ -139,7 +150,7 @@ add_custom_command(
 )
 
 add_custom_target(AltinaEngineDemoMinimalCookAssets
-    DEPENDS ${DemoAssetCookStamp}
+    DEPENDS ${DemoAssetCookOutput}
 )
 
 add_dependencies(${TargetName} AltinaEngineDemoMinimalCookAssets)

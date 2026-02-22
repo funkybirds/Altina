@@ -111,9 +111,9 @@ namespace {
             Rendering::FBasicDeferredRenderer::SetDefaultMaterialTemplate(materialTemplate);
             Rendering::FBasicDeferredRenderer::SetOutputShaderKeys(outputVS, outputPS);
 
-            const auto baseColorId = RenderCore::HashMaterialParamName(TEXT("BaseColor"));
-            Asset::FMeshMaterialParameterBlock materialParams;
-            materialParams.SetVector(baseColorId, Core::Math::FVector4f(1.0f, 0.0f, 1.0f, 1.0f));
+            // const auto baseColorId = RenderCore::HashMaterialParamName(TEXT("BaseColor"));
+            // Asset::FMeshMaterialParameterBlock materialParams;
+            // materialParams.SetVector(baseColorId, Core::Math::FVector4f(1.0f, 0.0f, 1.0f, 1.0f));
 
             auto&      worldManager = engineLoop.GetWorldManager();
             const auto worldHandle  = worldManager.CreateWorld();
@@ -145,7 +145,7 @@ namespace {
             }
             if (materialComponent.IsValid()) {
                 materialComponent.Get().SetMaterialTemplate(0U, materialHandle);
-                materialComponent.Get().SetMaterialParameters(0U, materialParams);
+                // materialComponent.Get().SetMaterialParameters(0U, materialParams);
             }
 
             {

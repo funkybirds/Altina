@@ -11,6 +11,12 @@
           "asset": "demo/minimal/shaders/basicdeferred",
           "entry": "PSBase"
         }
+      },
+      "overrides":{
+        "BaseColor":{
+          "type":"float4",
+          "value":[1.0,0.6,0.0,0.0]
+        }
       }
     }
   },

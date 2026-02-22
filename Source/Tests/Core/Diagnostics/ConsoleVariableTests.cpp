@@ -1,6 +1,6 @@
 #include "TestHarness.h"
 
-#include "../../Engine/Core/Public/Console/ConsoleVariable.h"
+#include "../../Runtime/Core/Public/Console/ConsoleVariable.h"
 
 using namespace AltinaEngine::Core::Console;
 

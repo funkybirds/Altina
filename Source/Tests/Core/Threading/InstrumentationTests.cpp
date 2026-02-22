@@ -1,5 +1,5 @@
 #include "TestHarness.h"
-#include "../../Engine/Core/Public/Instrumentation/Instrumentation.h"
+#include "../../Runtime/Core/Public/Instrumentation/Instrumentation.h"
 #include <cstring>
 
 using namespace AltinaEngine::Core::Instrumentation;

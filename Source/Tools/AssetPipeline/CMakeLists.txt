@@ -4,6 +4,14 @@ add_executable(${TargetName})
 
 set(Target_Private_Sources
     Private/AssetToolMain.cpp
+    Private/AssetToolIO.cpp
+    Private/Importers/Audio/AudioImporter.cpp
+    Private/Importers/Material/MaterialImporter.cpp
+    Private/Importers/Mesh/MeshImporter.cpp
+    Private/Importers/Model/GltfImporter.cpp
+    Private/Importers/Model/ModelImporter.cpp
+    Private/Importers/Shader/ShaderImporter.cpp
+    Private/Importers/Texture/TextureImporter.cpp
 )
 
 target_sources(${TargetName}

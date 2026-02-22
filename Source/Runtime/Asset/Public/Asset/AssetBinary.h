@@ -119,6 +119,29 @@ namespace AltinaEngine::Asset {
         u32          SamplerFlags = 0;
     };
 
+    struct AE_ASSET_API FModelBlobDesc {
+        u32 NodeCount           = 0;
+        u32 MeshRefCount        = 0;
+        u32 MaterialSlotCount   = 0;
+        u32 NodesOffset         = 0;
+        u32 MeshRefsOffset      = 0;
+        u32 MaterialSlotsOffset = 0;
+    };
+
+    struct AE_ASSET_API FModelNodeDesc {
+        i32 ParentIndex    = -1;
+        i32 MeshRefIndex   = -1;
+        f32 Translation[3] = { 0.0f, 0.0f, 0.0f };
+        f32 Rotation[4]    = { 0.0f, 0.0f, 0.0f, 1.0f };
+        f32 Scale[3]       = { 1.0f, 1.0f, 1.0f };
+    };
+
+    struct AE_ASSET_API FModelMeshRef {
+        FAssetHandle Mesh;
+        u32          MaterialSlotOffset = 0;
+        u32          MaterialSlotCount  = 0;
+    };
+
     constexpr u32                kMeshSemanticPosition = 0;
     constexpr u32                kMeshSemanticNormal   = 1;
     constexpr u32                kMeshSemanticTangent  = 2;

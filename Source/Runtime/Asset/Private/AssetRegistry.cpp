@@ -37,6 +37,9 @@ namespace AltinaEngine::Asset {
             if (Core::Utility::String::EqualLiteralI(text, "shader")) {
                 return EAssetType::Shader;
             }
+            if (Core::Utility::String::EqualLiteralI(text, "model")) {
+                return EAssetType::Model;
+            }
             if (Core::Utility::String::EqualLiteralI(text, "audio")) {
                 return EAssetType::Audio;
             }
@@ -103,6 +106,11 @@ namespace AltinaEngine::Asset {
                     break;
                 case EAssetType::Shader:
                     ReadU32Field(descObject, "Language", desc.Shader.Language);
+                    break;
+                case EAssetType::Model:
+                    ReadU32Field(descObject, "NodeCount", desc.Model.NodeCount);
+                    ReadU32Field(descObject, "MeshRefCount", desc.Model.MeshRefCount);
+                    ReadU32Field(descObject, "MaterialSlotCount", desc.Model.MaterialSlotCount);
                     break;
                 case EAssetType::Audio:
                     ReadU32Field(descObject, "Codec", desc.Audio.Codec);

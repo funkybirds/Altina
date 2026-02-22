@@ -24,6 +24,7 @@ namespace AltinaEngine::Asset {
         Redirector       = 6,
         MaterialInstance = 7,
         Shader           = 8,
+        Model            = 9,
     };
 
     struct AE_ASSET_API FAssetHandle {
@@ -69,6 +70,12 @@ namespace AltinaEngine::Asset {
         u32 VariantCount = 0;
     };
 
+    struct AE_ASSET_API FModelDesc {
+        u32 NodeCount         = 0;
+        u32 MeshRefCount      = 0;
+        u32 MaterialSlotCount = 0;
+    };
+
     struct AE_ASSET_API FShaderDesc {
         u32 Language = 0;
     };
@@ -97,6 +104,7 @@ namespace AltinaEngine::Asset {
         FTexture2DDesc        Texture;
         FMeshDesc             Mesh;
         FMaterialDesc         Material;
+        FModelDesc            Model;
         FShaderDesc           Shader;
         FAudioDesc            Audio;
         FScriptDesc           Script;

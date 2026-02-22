@@ -30,6 +30,9 @@ public unsafe struct NativeApi
 
     public delegate* unmanaged[Cdecl]<uint> GetCharInputCount;
     public delegate* unmanaged[Cdecl]<uint, uint> GetCharInputAt;
+
+    public delegate* unmanaged[Cdecl]<uint, uint, uint, Vector3*, bool> GetWorldTranslation;
+    public delegate* unmanaged[Cdecl]<uint, uint, uint, Vector3*, bool> SetWorldTranslation;
 }
 
 internal static unsafe class Native

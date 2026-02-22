@@ -9,6 +9,14 @@ namespace AltinaEngine::Input {
 }
 
 namespace AltinaEngine::Scripting::CoreCLR {
+    using FGetWorldTranslationFn = bool (*)(
+        u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptVector3* outValue);
+    using FSetWorldTranslationFn = bool (*)(
+        u32 worldId, u32 ownerIndex, u32 ownerGeneration, const FScriptVector3* value);
+
+    AE_SCRIPTING_CORECLR_API void SetWorldTranslationAccess(
+        FGetWorldTranslationFn getFn, FSetWorldTranslationFn setFn) noexcept;
+
     class AE_SCRIPTING_CORECLR_API FScriptSystem {
     public:
         FScriptSystem()  = default;

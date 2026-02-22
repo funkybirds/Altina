@@ -4,6 +4,12 @@
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Scripting {
+    struct AE_SCRIPTING_API FScriptVector3 {
+        f32 X = 0.0f;
+        f32 Y = 0.0f;
+        f32 Z = 0.0f;
+    };
+
     struct AE_SCRIPTING_API FNativeApi {
         void (*LogInfo)(const char* message)  = nullptr;
         void (*LogError)(const char* message) = nullptr;
@@ -28,6 +34,11 @@ namespace AltinaEngine::Scripting {
 
         u32 (*GetCharInputCount)()       = nullptr;
         u32 (*GetCharInputAt)(u32 index) = nullptr;
+
+        bool (*GetWorldTranslation)(
+            u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptVector3* outValue) = nullptr;
+        bool (*SetWorldTranslation)(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            const FScriptVector3* value)                                                = nullptr;
     };
 
     struct AE_SCRIPTING_API FManagedCreateArgs {

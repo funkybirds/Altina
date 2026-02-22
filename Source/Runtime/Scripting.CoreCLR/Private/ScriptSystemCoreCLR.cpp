@@ -37,8 +37,10 @@ using AltinaEngine::Core::Logging::FLogger;
 
 namespace AltinaEngine::Scripting::CoreCLR {
     namespace {
-        constexpr auto             kManagedLogCategory = TEXT("Scripting.Managed");
-        const Input::FInputSystem* gInputSystem        = nullptr;
+        constexpr auto             kManagedLogCategory  = TEXT("Scripting.Managed");
+        const Input::FInputSystem* gInputSystem         = nullptr;
+        FGetWorldTranslationFn     gGetWorldTranslation = nullptr;
+        FSetWorldTranslationFn     gSetWorldTranslation = nullptr;
 
         auto ToFStringFromUtf8(const char* message) -> Core::Container::FString {
             using Core::Container::FNativeStringView;
@@ -165,7 +167,29 @@ namespace AltinaEngine::Scripting::CoreCLR {
             }
             return inputs[index];
         }
+
+        auto GetWorldTranslation(
+            u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptVector3* outValue) -> bool {
+            if (!gGetWorldTranslation || outValue == nullptr) {
+                return false;
+            }
+            return gGetWorldTranslation(worldId, ownerIndex, ownerGeneration, outValue);
+        }
+
+        auto SetWorldTranslation(
+            u32 worldId, u32 ownerIndex, u32 ownerGeneration, const FScriptVector3* value) -> bool {
+            if (!gSetWorldTranslation || value == nullptr) {
+                return false;
+            }
+            return gSetWorldTranslation(worldId, ownerIndex, ownerGeneration, value);
+        }
     } // namespace
+
+    void SetWorldTranslationAccess(
+        FGetWorldTranslationFn getFn, FSetWorldTranslationFn setFn) noexcept {
+        gGetWorldTranslation = getFn;
+        gSetWorldTranslation = setFn;
+    }
 
     auto FScriptSystem::Initialize(const FScriptRuntimeConfig& runtimeConfig,
         const FManagedRuntimeConfig& managedConfig, const Input::FInputSystem* inputSystem)
@@ -196,6 +220,8 @@ namespace AltinaEngine::Scripting::CoreCLR {
         mNativeApi.HasFocus               = &HasFocus;
         mNativeApi.GetCharInputCount      = &GetCharInputCount;
         mNativeApi.GetCharInputAt         = &GetCharInputAt;
+        mNativeApi.GetWorldTranslation    = &GetWorldTranslation;
+        mNativeApi.SetWorldTranslation    = &SetWorldTranslation;
 
         if (!mRuntime.Initialize(runtimeConfig, managedConfig, mNativeApi)) {
             gInputSystem = nullptr;

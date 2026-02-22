@@ -4,6 +4,7 @@
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
+#include "Math/LinAlg/Common.h"
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Engine {
@@ -33,6 +34,7 @@ namespace AltinaEngine::Engine {
             viewData.Camera.VerticalFovRadians = component.GetFovYRadians();
             viewData.Camera.NearPlane          = component.GetNearPlane();
             viewData.Camera.FarPlane           = component.GetFarPlane();
+            viewData.Camera.Transform = world.Object(component.GetOwner()).GetWorldTransform();
 
             viewData.ViewRect            = params.ViewRect;
             viewData.RenderTargetExtent  = params.RenderTargetExtent;
@@ -42,6 +44,16 @@ namespace AltinaEngine::Engine {
             viewData.bReverseZ           = params.bReverseZ;
 
             viewData.BeginFrame();
+            const auto viewMatrix     = component.BuildViewMatrix(viewData.Camera.Transform);
+            viewData.Matrices.View    = viewMatrix;
+            viewData.Matrices.InvView = Core::Math::LinAlg::Inverse(viewMatrix);
+            viewData.Matrices.ViewProj =
+                Core::Math::MatMul(viewData.Matrices.ProjUnjittered, viewMatrix);
+            viewData.Matrices.ViewProjJittered =
+                Core::Math::MatMul(viewData.Matrices.ProjJittered, viewMatrix);
+            viewData.Matrices.InvViewProj = Core::Math::LinAlg::Inverse(viewData.Matrices.ViewProj);
+            viewData.Matrices.InvViewProjJittered =
+                Core::Math::LinAlg::Inverse(viewData.Matrices.ViewProjJittered);
 
             outScene.Views.PushBack(Move(sceneView));
         }

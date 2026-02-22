@@ -110,6 +110,9 @@ if(AE_DOTNET_HOST)
     )
     set_property(TARGET AltinaEngineDemoMinimalManagedBuild PROPERTY BUILD_ALWAYS TRUE)
     add_dependencies(${TargetName} AltinaEngineDemoMinimalManagedBuild)
+    if(TARGET AltinaEngineManagedBuild)
+        add_dependencies(AltinaEngineDemoMinimalManagedBuild AltinaEngineManagedBuild)
+    endif()
 
     add_custom_command(
         TARGET AltinaEngineDemoMinimalManagedBuild
@@ -126,6 +129,18 @@ if(AE_DOTNET_HOST)
             ${DemoBinaryDir}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.Minimal.pdb
+            ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.dll
+            ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.runtimeconfig.json
+            ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.deps.json
+            ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.pdb
             ${DemoBinaryDir}
         COMMENT "Staging Minimal demo managed scripting assembly"
     )

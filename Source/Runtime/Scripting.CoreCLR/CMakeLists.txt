@@ -112,6 +112,7 @@ if(AE_DOTNET_HOST)
             ${AE_MANAGED_ROOT}/ManagedLog.cs
             ${AE_MANAGED_ROOT}/ScriptComponent.cs
             ${AE_MANAGED_ROOT}/Input.cs
+            ${AE_MANAGED_ROOT}/Vector3.cs
         BYPRODUCTS
             ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.dll
             ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.runtimeconfig.json

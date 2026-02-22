@@ -1,3 +1,4 @@
+using System;
 using AltinaEngine.Managed;
 
 namespace AltinaEngine.Demo.Minimal;
@@ -7,6 +8,7 @@ public sealed class DemoScript : ScriptComponent
     private float _elapsedSeconds;
     private bool _loggedCreate;
     private bool _loggedFirstTick;
+    private const float MoveSpeed = 2.5f;
 
     public override void OnCreate()
     {
@@ -42,6 +44,44 @@ public sealed class DemoScript : ScriptComponent
         if (Input.WasKeyPressed(EKey.Space))
         {
             ManagedLog.Info("[DemoScript] Space pressed (managed).");
+        }
+
+        if (!TryGetWorldPosition(out var position))
+        {
+            return;
+        }
+
+        float moveX = 0.0f;
+        float moveY = 0.0f;
+        if (Input.IsKeyDown(EKey.W))
+        {
+            moveY += 1.0f;
+        }
+        if (Input.IsKeyDown(EKey.S))
+        {
+            moveY -= 1.0f;
+        }
+        if (Input.IsKeyDown(EKey.A))
+        {
+            moveX -= 1.0f;
+        }
+        if (Input.IsKeyDown(EKey.D))
+        {
+            moveX += 1.0f;
+        }
+
+        if (moveX != 0.0f || moveY != 0.0f)
+        {
+            float length = MathF.Sqrt(moveX * moveX + moveY * moveY);
+            if (length > 0.0f)
+            {
+                moveX /= length;
+                moveY /= length;
+            }
+
+            position.X += moveX * MoveSpeed * dt;
+            position.Y += moveY * MoveSpeed * dt;
+            TrySetWorldPosition(position);
         }
     }
 }

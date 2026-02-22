@@ -6,6 +6,7 @@
 #include "Asset/MeshMaterialParameterBlock.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/ScriptComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
 #include "Launch/EngineLoop.h"
@@ -43,8 +44,11 @@ namespace {
                 TEXT("demo/minimal/materials/purpledeferred"));
             const auto shaderHandle = engineLoop.GetAssetRegistry().FindByPath(
                 TEXT("demo/minimal/shaders/basicdeferred"));
-            if (!meshHandle.IsValid() || !materialHandle.IsValid() || !shaderHandle.IsValid()) {
-                LogError(TEXT("Demo assets missing (mesh, material, or shader)."));
+            const auto scriptHandle =
+                engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/scripts/demoscript"));
+            if (!meshHandle.IsValid() || !materialHandle.IsValid() || !shaderHandle.IsValid()
+                || !scriptHandle.IsValid()) {
+                LogError(TEXT("Demo assets missing (mesh, material, shader, or script)."));
                 return false;
             }
 
@@ -71,6 +75,7 @@ namespace {
 
             auto cameraObject    = world->CreateGameObject(TEXT("Camera"));
             auto cameraComponent = cameraObject.AddComponent<GameScene::FCameraComponent>();
+            auto scriptComponent = cameraObject.AddComponent<GameScene::FScriptComponent>();
             if (cameraComponent.IsValid()) {
                 auto& camera = cameraComponent.Get();
                 camera.SetNearPlane(0.1f);
@@ -79,6 +84,9 @@ namespace {
                 auto transform        = cameraObject.GetWorldTransform();
                 transform.Translation = Core::Math::FVector3f(0.0f, 0.0f, -2.0f);
                 cameraObject.SetWorldTransform(transform);
+            }
+            if (scriptComponent.IsValid()) {
+                scriptComponent.Get().SetScriptAsset(scriptHandle);
             }
 
             auto meshObject    = world->CreateGameObject(TEXT("TriangleMesh"));

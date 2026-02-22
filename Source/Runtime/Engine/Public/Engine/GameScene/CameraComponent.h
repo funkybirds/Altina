@@ -3,6 +3,8 @@
 #include "Engine/EngineAPI.h"
 #include "Engine/GameScene/Component.h"
 #include "Math/LinAlg/ProjectionMatrix.h"
+#include "Math/LinAlg/SpatialTransform.h"
+#include "Math/LinAlg/LookAt.h"
 #include "Reflection/ReflectionAnnotations.h"
 #include "Reflection/ReflectionFwd.h"
 
@@ -28,6 +30,16 @@ namespace AltinaEngine::GameScene {
             -> Math::FMatrix4x4f {
             return LinAlg::FProjectionMatrixf(
                 mFovYRadians, viewWidth, viewHeight, mNearPlane, mFarPlane);
+        }
+
+        [[nodiscard]] auto BuildViewMatrix(
+            const LinAlg::FSpatialTransform& worldTransform) const noexcept -> Math::FMatrix4x4f {
+            const Math::FVector3f eye = worldTransform.Translation;
+            const Math::FVector3f forward =
+                worldTransform.Rotation.RotateVector(Math::FVector3f(0.0f, 0.0f, 1.0f));
+            const Math::FVector3f up =
+                worldTransform.Rotation.RotateVector(Math::FVector3f(0.0f, 1.0f, 0.0f));
+            return LinAlg::LookAtLH(eye, eye + forward, up);
         }
 
     private:

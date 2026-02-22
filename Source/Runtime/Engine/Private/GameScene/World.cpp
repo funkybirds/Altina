@@ -145,6 +145,8 @@ namespace AltinaEngine::GameScene {
             const FStaticMeshFilterComponent&                            component) -> void {
             const auto& mesh = component.GetStaticMesh();
             serializer.BeginObject({});
+            serializer.WriteFieldName(TEXT("asset"));
+            WriteAssetHandleJson(serializer, component.GetStaticMeshAsset());
             serializer.WriteFieldName(TEXT("lodCount"));
             serializer.Write(mesh.GetLodCount());
             serializer.WriteFieldName(TEXT("valid"));

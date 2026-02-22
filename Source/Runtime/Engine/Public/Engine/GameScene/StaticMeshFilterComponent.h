@@ -2,33 +2,50 @@
 
 #include "Engine/EngineAPI.h"
 #include "Engine/GameScene/Component.h"
+#include "Asset/AssetTypes.h"
+#include "Container/Function.h"
 #include "Geometry/StaticMeshData.h"
 #include "Types/Traits.h"
 #include "Reflection/ReflectionAnnotations.h"
 #include "Reflection/ReflectionFwd.h"
 
 namespace AltinaEngine::GameScene {
-    namespace Geometry = RenderCore::Geometry;
+    using AltinaEngine::Move;
+    namespace Asset     = AltinaEngine::Asset;
+    namespace Container = Core::Container;
+    namespace Geometry  = RenderCore::Geometry;
 
     /**
      * @brief Component holding static mesh render data.
      */
     class ACLASS() AE_ENGINE_API FStaticMeshFilterComponent : public FComponent {
     public:
-        [[nodiscard]] auto GetStaticMesh() noexcept -> Geometry::FStaticMeshData& {
-            return mStaticMesh;
+        using FAssetToStaticMeshConverter =
+            Container::TFunction<Geometry::FStaticMeshData(const Asset::FAssetHandle&)>;
+
+        [[nodiscard]] auto GetStaticMesh() noexcept -> Geometry::FStaticMeshData&;
+        [[nodiscard]] auto GetStaticMesh() const noexcept -> const Geometry::FStaticMeshData&;
+
+        void               SetStaticMeshAsset(Asset::FAssetHandle handle) noexcept;
+        [[nodiscard]] auto GetStaticMeshAsset() const noexcept -> Asset::FAssetHandle {
+            return mMeshAsset;
         }
-        [[nodiscard]] auto GetStaticMesh() const noexcept -> const Geometry::FStaticMeshData& {
-            return mStaticMesh;
-        }
-        void SetStaticMesh(Geometry::FStaticMeshData&& mesh) noexcept { mStaticMesh = Move(mesh); }
+
+        static FAssetToStaticMeshConverter AssetToStaticMeshConverter;
 
     private:
         template <auto Member>
         friend struct AltinaEngine::Core::Reflection::Detail::TAutoMemberAccessor;
 
+        void ResolveStaticMesh() const noexcept;
+
     public:
         APROPERTY()
-        Geometry::FStaticMeshData mStaticMesh{};
+        Asset::FAssetHandle mMeshAsset{};
+
+    private:
+        mutable Geometry::FStaticMeshData mStaticMesh{};
+        mutable Asset::FAssetHandle       mResolvedAsset{};
+        mutable bool                      mMeshResolved = false;
     };
 } // namespace AltinaEngine::GameScene

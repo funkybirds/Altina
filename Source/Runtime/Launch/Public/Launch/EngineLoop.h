@@ -26,7 +26,11 @@
 #include "Engine/Runtime/EngineRuntime.h"
 #include "Engine/Runtime/MaterialCache.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "RenderAsset/MaterialShaderAssetLoader.h"
+#include "RenderAsset/MeshAssetConversion.h"
+#include "Asset/MeshAsset.h"
+#include "Types/CheckedCast.h"
 
 using AltinaEngine::Core::Container::TFunction;
 using AltinaEngine::Core::Container::TOwner;
@@ -80,6 +84,47 @@ namespace AltinaEngine::Launch {
                     const Asset::FMeshMaterialParameterBlock& parameters) -> RenderCore::FMaterial {
                 return Rendering::BuildRenderMaterialFromAsset(
                     handle, parameters, registry, manager);
+            };
+        }
+
+        static void BindStaticMeshConverter(
+            Asset::FAssetRegistry& /*registry*/, Asset::FAssetManager& manager) {
+            GameScene::FStaticMeshFilterComponent::AssetToStaticMeshConverter =
+                [&manager](
+                    const Asset::FAssetHandle& handle) -> RenderCore::Geometry::FStaticMeshData {
+                if (!handle.IsValid()) {
+                    return {};
+                }
+
+                const auto asset = manager.Load(handle);
+                if (!asset) {
+                    return {};
+                }
+
+                const auto* meshAsset =
+                    AltinaEngine::CheckedCast<const Asset::FMeshAsset*>(asset.Get());
+                if (meshAsset == nullptr) {
+                    return {};
+                }
+
+                RenderCore::Geometry::FStaticMeshData mesh{};
+                if (!Rendering::ConvertMeshAssetToStaticMesh(*meshAsset, mesh)) {
+                    return {};
+                }
+                for (auto& lod : mesh.Lods) {
+                    lod.PositionBuffer.InitResource();
+                    lod.IndexBuffer.InitResource();
+                    lod.TangentBuffer.InitResource();
+                    lod.UV0Buffer.InitResource();
+                    lod.UV1Buffer.InitResource();
+
+                    lod.PositionBuffer.WaitForInit();
+                    lod.IndexBuffer.WaitForInit();
+                    lod.TangentBuffer.WaitForInit();
+                    lod.UV0Buffer.WaitForInit();
+                    lod.UV1Buffer.WaitForInit();
+                }
+                return mesh;
             };
         }
 

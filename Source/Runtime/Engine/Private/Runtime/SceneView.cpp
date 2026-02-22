@@ -72,12 +72,17 @@ namespace AltinaEngine::Engine {
                 continue;
             }
 
+            const auto& meshData = meshComponent.GetStaticMesh();
+            if (!meshData.IsValid()) {
+                continue;
+            }
+
             const auto       owner = materialComponent.GetOwner();
             FSceneStaticMesh entry{};
             entry.OwnerId             = owner;
             entry.MeshComponentId     = meshId;
             entry.MaterialComponentId = id;
-            entry.Mesh                = &meshComponent.GetStaticMesh();
+            entry.Mesh                = &meshData;
             entry.Materials           = &materialComponent;
             const auto worldTransform = world.Object(owner).GetWorldTransform();
             entry.WorldMatrix         = worldTransform.ToMatrix();

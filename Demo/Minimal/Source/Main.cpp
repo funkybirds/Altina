@@ -3,13 +3,11 @@
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
 #include "Asset/MaterialAsset.h"
-#include "Asset/MeshAsset.h"
 #include "Asset/MeshMaterialParameterBlock.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
-#include "Geometry/StaticMeshData.h"
 #include "Launch/EngineLoop.h"
 #include "Launch/GameClient.h"
 #include "Logging/Log.h"
@@ -20,10 +18,7 @@
 #include "Platform/Generic/GenericPlatformDecl.h"
 #include "Platform/PlatformFileSystem.h"
 #include "Rendering/BasicDeferredRenderer.h"
-#include "RenderAsset/MeshAssetConversion.h"
-#include "RenderAsset/MaterialShaderAssetLoader.h"
 #include "Reflection/JsonSerializer.h"
-#include "ShaderCompiler/ShaderCompiler.h"
 #include "Rhi/RhiInit.h"
 #include "Types/Aliases.h"
 #include "Types/Traits.h"
@@ -53,32 +48,6 @@ namespace {
                 return false;
             }
 
-            auto  meshAsset = assetManager.Load(meshHandle);
-            auto* mesh = meshAsset ? static_cast<Asset::FMeshAsset*>(meshAsset.Get()) : nullptr;
-            if (mesh == nullptr) {
-                LogError(TEXT("Failed to load mesh asset."));
-                return false;
-            }
-
-            RenderCore::Geometry::FStaticMeshData meshData;
-            if (!Rendering::ConvertMeshAssetToStaticMesh(*mesh, meshData)) {
-                LogError(TEXT("Failed to build static mesh data from asset."));
-                return false;
-            }
-            for (auto& lod : meshData.Lods) {
-                lod.PositionBuffer.InitResource();
-                lod.IndexBuffer.InitResource();
-                lod.TangentBuffer.InitResource();
-                lod.UV0Buffer.InitResource();
-                lod.UV1Buffer.InitResource();
-
-                lod.PositionBuffer.WaitForInit();
-                lod.IndexBuffer.WaitForInit();
-                lod.TangentBuffer.WaitForInit();
-                lod.UV0Buffer.WaitForInit();
-                lod.UV1Buffer.WaitForInit();
-            }
-
             auto  materialAsset = assetManager.Load(materialHandle);
             auto* materialTemplateAsset =
                 materialAsset ? static_cast<Asset::FMaterialAsset*>(materialAsset.Get()) : nullptr;
@@ -86,30 +55,6 @@ namespace {
                 LogError(TEXT("Failed to load material template asset."));
                 return false;
             }
-
-            auto materialTemplate = Rendering::BuildMaterialTemplateFromAsset(
-                *materialTemplateAsset, engineLoop.GetAssetRegistry(), assetManager);
-            if (!materialTemplate) {
-                LogError(TEXT("Failed to build material template."));
-                return false;
-            }
-
-            RenderCore::FShaderRegistry::FShaderKey outputVS{};
-            RenderCore::FShaderRegistry::FShaderKey outputPS{};
-            ShaderCompiler::FShaderCompileResult    outputVsResult{};
-            ShaderCompiler::FShaderCompileResult    outputPsResult{};
-            if (!Rendering::CompileShaderFromAsset(shaderHandle, FStringView(TEXT("VSComposite")),
-                    Shader::EShaderStage::Vertex, engineLoop.GetAssetRegistry(), assetManager,
-                    outputVS, outputVsResult)
-                || !Rendering::CompileShaderFromAsset(shaderHandle,
-                    FStringView(TEXT("PSComposite")), Shader::EShaderStage::Pixel,
-                    engineLoop.GetAssetRegistry(), assetManager, outputPS, outputPsResult)) {
-                LogError(TEXT("Failed to compile output shaders."));
-                return false;
-            }
-
-            Rendering::FBasicDeferredRenderer::SetDefaultMaterialTemplate(materialTemplate);
-            Rendering::FBasicDeferredRenderer::SetOutputShaderKeys(outputVS, outputPS);
 
             // const auto baseColorId = RenderCore::HashMaterialParamName(TEXT("BaseColor"));
             // Asset::FMeshMaterialParameterBlock materialParams;
@@ -141,7 +86,7 @@ namespace {
             auto materialComponent = meshObject.AddComponent<GameScene::FMeshMaterialComponent>();
 
             if (meshComponent.IsValid()) {
-                meshComponent.Get().SetStaticMesh(AltinaEngine::Move(meshData));
+                meshComponent.Get().SetStaticMeshAsset(meshHandle);
             }
             if (materialComponent.IsValid()) {
                 materialComponent.Get().SetMaterialTemplate(0U, materialHandle);

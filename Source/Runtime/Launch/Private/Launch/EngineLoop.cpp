@@ -9,6 +9,7 @@
 #include "Engine/Runtime/SceneView.h"
 #include "Rendering/BasicDeferredRenderer.h"
 #include "Rendering/BasicForwardRenderer.h"
+#include "Rendering/CommonRendererResource.h"
 #include "Rendering/RenderingSettings.h"
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
@@ -313,6 +314,7 @@ namespace AltinaEngine::Launch {
             mAssetManager.RegisterLoader(&mTexture2DLoader);
             GameScene::FScriptComponent::SetAssetManager(&mAssetManager);
             BindMeshMaterialConverter(mAssetRegistry, mAssetManager);
+            BindStaticMeshConverter(mAssetRegistry, mAssetManager);
             mAssetReady = true;
         }
 
@@ -347,6 +349,8 @@ namespace AltinaEngine::Launch {
             LogError(TEXT("FEngineLoop Init failed: RHIInit failed."));
             return false;
         }
+
+        Rendering::InitCommonRendererResource();
 
         auto* window = mApplication->GetMainWindow();
         if (!window) {
@@ -606,6 +610,7 @@ namespace AltinaEngine::Launch {
             mAssetManager.SetRegistry(nullptr);
             GameScene::FScriptComponent::SetAssetManager(nullptr);
             GameScene::FMeshMaterialComponent::AssetToRenderMaterialConverter = {};
+            GameScene::FStaticMeshFilterComponent::AssetToStaticMeshConverter = {};
             mAssetReady                                                       = false;
         }
 

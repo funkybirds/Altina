@@ -26,6 +26,7 @@ struct VSOutput
 {
     float4 Position : SV_POSITION;
     float4 Albedo   : COLOR0;
+    float2 UV       : TEXCOORD0;
 };
 
 VSOutput VSBase(VSInput input)
@@ -34,8 +35,12 @@ VSOutput VSBase(VSInput input)
     float4 worldPos = mul(World, float4(input.Position, 1.0f));
     output.Position = mul(ViewProjection, worldPos);
     output.Albedo   = BaseColor;
+    output.UV       = input.Position.xy;
     return output;
 }
+
+Texture2D    BaseColorTex : register(t1);
+SamplerState BaseColorTexSampler : register(s1);
 
 struct PSOutput
 {
@@ -46,7 +51,7 @@ struct PSOutput
 PSOutput PSBase(VSOutput input)
 {
     PSOutput output;
-    output.Albedo = input.Albedo;
+    output.Albedo = BaseColorTex.Sample(BaseColorTexSampler, input.UV);
     output.Normal = float4(0.5f, 0.5f, 1.0f, 1.0f);
     return output;
 }

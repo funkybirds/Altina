@@ -43,8 +43,10 @@ namespace AltinaEngine::Core::Logging {
 
         static void SetLogSink(FLogSink Sink, void* UserData = nullptr);
         static void ResetLogSink();
+        static auto HasCustomLogSink() noexcept -> bool;
 
         static void Log(ELogLevel Level, FStringView Category, FStringView Message);
+        static void LogToDefaultSink(ELogLevel Level, FStringView Category, FStringView Message);
 
         static void Log(ELogLevel Level, FStringView Message) {
             Log(Level, GetDefaultCategory(), Message);
@@ -132,3 +134,16 @@ namespace AltinaEngine {
     using Logging::LogWarningCategory;
     using Logging::TFormatString;
 } // namespace AltinaEngine
+
+namespace std {
+    template <typename CharT>
+    struct formatter<AltinaEngine::Core::Container::TBasicStringView<CharT>, CharT> :
+        formatter<std::basic_string<CharT>, CharT> {
+        template <typename FormatContext>
+        auto format(const AltinaEngine::Core::Container::TBasicStringView<CharT>& value,
+            FormatContext&                                                        ctx) const {
+            const std::basic_string<CharT> temp(value.Data(), value.Data() + value.Length());
+            return formatter<std::basic_string<CharT>, CharT>::format(temp, ctx);
+        }
+    };
+} // namespace std

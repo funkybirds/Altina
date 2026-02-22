@@ -1,0 +1,9 @@
+{
+  "Uuid": "45519355-f63e-435a-bb17-d820bda07bb4",
+  "Type": "Texture2D",
+  "VirtualPath": "demo/minimal/purpleblack",
+  "SourcePath": "Demo/Minimal/Assets/PurpleBlack.png",
+  "Importer": "TextureImporter",
+  "ImporterVersion": 1,
+  "Dependencies": []
+}

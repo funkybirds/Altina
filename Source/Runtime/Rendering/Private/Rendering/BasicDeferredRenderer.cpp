@@ -23,6 +23,7 @@
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiTexture.h"
 
+#include <algorithm>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rendering {
@@ -49,13 +50,13 @@ namespace AltinaEngine::Rendering {
 
             Rhi::FRhiBindGroupLayoutRef                       PerFrameLayout;
             Rhi::FRhiBindGroupLayoutRef                       PerDrawLayout;
-            Rhi::FRhiBindGroupLayoutRef                       MaterialLayout;
             Rhi::FRhiBindGroupLayoutRef                       OutputLayout;
             Rhi::FRhiSamplerRef                               OutputSampler;
-            Rhi::FRhiPipelineLayoutRef                        BasePipelineLayout;
             Rhi::FRhiPipelineLayoutRef                        OutputPipelineLayout;
             Rhi::FRhiPipelineRef                              OutputPipeline;
             THashMap<u64, Rhi::FRhiPipelineRef>               BasePipelines;
+            THashMap<u64, Rhi::FRhiBindGroupLayoutRef>        MaterialLayouts;
+            THashMap<u64, Rhi::FRhiPipelineLayoutRef>         BasePipelineLayouts;
             Rhi::FRhiVertexLayoutDesc                         BaseVertexLayout;
             bool                                              bBaseVertexLayoutReady = false;
         };
@@ -83,12 +84,63 @@ namespace AltinaEngine::Rendering {
             return hash;
         }
 
+        auto BuildMaterialBindGroupLayoutDesc(const RenderCore::FMaterialLayout& materialLayout,
+            TVector<Rhi::FRhiBindGroupLayoutEntry>& outEntries) -> u64 {
+            outEntries.Clear();
+
+            if (materialLayout.PropertyBag.IsValid()) {
+                Rhi::FRhiBindGroupLayoutEntry entry{};
+                entry.mBinding          = materialLayout.PropertyBag.GetBinding();
+                entry.mType             = Rhi::ERhiBindingType::ConstantBuffer;
+                entry.mVisibility       = Rhi::ERhiShaderStageFlags::All;
+                entry.mArrayCount       = 1U;
+                entry.mHasDynamicOffset = false;
+                outEntries.PushBack(entry);
+            }
+
+            const usize textureCount = materialLayout.TextureBindings.Size();
+            for (usize i = 0U; i < textureCount; ++i) {
+                Rhi::FRhiBindGroupLayoutEntry entry{};
+                entry.mBinding          = materialLayout.TextureBindings[i];
+                entry.mType             = Rhi::ERhiBindingType::SampledTexture;
+                entry.mVisibility       = Rhi::ERhiShaderStageFlags::All;
+                entry.mArrayCount       = 1U;
+                entry.mHasDynamicOffset = false;
+                outEntries.PushBack(entry);
+            }
+
+            const usize samplerCount = materialLayout.SamplerBindings.Size();
+            for (usize i = 0U; i < samplerCount; ++i) {
+                const u32 samplerBinding = materialLayout.SamplerBindings[i];
+                if (samplerBinding == RenderCore::kMaterialInvalidBinding) {
+                    continue;
+                }
+                Rhi::FRhiBindGroupLayoutEntry entry{};
+                entry.mBinding          = samplerBinding;
+                entry.mType             = Rhi::ERhiBindingType::Sampler;
+                entry.mVisibility       = Rhi::ERhiShaderStageFlags::All;
+                entry.mArrayCount       = 1U;
+                entry.mHasDynamicOffset = false;
+                outEntries.PushBack(entry);
+            }
+
+            std::sort(outEntries.begin(), outEntries.end(), [](const auto& lhs, const auto& rhs) {
+                if (lhs.mBinding != rhs.mBinding) {
+                    return lhs.mBinding < rhs.mBinding;
+                }
+                return lhs.mType < rhs.mType;
+            });
+
+            return BuildLayoutHash(outEntries, 0U);
+        }
+
         void UpdateDefaultPassDesc(FDeferredSharedResources& resources) {
             if (!resources.DefaultTemplate) {
                 return;
             }
             const auto* baseDesc = resources.DefaultTemplate->FindPassDesc(EMaterialPass::BasePass);
-            const auto* anyDesc  = baseDesc ? baseDesc : resources.DefaultTemplate->FindAnyPassDesc();
+            const auto* anyDesc =
+                baseDesc ? baseDesc : resources.DefaultTemplate->FindAnyPassDesc();
             if (anyDesc != nullptr) {
                 resources.DefaultPassDesc = *anyDesc;
             }
@@ -160,23 +212,6 @@ namespace AltinaEngine::Rendering {
                 resources.PerDrawLayout = device.CreateBindGroupLayout(layoutDesc);
             }
 
-            if (!resources.MaterialLayout) {
-                const auto& materialLayout = resources.DefaultPassDesc.Layout;
-                if (materialLayout.PropertyBag.IsValid()) {
-                    Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding    = materialLayout.PropertyBag.GetBinding();
-                    entry.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                    entry.mVisibility = Rhi::ERhiShaderStageFlags::All;
-
-                    Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                    layoutDesc.mSetIndex = 0U;
-                    layoutDesc.mEntries.PushBack(entry);
-                    layoutDesc.mLayoutHash =
-                        BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                    resources.MaterialLayout = device.CreateBindGroupLayout(layoutDesc);
-                }
-            }
-
             if (!resources.OutputLayout) {
                 Rhi::FRhiBindGroupLayoutEntry textureEntry{};
                 textureEntry.mBinding    = 0U;
@@ -199,20 +234,6 @@ namespace AltinaEngine::Rendering {
             if (!resources.OutputSampler) {
                 Rhi::FRhiSamplerDesc samplerDesc{};
                 resources.OutputSampler = Rhi::RHICreateSampler(samplerDesc);
-            }
-
-            if (!resources.BasePipelineLayout) {
-                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
-                if (resources.PerFrameLayout) {
-                    layoutDesc.mBindGroupLayouts.PushBack(resources.PerFrameLayout.Get());
-                }
-                if (resources.PerDrawLayout) {
-                    layoutDesc.mBindGroupLayouts.PushBack(resources.PerDrawLayout.Get());
-                }
-                if (resources.MaterialLayout) {
-                    layoutDesc.mBindGroupLayouts.PushBack(resources.MaterialLayout.Get());
-                }
-                resources.BasePipelineLayout = device.CreatePipelineLayout(layoutDesc);
             }
 
             if (!resources.OutputPipelineLayout) {
@@ -259,7 +280,6 @@ namespace AltinaEngine::Rendering {
             RenderCore::FShaderRegistry*         Registry        = nullptr;
             THashMap<u64, Rhi::FRhiPipelineRef>* PipelineCache   = nullptr;
             const RenderCore::FMaterialPassDesc* DefaultPassDesc = nullptr;
-            Rhi::FRhiPipelineLayout*             PipelineLayout  = nullptr;
             Rhi::FRhiVertexLayoutDesc            VertexLayout;
         };
 
@@ -275,7 +295,64 @@ namespace AltinaEngine::Rendering {
                 return nullptr;
             }
 
-            const u64 key = batch.BatchKey.PipelineKey;
+            auto&       resources  = GetSharedResources();
+            const auto& passLayout = resolvedPass->Layout;
+            if (!passLayout.PropertyBag.IsValid() && passLayout.TextureBindings.IsEmpty()) {
+                return nullptr;
+            }
+
+            TVector<Rhi::FRhiBindGroupLayoutEntry> layoutEntries;
+            const u64                              materialLayoutHash =
+                BuildMaterialBindGroupLayoutDesc(passLayout, layoutEntries);
+
+            Rhi::FRhiBindGroupLayoutRef materialLayoutRef;
+            if (const auto it = resources.MaterialLayouts.find(materialLayoutHash);
+                it != resources.MaterialLayouts.end()) {
+                materialLayoutRef = it->second;
+            } else {
+                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+                layoutDesc.mSetIndex   = 0U;
+                layoutDesc.mEntries    = layoutEntries;
+                layoutDesc.mLayoutHash = materialLayoutHash;
+                materialLayoutRef      = data->Device->CreateBindGroupLayout(layoutDesc);
+                if (!materialLayoutRef) {
+                    return nullptr;
+                }
+                resources.MaterialLayouts[materialLayoutHash] = materialLayoutRef;
+                LogInfo(TEXT("BasePass MaterialLayout entries={} hash={}"),
+                    static_cast<u32>(layoutEntries.Size()), materialLayoutHash);
+                for (const auto& entry : layoutEntries) {
+                    LogInfo(TEXT("  MaterialLayout binding={} type={} vis={}"), entry.mBinding,
+                        static_cast<u32>(entry.mType), static_cast<u32>(entry.mVisibility));
+                }
+            }
+
+            Rhi::FRhiPipelineLayoutRef pipelineLayout;
+            if (const auto it = resources.BasePipelineLayouts.find(materialLayoutHash);
+                it != resources.BasePipelineLayouts.end()) {
+                pipelineLayout = it->second;
+            } else {
+                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
+                if (resources.PerFrameLayout) {
+                    layoutDesc.mBindGroupLayouts.PushBack(resources.PerFrameLayout.Get());
+                }
+                if (resources.PerDrawLayout) {
+                    layoutDesc.mBindGroupLayouts.PushBack(resources.PerDrawLayout.Get());
+                }
+                if (materialLayoutRef) {
+                    layoutDesc.mBindGroupLayouts.PushBack(materialLayoutRef.Get());
+                }
+                pipelineLayout = data->Device->CreatePipelineLayout(layoutDesc);
+                if (!pipelineLayout) {
+                    return nullptr;
+                }
+                resources.BasePipelineLayouts[materialLayoutHash] = pipelineLayout;
+                LogInfo(TEXT("BasePass PipelineLayout groups={} hash={}"),
+                    static_cast<u32>(layoutDesc.mBindGroupLayouts.Size()), materialLayoutHash);
+            }
+
+            const u64 key =
+                batch.BatchKey.PipelineKey ^ (materialLayoutHash * 0x9e3779b97f4a7c15ULL);
             if (const auto it = data->PipelineCache->find(key); it != data->PipelineCache->end()) {
                 return it->second.Get();
             }
@@ -290,7 +367,7 @@ namespace AltinaEngine::Rendering {
             desc.mDebugName.Assign(TEXT("BasicDeferred.BasePassPipeline"));
             desc.mVertexShader   = vs.Get();
             desc.mPixelShader    = ps.Get();
-            desc.mPipelineLayout = data->PipelineLayout;
+            desc.mPipelineLayout = pipelineLayout.Get();
             desc.mVertexLayout   = data->VertexLayout;
 
             auto pipeline = data->Device->CreateGraphicsPipeline(desc);
@@ -338,8 +415,8 @@ namespace AltinaEngine::Rendering {
         auto& resources           = GetSharedResources();
         resources.DefaultTemplate = Move(templ);
         resources.DefaultPassDesc = {};
-        resources.MaterialLayout.Reset();
-        resources.BasePipelineLayout.Reset();
+        resources.MaterialLayouts.clear();
+        resources.BasePipelineLayouts.clear();
         resources.BasePipelines.clear();
         EnsureDefaultTemplate(resources);
     }
@@ -347,7 +424,7 @@ namespace AltinaEngine::Rendering {
     void FBasicDeferredRenderer::SetOutputShaderKeys(
         const RenderCore::FShaderRegistry::FShaderKey& vs,
         const RenderCore::FShaderRegistry::FShaderKey& ps) noexcept {
-        auto& resources = GetSharedResources();
+        auto& resources       = GetSharedResources();
         resources.OutputVSKey = vs;
         resources.OutputPSKey = ps;
         resources.OutputPipeline.Reset();
@@ -483,7 +560,6 @@ namespace AltinaEngine::Rendering {
         pipelineData.Registry        = &resources.Registry;
         pipelineData.PipelineCache   = &resources.BasePipelines;
         pipelineData.DefaultPassDesc = &resources.DefaultPassDesc;
-        pipelineData.PipelineLayout  = resources.BasePipelineLayout.Get();
         pipelineData.VertexLayout    = resources.BaseVertexLayout;
 
         FBasePassBindingData bindingData{};

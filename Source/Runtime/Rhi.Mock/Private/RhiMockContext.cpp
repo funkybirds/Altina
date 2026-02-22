@@ -566,6 +566,15 @@ namespace AltinaEngine::Rhi {
                 return MakeResource<FRhiMockBindGroup>(desc, mCounters);
             }
 
+            void UpdateTextureSubresource(FRhiTexture* texture, u32 mipLevel, const void* data,
+                u32 rowPitchBytes, u32 slicePitchBytes) override {
+                (void)texture;
+                (void)mipLevel;
+                (void)data;
+                (void)rowPitchBytes;
+                (void)slicePitchBytes;
+            }
+
             auto CreateFence(u64 initialValue) -> FRhiFenceRef override {
                 return MakeResource<FRhiMockFence>(initialValue, mCounters);
             }

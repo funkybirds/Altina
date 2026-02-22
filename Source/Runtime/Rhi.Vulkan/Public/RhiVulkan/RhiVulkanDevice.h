@@ -87,6 +87,9 @@ namespace AltinaEngine::Rhi {
             -> FRhiBindGroupLayoutRef override;
         auto CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef override;
 
+        void UpdateTextureSubresource(FRhiTexture* texture, u32 mipLevel, const void* data,
+            u32 rowPitchBytes, u32 slicePitchBytes) override;
+
         auto CreateFence(u64 initialValue) -> FRhiFenceRef override;
 #ifdef CreateSemaphore
     #undef CreateSemaphore

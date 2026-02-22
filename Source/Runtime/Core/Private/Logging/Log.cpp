@@ -93,12 +93,21 @@ namespace AltinaEngine::Core::Logging {
 
     void FLogger::ResetLogSink() { SetLogSink(nullptr, nullptr); }
 
+    auto FLogger::HasCustomLogSink() noexcept -> bool { return gUserSink != nullptr; }
+
     void FLogger::Log(ELogLevel Level, FStringView Category, FStringView Message) {
         if (!ShouldLog(Level)) {
             return;
         }
 
         Dispatch(Level, Category, Message);
+    }
+
+    void FLogger::LogToDefaultSink(ELogLevel Level, FStringView Category, FStringView Message) {
+        if (!ShouldLog(Level)) {
+            return;
+        }
+        DefaultSink(Level, Category, Message, nullptr);
     }
 
     auto FLogger::ShouldLog(ELogLevel Level) noexcept -> bool {

@@ -49,8 +49,9 @@
 #include <vector>
 #include <type_traits>
 #include <limits>
-#include <iostream>
 #include <functional>
+#include <mutex>
+#include <string>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
@@ -356,6 +357,8 @@ namespace AltinaEngine::Rhi {
 
         void BindShaderResource(ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
             ID3D11ShaderResourceView* view) {
+            LogInfoCat(kD3D11DebugCategory, TEXT("BindShaderResource stage={} slot={} view={}"),
+                static_cast<u32>(stage), slot, static_cast<const void*>(view));
             switch (stage) {
                 case EShaderStage::Vertex:
                     context->VSSetShaderResources(slot, 1, &view);
@@ -382,6 +385,40 @@ namespace AltinaEngine::Rhi {
 
         void BindSampler(ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
             ID3D11SamplerState* sampler) {
+            if (context == nullptr) {
+                return;
+            }
+            if (sampler == nullptr) {
+                static std::mutex                 sDefaultSamplerMutex;
+                static ComPtr<ID3D11SamplerState> sDefaultSampler;
+                if (!sDefaultSampler) {
+                    std::lock_guard<std::mutex> lock(sDefaultSamplerMutex);
+                    if (!sDefaultSampler) {
+                        ComPtr<ID3D11Device> device;
+                        context->GetDevice(&device);
+                        if (device) {
+                            D3D11_SAMPLER_DESC samplerDesc = {};
+                            samplerDesc.Filter             = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+                            samplerDesc.AddressU           = D3D11_TEXTURE_ADDRESS_WRAP;
+                            samplerDesc.AddressV           = D3D11_TEXTURE_ADDRESS_WRAP;
+                            samplerDesc.AddressW           = D3D11_TEXTURE_ADDRESS_WRAP;
+                            samplerDesc.MipLODBias         = 0.0f;
+                            samplerDesc.MaxAnisotropy      = 1;
+                            samplerDesc.ComparisonFunc     = D3D11_COMPARISON_ALWAYS;
+                            samplerDesc.BorderColor[0]     = 0.0f;
+                            samplerDesc.BorderColor[1]     = 0.0f;
+                            samplerDesc.BorderColor[2]     = 0.0f;
+                            samplerDesc.BorderColor[3]     = 0.0f;
+                            samplerDesc.MinLOD             = 0.0f;
+                            samplerDesc.MaxLOD             = D3D11_FLOAT32_MAX;
+                            (void)device->CreateSamplerState(&samplerDesc, &sDefaultSampler);
+                        }
+                    }
+                }
+                sampler = sDefaultSampler.Get();
+            }
+            LogInfoCat(kD3D11DebugCategory, TEXT("BindSampler stage={} slot={} sampler={}"),
+                static_cast<u32>(stage), slot, static_cast<const void*>(sampler));
             switch (stage) {
                 case EShaderStage::Vertex:
                     context->VSSetSamplers(slot, 1, &sampler);
@@ -508,6 +545,16 @@ namespace AltinaEngine::Rhi {
             geometryShader = gs ? gs->GetGeometryShader() : nullptr;
             hullShader     = hs ? hs->GetHullShader() : nullptr;
             domainShader   = ds ? ds->GetDomainShader() : nullptr;
+
+            const auto& mappings = graphicsPipeline->GetBindingMappings();
+            LogInfoCat(kD3D11DebugCategory, TEXT("GraphicsPipeline bindings: {}"),
+                static_cast<u32>(mappings.Size()));
+            for (const auto& mapping : mappings) {
+                LogInfoCat(kD3D11DebugCategory,
+                    TEXT("  Binding set={} binding={} type={} stage={} reg={} space={}"),
+                    mapping.mSet, mapping.mBinding, static_cast<u32>(mapping.mType),
+                    static_cast<u32>(mapping.mStage), mapping.mRegister, mapping.mSpace);
+            }
         }
 
         context->IASetInputLayout(inputLayout);
@@ -806,6 +853,10 @@ namespace AltinaEngine::Rhi {
         }
 
         const auto& groupDesc = group->GetDesc();
+        LogInfoCat(kD3D11DebugCategory,
+            TEXT("RHISetBindGroup set={} entries={} dynOffsets={} layout={}"), setIndex,
+            static_cast<u32>(groupDesc.mEntries.Size()), dynamicOffsetCount,
+            static_cast<const void*>(groupDesc.mLayout));
         if (groupDesc.mEntries.IsEmpty()) {
             return;
         }
@@ -843,6 +894,7 @@ namespace AltinaEngine::Rhi {
 
         auto applyMappings = [&](const TVector<FD3D11BindingMappingEntry>& mappings) {
             for (const auto& entry : groupDesc.mEntries) {
+                bool matched = false;
                 for (const auto& mapping : mappings) {
                     if (mapping.mSet != setIndex || mapping.mBinding != entry.mBinding) {
                         continue;
@@ -852,6 +904,11 @@ namespace AltinaEngine::Rhi {
                     }
 
                     const UINT slot = static_cast<UINT>(mapping.mRegister + entry.mArrayIndex);
+                    matched         = true;
+                    LogInfoCat(kD3D11DebugCategory,
+                        TEXT("BindGroupMatch set={} binding={} type={} stage={} reg={} slot={}"),
+                        setIndex, entry.mBinding, static_cast<u32>(entry.mType),
+                        static_cast<u32>(mapping.mStage), mapping.mRegister, slot);
 
                     switch (mapping.mType) {
                         case ERhiBindingType::ConstantBuffer:
@@ -963,6 +1020,82 @@ namespace AltinaEngine::Rhi {
                         case ERhiBindingType::AccelerationStructure:
                         default:
                             break;
+                    }
+                }
+                if (!matched) {
+                    LogInfoCat(kD3D11DebugCategory,
+                        TEXT("BindGroupNoMatch set={} binding={} type={}"), setIndex,
+                        entry.mBinding, static_cast<u32>(entry.mType));
+                    if (!mState->mUseComputeBindings && layoutEntries != nullptr) {
+                        Rhi::ERhiShaderStageFlags visibility = Rhi::ERhiShaderStageFlags::All;
+                        for (const auto& layoutEntry : *layoutEntries) {
+                            if (layoutEntry.mBinding == entry.mBinding
+                                && layoutEntry.mType == entry.mType) {
+                                visibility = layoutEntry.mVisibility;
+                                break;
+                            }
+                        }
+
+                        auto forEachStage = [&](auto&& fn) {
+                            using Rhi::ERhiShaderStageFlags;
+                            if ((static_cast<u8>(visibility)
+                                    & static_cast<u8>(ERhiShaderStageFlags::Vertex))
+                                != 0U) {
+                                fn(EShaderStage::Vertex);
+                            }
+                            if ((static_cast<u8>(visibility)
+                                    & static_cast<u8>(ERhiShaderStageFlags::Pixel))
+                                != 0U) {
+                                fn(EShaderStage::Pixel);
+                            }
+                            if ((static_cast<u8>(visibility)
+                                    & static_cast<u8>(ERhiShaderStageFlags::Geometry))
+                                != 0U) {
+                                fn(EShaderStage::Geometry);
+                            }
+                            if ((static_cast<u8>(visibility)
+                                    & static_cast<u8>(ERhiShaderStageFlags::Hull))
+                                != 0U) {
+                                fn(EShaderStage::Hull);
+                            }
+                            if ((static_cast<u8>(visibility)
+                                    & static_cast<u8>(ERhiShaderStageFlags::Domain))
+                                != 0U) {
+                                fn(EShaderStage::Domain);
+                            }
+                        };
+
+                        const UINT slot = static_cast<UINT>(entry.mBinding);
+                        switch (entry.mType) {
+                            case ERhiBindingType::SampledTexture:
+                            {
+                                auto* texture = static_cast<FRhiD3D11Texture*>(entry.mTexture);
+                                ID3D11ShaderResourceView* view =
+                                    texture ? texture->GetShaderResourceView() : nullptr;
+                                LogInfoCat(kD3D11DebugCategory,
+                                    TEXT("BindGroupFallback SampledTexture binding={} slot={}"),
+                                    entry.mBinding, slot);
+                                forEachStage([&](EShaderStage stage) {
+                                    BindShaderResource(context, stage, slot, view);
+                                });
+                                break;
+                            }
+                            case ERhiBindingType::Sampler:
+                            {
+                                auto* sampler = static_cast<FRhiD3D11Sampler*>(entry.mSampler);
+                                ID3D11SamplerState* nativeSampler =
+                                    sampler ? sampler->GetNativeSampler() : nullptr;
+                                LogInfoCat(kD3D11DebugCategory,
+                                    TEXT("BindGroupFallback Sampler binding={} slot={}"),
+                                    entry.mBinding, slot);
+                                forEachStage([&](EShaderStage stage) {
+                                    BindSampler(context, stage, slot, nativeSampler);
+                                });
+                                break;
+                            }
+                            default:
+                                break;
+                        }
                     }
                 }
             }
@@ -1126,70 +1259,24 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        auto ConsoleStreamForLevel(ELogLevel level) noexcept -> std::basic_ostream<TChar>& {
-            if (level >= ELogLevel::Warning) {
-                if constexpr (std::is_same_v<TChar, wchar_t>) {
-                    return std::wcerr;
-                } else {
-                    return std::cerr;
-                }
-            }
-
-            if constexpr (std::is_same_v<TChar, wchar_t>) {
-                return std::wcout;
-            } else {
-                return std::cout;
-            }
-        }
-
-        void WriteStdioFallback(ELogLevel level, const TChar* severityText, u32 messageId,
-            const Container::FStringView& messageText) noexcept {
-            auto& stream = ConsoleStreamForLevel(level);
-            stream << TEXT("D3D11 Debug [");
-            if (severityText != nullptr) {
-                stream << severityText;
-            }
-            stream << TEXT(":") << messageId << TEXT("] ");
-            if (!messageText.IsEmpty()) {
-                stream.write(
-                    messageText.Data(), static_cast<std::streamsize>(messageText.Length()));
-            }
-            stream << TEXT('\n');
-            stream.flush();
-        }
-
         void EmitD3D11DebugMessage(D3D11_MESSAGE_SEVERITY severity, u32 messageId,
             const Container::FStringView& messageText) noexcept {
-            const TChar* severityText = SeverityToText(severity);
-            const auto   level        = SeverityToLogLevel(severity);
-            bool         logged       = false;
-
-            try {
-                switch (level) {
-                    case ELogLevel::Error:
-                        LogErrorCat(kD3D11DebugCategory, TEXT("D3D11 Debug [{}:{}] {}"),
-                            severityText, messageId, messageText);
-                        break;
-                    case ELogLevel::Warning:
-                        LogWarningCat(kD3D11DebugCategory, TEXT("D3D11 Debug [{}:{}] {}"),
-                            severityText, messageId, messageText);
-                        break;
-                    case ELogLevel::Info:
-                    case ELogLevel::Debug:
-                    case ELogLevel::Trace:
-                    case ELogLevel::Fatal:
-                    default:
-                        LogInfoCat(kD3D11DebugCategory, TEXT("D3D11 Debug [{}:{}] {}"),
-                            severityText, messageId, messageText);
-                        break;
-                }
-                logged = true;
-            } catch (...) {
-                logged = false;
+            const TChar*       severityText = SeverityToText(severity);
+            const auto         level        = SeverityToLogLevel(severity);
+            Container::FString message;
+            message.Append(TEXT("D3D11 Debug ["));
+            if (severityText != nullptr) {
+                message.Append(severityText);
             }
+            message.Append(TEXT(":"));
+            message.AppendNumber(messageId);
+            message.Append(TEXT("] "));
+            message.Append(messageText);
 
-            if (!logged) {
-                WriteStdioFallback(level, severityText, messageId, messageText);
+            const auto messageView = message.ToView();
+            FLogger::Log(level, kD3D11DebugCategory, messageView);
+            if (FLogger::HasCustomLogSink()) {
+                FLogger::LogToDefaultSink(level, kD3D11DebugCategory, messageView);
             }
         }
 
@@ -1316,7 +1403,15 @@ namespace AltinaEngine::Rhi {
             TVector<FD3D11BindingMappingEntry>& outBindings) -> void {
             for (const auto& resource : reflection.mResources) {
                 const auto bindingType = ToBindingType(resource);
-                if (!HasLayoutBinding(layout, resource.mSet, resource.mBinding, bindingType)) {
+                const bool hasLayout =
+                    HasLayoutBinding(layout, resource.mSet, resource.mBinding, bindingType);
+                LogInfoCat(kD3D11DebugCategory,
+                    TEXT("ShaderReflection stage={} name={} type={} set={} binding={} reg={} ")
+                        TEXT("space={} hasLayout={}"),
+                    static_cast<u32>(stage), resource.mName.CStr(), static_cast<u32>(bindingType),
+                    resource.mSet, resource.mBinding, resource.mRegister, resource.mSpace,
+                    hasLayout ? 1 : 0);
+                if (!hasLayout) {
                     continue;
                 }
 
@@ -1632,6 +1727,8 @@ namespace AltinaEngine::Rhi {
             mState->mDevice.Attach(device);
             mState->mImmediateContext.Attach(context);
             mState->mFeatureLevel = static_cast<D3D_FEATURE_LEVEL>(featureLevel);
+            LogInfoCat(kD3D11DebugCategory, TEXT("Rhi.D3D11 build stamp: {} {} (this={})"),
+                TEXT(__DATE__), TEXT(__TIME__), static_cast<const void*>(this));
         }
 
         if (mState && mState->mDevice) {
@@ -1932,6 +2029,34 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiD3D11Device::CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef {
         return MakeResource<FRhiD3D11BindGroup>(desc);
+    }
+
+    void FRhiD3D11Device::UpdateTextureSubresource(FRhiTexture* texture, u32 mipLevel,
+        const void* data, u32 rowPitchBytes, u32 slicePitchBytes) {
+#if AE_PLATFORM_WIN
+        if (texture == nullptr || data == nullptr || rowPitchBytes == 0U) {
+            return;
+        }
+
+        auto* context = GetImmediateContext();
+        if (context == nullptr) {
+            return;
+        }
+
+        auto* d3dTexture = static_cast<FRhiD3D11Texture*>(texture);
+        auto* native     = d3dTexture ? d3dTexture->GetNativeResource() : nullptr;
+        if (native == nullptr) {
+            return;
+        }
+
+        context->UpdateSubresource(native, mipLevel, nullptr, data, rowPitchBytes, slicePitchBytes);
+#else
+        (void)texture;
+        (void)mipLevel;
+        (void)data;
+        (void)rowPitchBytes;
+        (void)slicePitchBytes;
+#endif
     }
 
     auto FRhiD3D11Device::CreateFence(u64 initialValue) -> FRhiFenceRef {

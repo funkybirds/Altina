@@ -44,10 +44,12 @@ namespace {
                 TEXT("demo/minimal/materials/purpledeferred"));
             const auto shaderHandle = engineLoop.GetAssetRegistry().FindByPath(
                 TEXT("demo/minimal/shaders/basicdeferred"));
+            const auto textureHandle =
+                engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/purpleblack"));
             const auto scriptHandle =
                 engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/scripts/demoscript"));
             if (!meshHandle.IsValid() || !materialHandle.IsValid() || !shaderHandle.IsValid()
-                || !scriptHandle.IsValid()) {
+                || !textureHandle.IsValid() || !scriptHandle.IsValid()) {
                 LogError(TEXT("Demo assets missing (mesh, material, shader, or script)."));
                 return false;
             }
@@ -60,9 +62,14 @@ namespace {
                 return false;
             }
 
-            // const auto baseColorId = RenderCore::HashMaterialParamName(TEXT("BaseColor"));
-            // Asset::FMeshMaterialParameterBlock materialParams;
-            // materialParams.SetVector(baseColorId, Core::Math::FVector4f(1.0f, 0.0f, 1.0f, 1.0f));
+            const auto baseColorTexId = RenderCore::HashMaterialParamName(TEXT("BaseColorTex"));
+            const auto baseColorTexIdAlt =
+                RenderCore::HashMaterialParamName(TEXT("BaseColorTex_0"));
+            Asset::FMeshMaterialParameterBlock materialParams;
+            materialParams.SetTexture(
+                baseColorTexId, Asset::EMeshMaterialTextureType::Texture2D, textureHandle, 0U);
+            materialParams.SetTexture(
+                baseColorTexIdAlt, Asset::EMeshMaterialTextureType::Texture2D, textureHandle, 0U);
 
             auto&      worldManager = engineLoop.GetWorldManager();
             const auto worldHandle  = worldManager.CreateWorld();
@@ -98,7 +105,7 @@ namespace {
             }
             if (materialComponent.IsValid()) {
                 materialComponent.Get().SetMaterialTemplate(0U, materialHandle);
-                // materialComponent.Get().SetMaterialParameters(0U, materialParams);
+                materialComponent.Get().SetMaterialParameters(0U, materialParams);
             }
 
             {

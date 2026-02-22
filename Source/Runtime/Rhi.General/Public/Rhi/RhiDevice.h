@@ -62,6 +62,9 @@ namespace AltinaEngine::Rhi {
             -> FRhiBindGroupLayoutRef                                                   = 0;
         virtual auto CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef = 0;
 
+        virtual void UpdateTextureSubresource(FRhiTexture* texture, u32 mipLevel, const void* data,
+            u32 rowPitchBytes, u32 slicePitchBytes) = 0;
+
         virtual auto CreateFence(u64 initialValue) -> FRhiFenceRef                        = 0;
         virtual auto CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef = 0;
 

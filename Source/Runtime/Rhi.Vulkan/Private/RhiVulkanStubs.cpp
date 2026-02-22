@@ -130,6 +130,15 @@ namespace AltinaEngine::Rhi {
         return {};
     }
 
+    void FRhiVulkanDevice::UpdateTextureSubresource(FRhiTexture* texture, u32 mipLevel,
+        const void* data, u32 rowPitchBytes, u32 slicePitchBytes) {
+        (void)texture;
+        (void)mipLevel;
+        (void)data;
+        (void)rowPitchBytes;
+        (void)slicePitchBytes;
+    }
+
     auto FRhiVulkanDevice::CreateFence(u64 initialValue) -> FRhiFenceRef {
         (void)initialValue;
         return {};

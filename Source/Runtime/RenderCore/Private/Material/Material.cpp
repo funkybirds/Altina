@@ -10,6 +10,7 @@
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiResourceView.h"
 #include "Rhi/RhiSampler.h"
+#include "Logging/Log.h"
 #include "Types/Traits.h"
 
 #include <algorithm>
@@ -592,6 +593,16 @@ namespace AltinaEngine::RenderCore {
                     (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i] : 0U;
                 const auto* param =
                     (nameHash != 0U) ? mParameters.FindTextureParam(nameHash) : nullptr;
+                LogInfo(TEXT("Material BindGroup pass={} texIndex={} nameHash=0x{:08X} binding={} ")
+                            TEXT("samplerBinding={} hasParam={} srv={} sampler={}"),
+                    static_cast<u32>(pass), static_cast<u32>(i), nameHash,
+                    layout.TextureBindings[i],
+                    (i < layout.SamplerBindings.Size()) ? layout.SamplerBindings[i]
+                                                        : kMaterialInvalidBinding,
+                    (param != nullptr) ? 1 : 0,
+                    (param && param->SRV) ? static_cast<const void*>(param->SRV.Get()) : nullptr,
+                    (param && param->Sampler) ? static_cast<const void*>(param->Sampler.Get())
+                                              : nullptr);
 
                 Rhi::FRhiBindGroupEntry texEntry{};
                 texEntry.mBinding = layout.TextureBindings[i];

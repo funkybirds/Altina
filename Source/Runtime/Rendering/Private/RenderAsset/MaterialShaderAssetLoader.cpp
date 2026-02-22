@@ -156,6 +156,27 @@ namespace AltinaEngine::Rendering {
             }
         }
 
+        void LogReflectionResources(
+            const Shader::FShaderReflection* reflection, const FStringView& label) {
+            if (reflection == nullptr) {
+                LogInfo(TEXT("ShaderReflection {}: <null>"), label.Data());
+                return;
+            }
+            LogInfo(TEXT("ShaderReflection {} resources={} cbuffers={}"), label.Data(),
+                static_cast<u32>(reflection->mResources.Size()),
+                static_cast<u32>(reflection->mConstantBuffers.Size()));
+            for (const auto& resource : reflection->mResources) {
+                LogInfo(TEXT("  Resource name={} type={} set={} binding={} reg={} space={}"),
+                    resource.mName.CStr(), static_cast<u32>(resource.mType), resource.mSet,
+                    resource.mBinding, resource.mRegister, resource.mSpace);
+            }
+            for (const auto& cbuffer : reflection->mConstantBuffers) {
+                LogInfo(TEXT("  CBuffer name={} set={} binding={} reg={} space={} size={}"),
+                    cbuffer.mName.CStr(), cbuffer.mSet, cbuffer.mBinding, cbuffer.mRegister,
+                    cbuffer.mSpace, cbuffer.mSizeBytes);
+            }
+        }
+
         auto BuildMaterialLayout(const Shader::FShaderReflection* vertex,
             const Shader::FShaderReflection* pixel) -> RenderCore::FMaterialLayout {
             RenderCore::FMaterialLayout layout;
@@ -163,6 +184,8 @@ namespace AltinaEngine::Rendering {
             if (materialCBuffer == nullptr) {
                 return layout;
             }
+            LogReflectionResources(vertex, TEXT("Vertex"));
+            LogReflectionResources(pixel, TEXT("Pixel"));
             layout.InitFromConstantBuffer(*materialCBuffer);
             AddTextureBindings(layout, pixel);
             AddTextureBindings(layout, vertex);
@@ -296,6 +319,29 @@ namespace AltinaEngine::Rendering {
             auto texture = Rhi::RHICreateTexture(texDesc);
             if (!texture) {
                 return {};
+            }
+
+            const auto& pixels = asset.GetPixels();
+            if (!pixels.IsEmpty()) {
+                const u32 bytesPerPixel = Asset::GetTextureBytesPerPixel(assetDesc.Format);
+                u32       width         = assetDesc.Width;
+                u32       height        = assetDesc.Height;
+                usize     offset        = 0U;
+                for (u32 mip = 0U; mip < texDesc.mMipLevels; ++mip) {
+                    const usize rowPitch   = static_cast<usize>(width) * bytesPerPixel;
+                    const usize slicePitch = rowPitch * static_cast<usize>(height);
+                    if (rowPitch == 0U || slicePitch == 0U) {
+                        break;
+                    }
+                    if (offset + slicePitch > pixels.Size()) {
+                        break;
+                    }
+                    device->UpdateTextureSubresource(texture.Get(), mip, pixels.Data() + offset,
+                        static_cast<u32>(rowPitch), static_cast<u32>(slicePitch));
+                    offset += slicePitch;
+                    width  = (width > 1U) ? (width >> 1U) : 1U;
+                    height = (height > 1U) ? (height >> 1U) : 1U;
+                }
             }
 
             Rhi::FRhiShaderResourceViewDesc viewDesc{};

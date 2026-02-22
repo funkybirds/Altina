@@ -1,14 +1,16 @@
 #include "Asset/AssetBundle.h"
 
 #include "Types/Traits.h"
+#include "Utility/Filesystem/Path.h"
+#include "Utility/String/CodeConvert.h"
 
-#include <filesystem>
 #include <limits>
 
 namespace AltinaEngine::Asset {
     namespace {
-        auto ToPath(const FString& value) -> std::filesystem::path {
-            return std::filesystem::path(value.CStr());
+        auto ToUtf8Path(const FString& value) -> Container::FNativeString {
+            const Core::Utility::Filesystem::FPath path(value);
+            return Core::Utility::String::ToUtf8Bytes(path.GetString());
         }
 
         auto ReadExact(std::ifstream& stream, void* outBuffer, usize size) -> bool {
@@ -36,7 +38,8 @@ namespace AltinaEngine::Asset {
     auto FAssetBundleReader::Open(const FString& path) -> bool {
         Close();
 
-        mFile.open(ToPath(path), std::ios::binary);
+        const auto utf8Path = ToUtf8Path(path);
+        mFile.open(utf8Path.CStr(), std::ios::binary);
         if (!mFile) {
             return false;
         }

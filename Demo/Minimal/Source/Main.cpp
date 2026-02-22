@@ -160,13 +160,8 @@ namespace {
         auto OnTick(Launch::FEngineLoop& engineLoop, float deltaSeconds) -> bool override {
             engineLoop.Tick(deltaSeconds);
             Core::Platform::Generic::PlatformSleepMilliseconds(16);
-            ++mFrameIndex;
-            return mFrameIndex < mMaxFrames;
+            return engineLoop.IsRunning();
         }
-
-    private:
-        u32 mFrameIndex = 0U;
-        u32 mMaxFrames  = 600U;
     };
 } // namespace
 

@@ -2,9 +2,12 @@
 
 #include "Logging/Log.h"
 #include "Types/Aliases.h"
+#include "Utility/Filesystem/FileSystem.h"
+#include "Utility/String/CodeConvert.h"
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -35,7 +38,12 @@
 using AltinaEngine::TChar;
 using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Container::FStringView;
+using AltinaEngine::Core::Container::TVector;
 using AltinaEngine::Core::Logging::LogErrorCat;
+using AltinaEngine::Core::Utility::Filesystem::EnumerateDirectory;
+using AltinaEngine::Core::Utility::Filesystem::FDirectoryEntry;
+using AltinaEngine::Core::Utility::Filesystem::FPath;
+using AltinaEngine::Core::Utility::String::FromUtf8Bytes;
 
 namespace AltinaEngine::Scripting::CoreCLR::Host {
     namespace {
@@ -64,43 +72,59 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             }
         }
 
-        auto ToStdPath(FStringView value) -> std::filesystem::path {
-            return std::filesystem::path(ConvertStringView<TChar, TChar>(value));
-        }
+        auto ToPath(FStringView value) -> FPath { return FPath(value); }
 
-        auto HostFxrLibraryName() -> const char* {
-#if AE_PLATFORM_WIN
-            return "hostfxr.dll";
-#elif AE_PLATFORM_MACOS
-            return "libhostfxr.dylib";
+        auto MakeFStringFromWide(const wchar_t* data, usize length) -> FString {
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+            return FString(data, length);
 #else
-            return "libhostfxr.so";
+            const auto utf8 = WideToUtf8(data, length);
+            return FromUtf8Bytes(utf8.c_str(), utf8.size());
 #endif
         }
 
-        auto NethostLibraryName() -> const char* {
+        auto MakeFStringFromHostFxr(const FHostFxrChar* data, usize length) -> FString {
 #if AE_PLATFORM_WIN
-            return "nethost.dll";
-#elif AE_PLATFORM_MACOS
-            return "libnethost.dylib";
+            return MakeFStringFromWide(data, length);
 #else
-            return "libnethost.so";
+            return FromUtf8Bytes(data, length);
 #endif
         }
 
-        auto ParseVersion(const std::string& value, std::vector<int>& out) -> bool {
-            out.clear();
-            int  current  = 0;
+        auto HostFxrLibraryName() -> const TChar* {
+#if AE_PLATFORM_WIN
+            return TEXT("hostfxr.dll");
+#elif AE_PLATFORM_MACOS
+            return TEXT("libhostfxr.dylib");
+#else
+            return TEXT("libhostfxr.so");
+#endif
+        }
+
+        auto NethostLibraryName() -> const TChar* {
+#if AE_PLATFORM_WIN
+            return TEXT("nethost.dll");
+#elif AE_PLATFORM_MACOS
+            return TEXT("libnethost.dylib");
+#else
+            return TEXT("libnethost.so");
+#endif
+        }
+
+        auto ParseVersion(FStringView value, TVector<i32>& out) -> bool {
+            out.Clear();
+            i32  current  = 0;
             bool hasDigit = false;
-            for (char ch : value) {
-                if (ch >= '0' && ch <= '9') {
-                    current  = (current * 10) + (ch - '0');
+            for (usize i = 0; i < value.Length(); ++i) {
+                const TChar ch = value[i];
+                if (ch >= static_cast<TChar>('0') && ch <= static_cast<TChar>('9')) {
+                    current  = (current * 10) + (ch - static_cast<TChar>('0'));
                     hasDigit = true;
-                } else if (ch == '.') {
+                } else if (ch == static_cast<TChar>('.')) {
                     if (!hasDigit) {
                         return false;
                     }
-                    out.push_back(current);
+                    out.PushBack(current);
                     current  = 0;
                     hasDigit = false;
                 } else {
@@ -110,15 +134,15 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             if (!hasDigit) {
                 return false;
             }
-            out.push_back(current);
-            return !out.empty();
+            out.PushBack(current);
+            return !out.IsEmpty();
         }
 
-        auto IsVersionGreater(const std::vector<int>& a, const std::vector<int>& b) -> bool {
-            const size_t maxCount = std::max(a.size(), b.size());
-            for (size_t i = 0; i < maxCount; ++i) {
-                const int left  = (i < a.size()) ? a[i] : 0;
-                const int right = (i < b.size()) ? b[i] : 0;
+        auto IsVersionGreater(const TVector<i32>& a, const TVector<i32>& b) -> bool {
+            const usize maxCount = (a.Size() > b.Size()) ? a.Size() : b.Size();
+            for (usize i = 0; i < maxCount; ++i) {
+                const i32 left  = (i < a.Size()) ? a[i] : 0;
+                const i32 right = (i < b.Size()) ? b[i] : 0;
                 if (left != right) {
                     return left > right;
                 }
@@ -126,45 +150,45 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             return false;
         }
 
-        auto FindLibraryInRoot(const std::filesystem::path& root, const char* fileName)
-            -> std::filesystem::path {
-            if (root.empty()) {
+        auto FindLibraryInRoot(const FPath& root, const TChar* fileName) -> FPath {
+            if (root.IsEmpty() || fileName == nullptr || fileName[0] == static_cast<TChar>(0)) {
                 return {};
             }
 
-            std::error_code ec;
-            auto            direct = root / fileName;
-            if (std::filesystem::exists(direct, ec)) {
+            const FPath direct = root / fileName;
+            if (direct.Exists()) {
                 return direct;
             }
 
-            auto fxrRoot = root / "host" / "fxr";
-            if (!std::filesystem::exists(fxrRoot, ec)) {
+            const FPath fxrRoot = root / TEXT("host") / TEXT("fxr");
+            if (!Core::Utility::Filesystem::IsDirectory(fxrRoot)) {
                 return {};
             }
 
-            std::filesystem::path bestPath;
-            std::vector<int>      bestVersion;
-            for (const auto& entry : std::filesystem::directory_iterator(fxrRoot, ec)) {
-                if (ec) {
-                    break;
-                }
-                if (!entry.is_directory()) {
+            TVector<FDirectoryEntry> entries;
+            if (!EnumerateDirectory(fxrRoot, false, entries)) {
+                return {};
+            }
+
+            FPath        bestPath;
+            TVector<i32> bestVersion;
+            for (const auto& entry : entries) {
+                if (!entry.IsDirectory) {
                     continue;
                 }
 
-                const std::string versionName = entry.path().filename().string();
-                std::vector<int>  parsed;
+                const auto   versionName = entry.Path.Filename();
+                TVector<i32> parsed;
                 if (!ParseVersion(versionName, parsed)) {
                     continue;
                 }
 
-                auto candidate = entry.path() / fileName;
-                if (!std::filesystem::exists(candidate, ec)) {
+                const FPath candidate = entry.Path / fileName;
+                if (!candidate.Exists()) {
                     continue;
                 }
 
-                if (bestPath.empty() || IsVersionGreater(parsed, bestVersion)) {
+                if (bestPath.IsEmpty() || IsVersionGreater(parsed, bestVersion)) {
                     bestVersion = parsed;
                     bestPath    = candidate;
                 }
@@ -173,7 +197,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             return bestPath;
         }
 
-        auto GetDotnetRootFromEnv() -> std::filesystem::path {
+        auto GetDotnetRootFromEnv() -> FPath {
 #if AE_PLATFORM_WIN
             auto ReadEnv = [](const wchar_t* name) -> std::wstring {
                 DWORD size = GetEnvironmentVariableW(name, nullptr, 0);
@@ -191,40 +215,39 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
 
             std::wstring value = ReadEnv(L"DOTNET_ROOT");
             if (!value.empty()) {
-                return std::filesystem::path(value);
+                return FPath(MakeFStringFromWide(value.c_str(), static_cast<usize>(value.size())));
             }
             value = ReadEnv(L"DOTNET_ROOT(x86)");
             if (!value.empty()) {
-                return std::filesystem::path(value);
+                return FPath(MakeFStringFromWide(value.c_str(), static_cast<usize>(value.size())));
             }
 #else
             if (const char* value = std::getenv("DOTNET_ROOT")) {
-                return std::filesystem::path(value);
+                return FPath(Core::Utility::String::FromUtf8Bytes(value, std::strlen(value)));
             }
 #endif
             return {};
         }
 
-        auto FindHostFxrWithNethost(const std::vector<std::filesystem::path>& roots,
-            const std::filesystem::path& dotnetRoot) -> std::filesystem::path {
-            std::filesystem::path nethostPath;
+        auto FindHostFxrWithNethost(const TVector<FPath>& roots, const FPath& dotnetRoot) -> FPath {
+            FPath nethostPath;
             for (const auto& root : roots) {
                 nethostPath = FindLibraryInRoot(root, NethostLibraryName());
-                if (!nethostPath.empty()) {
+                if (!nethostPath.IsEmpty()) {
                     break;
                 }
             }
-            if (nethostPath.empty() && !dotnetRoot.empty()) {
+            if (nethostPath.IsEmpty() && !dotnetRoot.IsEmpty()) {
                 nethostPath = FindLibraryInRoot(dotnetRoot, NethostLibraryName());
             }
 
             FDynamicLibrary nethostLibrary;
-            if (!nethostPath.empty()) {
+            if (!nethostPath.IsEmpty()) {
                 if (!nethostLibrary.Load(nethostPath)) {
                     return {};
                 }
             } else {
-                nethostLibrary.Load(std::filesystem::path(NethostLibraryName()));
+                nethostLibrary.Load(FPath(NethostLibraryName()));
             }
 
             if (!nethostLibrary.IsLoaded()) {
@@ -247,7 +270,11 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
                 return {};
             }
 
-            return std::filesystem::path(buffer.data());
+            usize length = bufferSize;
+            if (length > 0 && buffer[length - 1] == static_cast<FHostFxrChar>(0)) {
+                --length;
+            }
+            return FPath(MakeFStringFromHostFxr(buffer.data(), length));
         }
 
 #if AE_PLATFORM_WIN
@@ -311,15 +338,21 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
 #endif
     } // namespace
 
-    auto FDynamicLibrary::Load(const std::filesystem::path& path) -> bool {
+    auto FDynamicLibrary::Load(const FPath& path) -> bool {
         Unload();
-        if (path.empty()) {
+        if (path.IsEmpty()) {
             return false;
         }
 #if AE_PLATFORM_WIN
-        mHandle = static_cast<void*>(LoadLibraryW(path.c_str()));
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        mHandle = static_cast<void*>(LoadLibraryW(path.GetString().CStr()));
+    #else
+        const auto utf8Path = Core::Utility::String::ToUtf8Bytes(path.GetString());
+        mHandle             = static_cast<void*>(LoadLibraryA(utf8Path.CStr()));
+    #endif
 #else
-        mHandle = dlopen(path.c_str(), RTLD_LAZY | RTLD_LOCAL);
+        const auto utf8Path = Core::Utility::String::ToUtf8Bytes(path.GetString());
+        mHandle             = dlopen(utf8Path.CStr(), RTLD_LAZY | RTLD_LOCAL);
 #endif
         return mHandle != nullptr;
     }
@@ -355,52 +388,52 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
         const FString& dotnetRoot) -> bool {
         Unload();
 
-        std::vector<std::filesystem::path> localRoots;
+        TVector<FPath> localRoots;
         if (!runtimeRoot.IsEmptyString()) {
-            localRoots.push_back(ToStdPath(runtimeRoot.ToView()));
+            localRoots.PushBack(ToPath(runtimeRoot.ToView()));
         }
         if (!runtimeConfigPath.IsEmptyString()) {
-            auto configPath = ToStdPath(runtimeConfigPath.ToView());
-            if (!configPath.empty()) {
-                localRoots.push_back(configPath.parent_path());
+            const auto configPath = ToPath(runtimeConfigPath.ToView());
+            if (!configPath.IsEmpty()) {
+                localRoots.PushBack(configPath.ParentPath());
             }
         }
 
-        std::filesystem::path hostFxrPath;
+        FPath hostFxrPath;
         for (const auto& root : localRoots) {
             hostFxrPath = FindLibraryInRoot(root, HostFxrLibraryName());
-            if (!hostFxrPath.empty()) {
+            if (!hostFxrPath.IsEmpty()) {
                 break;
             }
         }
 
-        std::filesystem::path dotnetRootPath;
+        FPath dotnetRootPath;
         if (!dotnetRoot.IsEmptyString()) {
-            dotnetRootPath = ToStdPath(dotnetRoot.ToView());
+            dotnetRootPath = ToPath(dotnetRoot.ToView());
         } else {
             dotnetRootPath = GetDotnetRootFromEnv();
         }
-        if (dotnetRootPath.empty()) {
+        if (dotnetRootPath.IsEmpty()) {
             if (!runtimeRoot.IsEmptyString()) {
-                dotnetRootPath = ToStdPath(runtimeRoot.ToView());
+                dotnetRootPath = ToPath(runtimeRoot.ToView());
             } else if (!runtimeConfigPath.IsEmptyString()) {
-                auto configPath = ToStdPath(runtimeConfigPath.ToView());
-                if (!configPath.empty()) {
-                    dotnetRootPath = configPath.parent_path();
+                const auto configPath = ToPath(runtimeConfigPath.ToView());
+                if (!configPath.IsEmpty()) {
+                    dotnetRootPath = configPath.ParentPath();
                 }
             }
         }
 
-        if (hostFxrPath.empty() && !dotnetRootPath.empty()) {
+        if (hostFxrPath.IsEmpty() && !dotnetRootPath.IsEmpty()) {
             hostFxrPath = FindLibraryInRoot(dotnetRootPath, HostFxrLibraryName());
         }
 
-        if (hostFxrPath.empty()) {
+        if (hostFxrPath.IsEmpty()) {
             hostFxrPath = FindHostFxrWithNethost(localRoots, dotnetRootPath);
         }
 
-        if (hostFxrPath.empty()) {
-            hostFxrPath = std::filesystem::path(HostFxrLibraryName());
+        if (hostFxrPath.IsEmpty()) {
+            hostFxrPath = FPath(HostFxrLibraryName());
         }
 
         if (!mLibrary.Load(hostFxrPath)) {
@@ -424,10 +457,10 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             return false;
         }
 
-        if (!dotnetRootPath.empty()) {
-            mDotnetRoot = dotnetRootPath.native();
+        if (!dotnetRootPath.IsEmpty()) {
+            mDotnetRoot = ToHostFxrString(dotnetRootPath.GetString().ToView());
         }
-        mHostFxrPath = hostFxrPath.native();
+        mHostFxrPath = ToHostFxrString(hostFxrPath.GetString().ToView());
 
         return true;
     }

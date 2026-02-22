@@ -208,6 +208,11 @@ namespace AltinaEngine::Application {
         if (!mIsRunning) {
             return;
         }
+
+        if (mMainWindow && mMainWindow->IsClosed()) {
+            RequestShutdown();
+            return;
+        }
         (void)InDeltaTime;
         // LogInfo(TEXT("AltinaEngine application tick: {}s"), InDeltaTime);
     }

@@ -307,6 +307,26 @@ namespace AltinaEngine::Rendering {
             viewDesc.mTextureRange.mLayerCount     = texDesc.mArrayLayers;
             return device->CreateShaderResourceView(viewDesc);
         }
+
+        auto BuildTemplateOverrides(const Asset::FMeshMaterialParameterBlock& overrides)
+            -> RenderCore::FMaterialParameterBlock {
+            RenderCore::FMaterialParameterBlock block;
+            for (const auto& scalar : overrides.GetScalars()) {
+                block.SetScalar(scalar.NameHash, scalar.Value);
+            }
+            for (const auto& vector : overrides.GetVectors()) {
+                block.SetVector(vector.NameHash, vector.Value);
+            }
+            for (const auto& matrix : overrides.GetMatrices()) {
+                block.SetMatrix(matrix.NameHash, matrix.Value);
+            }
+            return block;
+        }
+
+        auto HasTemplateOverrides(const RenderCore::FMaterialParameterBlock& overrides) -> bool {
+            return !overrides.GetScalars().IsEmpty() || !overrides.GetVectors().IsEmpty()
+                || !overrides.GetMatrices().IsEmpty();
+        }
     } // namespace
 
     auto CompileShaderFromAsset(const Asset::FAssetHandle& handle, FStringView entry,
@@ -468,6 +488,11 @@ namespace AltinaEngine::Rendering {
             }
 
             templ->SetPassDesc(passType, Move(passDesc));
+
+            const auto overrideBlock = BuildTemplateOverrides(pass.Overrides);
+            if (HasTemplateOverrides(overrideBlock)) {
+                templ->SetPassOverrides(passType, overrideBlock);
+            }
         }
         if (templ->GetPasses().empty()) {
             return {};
@@ -499,18 +524,42 @@ namespace AltinaEngine::Rendering {
 
         material.SetTemplate(templ);
 
-        auto schema = Container::MakeShared<RenderCore::FMaterialSchema>();
+        auto schema       = Container::MakeShared<RenderCore::FMaterialSchema>();
+        auto ensureSchema = [&](RenderCore::FMaterialParamId   id,
+                                RenderCore::EMaterialParamType type) {
+            if (id == 0U) {
+                return;
+            }
+            if (schema->Find(id) != nullptr) {
+                return;
+            }
+            switch (type) {
+                case RenderCore::EMaterialParamType::Scalar:
+                    schema->AddScalar(id);
+                    break;
+                case RenderCore::EMaterialParamType::Vector:
+                    schema->AddVector(id);
+                    break;
+                case RenderCore::EMaterialParamType::Matrix:
+                    schema->AddMatrix(id);
+                    break;
+                case RenderCore::EMaterialParamType::Texture:
+                    schema->AddTexture(id);
+                    break;
+            }
+        };
+
         for (const auto& param : parameters.GetScalars()) {
-            schema->AddScalar(param.NameHash);
+            ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Scalar);
         }
         for (const auto& param : parameters.GetVectors()) {
-            schema->AddVector(param.NameHash);
+            ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Vector);
         }
         for (const auto& param : parameters.GetMatrices()) {
-            schema->AddMatrix(param.NameHash);
+            ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Matrix);
         }
         for (const auto& param : parameters.GetTextures()) {
-            schema->AddTexture(param.NameHash);
+            ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Texture);
         }
         material.SetSchema(Move(schema));
 
@@ -540,6 +589,63 @@ namespace AltinaEngine::Rendering {
             samplerDesc.mDebugName.Assign(TEXT("MeshMaterialSampler"));
             auto sampler = Rhi::RHICreateSampler(samplerDesc);
             material.SetTexture(param.NameHash, Move(srv), Move(sampler), param.SamplerFlags);
+        }
+
+        auto applyOverrideTexture = [&](const Asset::FMeshMaterialTextureParam& param) {
+            if (material.GetParameters().FindTextureParam(param.NameHash) != nullptr) {
+                return;
+            }
+            Rhi::FRhiShaderResourceViewRef srv{};
+            if (param.Texture.IsValid()
+                && param.Type == Asset::EMeshMaterialTextureType::Texture2D) {
+                auto  textureAssetRef = manager.Load(param.Texture);
+                auto* textureAsset    = textureAssetRef
+                       ? static_cast<Asset::FTexture2DAsset*>(textureAssetRef.Get())
+                       : nullptr;
+                if (textureAsset != nullptr) {
+                    srv = CreateTextureSrv(*textureAsset);
+                }
+            }
+
+            Rhi::FRhiSamplerDesc samplerDesc{};
+            samplerDesc.mDebugName.Assign(TEXT("MeshMaterialSampler"));
+            auto sampler = Rhi::RHICreateSampler(samplerDesc);
+            material.SetTexture(param.NameHash, Move(srv), Move(sampler), param.SamplerFlags);
+        };
+
+        auto applyOverrides = [&](const Asset::FMeshMaterialParameterBlock& overrides) {
+            for (const auto& param : overrides.GetScalars()) {
+                if (material.GetParameters().FindScalarParam(param.NameHash) != nullptr) {
+                    continue;
+                }
+                ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Scalar);
+                material.SetScalar(param.NameHash, param.Value);
+            }
+            for (const auto& param : overrides.GetVectors()) {
+                if (material.GetParameters().FindVectorParam(param.NameHash) != nullptr) {
+                    continue;
+                }
+                ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Vector);
+                material.SetVector(param.NameHash, param.Value);
+            }
+            for (const auto& param : overrides.GetMatrices()) {
+                if (material.GetParameters().FindMatrixParam(param.NameHash) != nullptr) {
+                    continue;
+                }
+                ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Matrix);
+                material.SetMatrix(param.NameHash, param.Value);
+            }
+            for (const auto& param : overrides.GetTextures()) {
+                if (material.GetParameters().FindTextureParam(param.NameHash) != nullptr) {
+                    continue;
+                }
+                ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Texture);
+                applyOverrideTexture(param);
+            }
+        };
+
+        for (const auto& pass : materialAsset->GetPasses()) {
+            applyOverrides(pass.Overrides);
         }
 
         return material;

@@ -65,24 +65,24 @@ namespace AltinaEngine::Tools::AssetPipeline {
         };
 
         struct FRegistryEntry {
-            std::string           Uuid;
-            Asset::EAssetType     Type = Asset::EAssetType::Unknown;
-            std::string           VirtualPath;
-            std::string           CookedPath;
+            std::string                      Uuid;
+            Asset::EAssetType                Type = Asset::EAssetType::Unknown;
+            std::string                      VirtualPath;
+            std::string                      CookedPath;
             std::vector<Asset::FAssetHandle> Dependencies;
-            Asset::FTexture2DDesc TextureDesc{};
-            bool                  HasTextureDesc = false;
-            Asset::FMeshDesc      MeshDesc{};
-            bool                  HasMeshDesc = false;
-            Asset::FMaterialDesc  MaterialDesc{};
-            bool                  HasMaterialDesc = false;
-            Asset::FShaderDesc    ShaderDesc{};
-            bool                  HasShaderDesc = false;
-            Asset::FAudioDesc     AudioDesc{};
-            bool                  HasAudioDesc = false;
-            std::string           ScriptAssemblyPath;
-            std::string           ScriptTypeName;
-            bool                  HasScriptDesc = false;
+            Asset::FTexture2DDesc            TextureDesc{};
+            bool                             HasTextureDesc = false;
+            Asset::FMeshDesc                 MeshDesc{};
+            bool                             HasMeshDesc = false;
+            Asset::FMaterialDesc             MaterialDesc{};
+            bool                             HasMaterialDesc = false;
+            Asset::FShaderDesc               ShaderDesc{};
+            bool                             HasShaderDesc = false;
+            Asset::FAudioDesc                AudioDesc{};
+            bool                             HasAudioDesc = false;
+            std::string                      ScriptAssemblyPath;
+            std::string                      ScriptTypeName;
+            bool                             HasScriptDesc = false;
         };
 
         struct FCookCacheEntry {
@@ -318,24 +318,32 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
 
         struct FMaterialShaderRef {
-            std::string        AssetPath;
-            std::string        Entry;
+            std::string         AssetPath;
+            std::string         Entry;
             Asset::FAssetHandle Handle{};
         };
 
+        struct FMaterialOverrideParam {
+            std::string         Name;
+            std::string         Type;
+            std::vector<double> Values;
+            bool                IsScalar = false;
+        };
+
         struct FMaterialPassSource {
-            std::string     Name;
-            bool            HasVertex  = false;
-            bool            HasPixel   = false;
-            bool            HasCompute = false;
-            FMaterialShaderRef Vertex;
-            FMaterialShaderRef Pixel;
-            FMaterialShaderRef Compute;
+            std::string                         Name;
+            bool                                HasVertex  = false;
+            bool                                HasPixel   = false;
+            bool                                HasCompute = false;
+            FMaterialShaderRef                  Vertex;
+            FMaterialShaderRef                  Pixel;
+            FMaterialShaderRef                  Compute;
+            std::vector<FMaterialOverrideParam> Overrides;
         };
 
         struct FMaterialTemplateSource {
-            std::string                     Name;
-            std::vector<FMaterialPassSource> Passes;
+            std::string                           Name;
+            std::vector<FMaterialPassSource>      Passes;
             std::vector<std::vector<std::string>> Variants;
         };
 
@@ -359,8 +367,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return !out.AssetPath.empty() && !out.Entry.empty();
         }
 
-        auto ParseMaterialSource(const std::vector<u8>& sourceBytes,
-            FMaterialTemplateSource& out, std::string& outError) -> bool {
+        auto ParseMaterialSource(const std::vector<u8>& sourceBytes, FMaterialTemplateSource& out,
+            std::string& outError) -> bool {
             out = {};
             if (sourceBytes.empty()) {
                 outError = "Material source empty.";
@@ -372,7 +380,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             native.Append(text.c_str(), text.size());
             const FNativeStringView view(native.GetData(), native.Length());
 
-            FJsonDocument document;
+            FJsonDocument           document;
             if (!document.Parse(view)) {
                 outError = "Material JSON parse failed.";
                 return false;
@@ -406,29 +414,78 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     continue;
                 }
 
-                const FJsonValue* shadersValue =
-                    FindObjectValueInsensitive(*pair.Value, "Shaders");
+                const FJsonValue* shadersValue = FindObjectValueInsensitive(*pair.Value, "Shaders");
                 if (shadersValue == nullptr || shadersValue->Type != EJsonType::Object) {
                     outError = "Material Pass shaders missing.";
                     return false;
                 }
 
-                if (const FJsonValue* vsValue =
-                        FindObjectValueInsensitive(*shadersValue, "vs")) {
+                if (const FJsonValue* vsValue = FindObjectValueInsensitive(*shadersValue, "vs")) {
                     pass.HasVertex = ParseShaderStageRef(*vsValue, pass.Vertex);
                 }
-                if (const FJsonValue* psValue =
-                        FindObjectValueInsensitive(*shadersValue, "ps")) {
+                if (const FJsonValue* psValue = FindObjectValueInsensitive(*shadersValue, "ps")) {
                     pass.HasPixel = ParseShaderStageRef(*psValue, pass.Pixel);
                 }
-                if (const FJsonValue* csValue =
-                        FindObjectValueInsensitive(*shadersValue, "cs")) {
+                if (const FJsonValue* csValue = FindObjectValueInsensitive(*shadersValue, "cs")) {
                     pass.HasCompute = ParseShaderStageRef(*csValue, pass.Compute);
                 }
 
                 if (!pass.HasVertex && !pass.HasCompute) {
                     outError = "Material Pass requires at least VS or CS.";
                     return false;
+                }
+
+                if (const FJsonValue* overridesValue =
+                        FindObjectValueInsensitive(*pair.Value, "Overrides")) {
+                    if (overridesValue->Type == EJsonType::Object) {
+                        for (const auto& overridePair : overridesValue->Object) {
+                            if (overridePair.Value == nullptr
+                                || overridePair.Value->Type != EJsonType::Object) {
+                                continue;
+                            }
+
+                            FNativeString typeText;
+                            if (!GetStringValue(
+                                    FindObjectValueInsensitive(*overridePair.Value, "Type"),
+                                    typeText)) {
+                                continue;
+                            }
+
+                            const FJsonValue* valueNode =
+                                FindObjectValueInsensitive(*overridePair.Value, "Value");
+                            if (valueNode == nullptr) {
+                                continue;
+                            }
+
+                            FMaterialOverrideParam overrideParam{};
+                            overrideParam.Name = ToStdString(overridePair.Key);
+                            overrideParam.Type = ToStdString(typeText);
+                            if (overrideParam.Name.empty() || overrideParam.Type.empty()) {
+                                continue;
+                            }
+
+                            if (valueNode->Type == EJsonType::Number) {
+                                overrideParam.IsScalar = true;
+                                overrideParam.Values.push_back(valueNode->Number);
+                            } else if (valueNode->Type == EJsonType::Array) {
+                                bool valid = true;
+                                for (const auto* entry : valueNode->Array) {
+                                    if (entry == nullptr || entry->Type != EJsonType::Number) {
+                                        valid = false;
+                                        break;
+                                    }
+                                    overrideParam.Values.push_back(entry->Number);
+                                }
+                                if (!valid) {
+                                    continue;
+                                }
+                            } else {
+                                continue;
+                            }
+
+                            pass.Overrides.push_back(Move(overrideParam));
+                        }
+                    }
                 }
 
                 out.Passes.push_back(Move(pass));
@@ -458,7 +515,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return !out.Passes.empty();
         }
 
-        auto ResolveMaterialDependencies(FMaterialTemplateSource& material,
+        auto ResolveMaterialDependencies(FMaterialTemplateSource&       material,
             const std::unordered_map<std::string, const FAssetRecord*>& assetsByPath,
             std::vector<Asset::FAssetHandle>& outDeps, Asset::FMaterialDesc& outDesc,
             std::string& outError) -> bool {
@@ -467,7 +524,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             std::unordered_set<std::string> seen;
 
-            u32 shaderCount = 0U;
+            u32                             shaderCount = 0U;
             for (auto& pass : material.Passes) {
                 auto resolve = [&](FMaterialShaderRef& shaderRef) -> bool {
                     const auto it = assetsByPath.find(shaderRef.AssetPath);
@@ -509,8 +566,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return true;
         }
 
-        auto WriteMaterialCookedJson(const FMaterialTemplateSource& material,
-            std::string& outJson) -> bool {
+        auto WriteMaterialCookedJson(const FMaterialTemplateSource& material, std::string& outJson)
+            -> bool {
             std::ostringstream stream;
             stream << "{\n";
             if (!material.Name.empty()) {
@@ -522,8 +579,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 stream << "    \"" << EscapeJson(pass.Name) << "\": {\n";
                 stream << "      \"Shaders\": {\n";
 
-                auto WriteShader = [&](const char* key, const FMaterialShaderRef& ref,
-                                       bool emit, bool isLast) {
+                auto WriteShader = [&](const char* key, const FMaterialShaderRef& ref, bool emit,
+                                       bool isLast) {
                     if (!emit) {
                         return;
                     }
@@ -537,9 +594,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     stream << "\n";
                 };
 
-                const bool hasVs = pass.HasVertex;
-                const bool hasPs = pass.HasPixel;
-                const bool hasCs = pass.HasCompute;
+                const bool hasVs  = pass.HasVertex;
+                const bool hasPs  = pass.HasPixel;
+                const bool hasCs  = pass.HasCompute;
                 const bool vsLast = !hasPs && !hasCs;
                 const bool psLast = !hasCs;
 
@@ -553,7 +610,40 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     WriteShader("cs", pass.Compute, true, true);
                 }
 
-                stream << "      }\n";
+                stream << "      }";
+
+                if (!pass.Overrides.empty()) {
+                    stream << ",\n";
+                    stream << "      \"Overrides\": {\n";
+                    for (size_t overrideIndex = 0; overrideIndex < pass.Overrides.size();
+                        ++overrideIndex) {
+                        const auto& overrideParam = pass.Overrides[overrideIndex];
+                        stream << "        \"" << EscapeJson(overrideParam.Name) << "\": { ";
+                        stream << "\"Type\": \"" << EscapeJson(overrideParam.Type) << "\", ";
+                        stream << "\"Value\": ";
+                        if (overrideParam.IsScalar && !overrideParam.Values.empty()) {
+                            stream << overrideParam.Values[0];
+                        } else {
+                            stream << "[";
+                            for (size_t valueIndex = 0; valueIndex < overrideParam.Values.size();
+                                ++valueIndex) {
+                                stream << overrideParam.Values[valueIndex];
+                                if (valueIndex + 1 < overrideParam.Values.size()) {
+                                    stream << ", ";
+                                }
+                            }
+                            stream << "]";
+                        }
+                        stream << " }";
+                        if (overrideIndex + 1 < pass.Overrides.size()) {
+                            stream << ",";
+                        }
+                        stream << "\n";
+                    }
+                    stream << "      }\n";
+                } else {
+                    stream << "\n";
+                }
                 stream << "    }";
                 if (passIndex + 1 < material.Passes.size()) {
                     stream << ",";
@@ -584,7 +674,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return true;
         }
 
-        auto CookMaterial(const std::vector<u8>& sourceBytes,
+        auto CookMaterial(const std::vector<u8>&                        sourceBytes,
             const std::unordered_map<std::string, const FAssetRecord*>& assetsByPath,
             std::vector<Asset::FAssetHandle>& outDeps, Asset::FMaterialDesc& outDesc,
             std::vector<u8>& outCooked) -> bool {
@@ -689,9 +779,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     }
 
                     includeStack.push_back(resolved);
-                    if (!PreprocessShaderText(
-                            includeText, resolved.parent_path(), includeDirs, includeStack,
-                            outText)) {
+                    if (!PreprocessShaderText(includeText, resolved.parent_path(), includeDirs,
+                            includeStack, outText)) {
                         return false;
                     }
                     includeStack.pop_back();
@@ -707,7 +796,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         auto CookShader(const std::filesystem::path& sourcePath, const std::vector<u8>& sourceBytes,
             const std::filesystem::path& repoRoot, std::vector<u8>& outCooked,
             Asset::FShaderDesc& outDesc) -> bool {
-            std::string text(sourceBytes.begin(), sourceBytes.end());
+            std::string                        text(sourceBytes.begin(), sourceBytes.end());
 
             std::vector<std::filesystem::path> includeDirs;
             includeDirs.push_back(sourcePath.parent_path());
@@ -722,8 +811,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             includeStack.push_back(sourcePath);
 
             std::string output;
-            if (!PreprocessShaderText(text, sourcePath.parent_path(), includeDirs, includeStack,
-                    output)) {
+            if (!PreprocessShaderText(
+                    text, sourcePath.parent_path(), includeDirs, includeStack, output)) {
                 return false;
             }
 
@@ -2727,7 +2816,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             paths.BuildRoot = std::filesystem::absolute(buildRoot);
             auto cookedIt   = command.Options.find("cook-root");
             if (cookedIt != command.Options.end()) {
-                paths.CookedRoot = std::filesystem::absolute(std::filesystem::path(cookedIt->second));
+                paths.CookedRoot =
+                    std::filesystem::absolute(std::filesystem::path(cookedIt->second));
             } else {
                 paths.CookedRoot = paths.BuildRoot / "Cooked" / platform;
             }
@@ -2868,8 +2958,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         if (dep.Type == Asset::EAssetType::Unknown) {
                             stream << "\"" << EscapeJson(depUuid) << "\"";
                         } else {
-                            stream << "{ \"Uuid\": \"" << EscapeJson(depUuid)
-                                   << "\", \"Type\": \"" << AssetTypeToString(dep.Type) << "\" }";
+                            stream << "{ \"Uuid\": \"" << EscapeJson(depUuid) << "\", \"Type\": \""
+                                   << AssetTypeToString(dep.Type) << "\" }";
                         }
                         if (depIndex + 1 < deps.size()) {
                             stream << ",";
@@ -3068,16 +3158,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 Asset::FMaterialDesc  materialDesc{};
                 Asset::FShaderDesc    shaderDesc{};
                 Asset::FAudioDesc     audioDesc{};
-                const bool            isTexture  = asset.Type == Asset::EAssetType::Texture2D;
-                const bool            isMesh     = asset.Type == Asset::EAssetType::Mesh;
-                const bool            isMaterial =
-                    asset.Type == Asset::EAssetType::MaterialTemplate;
-                const bool            isAudio    = asset.Type == Asset::EAssetType::Audio;
-                const bool            isScript   = asset.Type == Asset::EAssetType::Script;
-                const bool            isShader   = asset.Type == Asset::EAssetType::Shader;
-                std::string           scriptAssemblyPath;
-                std::string           scriptTypeName;
-                bool                  hasScriptDesc = false;
+                const bool            isTexture = asset.Type == Asset::EAssetType::Texture2D;
+                const bool            isMesh    = asset.Type == Asset::EAssetType::Mesh;
+                const bool  isMaterial          = asset.Type == Asset::EAssetType::MaterialTemplate;
+                const bool  isAudio             = asset.Type == Asset::EAssetType::Audio;
+                const bool  isScript            = asset.Type == Asset::EAssetType::Script;
+                const bool  isShader            = asset.Type == Asset::EAssetType::Shader;
+                std::string scriptAssemblyPath;
+                std::string scriptTypeName;
+                bool        hasScriptDesc = false;
                 std::vector<Asset::FAssetHandle> materialDeps;
                 if (isScript) {
                     if (!ParseScriptDescriptor(bytes, scriptAssemblyPath, scriptTypeName)) {
@@ -3100,18 +3189,16 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         continue;
                     }
                 } else if (isMaterial) {
-                    if (!CookMaterial(bytes, assetsByVirtualPath, materialDeps, materialDesc,
-                            cookedBytes)) {
+                    if (!CookMaterial(
+                            bytes, assetsByVirtualPath, materialDeps, materialDesc, cookedBytes)) {
                         std::cerr << "Failed to cook material: " << asset.SourcePath.string()
                                   << "\n";
                         continue;
                     }
                     cookKeyExtras = cookedBytes;
                 } else if (isShader) {
-                    if (!CookShader(
-                            asset.SourcePath, bytes, paths.Root, cookedBytes, shaderDesc)) {
-                        std::cerr << "Failed to cook shader: " << asset.SourcePath.string()
-                                  << "\n";
+                    if (!CookShader(asset.SourcePath, bytes, paths.Root, cookedBytes, shaderDesc)) {
+                        std::cerr << "Failed to cook shader: " << asset.SourcePath.string() << "\n";
                         continue;
                     }
                     cookKeyExtras = cookedBytes;
@@ -3129,8 +3216,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 const std::filesystem::path cookedPath =
                     paths.CookedRoot / "Assets" / (uuid + ".bin");
 
-                const std::string cookKey =
-                    (!cookKeyExtras.empty() || isMesh)
+                const std::string cookKey = (!cookKeyExtras.empty() || isMesh)
                     ? BuildCookKeyWithExtras(bytes, cookKeyExtras, asset, platform)
                     : BuildCookKey(bytes, asset, platform);
 

@@ -4,8 +4,7 @@
 #include "Container/String.h"
 #include "Container/StringView.h"
 #include "Types/Aliases.h"
-
-#include <filesystem>
+#include "Utility/Filesystem/Path.h"
 
 namespace AltinaEngine::Scripting::CoreCLR::Host {
     namespace Container = ::AltinaEngine::Core::Container;
@@ -66,7 +65,7 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
     struct FDynamicLibrary {
         ~FDynamicLibrary() { Unload(); }
 
-        auto               Load(const std::filesystem::path& path) -> bool;
+        auto               Load(const Core::Utility::Filesystem::FPath& path) -> bool;
         void               Unload();
         [[nodiscard]] auto GetSymbol(const char* name) const -> void*;
         [[nodiscard]] auto IsLoaded() const noexcept -> bool { return mHandle != nullptr; }

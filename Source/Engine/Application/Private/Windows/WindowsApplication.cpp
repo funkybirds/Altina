@@ -94,6 +94,7 @@ namespace AltinaEngine::Application {
 
         mProperties = InProperties;
         UpdateCachedSizeFromClientRect();
+        mIsClosed = false;
 
         return true;
     }
@@ -195,11 +196,17 @@ namespace AltinaEngine::Application {
 
         switch (InMessage) {
             case WM_CLOSE:
+                if (window) {
+                    window->mIsClosed = true;
+                }
                 dispatchIfAvailable([window](FAppMessageRouter& router) {
                     router.BroadcastWindowCloseRequested(window);
                 });
                 break;
             case WM_DESTROY:
+                if (window) {
+                    window->mIsClosed = true;
+                }
                 dispatchIfAvailable(
                     [window](FAppMessageRouter& router) { router.BroadcastWindowClosed(window); });
                 PostQuitMessage(0);

@@ -215,6 +215,11 @@ namespace AltinaEngine::RenderCore {
         mPasses[pass] = Move(desc);
     }
 
+    void FMaterialTemplate::SetPassOverrides(
+        EMaterialPass pass, FMaterialParameterBlock overrides) {
+        mOverrides[pass] = Move(overrides);
+    }
+
     auto FMaterialTemplate::FindPassDesc(EMaterialPass pass) const noexcept
         -> const FMaterialPassDesc* {
         const auto it = mPasses.find(pass);
@@ -240,6 +245,15 @@ namespace AltinaEngine::RenderCore {
         -> const FMaterialPassState* {
         const auto* desc = FindPassDesc(pass);
         return desc ? &desc->State : nullptr;
+    }
+
+    auto FMaterialTemplate::FindOverrides(EMaterialPass pass) const noexcept
+        -> const FMaterialParameterBlock* {
+        const auto it = mOverrides.find(pass);
+        if (it == mOverrides.end()) {
+            return nullptr;
+        }
+        return &it->second;
     }
 
     auto FMaterialTemplate::FindAnyPassDesc() const noexcept -> const FMaterialPassDesc* {

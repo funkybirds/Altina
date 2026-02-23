@@ -36,6 +36,13 @@ namespace AltinaEngine::Rendering {
         using ShaderCompiler::FShaderPermutationParseResult;
         using ShaderCompiler::GetShaderCompiler;
 
+        // Runtime-staged shader location (preferred): next to the executable under
+        // Assets/Shader/... This keeps demo/game builds self-contained without requiring the engine
+        // source tree.
+        constexpr FStringView kDeferredShaderAssetsRelPath =
+            TEXT("Assets/Shader/Deferred/BasicDeferred.hlsl");
+
+        // Legacy runtime-staged shader location (kept for backward compatibility).
         constexpr FStringView kDeferredShaderRelPath = TEXT("Shader/Deferred/BasicDeferred.hlsl");
         constexpr FStringView kDeferredShaderSourcePath =
             TEXT("Source/Shader/Deferred/BasicDeferred.hlsl");
@@ -43,6 +50,10 @@ namespace AltinaEngine::Rendering {
         auto FindBuiltinDeferredShaderPath() -> FPath {
             const FPath exeDir(Core::Platform::GetExecutableDir());
             if (!exeDir.IsEmpty()) {
+                const auto candidateAssets = exeDir / kDeferredShaderAssetsRelPath;
+                if (candidateAssets.Exists()) {
+                    return candidateAssets;
+                }
                 const auto candidate = exeDir / kDeferredShaderRelPath;
                 if (candidate.Exists()) {
                     return candidate;
@@ -54,6 +65,10 @@ namespace AltinaEngine::Rendering {
                 const auto candidate = cwd / kDeferredShaderSourcePath;
                 if (candidate.Exists()) {
                     return candidate;
+                }
+                const auto candidateAssets = cwd / kDeferredShaderAssetsRelPath;
+                if (candidateAssets.Exists()) {
+                    return candidateAssets;
                 }
                 const auto candidate2 = cwd / kDeferredShaderRelPath;
                 if (candidate2.Exists()) {

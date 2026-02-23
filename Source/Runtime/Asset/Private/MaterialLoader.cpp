@@ -2,6 +2,7 @@
 
 #include "Asset/MaterialAsset.h"
 
+#include "Algorithm/CStringUtils.h"
 #include "Container/StringView.h"
 #include "Types/Traits.h"
 #include "Utility/Json.h"
@@ -22,6 +23,7 @@ namespace AltinaEngine::Asset {
         using Core::Utility::Json::FindObjectValueInsensitive;
         using Core::Utility::Json::FJsonDocument;
         using Core::Utility::Json::FJsonValue;
+        using Core::Utility::Json::GetBoolValue;
         using Core::Utility::Json::GetNumberValue;
         using Core::Utility::Json::GetStringValue;
 
@@ -326,6 +328,183 @@ namespace AltinaEngine::Asset {
             }
         }
 
+        auto FindRasterOverridesValue(const FJsonValue& passObject) -> const FJsonValue* {
+            if (const auto* value = FindObjectValueInsensitive(passObject, "RasterOverrides")) {
+                return value;
+            }
+            if (const auto* value = FindObjectValueInsensitive(passObject, "Raster_Overrides")) {
+                return value;
+            }
+            if (const auto* value =
+                    FindObjectValueInsensitive(passObject, "RasterStateOverrides")) {
+                return value;
+            }
+            if (const auto* value =
+                    FindObjectValueInsensitive(passObject, "Raster_State_Overrides")) {
+                return value;
+            }
+            return nullptr;
+        }
+
+        auto TryParseRasterFillMode(
+            Container::FNativeStringView value, EMaterialRasterFillMode& out) noexcept -> bool {
+            if (Core::Utility::String::EqualLiteralI(value, "solid")) {
+                out = EMaterialRasterFillMode::Solid;
+                return true;
+            }
+            if (Core::Utility::String::EqualLiteralI(value, "wireframe")) {
+                out = EMaterialRasterFillMode::Wireframe;
+                return true;
+            }
+            return false;
+        }
+
+        auto TryParseRasterCullMode(
+            Container::FNativeStringView value, EMaterialRasterCullMode& out) noexcept -> bool {
+            if (Core::Utility::String::EqualLiteralI(value, "none")) {
+                out = EMaterialRasterCullMode::None;
+                return true;
+            }
+            if (Core::Utility::String::EqualLiteralI(value, "front")) {
+                out = EMaterialRasterCullMode::Front;
+                return true;
+            }
+            if (Core::Utility::String::EqualLiteralI(value, "back")) {
+                out = EMaterialRasterCullMode::Back;
+                return true;
+            }
+            return false;
+        }
+
+        auto TryParseRasterFrontFace(
+            Container::FNativeStringView value, EMaterialRasterFrontFace& out) noexcept -> bool {
+            if (Core::Utility::String::EqualLiteralI(value, "ccw")) {
+                out = EMaterialRasterFrontFace::CCW;
+                return true;
+            }
+            if (Core::Utility::String::EqualLiteralI(value, "cw")) {
+                out = EMaterialRasterFrontFace::CW;
+                return true;
+            }
+            return false;
+        }
+
+        void ParseRasterOverridesObject(
+            const FJsonValue& value, FMaterialRasterStateOverrides& outOverrides) {
+            if (value.Type != EJsonType::Object) {
+                return;
+            }
+
+            auto KeyEquals = [](Container::FNativeStringView key, const char* literalLower) {
+                if (literalLower == nullptr) {
+                    return false;
+                }
+
+                usize j = 0U;
+                for (usize i = 0U; i < key.Length(); ++i) {
+                    const char ch = key[i];
+                    if (ch == '_' || ch == '-') {
+                        continue;
+                    }
+
+                    const char expected = literalLower[j];
+                    if (expected == '\0') {
+                        return false;
+                    }
+
+                    if (Core::Algorithm::ToLowerChar(ch) != expected) {
+                        return false;
+                    }
+                    ++j;
+                }
+                return literalLower[j] == '\0';
+            };
+
+            for (const auto& pair : value.Object) {
+                if (pair.Value == nullptr) {
+                    continue;
+                }
+
+                const Container::FNativeStringView key(pair.Key.GetData(), pair.Key.Length());
+
+                if (pair.Value->Type == EJsonType::String) {
+                    const Container::FNativeStringView text(
+                        pair.Value->String.GetData(), pair.Value->String.Length());
+
+                    if (KeyEquals(key, "fillmode")) {
+                        EMaterialRasterFillMode mode{};
+                        if (TryParseRasterFillMode(text, mode)) {
+                            outOverrides.HasFillMode = true;
+                            outOverrides.FillMode    = mode;
+                        }
+                        continue;
+                    }
+
+                    if (KeyEquals(key, "cullmode") || KeyEquals(key, "cull")) {
+                        EMaterialRasterCullMode mode{};
+                        if (TryParseRasterCullMode(text, mode)) {
+                            outOverrides.HasCullMode = true;
+                            outOverrides.CullMode    = mode;
+                        }
+                        continue;
+                    }
+
+                    if (KeyEquals(key, "frontface") || KeyEquals(key, "front")) {
+                        EMaterialRasterFrontFace mode{};
+                        if (TryParseRasterFrontFace(text, mode)) {
+                            outOverrides.HasFrontFace = true;
+                            outOverrides.FrontFace    = mode;
+                        }
+                        continue;
+                    }
+                }
+
+                if (pair.Value->Type == EJsonType::Number) {
+                    double number = 0.0;
+                    if (!GetNumberValue(pair.Value, number)) {
+                        continue;
+                    }
+
+                    if (KeyEquals(key, "depthbias")) {
+                        outOverrides.HasDepthBias = true;
+                        outOverrides.DepthBias    = static_cast<i32>(number);
+                        continue;
+                    }
+
+                    if (KeyEquals(key, "depthbiasclamp")) {
+                        outOverrides.HasDepthBiasClamp = true;
+                        outOverrides.DepthBiasClamp    = static_cast<f32>(number);
+                        continue;
+                    }
+
+                    if (KeyEquals(key, "slopescaleddepthbias")) {
+                        outOverrides.HasSlopeScaledDepthBias = true;
+                        outOverrides.SlopeScaledDepthBias    = static_cast<f32>(number);
+                        continue;
+                    }
+                }
+
+                if (pair.Value->Type == EJsonType::Bool) {
+                    bool flag = false;
+                    if (!GetBoolValue(pair.Value, flag)) {
+                        continue;
+                    }
+
+                    if (KeyEquals(key, "depthclip")) {
+                        outOverrides.HasDepthClip = true;
+                        outOverrides.DepthClip    = flag;
+                        continue;
+                    }
+
+                    if (KeyEquals(key, "conservativeraster")) {
+                        outOverrides.HasConservativeRaster = true;
+                        outOverrides.ConservativeRaster    = flag;
+                        continue;
+                    }
+                }
+            }
+        }
+
         auto ParseMaterialTemplate(const FJsonValue& root, Container::FString& outName,
             TVector<FMaterialPassTemplate>&       outPasses,
             TVector<TVector<Container::FString>>& outVariants) -> bool {
@@ -385,6 +564,10 @@ namespace AltinaEngine::Asset {
                 if (const FJsonValue* overridesValue =
                         FindObjectValueInsensitive(*pair.Value, "Overrides")) {
                     ParseOverridesObject(*overridesValue, pass.Overrides);
+                }
+
+                if (const FJsonValue* rasterValue = FindRasterOverridesValue(*pair.Value)) {
+                    ParseRasterOverridesObject(*rasterValue, pass.RasterOverrides);
                 }
 
                 outPasses.PushBack(Move(pass));

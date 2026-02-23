@@ -18,6 +18,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         using Core::Utility::Json::FindObjectValueInsensitive;
         using Core::Utility::Json::FJsonDocument;
         using Core::Utility::Json::FJsonValue;
+        using Core::Utility::Json::GetBoolValue;
         using Core::Utility::Json::GetNumberValue;
         using Core::Utility::Json::GetStringValue;
 
@@ -137,6 +138,48 @@ namespace AltinaEngine::Tools::AssetPipeline {
             Asset::FAssetHandle TextureHandle{};
         };
 
+        enum class EMaterialRasterFillMode : u8 {
+            Solid = 0,
+            Wireframe
+        };
+
+        enum class EMaterialRasterCullMode : u8 {
+            None = 0,
+            Front,
+            Back
+        };
+
+        enum class EMaterialRasterFrontFace : u8 {
+            CCW = 0,
+            CW
+        };
+
+        struct FMaterialRasterOverrides {
+            bool                     HasFillMode             = false;
+            bool                     HasCullMode             = false;
+            bool                     HasFrontFace            = false;
+            bool                     HasDepthBias            = false;
+            bool                     HasDepthBiasClamp       = false;
+            bool                     HasSlopeScaledDepthBias = false;
+            bool                     HasDepthClip            = false;
+            bool                     HasConservativeRaster   = false;
+
+            EMaterialRasterFillMode  FillMode             = EMaterialRasterFillMode::Solid;
+            EMaterialRasterCullMode  CullMode             = EMaterialRasterCullMode::Back;
+            EMaterialRasterFrontFace FrontFace            = EMaterialRasterFrontFace::CCW;
+            int                      DepthBias            = 0;
+            double                   DepthBiasClamp       = 0.0;
+            double                   SlopeScaledDepthBias = 0.0;
+            bool                     DepthClip            = true;
+            bool                     ConservativeRaster   = false;
+
+            [[nodiscard]] auto       HasAny() const noexcept -> bool {
+                return HasFillMode || HasCullMode || HasFrontFace || HasDepthBias
+                    || HasDepthBiasClamp || HasSlopeScaledDepthBias || HasDepthClip
+                    || HasConservativeRaster;
+            }
+        };
+
         struct FMaterialPassSource {
             std::string                         Name;
             std::string                         Preset;
@@ -147,6 +190,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             FMaterialShaderRef                  Pixel;
             FMaterialShaderRef                  Compute;
             std::vector<FMaterialOverrideParam> Overrides;
+            FMaterialRasterOverrides            RasterOverrides;
         };
 
         struct FMaterialTemplateSource {
@@ -173,6 +217,114 @@ namespace AltinaEngine::Tools::AssetPipeline {
             out.AssetPath = NormalizeVirtualPath(ToStdString(assetText));
             out.Entry     = ToStdString(entryText);
             return !out.AssetPath.empty() && !out.Entry.empty();
+        }
+
+        auto FindRasterOverridesValue(const FJsonValue& passObject) -> const FJsonValue* {
+            if (const auto* value = FindObjectValueInsensitive(passObject, "RasterOverrides")) {
+                return value;
+            }
+            if (const auto* value = FindObjectValueInsensitive(passObject, "Raster_Overrides")) {
+                return value;
+            }
+            if (const auto* value =
+                    FindObjectValueInsensitive(passObject, "RasterStateOverrides")) {
+                return value;
+            }
+            if (const auto* value =
+                    FindObjectValueInsensitive(passObject, "Raster_State_Overrides")) {
+                return value;
+            }
+            return nullptr;
+        }
+
+        auto NormalizeKey(std::string value) -> std::string {
+            std::string out;
+            out.reserve(value.size());
+            for (const char ch : value) {
+                if (ch == '_' || ch == '-') {
+                    continue;
+                }
+                out.push_back(ToLowerAscii(ch));
+            }
+            return out;
+        }
+
+        auto TryParseRasterFillMode(const std::string& value, EMaterialRasterFillMode& out)
+            -> bool {
+            const auto token = NormalizeKey(value);
+            if (token == "solid") {
+                out = EMaterialRasterFillMode::Solid;
+                return true;
+            }
+            if (token == "wireframe") {
+                out = EMaterialRasterFillMode::Wireframe;
+                return true;
+            }
+            return false;
+        }
+
+        auto TryParseRasterCullMode(const std::string& value, EMaterialRasterCullMode& out)
+            -> bool {
+            const auto token = NormalizeKey(value);
+            if (token == "none") {
+                out = EMaterialRasterCullMode::None;
+                return true;
+            }
+            if (token == "front") {
+                out = EMaterialRasterCullMode::Front;
+                return true;
+            }
+            if (token == "back") {
+                out = EMaterialRasterCullMode::Back;
+                return true;
+            }
+            return false;
+        }
+
+        auto TryParseRasterFrontFace(const std::string& value, EMaterialRasterFrontFace& out)
+            -> bool {
+            const auto token = NormalizeKey(value);
+            if (token == "ccw") {
+                out = EMaterialRasterFrontFace::CCW;
+                return true;
+            }
+            if (token == "cw") {
+                out = EMaterialRasterFrontFace::CW;
+                return true;
+            }
+            return false;
+        }
+
+        auto RasterFillModeToString(EMaterialRasterFillMode mode) -> const char* {
+            switch (mode) {
+                case EMaterialRasterFillMode::Wireframe:
+                    return "Wireframe";
+                case EMaterialRasterFillMode::Solid:
+                default:
+                    return "Solid";
+            }
+        }
+
+        auto RasterCullModeToString(EMaterialRasterCullMode mode) -> const char* {
+            switch (mode) {
+                case EMaterialRasterCullMode::None:
+                    return "None";
+                case EMaterialRasterCullMode::Front:
+                    return "Front";
+                case EMaterialRasterCullMode::Back:
+                default:
+                    return "Back";
+            }
+        }
+
+        auto RasterFrontFaceToString(EMaterialRasterFrontFace mode) -> const char* {
+            switch (mode) {
+                case EMaterialRasterFrontFace::CW:
+                    return "CW";
+                case EMaterialRasterFrontFace::CCW:
+                default:
+                    return "CCW";
+            }
         }
 
         auto ParseMaterialSource(const std::vector<u8>& sourceBytes, FMaterialTemplateSource& out,
@@ -316,6 +468,96 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             }
 
                             pass.Overrides.push_back(Move(overrideParam));
+                        }
+                    }
+                }
+
+                if (const FJsonValue* rasterValue = FindRasterOverridesValue(*pair.Value)) {
+                    if (rasterValue->Type == EJsonType::Object) {
+                        for (const auto& rasterPair : rasterValue->Object) {
+                            if (rasterPair.Value == nullptr) {
+                                continue;
+                            }
+
+                            const std::string keyNorm = NormalizeKey(ToStdString(rasterPair.Key));
+                            if (keyNorm.empty()) {
+                                continue;
+                            }
+
+                            if (rasterPair.Value->Type == EJsonType::String) {
+                                const std::string valueText = ToStdString(rasterPair.Value->String);
+
+                                if (keyNorm == "fillmode" || keyNorm == "fill") {
+                                    EMaterialRasterFillMode mode{};
+                                    if (TryParseRasterFillMode(valueText, mode)) {
+                                        pass.RasterOverrides.HasFillMode = true;
+                                        pass.RasterOverrides.FillMode    = mode;
+                                    }
+                                    continue;
+                                }
+
+                                if (keyNorm == "cullmode" || keyNorm == "cull") {
+                                    EMaterialRasterCullMode mode{};
+                                    if (TryParseRasterCullMode(valueText, mode)) {
+                                        pass.RasterOverrides.HasCullMode = true;
+                                        pass.RasterOverrides.CullMode    = mode;
+                                    }
+                                    continue;
+                                }
+
+                                if (keyNorm == "frontface" || keyNorm == "front") {
+                                    EMaterialRasterFrontFace mode{};
+                                    if (TryParseRasterFrontFace(valueText, mode)) {
+                                        pass.RasterOverrides.HasFrontFace = true;
+                                        pass.RasterOverrides.FrontFace    = mode;
+                                    }
+                                    continue;
+                                }
+                            }
+
+                            if (rasterPair.Value->Type == EJsonType::Number) {
+                                double number = 0.0;
+                                if (!GetNumberValue(rasterPair.Value, number)) {
+                                    continue;
+                                }
+
+                                if (keyNorm == "depthbias") {
+                                    pass.RasterOverrides.HasDepthBias = true;
+                                    pass.RasterOverrides.DepthBias    = static_cast<int>(number);
+                                    continue;
+                                }
+
+                                if (keyNorm == "depthbiasclamp") {
+                                    pass.RasterOverrides.HasDepthBiasClamp = true;
+                                    pass.RasterOverrides.DepthBiasClamp    = number;
+                                    continue;
+                                }
+
+                                if (keyNorm == "slopescaleddepthbias") {
+                                    pass.RasterOverrides.HasSlopeScaledDepthBias = true;
+                                    pass.RasterOverrides.SlopeScaledDepthBias    = number;
+                                    continue;
+                                }
+                            }
+
+                            if (rasterPair.Value->Type == EJsonType::Bool) {
+                                bool flag = false;
+                                if (!GetBoolValue(rasterPair.Value, flag)) {
+                                    continue;
+                                }
+
+                                if (keyNorm == "depthclip") {
+                                    pass.RasterOverrides.HasDepthClip = true;
+                                    pass.RasterOverrides.DepthClip    = flag;
+                                    continue;
+                                }
+
+                                if (keyNorm == "conservativeraster") {
+                                    pass.RasterOverrides.HasConservativeRaster = true;
+                                    pass.RasterOverrides.ConservativeRaster    = flag;
+                                    continue;
+                                }
+                            }
                         }
                     }
                 }
@@ -474,6 +716,60 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     stream << "      }";
                 }
 
+                if (pass.RasterOverrides.HasAny()) {
+                    stream << ",\n";
+                    stream << "      \"RasterOverrides\": {\n";
+
+                    // Write only overridden fields; keep deterministic ordering.
+                    std::vector<std::string> lines;
+                    lines.reserve(8);
+                    if (pass.RasterOverrides.HasFillMode) {
+                        lines.push_back(std::string("        \"FillMode\": \"")
+                            + RasterFillModeToString(pass.RasterOverrides.FillMode) + "\"");
+                    }
+                    if (pass.RasterOverrides.HasCullMode) {
+                        lines.push_back(std::string("        \"CullMode\": \"")
+                            + RasterCullModeToString(pass.RasterOverrides.CullMode) + "\"");
+                    }
+                    if (pass.RasterOverrides.HasFrontFace) {
+                        lines.push_back(std::string("        \"FrontFace\": \"")
+                            + RasterFrontFaceToString(pass.RasterOverrides.FrontFace) + "\"");
+                    }
+                    if (pass.RasterOverrides.HasDepthBias) {
+                        lines.push_back("        \"DepthBias\": "
+                            + std::to_string(pass.RasterOverrides.DepthBias));
+                    }
+                    if (pass.RasterOverrides.HasDepthBiasClamp) {
+                        std::ostringstream s;
+                        s << "        \"DepthBiasClamp\": " << pass.RasterOverrides.DepthBiasClamp;
+                        lines.push_back(s.str());
+                    }
+                    if (pass.RasterOverrides.HasSlopeScaledDepthBias) {
+                        std::ostringstream s;
+                        s << "        \"SlopeScaledDepthBias\": "
+                          << pass.RasterOverrides.SlopeScaledDepthBias;
+                        lines.push_back(s.str());
+                    }
+                    if (pass.RasterOverrides.HasDepthClip) {
+                        lines.push_back(std::string("        \"DepthClip\": ")
+                            + (pass.RasterOverrides.DepthClip ? "true" : "false"));
+                    }
+                    if (pass.RasterOverrides.HasConservativeRaster) {
+                        lines.push_back(std::string("        \"ConservativeRaster\": ")
+                            + (pass.RasterOverrides.ConservativeRaster ? "true" : "false"));
+                    }
+
+                    for (size_t i = 0; i < lines.size(); ++i) {
+                        stream << lines[i];
+                        if (i + 1 < lines.size()) {
+                            stream << ",";
+                        }
+                        stream << "\n";
+                    }
+
+                    stream << "      }";
+                }
+
                 if (!pass.Overrides.empty()) {
                     stream << ",\n";
                     stream << "      \"Overrides\": {\n";
@@ -507,10 +803,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         }
                         stream << "\n";
                     }
-                    stream << "      }\n";
+                    stream << "      }";
                 } else {
-                    stream << "\n";
+                    // No parameter overrides.
                 }
+                stream << "\n";
                 stream << "    }";
                 if (passIndex + 1 < material.Passes.size()) {
                     stream << ",";

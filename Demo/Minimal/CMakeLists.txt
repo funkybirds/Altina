@@ -37,6 +37,8 @@ set(DemoAssetCookOutput ${DemoBinaryDir}/Assets/Registry/AssetRegistry.json)
 set(DemoAssetsRoot ${CMAKE_CURRENT_SOURCE_DIR}/Assets)
 set(DemoConfigRoot ${CMAKE_CURRENT_SOURCE_DIR}/Config)
 set(DemoCookedRoot ${DemoBinaryDir}/Assets)
+set(EngineShaderRoot ${CMAKE_SOURCE_DIR}/Source/Shader)
+set(DemoStagedShaderRoot ${DemoBinaryDir}/Assets/Shader)
 file(GLOB_RECURSE DemoAssetSources CONFIGURE_DEPENDS
     ${DemoAssetsRoot}/*
 )
@@ -56,6 +58,8 @@ add_custom_command(
         ${DemoBinaryDir}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}/Assets/Config
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${DemoConfigRoot} ${DemoBinaryDir}/Assets/Config
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoStagedShaderRoot}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${EngineShaderRoot} ${DemoStagedShaderRoot}
     COMMENT "Staging Minimal demo executable"
 )
 

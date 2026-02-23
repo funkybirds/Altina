@@ -66,6 +66,64 @@ namespace AltinaEngine::Rendering {
             return false;
         }
 
+        void ApplyRasterOverrides(const Asset::FMaterialRasterStateOverrides& overrides,
+            Rhi::FRhiRasterStateDesc&                                         outRaster) noexcept {
+            if (overrides.HasFillMode) {
+                switch (overrides.FillMode) {
+                    case Asset::EMaterialRasterFillMode::Wireframe:
+                        outRaster.mFillMode = Rhi::ERhiRasterFillMode::Wireframe;
+                        break;
+                    case Asset::EMaterialRasterFillMode::Solid:
+                    default:
+                        outRaster.mFillMode = Rhi::ERhiRasterFillMode::Solid;
+                        break;
+                }
+            }
+
+            if (overrides.HasCullMode) {
+                switch (overrides.CullMode) {
+                    case Asset::EMaterialRasterCullMode::None:
+                        outRaster.mCullMode = Rhi::ERhiRasterCullMode::None;
+                        break;
+                    case Asset::EMaterialRasterCullMode::Front:
+                        outRaster.mCullMode = Rhi::ERhiRasterCullMode::Front;
+                        break;
+                    case Asset::EMaterialRasterCullMode::Back:
+                    default:
+                        outRaster.mCullMode = Rhi::ERhiRasterCullMode::Back;
+                        break;
+                }
+            }
+
+            if (overrides.HasFrontFace) {
+                switch (overrides.FrontFace) {
+                    case Asset::EMaterialRasterFrontFace::CW:
+                        outRaster.mFrontFace = Rhi::ERhiRasterFrontFace::CW;
+                        break;
+                    case Asset::EMaterialRasterFrontFace::CCW:
+                    default:
+                        outRaster.mFrontFace = Rhi::ERhiRasterFrontFace::CCW;
+                        break;
+                }
+            }
+
+            if (overrides.HasDepthBias) {
+                outRaster.mDepthBias = overrides.DepthBias;
+            }
+            if (overrides.HasDepthBiasClamp) {
+                outRaster.mDepthBiasClamp = overrides.DepthBiasClamp;
+            }
+            if (overrides.HasSlopeScaledDepthBias) {
+                outRaster.mSlopeScaledDepthBias = overrides.SlopeScaledDepthBias;
+            }
+            if (overrides.HasDepthClip) {
+                outRaster.mDepthClip = overrides.DepthClip;
+            }
+            if (overrides.HasConservativeRaster) {
+                outRaster.mConservativeRaster = overrides.ConservativeRaster;
+            }
+        }
+
         auto IsMaterialCBufferName(FStringView name) -> bool {
             if (name.IsEmpty()) {
                 return false;
@@ -699,6 +757,10 @@ namespace AltinaEngine::Rendering {
 
             if (hasRasterState) {
                 passDesc.State.ApplyRasterState(rasterState);
+            }
+
+            if (pass.RasterOverrides.HasAny()) {
+                ApplyRasterOverrides(pass.RasterOverrides, passDesc.State.Raster);
             }
 
             templ->SetPassDesc(passType, Move(passDesc));

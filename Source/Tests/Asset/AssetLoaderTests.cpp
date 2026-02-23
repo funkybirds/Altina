@@ -248,6 +248,11 @@ TEST_CASE("Asset.MaterialTemplate.Json.Load") {
     json.Append("\"ps\":{\"uuid\":\"");
     json.Append(kShaderUuid);
     json.Append("\",\"type\":\"shader\",\"entry\":\"PSMain\"}");
+    json.Append("},\"raster_overrides\":{");
+    json.Append("\"cull\":\"none\",");
+    json.Append("\"front_face\":\"cw\",");
+    json.Append("\"depth_bias\":2,");
+    json.Append("\"depth_clip\":false");
     json.Append("}}},\"precompile_variants\":[[\"PARAM_A\",\"PARAM_B\"]]}");
 
     TVector<u8> cooked;
@@ -257,8 +262,8 @@ TEST_CASE("Asset.MaterialTemplate.Json.Load") {
     FTestAssetStream stream(cooked);
     FMaterialLoader  loader;
 
-    FAssetDesc desc{};
-    auto      asset = loader.Load(desc, stream);
+    FAssetDesc       desc{};
+    auto             asset = loader.Load(desc, stream);
     REQUIRE(asset);
 
     auto* material = static_cast<FMaterialAsset*>(asset.Get());
@@ -277,6 +282,16 @@ TEST_CASE("Asset.MaterialTemplate.Json.Load") {
     REQUIRE_EQ(pass.Pixel.Asset.Uuid, shaderUuid);
     REQUIRE_EQ(pass.Pixel.Asset.Type, AltinaEngine::Asset::EAssetType::Shader);
     REQUIRE_EQ(pass.Pixel.Entry, FString(TEXT("PSMain")));
+
+    REQUIRE(pass.RasterOverrides.HasAny());
+    REQUIRE(pass.RasterOverrides.HasCullMode);
+    REQUIRE_EQ(pass.RasterOverrides.CullMode, AltinaEngine::Asset::EMaterialRasterCullMode::None);
+    REQUIRE(pass.RasterOverrides.HasFrontFace);
+    REQUIRE_EQ(pass.RasterOverrides.FrontFace, AltinaEngine::Asset::EMaterialRasterFrontFace::CW);
+    REQUIRE(pass.RasterOverrides.HasDepthBias);
+    REQUIRE_EQ(pass.RasterOverrides.DepthBias, 2);
+    REQUIRE(pass.RasterOverrides.HasDepthClip);
+    REQUIRE(!pass.RasterOverrides.DepthClip);
 
     const auto& variants = material->GetPrecompileVariants();
     REQUIRE_EQ(variants.Size(), static_cast<usize>(1));

@@ -1,9 +1,3 @@
-{
-  "Uuid": "f6a1b5f2-3b1f-4d8b-9ae5-8e0b6c0f0f64",
-  "Type": "Script",
-  "VirtualPath": "demo/minimal/scripts/demoscript",
-  "SourcePath": "Demo/Minimal/Assets/Scripts/DemoScript.script",
-  "Importer": "ScriptImporter",
-  "ImporterVersion": 1,
-  "Dependencies": []
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:efe4d2219c7c8f03ab7641ede5269fb67abe1084ae406b3be65bf3c0ea89808b
+size 268

@@ -1,9 +1,3 @@
-{
-  "Uuid": "5f6ecd7a-f19b-4abc-b018-dacb84de118c",
-  "Type": "Audio",
-  "VirtualPath": "demo/minimal/beep",
-  "SourcePath": "Demo/Minimal/Assets/Beep.wav",
-  "Importer": "AudioImporter",
-  "ImporterVersion": 1,
-  "Dependencies": []
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:1333b5eca2d368476d5a6aa622eeebf5fb1757269c7f5709ebe4ad31de101581
+size 235

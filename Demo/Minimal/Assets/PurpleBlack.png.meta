@@ -1,9 +1,3 @@
-{
-  "Uuid": "45519355-f63e-435a-bb17-d820bda07bb4",
-  "Type": "Texture2D",
-  "VirtualPath": "demo/minimal/purpleblack",
-  "SourcePath": "Demo/Minimal/Assets/PurpleBlack.png",
-  "Importer": "TextureImporter",
-  "ImporterVersion": 1,
-  "Dependencies": []
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:7af8d0a362cd9a7aae817b5beda46bf1845bfa9e67bed16e9bff5e6169b5b9fb
+size 255

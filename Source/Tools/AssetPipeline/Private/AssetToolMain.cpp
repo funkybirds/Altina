@@ -256,13 +256,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
         auto IsMeshExtension(const std::filesystem::path& path) -> bool {
             std::string ext = path.extension().string();
             ToLowerAscii(ext);
-            return ext == ".fbx" || ext == ".obj" || ext == ".gltf" || ext == ".glb";
+            return ext == ".obj";
         }
 
         auto IsModelExtension(const std::filesystem::path& path) -> bool {
             std::string ext = path.extension().string();
             ToLowerAscii(ext);
-            return ext == ".model";
+            return ext == ".fbx" || ext == ".gltf" || ext == ".glb" || ext == ".model";
         }
 
         auto IsMaterialExtension(const std::filesystem::path& path) -> bool {
@@ -671,7 +671,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             Asset::EAssetType metaType = Asset::EAssetType::Unknown;
             std::string       metaVirtualPath;
             if (LoadMeta(asset.MetaPath, asset.Uuid, metaType, metaVirtualPath)) {
-                if (metaType != Asset::EAssetType::Unknown) {
+                const auto guessedType = GuessAssetType(asset.SourcePath);
+                if (guessedType != Asset::EAssetType::Unknown && guessedType != metaType) {
+                    asset.Type = guessedType;
+                } else if (metaType != Asset::EAssetType::Unknown) {
                     asset.Type = metaType;
                 }
                 if (!metaVirtualPath.empty()) {
@@ -1109,6 +1112,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 std::string scriptTypeName;
                 bool        hasScriptDesc = false;
                 std::vector<Asset::FAssetHandle> materialDeps;
+                FModelCookResult                 modelResult{};
                 if (isScript) {
                     if (!ParseScriptDescriptor(bytes, scriptAssemblyPath, scriptTypeName)) {
                         std::cerr << "Failed to read script descriptor: "
@@ -1130,11 +1134,22 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         continue;
                     }
                 } else if (isModel) {
-                    if (!CookModel(bytes, cookedBytes, modelDesc)) {
-                        std::cerr << "Failed to cook model: " << asset.SourcePath.string() << "\n";
+                    Asset::FAssetHandle baseHandle{};
+                    baseHandle.Uuid = asset.Uuid;
+                    baseHandle.Type = asset.Type;
+                    std::string modelError;
+                    if (!CookModel(asset.SourcePath, bytes, baseHandle, asset.VirtualPath,
+                            modelResult, modelError)) {
+                        std::cerr << "Failed to cook model: " << asset.SourcePath.string();
+                        if (!modelError.empty()) {
+                            std::cerr << " (" << modelError << ")";
+                        }
+                        std::cerr << "\n";
                         continue;
                     }
-                    cookKeyExtras = cookedBytes;
+                    cookedBytes   = modelResult.CookedBytes;
+                    modelDesc     = modelResult.Desc;
+                    cookKeyExtras = modelResult.CookKeyExtras;
                 } else if (isMaterial) {
                     if (!CookMaterial(
                             bytes, assetsByVirtualPath, materialDeps, materialDesc, cookedBytes)) {
@@ -1208,6 +1223,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 } else if (isModel) {
                     registryEntry.ModelDesc    = modelDesc;
                     registryEntry.HasModelDesc = true;
+                    registryEntry.Dependencies = modelResult.ModelDependencies;
                 } else if (isMaterial) {
                     registryEntry.MaterialDesc    = materialDesc;
                     registryEntry.HasMaterialDesc = true;
@@ -1224,6 +1240,54 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     registryEntry.HasScriptDesc      = hasScriptDesc;
                 }
                 registryAssets.push_back(registryEntry);
+
+                if (isModel && !modelResult.Generated.empty()) {
+                    for (const auto& generated : modelResult.Generated) {
+                        if (!generated.Handle.IsValid()) {
+                            continue;
+                        }
+
+                        const std::string genUuid =
+                            ToStdString(generated.Handle.Uuid.ToNativeString());
+                        const std::string           genCookedRel = "Assets/" + genUuid + ".bin";
+                        const std::filesystem::path genCookedPath =
+                            paths.CookedRoot / "Assets" / (genUuid + ".bin");
+
+                        const bool genNeedsCook =
+                            needsCook || !std::filesystem::exists(genCookedPath);
+                        if (genNeedsCook) {
+                            std::error_code genEc;
+                            std::filesystem::create_directories(genCookedPath.parent_path(), genEc);
+                            if (!WriteBytesFile(genCookedPath, generated.CookedBytes)) {
+                                std::cerr
+                                    << "Failed to write cooked asset: " << genCookedPath.string()
+                                    << "\n";
+                                continue;
+                            }
+                            ++cookedCount;
+                        }
+
+                        FRegistryEntry genEntry{};
+                        genEntry.Uuid         = genUuid;
+                        genEntry.Type         = generated.Type;
+                        genEntry.VirtualPath  = generated.VirtualPath;
+                        genEntry.CookedPath   = genCookedRel;
+                        genEntry.Dependencies = generated.Dependencies;
+
+                        if (generated.Type == Asset::EAssetType::Texture2D) {
+                            genEntry.TextureDesc    = generated.TextureDesc;
+                            genEntry.HasTextureDesc = true;
+                        } else if (generated.Type == Asset::EAssetType::Mesh) {
+                            genEntry.MeshDesc    = generated.MeshDesc;
+                            genEntry.HasMeshDesc = true;
+                        } else if (generated.Type == Asset::EAssetType::MaterialTemplate) {
+                            genEntry.MaterialDesc    = generated.MaterialDesc;
+                            genEntry.HasMaterialDesc = true;
+                        }
+
+                        registryAssets.push_back(Move(genEntry));
+                    }
+                }
             }
 
             const std::filesystem::path registryPath =

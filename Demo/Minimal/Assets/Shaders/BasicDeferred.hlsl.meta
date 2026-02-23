@@ -1,9 +1,3 @@
-{
-  "Uuid": "b2fcb5a0-2d4f-4f1c-9e24-1f2a91c8e9dd",
-  "Type": "Shader",
-  "VirtualPath": "demo/minimal/shaders/basicdeferred",
-  "SourcePath": "Demo/Minimal/Assets/Shaders/BasicDeferred.hlsl",
-  "Importer": "ShaderImporter",
-  "ImporterVersion": 1,
-  "Dependencies": []
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:8e636a6bd553d6bdae526d73a1780500b09977195d407ac77b8e4ce712a5ad83
+size 272

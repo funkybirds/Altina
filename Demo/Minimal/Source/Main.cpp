@@ -2,13 +2,10 @@
 #include "Asset/AssetBinary.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
-#include "Asset/MaterialAsset.h"
-#include "Asset/MeshMaterialParameterBlock.h"
 #include "Engine/GameScene/CameraComponent.h"
-#include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
-#include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
+#include "Engine/GameSceneAsset/ModelAssetInstantiator.h"
 #include "Launch/EngineLoop.h"
 #include "Launch/GameClient.h"
 #include "Logging/Log.h"
@@ -38,38 +35,14 @@ namespace {
         auto OnInit(Launch::FEngineLoop& engineLoop) -> bool override {
             auto&      assetManager = engineLoop.GetAssetManager();
 
-            const auto meshHandle =
-                engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/triangle"));
-            const auto materialHandle = engineLoop.GetAssetRegistry().FindByPath(
-                TEXT("demo/minimal/materials/purpledeferred"));
-            const auto shaderHandle = engineLoop.GetAssetRegistry().FindByPath(
-                TEXT("demo/minimal/shaders/basicdeferred"));
-            const auto textureHandle =
-                engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/purpleblack"));
+            const auto modelHandle = engineLoop.GetAssetRegistry().FindByPath(
+                TEXT("demo/minimal/models/hoshino/hoshino_battle"));
             const auto scriptHandle =
                 engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/scripts/demoscript"));
-            if (!meshHandle.IsValid() || !materialHandle.IsValid() || !shaderHandle.IsValid()
-                || !textureHandle.IsValid() || !scriptHandle.IsValid()) {
-                LogError(TEXT("Demo assets missing (mesh, material, shader, or script)."));
+            if (!modelHandle.IsValid() || !scriptHandle.IsValid()) {
+                LogError(TEXT("Demo assets missing (model or script)."));
                 return false;
             }
-
-            auto  materialAsset = assetManager.Load(materialHandle);
-            auto* materialTemplateAsset =
-                materialAsset ? static_cast<Asset::FMaterialAsset*>(materialAsset.Get()) : nullptr;
-            if (materialTemplateAsset == nullptr) {
-                LogError(TEXT("Failed to load material template asset."));
-                return false;
-            }
-
-            const auto baseColorTexId = RenderCore::HashMaterialParamName(TEXT("BaseColorTex"));
-            const auto baseColorTexIdAlt =
-                RenderCore::HashMaterialParamName(TEXT("BaseColorTex_0"));
-            Asset::FMeshMaterialParameterBlock materialParams;
-            materialParams.SetTexture(
-                baseColorTexId, Asset::EMeshMaterialTextureType::Texture2D, textureHandle, 0U);
-            materialParams.SetTexture(
-                baseColorTexIdAlt, Asset::EMeshMaterialTextureType::Texture2D, textureHandle, 0U);
 
             auto&      worldManager = engineLoop.GetWorldManager();
             const auto worldHandle  = worldManager.CreateWorld();
@@ -89,23 +62,18 @@ namespace {
                 camera.SetFarPlane(1000.0f);
 
                 auto transform        = cameraObject.GetWorldTransform();
-                transform.Translation = Core::Math::FVector3f(0.0f, 0.0f, -2.0f);
+                transform.Translation = Core::Math::FVector3f(0.0f, 0.0f, -4.0f);
                 cameraObject.SetWorldTransform(transform);
             }
             if (scriptComponent.IsValid()) {
                 scriptComponent.Get().SetScriptAsset(scriptHandle);
             }
 
-            auto meshObject    = world->CreateGameObject(TEXT("TriangleMesh"));
-            auto meshComponent = meshObject.AddComponent<GameScene::FStaticMeshFilterComponent>();
-            auto materialComponent = meshObject.AddComponent<GameScene::FMeshMaterialComponent>();
-
-            if (meshComponent.IsValid()) {
-                meshComponent.Get().SetStaticMeshAsset(meshHandle);
-            }
-            if (materialComponent.IsValid()) {
-                materialComponent.Get().SetMaterialTemplate(0U, materialHandle);
-                materialComponent.Get().SetMaterialParameters(0U, materialParams);
+            auto modelResult = Engine::GameSceneAsset::FModelAssetInstantiator::Instantiate(
+                *world, assetManager, modelHandle);
+            if (!modelResult.Root.IsValid()) {
+                LogError(TEXT("Failed to instantiate model asset."));
+                return false;
             }
 
             {

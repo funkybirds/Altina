@@ -9,7 +9,9 @@
 #include "Asset/Texture2DAsset.h"
 #include "Rhi/RhiInit.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
+#include "Platform/PlatformFileSystem.h"
 #include "Rendering/BasicDeferredRenderer.h"
+#include "Shader/ShaderPreset.h"
 #include "Shader/ShaderPermutation.h"
 #include "Shader/ShaderReflection.h"
 #include "ShaderCompiler/ShaderPermutationParser.h"
@@ -29,6 +31,7 @@ namespace AltinaEngine::Rendering {
         namespace Container = Core::Container;
         using Container::FString;
         using Container::FStringView;
+        using Core::Utility::Filesystem::FPath;
 
         auto TryParseMaterialPass(FStringView name, RenderCore::EMaterialPass& outPass) -> bool {
             auto EqualsI = [](FStringView lhs, const TChar* rhs) -> bool {
@@ -158,23 +161,26 @@ namespace AltinaEngine::Rendering {
 
         void LogReflectionResources(
             const Shader::FShaderReflection* reflection, const FStringView& label) {
-            if (reflection == nullptr) {
-                LogInfo(TEXT("ShaderReflection {}: <null>"), label.Data());
-                return;
-            }
-            LogInfo(TEXT("ShaderReflection {} resources={} cbuffers={}"), label.Data(),
-                static_cast<u32>(reflection->mResources.Size()),
-                static_cast<u32>(reflection->mConstantBuffers.Size()));
-            for (const auto& resource : reflection->mResources) {
-                LogInfo(TEXT("  Resource name={} type={} set={} binding={} reg={} space={}"),
-                    resource.mName.CStr(), static_cast<u32>(resource.mType), resource.mSet,
-                    resource.mBinding, resource.mRegister, resource.mSpace);
-            }
-            for (const auto& cbuffer : reflection->mConstantBuffers) {
-                LogInfo(TEXT("  CBuffer name={} set={} binding={} reg={} space={} size={}"),
-                    cbuffer.mName.CStr(), cbuffer.mSet, cbuffer.mBinding, cbuffer.mRegister,
-                    cbuffer.mSpace, cbuffer.mSizeBytes);
-            }
+            // Too chatty in normal runs; enable when diagnosing shader reflection issues.
+            // if (reflection == nullptr) {
+            //     LogInfo(TEXT("ShaderReflection {}: <null>"), label.Data());
+            //     return;
+            // }
+            // LogInfo(TEXT("ShaderReflection {} resources={} cbuffers={}"), label.Data(),
+            //     static_cast<u32>(reflection->mResources.Size()),
+            //     static_cast<u32>(reflection->mConstantBuffers.Size()));
+            // for (const auto& resource : reflection->mResources) {
+            //     LogInfo(TEXT("  Resource name={} type={} set={} binding={} reg={} space={}"),
+            //         resource.mName.CStr(), static_cast<u32>(resource.mType), resource.mSet,
+            //         resource.mBinding, resource.mRegister, resource.mSpace);
+            // }
+            // for (const auto& cbuffer : reflection->mConstantBuffers) {
+            //     LogInfo(TEXT("  CBuffer name={} set={} binding={} reg={} space={} size={}"),
+            //         cbuffer.mName.CStr(), cbuffer.mSet, cbuffer.mBinding, cbuffer.mRegister,
+            //         cbuffer.mSpace, cbuffer.mSizeBytes);
+            // }
+            (void)reflection;
+            (void)label;
         }
 
         auto BuildMaterialLayout(const Shader::FShaderReflection* vertex,
@@ -195,50 +201,53 @@ namespace AltinaEngine::Rendering {
 
         void LogMaterialLayout(const RenderCore::FMaterialLayout& layout,
             const Shader::FShaderConstantBuffer* materialCBuffer, const FString& passName) {
-            LogInfo(TEXT("Material Layout for pass {}"), passName.CStr());
-
-            if (!layout.PropertyBag.IsValid()) {
-                LogInfo(TEXT("  PropertyBag: <invalid>"));
-            } else {
-                LogInfo(
-                    TEXT("  PropertyBag: Name={} Size={} Set={} Binding={} Register={} Space={}"),
-                    layout.PropertyBag.GetName().CStr(), layout.PropertyBag.GetSizeBytes(),
-                    layout.PropertyBag.GetSet(), layout.PropertyBag.GetBinding(),
-                    layout.PropertyBag.GetRegister(), layout.PropertyBag.GetSpace());
-            }
-
-            if (materialCBuffer == nullptr) {
-                LogWarning(TEXT("  Material CBuffer: <null>"));
-            } else {
-                LogInfo(
-                    TEXT(
-                        "  Material CBuffer: Name={} Size={} Set={} Binding={} Register={} Space={}"),
-                    materialCBuffer->mName.CStr(), materialCBuffer->mSizeBytes,
-                    materialCBuffer->mSet, materialCBuffer->mBinding, materialCBuffer->mRegister,
-                    materialCBuffer->mSpace);
-
-                LogInfo(
-                    TEXT("  Properties: {}"), static_cast<u32>(materialCBuffer->mMembers.Size()));
-                for (const auto& member : materialCBuffer->mMembers) {
-                    const auto nameHash = RenderCore::HashMaterialParamName(member.mName.ToView());
-                    LogInfo(
-                        TEXT("    {} (hash=0x{:08X}) Offset={} Size={} ElemCount={} ElemStride={}"),
-                        member.mName.CStr(), nameHash, member.mOffset, member.mSize,
-                        member.mElementCount, member.mElementStride);
-                }
-            }
-
-            const usize textureCount = layout.TextureBindings.Size();
-            LogInfo(TEXT("  TextureBindings: {}"), static_cast<u32>(textureCount));
-            for (usize i = 0U; i < textureCount; ++i) {
-                const u32 nameHash =
-                    (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i] : 0U;
-                const u32 samplerBinding = (i < layout.SamplerBindings.Size())
-                    ? layout.SamplerBindings[i]
-                    : RenderCore::kMaterialInvalidBinding;
-                LogInfo(TEXT("    [{}] NameHash=0x{:08X} TextureBinding={} SamplerBinding={}"),
-                    static_cast<u32>(i), nameHash, layout.TextureBindings[i], samplerBinding);
-            }
+            // Too chatty in normal runs; enable when diagnosing material layout issues.
+            // LogInfo(TEXT("Material Layout for pass {}"), passName.CStr());
+            // if (!layout.PropertyBag.IsValid()) {
+            //     LogInfo(TEXT("  PropertyBag: <invalid>"));
+            // } else {
+            //     LogInfo(
+            //         TEXT("  PropertyBag: Name={} Size={} Set={} Binding={} Register={}
+            //         Space={}"), layout.PropertyBag.GetName().CStr(),
+            //         layout.PropertyBag.GetSizeBytes(), layout.PropertyBag.GetSet(),
+            //         layout.PropertyBag.GetBinding(), layout.PropertyBag.GetRegister(),
+            //         layout.PropertyBag.GetSpace());
+            // }
+            // if (materialCBuffer == nullptr) {
+            //     LogWarning(TEXT("  Material CBuffer: <null>"));
+            // } else {
+            //     LogInfo(
+            //         TEXT(
+            //             "  Material CBuffer: Name={} Size={} Set={} Binding={} Register={}
+            //             Space={}"),
+            //         materialCBuffer->mName.CStr(), materialCBuffer->mSizeBytes,
+            //         materialCBuffer->mSet, materialCBuffer->mBinding, materialCBuffer->mRegister,
+            //         materialCBuffer->mSpace);
+            //     LogInfo(
+            //         TEXT("  Properties: {}"),
+            //         static_cast<u32>(materialCBuffer->mMembers.Size()));
+            //     for (const auto& member : materialCBuffer->mMembers) {
+            //         const auto nameHash =
+            //         RenderCore::HashMaterialParamName(member.mName.ToView()); LogInfo(
+            //             TEXT("    {} (hash=0x{:08X}) Offset={} Size={} ElemCount={}
+            //             ElemStride={}"), member.mName.CStr(), nameHash, member.mOffset,
+            //             member.mSize, member.mElementCount, member.mElementStride);
+            //     }
+            // }
+            // const usize textureCount = layout.TextureBindings.Size();
+            // LogInfo(TEXT("  TextureBindings: {}"), static_cast<u32>(textureCount));
+            // for (usize i = 0U; i < textureCount; ++i) {
+            //     const u32 nameHash =
+            //         (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i] : 0U;
+            //     const u32 samplerBinding = (i < layout.SamplerBindings.Size())
+            //         ? layout.SamplerBindings[i]
+            //         : RenderCore::kMaterialInvalidBinding;
+            //     LogInfo(TEXT("    [{}] NameHash=0x{:08X} TextureBinding={} SamplerBinding={}"),
+            //         static_cast<u32>(i), nameHash, layout.TextureBindings[i], samplerBinding);
+            // }
+            (void)layout;
+            (void)materialCBuffer;
+            (void)passName;
         }
 
         auto WriteTempShaderFile(const Container::FNativeStringView& source, const FUuid& uuid,
@@ -270,6 +279,134 @@ namespace AltinaEngine::Rendering {
                 file.write(source.Data(), static_cast<std::streamsize>(source.Length()));
             }
             return file.good();
+        }
+
+        auto ResolveShaderPath(FStringView relativePath) -> FPath {
+            if (relativePath.IsEmpty()) {
+                return {};
+            }
+
+            FPath relPath(relativePath);
+            if (relPath.IsAbsolute() && relPath.Exists()) {
+                return relPath;
+            }
+
+            const FPath exeDir(Core::Platform::GetExecutableDir());
+            if (!exeDir.IsEmpty()) {
+                const auto candidate = exeDir / relativePath;
+                if (candidate.Exists()) {
+                    return candidate;
+                }
+            }
+
+            const auto cwd = Core::Utility::Filesystem::GetCurrentWorkingDir();
+            if (!cwd.IsEmpty()) {
+                const auto candidate = cwd / relativePath;
+                if (candidate.Exists()) {
+                    return candidate;
+                }
+
+                FString sourceRel(TEXT("Source/"));
+                sourceRel.Append(relativePath);
+                const auto candidate2 = cwd / sourceRel;
+                if (candidate2.Exists()) {
+                    return candidate2;
+                }
+            }
+
+            FString sourceRel(TEXT("Source/"));
+            sourceRel.Append(relativePath);
+            FPath probe = cwd;
+            for (u32 i = 0U; i < 6U && !probe.IsEmpty(); ++i) {
+                const auto candidate = probe / sourceRel;
+                if (candidate.Exists()) {
+                    return candidate;
+                }
+                const auto parent = probe.ParentPath();
+                if (parent == probe) {
+                    break;
+                }
+                probe = parent;
+            }
+
+            return {};
+        }
+
+        auto CompileShaderFromFile(const FPath& path, FStringView entry, Shader::EShaderStage stage,
+            const FStringView keyPrefix, RenderCore::FShaderRegistry::FShaderKey& outKey,
+            ShaderCompiler::FShaderCompileResult& outResult) -> bool {
+            if (path.IsEmpty() || !path.Exists()) {
+                LogError(TEXT("Preset shader source not found."));
+                return false;
+            }
+
+            ShaderCompiler::FShaderCompileRequest request{};
+            request.mSource.mPath.Assign(path.GetString().ToView());
+            request.mSource.mEntryPoint.Assign(entry);
+            request.mSource.mStage    = stage;
+            request.mSource.mLanguage = ShaderCompiler::EShaderSourceLanguage::Hlsl;
+
+            FPath includeDir = path.ParentPath();
+            FPath probe      = includeDir;
+            for (u32 i = 0U; i < 8U && !probe.IsEmpty(); ++i) {
+                if (probe.Filename() == TEXT("Shader")) {
+                    includeDir = probe.ParentPath();
+                    break;
+                }
+                const auto parent = probe.ParentPath();
+                if (parent == probe) {
+                    break;
+                }
+                probe = parent;
+            }
+            if (!includeDir.IsEmpty()) {
+                request.mSource.mIncludeDirs.PushBack(includeDir.GetString());
+            }
+
+            request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
+            request.mOptions.mOptimization  = ShaderCompiler::EShaderOptimization::Default;
+            request.mOptions.mDebugInfo     = false;
+
+            outResult = ShaderCompiler::GetShaderCompiler().Compile(request);
+            if (!outResult.mSucceeded) {
+                LogError(TEXT("Preset shader compile failed: {}"), outResult.mDiagnostics.ToView());
+                return false;
+            }
+
+            auto* device = Rhi::RHIGetDevice();
+            if (!device) {
+                LogError(TEXT("RHI device missing for shader creation."));
+                return false;
+            }
+
+            auto shaderDesc = ShaderCompiler::BuildRhiShaderDesc(outResult);
+            shaderDesc.mDebugName.Assign(entry);
+            auto shader = device->CreateShader(shaderDesc);
+            if (!shader) {
+                LogError(TEXT("Failed to create preset RHI shader."));
+                return false;
+            }
+
+            FString keyName(keyPrefix);
+            keyName.Append(TEXT("."));
+            keyName.Append(entry);
+            outKey = RenderCore::FShaderRegistry::MakeKey(keyName.ToView(), stage);
+
+            if (!Rendering::FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
+                LogError(TEXT("Failed to register preset shader {}."), outKey.Name.ToView());
+                return false;
+            }
+
+            return true;
+        }
+
+        auto SelectPresetEntry(RenderCore::EMaterialPass pass, Shader::EShaderStage stage)
+            -> FStringView {
+            if (pass == RenderCore::EMaterialPass::BasePass) {
+                return (stage == Shader::EShaderStage::Vertex) ? FStringView(TEXT("VSBase"))
+                                                               : FStringView(TEXT("PSBase"));
+            }
+            return {};
         }
 
         auto TryParseRasterState(const Asset::FShaderAsset& shader, Shader::FShaderRasterState& out)
@@ -468,7 +605,38 @@ namespace AltinaEngine::Rendering {
             Shader::FShaderRasterState           rasterState{};
             bool                                 hasRasterState = false;
 
-            if (pass.HasVertex) {
+            if (!pass.Preset.IsEmptyString()) {
+                const auto* presetPath =
+                    RenderCore::FShaderPresetRegistry::FindPreset(pass.Preset.ToView());
+                if (presetPath == nullptr) {
+                    LogError(TEXT("Shader preset not found: {}"), pass.Preset.ToView());
+                    return {};
+                }
+
+                const auto shaderPath = ResolveShaderPath(presetPath->ToView());
+                const auto vsEntry    = SelectPresetEntry(passType, Shader::EShaderStage::Vertex);
+                const auto psEntry    = SelectPresetEntry(passType, Shader::EShaderStage::Pixel);
+                if (vsEntry.IsEmpty() || psEntry.IsEmpty()) {
+                    LogError(TEXT("Shader preset pass not supported: {}"), pass.Preset.ToView());
+                    return {};
+                }
+
+                RenderCore::FShaderRegistry::FShaderKey key{};
+                const FStringView                       keyPrefix = pass.Preset.ToView();
+                if (!CompileShaderFromFile(shaderPath, vsEntry, Shader::EShaderStage::Vertex,
+                        keyPrefix, key, vertexResult)) {
+                    return {};
+                }
+                passDesc.Shaders.Vertex = key;
+                hasVertexResult         = true;
+
+                if (!CompileShaderFromFile(shaderPath, psEntry, Shader::EShaderStage::Pixel,
+                        keyPrefix, key, pixelResult)) {
+                    return {};
+                }
+                passDesc.Shaders.Pixel = key;
+                hasPixelResult         = true;
+            } else if (pass.HasVertex) {
                 RenderCore::FShaderRegistry::FShaderKey key{};
                 if (!CompileShaderFromAsset(pass.Vertex.Asset, pass.Vertex.Entry.ToView(),
                         Shader::EShaderStage::Vertex, registry, manager, key, vertexResult)) {
@@ -478,7 +646,7 @@ namespace AltinaEngine::Rendering {
                 hasVertexResult         = true;
             }
 
-            if (pass.HasPixel) {
+            if (pass.Preset.IsEmptyString() && pass.HasPixel) {
                 RenderCore::FShaderRegistry::FShaderKey key{};
                 if (!CompileShaderFromAsset(pass.Pixel.Asset, pass.Pixel.Entry.ToView(),
                         Shader::EShaderStage::Pixel, registry, manager, key, pixelResult)) {
@@ -488,7 +656,7 @@ namespace AltinaEngine::Rendering {
                 hasPixelResult         = true;
             }
 
-            if (pass.HasCompute) {
+            if (pass.Preset.IsEmptyString() && pass.HasCompute) {
                 RenderCore::FShaderRegistry::FShaderKey key{};
                 ShaderCompiler::FShaderCompileResult    computeResult{};
                 if (!CompileShaderFromAsset(pass.Compute.Asset, pass.Compute.Entry.ToView(),

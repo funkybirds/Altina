@@ -357,8 +357,8 @@ namespace AltinaEngine::Rhi {
 
         void BindShaderResource(ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
             ID3D11ShaderResourceView* view) {
-            LogInfoCat(kD3D11DebugCategory, TEXT("BindShaderResource stage={} slot={} view={}"),
-                static_cast<u32>(stage), slot, static_cast<const void*>(view));
+            // LogInfoCat(kD3D11DebugCategory, TEXT("BindShaderResource stage={} slot={} view={}"),
+            //     static_cast<u32>(stage), slot, static_cast<const void*>(view));
             switch (stage) {
                 case EShaderStage::Vertex:
                     context->VSSetShaderResources(slot, 1, &view);
@@ -417,8 +417,8 @@ namespace AltinaEngine::Rhi {
                 }
                 sampler = sDefaultSampler.Get();
             }
-            LogInfoCat(kD3D11DebugCategory, TEXT("BindSampler stage={} slot={} sampler={}"),
-                static_cast<u32>(stage), slot, static_cast<const void*>(sampler));
+            // LogInfoCat(kD3D11DebugCategory, TEXT("BindSampler stage={} slot={} sampler={}"),
+            //     static_cast<u32>(stage), slot, static_cast<const void*>(sampler));
             switch (stage) {
                 case EShaderStage::Vertex:
                     context->VSSetSamplers(slot, 1, &sampler);
@@ -547,13 +547,13 @@ namespace AltinaEngine::Rhi {
             domainShader   = ds ? ds->GetDomainShader() : nullptr;
 
             const auto& mappings = graphicsPipeline->GetBindingMappings();
-            LogInfoCat(kD3D11DebugCategory, TEXT("GraphicsPipeline bindings: {}"),
-                static_cast<u32>(mappings.Size()));
+            // LogInfoCat(kD3D11DebugCategory, TEXT("GraphicsPipeline bindings: {}"),
+            //     static_cast<u32>(mappings.Size()));
             for (const auto& mapping : mappings) {
-                LogInfoCat(kD3D11DebugCategory,
-                    TEXT("  Binding set={} binding={} type={} stage={} reg={} space={}"),
-                    mapping.mSet, mapping.mBinding, static_cast<u32>(mapping.mType),
-                    static_cast<u32>(mapping.mStage), mapping.mRegister, mapping.mSpace);
+                // LogInfoCat(kD3D11DebugCategory,
+                //     TEXT("  Binding set={} binding={} type={} stage={} reg={} space={}"),
+                //     mapping.mSet, mapping.mBinding, static_cast<u32>(mapping.mType),
+                //     static_cast<u32>(mapping.mStage), mapping.mRegister, mapping.mSpace);
             }
         }
 
@@ -853,10 +853,10 @@ namespace AltinaEngine::Rhi {
         }
 
         const auto& groupDesc = group->GetDesc();
-        LogInfoCat(kD3D11DebugCategory,
-            TEXT("RHISetBindGroup set={} entries={} dynOffsets={} layout={}"), setIndex,
-            static_cast<u32>(groupDesc.mEntries.Size()), dynamicOffsetCount,
-            static_cast<const void*>(groupDesc.mLayout));
+        // LogInfoCat(kD3D11DebugCategory,
+        //     TEXT("RHISetBindGroup set={} entries={} dynOffsets={} layout={}"), setIndex,
+        //     static_cast<u32>(groupDesc.mEntries.Size()), dynamicOffsetCount,
+        //     static_cast<const void*>(groupDesc.mLayout));
         if (groupDesc.mEntries.IsEmpty()) {
             return;
         }
@@ -905,10 +905,10 @@ namespace AltinaEngine::Rhi {
 
                     const UINT slot = static_cast<UINT>(mapping.mRegister + entry.mArrayIndex);
                     matched         = true;
-                    LogInfoCat(kD3D11DebugCategory,
-                        TEXT("BindGroupMatch set={} binding={} type={} stage={} reg={} slot={}"),
-                        setIndex, entry.mBinding, static_cast<u32>(entry.mType),
-                        static_cast<u32>(mapping.mStage), mapping.mRegister, slot);
+                    // LogInfoCat(kD3D11DebugCategory,
+                    //     TEXT("BindGroupMatch set={} binding={} type={} stage={} reg={} slot={}"),
+                    //     setIndex, entry.mBinding, static_cast<u32>(entry.mType),
+                    //     static_cast<u32>(mapping.mStage), mapping.mRegister, slot);
 
                     switch (mapping.mType) {
                         case ERhiBindingType::ConstantBuffer:
@@ -1023,9 +1023,9 @@ namespace AltinaEngine::Rhi {
                     }
                 }
                 if (!matched) {
-                    LogInfoCat(kD3D11DebugCategory,
-                        TEXT("BindGroupNoMatch set={} binding={} type={}"), setIndex,
-                        entry.mBinding, static_cast<u32>(entry.mType));
+                    // LogInfoCat(kD3D11DebugCategory,
+                    //     TEXT("BindGroupNoMatch set={} binding={} type={}"), setIndex,
+                    //     entry.mBinding, static_cast<u32>(entry.mType));
                     if (!mState->mUseComputeBindings && layoutEntries != nullptr) {
                         Rhi::ERhiShaderStageFlags visibility = Rhi::ERhiShaderStageFlags::All;
                         for (const auto& layoutEntry : *layoutEntries) {
@@ -1072,9 +1072,9 @@ namespace AltinaEngine::Rhi {
                                 auto* texture = static_cast<FRhiD3D11Texture*>(entry.mTexture);
                                 ID3D11ShaderResourceView* view =
                                     texture ? texture->GetShaderResourceView() : nullptr;
-                                LogInfoCat(kD3D11DebugCategory,
-                                    TEXT("BindGroupFallback SampledTexture binding={} slot={}"),
-                                    entry.mBinding, slot);
+                                // LogInfoCat(kD3D11DebugCategory,
+                                //     TEXT("BindGroupFallback SampledTexture binding={} slot={}"),
+                                //     entry.mBinding, slot);
                                 forEachStage([&](EShaderStage stage) {
                                     BindShaderResource(context, stage, slot, view);
                                 });
@@ -1085,9 +1085,9 @@ namespace AltinaEngine::Rhi {
                                 auto* sampler = static_cast<FRhiD3D11Sampler*>(entry.mSampler);
                                 ID3D11SamplerState* nativeSampler =
                                     sampler ? sampler->GetNativeSampler() : nullptr;
-                                LogInfoCat(kD3D11DebugCategory,
-                                    TEXT("BindGroupFallback Sampler binding={} slot={}"),
-                                    entry.mBinding, slot);
+                                // LogInfoCat(kD3D11DebugCategory,
+                                //     TEXT("BindGroupFallback Sampler binding={} slot={}"),
+                                //     entry.mBinding, slot);
                                 forEachStage([&](EShaderStage stage) {
                                     BindSampler(context, stage, slot, nativeSampler);
                                 });
@@ -1336,6 +1336,8 @@ namespace AltinaEngine::Rhi {
                     return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
                 case ERhiFormat::R16G16B16A16Float:
                     return DXGI_FORMAT_R16G16B16A16_FLOAT;
+                case ERhiFormat::R32G32Float:
+                    return DXGI_FORMAT_R32G32_FLOAT;
                 case ERhiFormat::R32G32B32Float:
                     return DXGI_FORMAT_R32G32B32_FLOAT;
                 case ERhiFormat::R32Float:
@@ -1405,12 +1407,12 @@ namespace AltinaEngine::Rhi {
                 const auto bindingType = ToBindingType(resource);
                 const bool hasLayout =
                     HasLayoutBinding(layout, resource.mSet, resource.mBinding, bindingType);
-                LogInfoCat(kD3D11DebugCategory,
-                    TEXT("ShaderReflection stage={} name={} type={} set={} binding={} reg={} ")
-                        TEXT("space={} hasLayout={}"),
-                    static_cast<u32>(stage), resource.mName.CStr(), static_cast<u32>(bindingType),
-                    resource.mSet, resource.mBinding, resource.mRegister, resource.mSpace,
-                    hasLayout ? 1 : 0);
+                // LogInfoCat(kD3D11DebugCategory,
+                //     TEXT("ShaderReflection stage={} name={} type={} set={} binding={} reg={} ")
+                //         TEXT("space={} hasLayout={}"),
+                //     static_cast<u32>(stage), resource.mName.CStr(),
+                //     static_cast<u32>(bindingType), resource.mSet, resource.mBinding,
+                //     resource.mRegister, resource.mSpace, hasLayout ? 1 : 0);
                 if (!hasLayout) {
                     continue;
                 }
@@ -1727,8 +1729,8 @@ namespace AltinaEngine::Rhi {
             mState->mDevice.Attach(device);
             mState->mImmediateContext.Attach(context);
             mState->mFeatureLevel = static_cast<D3D_FEATURE_LEVEL>(featureLevel);
-            LogInfoCat(kD3D11DebugCategory, TEXT("Rhi.D3D11 build stamp: {} {} (this={})"),
-                TEXT(__DATE__), TEXT(__TIME__), static_cast<const void*>(this));
+            // LogInfoCat(kD3D11DebugCategory, TEXT("Rhi.D3D11 build stamp: {} {} (this={})"),
+            //     TEXT(__DATE__), TEXT(__TIME__), static_cast<const void*>(this));
         }
 
         if (mState && mState->mDevice) {

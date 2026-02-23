@@ -213,11 +213,6 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.OutputLayout) {
-                Rhi::FRhiBindGroupLayoutEntry textureEntry{};
-                textureEntry.mBinding    = 0U;
-                textureEntry.mType       = Rhi::ERhiBindingType::SampledTexture;
-                textureEntry.mVisibility = Rhi::ERhiShaderStageFlags::All;
-
                 Rhi::FRhiBindGroupLayoutEntry samplerEntry{};
                 samplerEntry.mBinding    = 0U;
                 samplerEntry.mType       = Rhi::ERhiBindingType::Sampler;
@@ -225,7 +220,13 @@ namespace AltinaEngine::Rendering {
 
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
                 layoutDesc.mSetIndex = 0U;
-                layoutDesc.mEntries.PushBack(textureEntry);
+                for (u32 binding = 0U; binding < 3U; ++binding) {
+                    Rhi::FRhiBindGroupLayoutEntry textureEntry{};
+                    textureEntry.mBinding    = binding;
+                    textureEntry.mType       = Rhi::ERhiBindingType::SampledTexture;
+                    textureEntry.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                    layoutDesc.mEntries.PushBack(textureEntry);
+                }
                 layoutDesc.mEntries.PushBack(samplerEntry);
                 layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
                 resources.OutputLayout = device.CreateBindGroupLayout(layoutDesc);
@@ -260,6 +261,26 @@ namespace AltinaEngine::Rendering {
             position.mInstanceStepRate  = 0U;
 
             resources.BaseVertexLayout.mAttributes.PushBack(position);
+
+            Rhi::FRhiVertexAttributeDesc normal{};
+            normal.mSemanticName.Assign(TEXT("NORMAL"));
+            normal.mSemanticIndex     = 0U;
+            normal.mFormat            = Rhi::ERhiFormat::R32G32B32Float;
+            normal.mInputSlot         = 1U;
+            normal.mAlignedByteOffset = 0U;
+            normal.mPerInstance       = false;
+            normal.mInstanceStepRate  = 0U;
+            resources.BaseVertexLayout.mAttributes.PushBack(normal);
+
+            Rhi::FRhiVertexAttributeDesc texcoord{};
+            texcoord.mSemanticName.Assign(TEXT("TEXCOORD"));
+            texcoord.mSemanticIndex     = 0U;
+            texcoord.mFormat            = Rhi::ERhiFormat::R32G32Float;
+            texcoord.mInputSlot         = 2U;
+            texcoord.mAlignedByteOffset = 0U;
+            texcoord.mPerInstance       = false;
+            texcoord.mInstanceStepRate  = 0U;
+            resources.BaseVertexLayout.mAttributes.PushBack(texcoord);
             resources.bBaseVertexLayoutReady = true;
         }
 
@@ -529,16 +550,20 @@ namespace AltinaEngine::Rendering {
 
         constexpr Rhi::FRhiClearColor     kAlbedoClear{ 0.12f, 0.12f, 0.12f, 1.0f };
         constexpr Rhi::FRhiClearColor     kNormalClear{ 0.5f, 0.5f, 1.0f, 1.0f };
+        constexpr Rhi::FRhiClearColor     kEmissiveClear{ 0.0f, 0.0f, 0.0f, 1.0f };
 
         RenderCore::FFrameGraphTextureRef gbufferA;
         RenderCore::FFrameGraphTextureRef gbufferB;
+        RenderCore::FFrameGraphTextureRef gbufferC;
 
         struct FBasePassData {
             RenderCore::FFrameGraphTextureRef GBufferA;
             RenderCore::FFrameGraphTextureRef GBufferB;
+            RenderCore::FFrameGraphTextureRef GBufferC;
             RenderCore::FFrameGraphTextureRef Depth;
             RenderCore::FFrameGraphRTVRef     GBufferARTV;
             RenderCore::FFrameGraphRTVRef     GBufferBRTV;
+            RenderCore::FFrameGraphRTVRef     GBufferCRTV;
             RenderCore::FFrameGraphDSVRef     DepthDSV;
         };
 
@@ -588,6 +613,14 @@ namespace AltinaEngine::Rendering {
                 gbufferBDesc.mDesc.mBindFlags = Rhi::ERhiTextureBindFlags::RenderTarget
                     | Rhi::ERhiTextureBindFlags::ShaderResource;
 
+                RenderCore::FFrameGraphTextureDesc gbufferCDesc{};
+                gbufferCDesc.mDesc.mDebugName.Assign(TEXT("GBufferC.Emissive"));
+                gbufferCDesc.mDesc.mWidth     = width;
+                gbufferCDesc.mDesc.mHeight    = height;
+                gbufferCDesc.mDesc.mFormat    = Rhi::ERhiFormat::R8G8B8A8Unorm;
+                gbufferCDesc.mDesc.mBindFlags = Rhi::ERhiTextureBindFlags::RenderTarget
+                    | Rhi::ERhiTextureBindFlags::ShaderResource;
+
                 RenderCore::FFrameGraphTextureDesc depthDesc{};
                 depthDesc.mDesc.mDebugName.Assign(TEXT("GBufferDepth"));
                 depthDesc.mDesc.mWidth     = width;
@@ -597,10 +630,12 @@ namespace AltinaEngine::Rendering {
 
                 data.GBufferA = builder.CreateTexture(gbufferADesc);
                 data.GBufferB = builder.CreateTexture(gbufferBDesc);
+                data.GBufferC = builder.CreateTexture(gbufferCDesc);
                 data.Depth    = builder.CreateTexture(depthDesc);
 
                 data.GBufferA = builder.Write(data.GBufferA, Rhi::ERhiResourceState::RenderTarget);
                 data.GBufferB = builder.Write(data.GBufferB, Rhi::ERhiResourceState::RenderTarget);
+                data.GBufferC = builder.Write(data.GBufferC, Rhi::ERhiResourceState::RenderTarget);
                 data.Depth    = builder.Write(data.Depth, Rhi::ERhiResourceState::DepthWrite);
 
                 Rhi::FRhiTextureViewRange viewRange{};
@@ -620,13 +655,19 @@ namespace AltinaEngine::Rendering {
                 rtvDescB.mRange  = viewRange;
                 data.GBufferBRTV = builder.CreateRTV(data.GBufferB, rtvDescB);
 
+                Rhi::FRhiRenderTargetViewDesc rtvDescC{};
+                rtvDescC.mDebugName.Assign(TEXT("GBufferC.RTV"));
+                rtvDescC.mFormat = gbufferCDesc.mDesc.mFormat;
+                rtvDescC.mRange  = viewRange;
+                data.GBufferCRTV = builder.CreateRTV(data.GBufferC, rtvDescC);
+
                 Rhi::FRhiDepthStencilViewDesc dsvDesc{};
                 dsvDesc.mDebugName.Assign(TEXT("GBufferDepth.DSV"));
                 dsvDesc.mFormat = depthDesc.mDesc.mFormat;
                 dsvDesc.mRange  = viewRange;
                 data.DepthDSV   = builder.CreateDSV(data.Depth, dsvDesc);
 
-                RenderCore::FRdgRenderTargetBinding rtvs[2]{};
+                RenderCore::FRdgRenderTargetBinding rtvs[3]{};
                 rtvs[0].mRTV        = data.GBufferARTV;
                 rtvs[0].mLoadOp     = Rhi::ERhiLoadOp::Clear;
                 rtvs[0].mStoreOp    = Rhi::ERhiStoreOp::Store;
@@ -637,16 +678,22 @@ namespace AltinaEngine::Rendering {
                 rtvs[1].mStoreOp    = Rhi::ERhiStoreOp::Store;
                 rtvs[1].mClearColor = kNormalClear;
 
+                rtvs[2].mRTV        = data.GBufferCRTV;
+                rtvs[2].mLoadOp     = Rhi::ERhiLoadOp::Clear;
+                rtvs[2].mStoreOp    = Rhi::ERhiStoreOp::Store;
+                rtvs[2].mClearColor = kEmissiveClear;
+
                 RenderCore::FRdgDepthStencilBinding depthBinding{};
                 depthBinding.mDSV                      = data.DepthDSV;
                 depthBinding.mDepthLoadOp              = Rhi::ERhiLoadOp::Clear;
                 depthBinding.mDepthStoreOp             = Rhi::ERhiStoreOp::Store;
                 depthBinding.mClearDepthStencil.mDepth = 1.0f;
 
-                builder.SetRenderTargets(rtvs, 2U, &depthBinding);
+                builder.SetRenderTargets(rtvs, 3U, &depthBinding);
 
                 gbufferA = data.GBufferA;
                 gbufferB = data.GBufferB;
+                gbufferC = data.GBufferC;
             },
             [drawList, drawBindings, pipelineData, bindingData, viewRect](Rhi::FRhiCmdContext& ctx,
                 const RenderCore::FFrameGraphPassResources&, const FBasePassData&) {
@@ -679,6 +726,8 @@ namespace AltinaEngine::Rendering {
             RenderCore::FFrameGraphTextureRef Output;
             RenderCore::FFrameGraphRTVRef     OutputRTV;
             RenderCore::FFrameGraphTextureRef GBufferA;
+            RenderCore::FFrameGraphTextureRef GBufferB;
+            RenderCore::FFrameGraphTextureRef GBufferC;
         };
 
         RenderCore::FFrameGraphPassDesc outputPassDesc{};
@@ -695,8 +744,13 @@ namespace AltinaEngine::Rendering {
                 if (gbufferB.IsValid()) {
                     builder.Read(gbufferB, Rhi::ERhiResourceState::ShaderResource);
                 }
+                if (gbufferC.IsValid()) {
+                    builder.Read(gbufferC, Rhi::ERhiResourceState::ShaderResource);
+                }
 
                 data.GBufferA = gbufferA;
+                data.GBufferB = gbufferB;
+                data.GBufferC = gbufferC;
                 data.Output   = builder.Write(outputTexture, Rhi::ERhiResourceState::RenderTarget);
 
                 Rhi::FRhiTextureViewRange viewRange{};
@@ -727,8 +781,10 @@ namespace AltinaEngine::Rendering {
                     return;
                 }
 
-                auto* texture = res.GetTexture(data.GBufferA);
-                if (!texture) {
+                auto* textureA = res.GetTexture(data.GBufferA);
+                auto* textureB = res.GetTexture(data.GBufferB);
+                auto* textureC = res.GetTexture(data.GBufferC);
+                if (!textureA || !textureB || !textureC) {
                     return;
                 }
 
@@ -740,11 +796,23 @@ namespace AltinaEngine::Rendering {
                 Rhi::FRhiBindGroupDesc groupDesc{};
                 groupDesc.mLayout = shared.OutputLayout.Get();
 
-                Rhi::FRhiBindGroupEntry texEntry{};
-                texEntry.mBinding = 0U;
-                texEntry.mType    = Rhi::ERhiBindingType::SampledTexture;
-                texEntry.mTexture = texture;
-                groupDesc.mEntries.PushBack(texEntry);
+                Rhi::FRhiBindGroupEntry texEntryA{};
+                texEntryA.mBinding = 0U;
+                texEntryA.mType    = Rhi::ERhiBindingType::SampledTexture;
+                texEntryA.mTexture = textureA;
+                groupDesc.mEntries.PushBack(texEntryA);
+
+                Rhi::FRhiBindGroupEntry texEntryB{};
+                texEntryB.mBinding = 1U;
+                texEntryB.mType    = Rhi::ERhiBindingType::SampledTexture;
+                texEntryB.mTexture = textureB;
+                groupDesc.mEntries.PushBack(texEntryB);
+
+                Rhi::FRhiBindGroupEntry texEntryC{};
+                texEntryC.mBinding = 2U;
+                texEntryC.mType    = Rhi::ERhiBindingType::SampledTexture;
+                texEntryC.mTexture = textureC;
+                groupDesc.mEntries.PushBack(texEntryC);
 
                 Rhi::FRhiBindGroupEntry samplerEntry{};
                 samplerEntry.mBinding = 0U;

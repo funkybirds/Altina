@@ -1,9 +1,3 @@
-{
-  "Uuid": "cd3be45e-9aa5-4e33-bf83-f96136b1f50d",
-  "Type": "Texture2D",
-  "VirtualPath": "demo/minimal/checker",
-  "SourcePath": "Demo/Minimal/Assets/Checker.png",
-  "Importer": "TextureImporter",
-  "ImporterVersion": 1,
-  "Dependencies": []
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:07a55e62d6ac2b9df416f2e79ca36bbfc9d25213ae2fd0280ab581b52598b60b
+size 247

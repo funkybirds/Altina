@@ -131,11 +131,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::string         Name;
             std::string         Type;
             std::vector<double> Values;
-            bool                IsScalar = false;
+            bool                IsScalar  = false;
+            bool                IsTexture = false;
+            std::string         TextureAssetPath;
+            Asset::FAssetHandle TextureHandle{};
         };
 
         struct FMaterialPassSource {
             std::string                         Name;
+            std::string                         Preset;
             bool                                HasVertex  = false;
             bool                                HasPixel   = false;
             bool                                HasCompute = false;
@@ -218,23 +222,36 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     continue;
                 }
 
+                FNativeString presetText;
+                if (GetStringValue(FindObjectValueInsensitive(*pair.Value, "Preset"), presetText)) {
+                    pass.Preset = ToStdString(presetText);
+                }
+
+                const bool        hasPreset    = !pass.Preset.empty();
                 const FJsonValue* shadersValue = FindObjectValueInsensitive(*pair.Value, "Shaders");
-                if (shadersValue == nullptr || shadersValue->Type != EJsonType::Object) {
-                    outError = "Material Pass shaders missing.";
-                    return false;
+                if (!hasPreset) {
+                    if (shadersValue == nullptr || shadersValue->Type != EJsonType::Object) {
+                        outError = "Material Pass shaders missing.";
+                        return false;
+                    }
                 }
 
-                if (const FJsonValue* vsValue = FindObjectValueInsensitive(*shadersValue, "vs")) {
-                    pass.HasVertex = ParseShaderStageRef(*vsValue, pass.Vertex);
-                }
-                if (const FJsonValue* psValue = FindObjectValueInsensitive(*shadersValue, "ps")) {
-                    pass.HasPixel = ParseShaderStageRef(*psValue, pass.Pixel);
-                }
-                if (const FJsonValue* csValue = FindObjectValueInsensitive(*shadersValue, "cs")) {
-                    pass.HasCompute = ParseShaderStageRef(*csValue, pass.Compute);
+                if (shadersValue != nullptr && shadersValue->Type == EJsonType::Object) {
+                    if (const FJsonValue* vsValue =
+                            FindObjectValueInsensitive(*shadersValue, "vs")) {
+                        pass.HasVertex = ParseShaderStageRef(*vsValue, pass.Vertex);
+                    }
+                    if (const FJsonValue* psValue =
+                            FindObjectValueInsensitive(*shadersValue, "ps")) {
+                        pass.HasPixel = ParseShaderStageRef(*psValue, pass.Pixel);
+                    }
+                    if (const FJsonValue* csValue =
+                            FindObjectValueInsensitive(*shadersValue, "cs")) {
+                        pass.HasCompute = ParseShaderStageRef(*csValue, pass.Compute);
+                    }
                 }
 
-                if (!pass.HasVertex && !pass.HasCompute) {
+                if (!hasPreset && !pass.HasVertex && !pass.HasCompute) {
                     outError = "Material Pass requires at least VS or CS.";
                     return false;
                 }
@@ -268,7 +285,18 @@ namespace AltinaEngine::Tools::AssetPipeline {
                                 continue;
                             }
 
-                            if (valueNode->Type == EJsonType::Number) {
+                            const auto typeLower = NormalizeVirtualPath(overrideParam.Type);
+                            const bool isTextureType =
+                                (typeLower == "texture2d" || typeLower == "texture");
+
+                            if (isTextureType && valueNode->Type == EJsonType::String) {
+                                const std::string assetPath =
+                                    NormalizeVirtualPath(ToStdString(valueNode->String));
+                                if (!assetPath.empty()) {
+                                    overrideParam.IsTexture        = true;
+                                    overrideParam.TextureAssetPath = assetPath;
+                                }
+                            } else if (valueNode->Type == EJsonType::Number) {
                                 overrideParam.IsScalar = true;
                                 overrideParam.Values.push_back(valueNode->Number);
                             } else if (valueNode->Type == EJsonType::Array) {
@@ -283,7 +311,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                                 if (!valid) {
                                     continue;
                                 }
-                            } else {
+                            } else if (!isTextureType) {
                                 continue;
                             }
 
@@ -353,14 +381,39 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return true;
                 };
 
-                if (pass.HasVertex && !resolve(pass.Vertex)) {
-                    return false;
-                }
-                if (pass.HasPixel && !resolve(pass.Pixel)) {
-                    return false;
-                }
-                if (pass.HasCompute && !resolve(pass.Compute)) {
-                    return false;
+                if (!pass.Preset.empty()) {
+                    for (auto& param : pass.Overrides) {
+                        if (!param.IsTexture || param.TextureAssetPath.empty()) {
+                            continue;
+                        }
+                        const auto it = assetsByPath.find(param.TextureAssetPath);
+                        if (it == assetsByPath.end()) {
+                            outError =
+                                "Material texture asset not found: " + param.TextureAssetPath;
+                            return false;
+                        }
+                        const auto* record = it->second;
+                        if (record == nullptr || record->Type != Asset::EAssetType::Texture2D) {
+                            outError = "Material texture asset invalid: " + param.TextureAssetPath;
+                            return false;
+                        }
+                        param.TextureHandle.Uuid   = record->Uuid;
+                        param.TextureHandle.Type   = record->Type;
+                        const std::string uuidText = ToStdString(record->Uuid.ToNativeString());
+                        if (seen.insert(uuidText).second) {
+                            outDeps.push_back(param.TextureHandle);
+                        }
+                    }
+                } else {
+                    if (pass.HasVertex && !resolve(pass.Vertex)) {
+                        return false;
+                    }
+                    if (pass.HasPixel && !resolve(pass.Pixel)) {
+                        return false;
+                    }
+                    if (pass.HasCompute && !resolve(pass.Compute)) {
+                        return false;
+                    }
                 }
             }
 
@@ -381,40 +434,45 @@ namespace AltinaEngine::Tools::AssetPipeline {
             for (size_t passIndex = 0; passIndex < material.Passes.size(); ++passIndex) {
                 const auto& pass = material.Passes[passIndex];
                 stream << "    \"" << EscapeJson(pass.Name) << "\": {\n";
-                stream << "      \"Shaders\": {\n";
+                if (!pass.Preset.empty()) {
+                    stream << "      \"Preset\": \"" << EscapeJson(pass.Preset) << "\"";
+                } else {
+                    stream << "      \"Shaders\": {\n";
 
-                auto WriteShader = [&](const char* key, const FMaterialShaderRef& ref, bool emit,
-                                       bool isLast) {
-                    if (!emit) {
-                        return;
+                    auto WriteShader = [&](const char* key, const FMaterialShaderRef& ref,
+                                           bool emit, bool isLast) {
+                        if (!emit) {
+                            return;
+                        }
+                        const std::string uuidText = ToStdString(ref.Handle.Uuid.ToNativeString());
+                        stream << "        \"" << key << "\": { \"Uuid\": \""
+                               << EscapeJson(uuidText) << "\", \"Type\": \""
+                               << AssetTypeToString(ref.Handle.Type) << "\", \"Entry\": \""
+                               << EscapeJson(ref.Entry) << "\" }";
+                        if (!isLast) {
+                            stream << ",";
+                        }
+                        stream << "\n";
+                    };
+
+                    const bool hasVs  = pass.HasVertex;
+                    const bool hasPs  = pass.HasPixel;
+                    const bool hasCs  = pass.HasCompute;
+                    const bool vsLast = !hasPs && !hasCs;
+                    const bool psLast = !hasCs;
+
+                    if (hasVs) {
+                        WriteShader("vs", pass.Vertex, true, vsLast);
                     }
-                    const std::string uuidText = ToStdString(ref.Handle.Uuid.ToNativeString());
-                    stream << "        \"" << key << "\": { \"Uuid\": \"" << EscapeJson(uuidText)
-                           << "\", \"Type\": \"" << AssetTypeToString(ref.Handle.Type)
-                           << "\", \"Entry\": \"" << EscapeJson(ref.Entry) << "\" }";
-                    if (!isLast) {
-                        stream << ",";
+                    if (hasPs) {
+                        WriteShader("ps", pass.Pixel, true, psLast);
                     }
-                    stream << "\n";
-                };
+                    if (hasCs) {
+                        WriteShader("cs", pass.Compute, true, true);
+                    }
 
-                const bool hasVs  = pass.HasVertex;
-                const bool hasPs  = pass.HasPixel;
-                const bool hasCs  = pass.HasCompute;
-                const bool vsLast = !hasPs && !hasCs;
-                const bool psLast = !hasCs;
-
-                if (hasVs) {
-                    WriteShader("vs", pass.Vertex, true, vsLast);
+                    stream << "      }";
                 }
-                if (hasPs) {
-                    WriteShader("ps", pass.Pixel, true, psLast);
-                }
-                if (hasCs) {
-                    WriteShader("cs", pass.Compute, true, true);
-                }
-
-                stream << "      }";
 
                 if (!pass.Overrides.empty()) {
                     stream << ",\n";
@@ -425,7 +483,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         stream << "        \"" << EscapeJson(overrideParam.Name) << "\": { ";
                         stream << "\"Type\": \"" << EscapeJson(overrideParam.Type) << "\", ";
                         stream << "\"Value\": ";
-                        if (overrideParam.IsScalar && !overrideParam.Values.empty()) {
+                        if (overrideParam.IsTexture) {
+                            const std::string uuidText =
+                                ToStdString(overrideParam.TextureHandle.Uuid.ToNativeString());
+                            stream << "{ \"Uuid\": \"" << EscapeJson(uuidText) << "\", \"Type\": \""
+                                   << AssetTypeToString(overrideParam.TextureHandle.Type) << "\" }";
+                        } else if (overrideParam.IsScalar && !overrideParam.Values.empty()) {
                             stream << overrideParam.Values[0];
                         } else {
                             stream << "[";

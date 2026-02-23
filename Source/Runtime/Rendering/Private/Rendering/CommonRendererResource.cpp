@@ -15,6 +15,7 @@
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "ShaderCompiler/ShaderPermutationParser.h"
 #include "ShaderCompiler/ShaderRhiBindings.h"
+#include "Shader/ShaderPreset.h"
 #include "Types/Traits.h"
 #include "Utility/Filesystem/Path.h"
 #include "Utility/Filesystem/PathUtils.h"
@@ -271,6 +272,8 @@ namespace AltinaEngine::Rendering {
         if (sInitialized) {
             return;
         }
+
+        RenderCore::InitCommonShaders();
 
         if (FBasicDeferredRenderer::GetDefaultMaterialTemplate()) {
             sInitialized = true;

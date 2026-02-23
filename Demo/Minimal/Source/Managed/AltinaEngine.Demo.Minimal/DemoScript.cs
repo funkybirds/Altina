@@ -8,7 +8,7 @@ public sealed class DemoScript : ScriptComponent
     private float _elapsedSeconds;
     private bool _loggedCreate;
     private bool _loggedFirstTick;
-    private const float MoveSpeed = 2.5f;
+    private const float MoveSpeed = 12.5f;
 
     public override void OnCreate()
     {
@@ -53,6 +53,7 @@ public sealed class DemoScript : ScriptComponent
 
         float moveX = 0.0f;
         float moveY = 0.0f;
+        float moveZ = 0.0f;
         if (Input.IsKeyDown(EKey.W))
         {
             moveY += 1.0f;
@@ -69,18 +70,27 @@ public sealed class DemoScript : ScriptComponent
         {
             moveX += 1.0f;
         }
-
-        if (moveX != 0.0f || moveY != 0.0f)
+        if (Input.IsKeyDown(EKey.Q))
         {
-            float length = MathF.Sqrt(moveX * moveX + moveY * moveY);
+            moveZ -= 1.0f;
+        }
+        if (Input.IsKeyDown(EKey.E))
+        {
+            moveZ += 1.0f;
+        }
+        if (moveX != 0.0f || moveY != 0.0f || moveZ != 0.0f)
+        {
+            float length = MathF.Sqrt(moveX * moveX + moveY * moveY + moveZ * moveZ);
             if (length > 0.0f)
             {
                 moveX /= length;
                 moveY /= length;
+                moveZ /= length;
             }
 
             position.X += moveX * MoveSpeed * dt;
             position.Y += moveY * MoveSpeed * dt;
+            position.Z += moveZ * MoveSpeed * dt;
             TrySetWorldPosition(position);
         }
     }

@@ -1,9 +1,3 @@
-{
-  "Uuid": "e8f3e312-b6f6-4161-9c32-3c3bb726526e",
-  "Type": "Mesh",
-  "VirtualPath": "demo/minimal/triangle",
-  "SourcePath": "Demo/Minimal/Assets/Triangle.obj",
-  "Importer": "MeshImporter",
-  "ImporterVersion": 1,
-  "Dependencies": []
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:34c6f7bda230c6e6eb6462e29d186cc9d7657d0e30e926d0200c05bc7fa0c874
+size 241

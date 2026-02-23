@@ -91,6 +91,12 @@ namespace AltinaEngine::Asset {
             }
 
             Container::FNativeStringView view(typeText.GetData(), typeText.Length());
+            if (Core::Utility::String::EqualLiteralI(view, "texture2d")
+                || Core::Utility::String::EqualLiteralI(view, "texture")
+                || Core::Utility::String::EqualLiteralI(view, "tex2d")) {
+                outType = EAssetType::Texture2D;
+                return true;
+            }
             if (Core::Utility::String::EqualLiteralI(view, "shader")) {
                 outType = EAssetType::Shader;
                 return true;
@@ -105,6 +111,35 @@ namespace AltinaEngine::Asset {
                 return true;
             }
             return false;
+        }
+
+        auto ParseAssetHandle(const FJsonValue& value, FAssetHandle& outHandle) -> bool {
+            if (value.Type != EJsonType::Object) {
+                return false;
+            }
+
+            FNativeString uuidText;
+            if (!GetStringValue(FindObjectValueInsensitive(value, "Uuid"), uuidText)) {
+                return false;
+            }
+
+            FUuid uuid;
+            if (!Core::Utility::String::ParseUuid(uuidText, uuid)) {
+                return false;
+            }
+
+            EAssetType        type      = EAssetType::Unknown;
+            const FJsonValue* typeValue = FindObjectValueInsensitive(value, "Type");
+            if (typeValue != nullptr) {
+                (void)ParseAssetTypeText(typeValue, type);
+            }
+            if (type == EAssetType::Unknown) {
+                return false;
+            }
+
+            outHandle.Uuid = uuid;
+            outHandle.Type = type;
+            return outHandle.IsValid();
         }
 
         auto ParseShaderSource(const FJsonValue& value, FMaterialShaderSource& out) -> bool {
@@ -252,6 +287,28 @@ namespace AltinaEngine::Asset {
                 return true;
             }
 
+            if (Core::Utility::String::EqualLiteralI(typeView, "texture2d")
+                || Core::Utility::String::EqualLiteralI(typeView, "texture")) {
+                FAssetHandle handle{};
+                if (valueNode->Type == EJsonType::Object) {
+                    if (!ParseAssetHandle(*valueNode, handle)) {
+                        return false;
+                    }
+                } else if (valueNode->Type == EJsonType::String) {
+                    FUuid uuid;
+                    if (!Core::Utility::String::ParseUuid(valueNode->String, uuid)) {
+                        return false;
+                    }
+                    handle.Uuid = uuid;
+                    handle.Type = EAssetType::Texture2D;
+                } else {
+                    return false;
+                }
+
+                return outOverrides.SetTexture(
+                    nameHash, EMeshMaterialTextureType::Texture2D, handle, 0U);
+            }
+
             return false;
         }
 
@@ -293,22 +350,35 @@ namespace AltinaEngine::Asset {
                     continue;
                 }
 
+                const FJsonValue* presetValue = FindObjectValueInsensitive(*pair.Value, "Preset");
+                if (presetValue != nullptr && presetValue->Type == EJsonType::String) {
+                    pass.Preset = Core::Utility::String::FromUtf8(presetValue->String);
+                }
+
+                const bool        hasPreset    = !pass.Preset.IsEmptyString();
                 const FJsonValue* shadersValue = FindObjectValueInsensitive(*pair.Value, "Shaders");
-                if (shadersValue == nullptr || shadersValue->Type != EJsonType::Object) {
-                    return false;
+                if (!hasPreset) {
+                    if (shadersValue == nullptr || shadersValue->Type != EJsonType::Object) {
+                        return false;
+                    }
                 }
 
-                if (const FJsonValue* vsValue = FindObjectValueInsensitive(*shadersValue, "vs")) {
-                    pass.HasVertex = ParseShaderSource(*vsValue, pass.Vertex);
-                }
-                if (const FJsonValue* psValue = FindObjectValueInsensitive(*shadersValue, "ps")) {
-                    pass.HasPixel = ParseShaderSource(*psValue, pass.Pixel);
-                }
-                if (const FJsonValue* csValue = FindObjectValueInsensitive(*shadersValue, "cs")) {
-                    pass.HasCompute = ParseShaderSource(*csValue, pass.Compute);
+                if (shadersValue != nullptr && shadersValue->Type == EJsonType::Object) {
+                    if (const FJsonValue* vsValue =
+                            FindObjectValueInsensitive(*shadersValue, "vs")) {
+                        pass.HasVertex = ParseShaderSource(*vsValue, pass.Vertex);
+                    }
+                    if (const FJsonValue* psValue =
+                            FindObjectValueInsensitive(*shadersValue, "ps")) {
+                        pass.HasPixel = ParseShaderSource(*psValue, pass.Pixel);
+                    }
+                    if (const FJsonValue* csValue =
+                            FindObjectValueInsensitive(*shadersValue, "cs")) {
+                        pass.HasCompute = ParseShaderSource(*csValue, pass.Compute);
+                    }
                 }
 
-                if (!pass.HasVertex && !pass.HasCompute) {
+                if (!hasPreset && !pass.HasVertex && !pass.HasCompute) {
                     return false;
                 }
 

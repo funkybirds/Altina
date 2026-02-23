@@ -19,6 +19,7 @@ namespace AltinaEngine::Asset {
 
     struct AE_ASSET_API FMaterialPassTemplate {
         FString                     Name;
+        FString                     Preset;
         bool                        HasVertex  = false;
         bool                        HasPixel   = false;
         bool                        HasCompute = false;

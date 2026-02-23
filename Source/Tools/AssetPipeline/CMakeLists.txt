@@ -27,19 +27,45 @@ endif()
 
 set(_assimp_libdir "${AssimpBuildDir}/lib")
 set(_assimp_byproduct "${_assimp_libdir}/${CMAKE_CFG_INTDIR}/${_assimp_libname}")
+set(_assimp_zlib_libdir "${AssimpBuildDir}/contrib/zlib")
+set(_assimp_zlib_byproduct
+    "${_assimp_zlib_libdir}/${CMAKE_CFG_INTDIR}/zlibstatic${CMAKE_STATIC_LIBRARY_SUFFIX}")
+
+set(_assimp_cmake_args
+    -DBUILD_SHARED_LIBS=OFF
+    -DASSIMP_NO_EXPORT=ON
+    -DASSIMP_BUILD_TESTS=OFF
+    -DASSIMP_BUILD_ASSIMP_TOOLS=OFF
+    -DASSIMP_BUILD_ZLIB=ON
+    -DASSIMP_BUILD_MINIZIP=ON
+    -DASSIMP_INSTALL=OFF
+    -DASSIMP_WARNINGS_AS_ERRORS=OFF
+    -DASSIMP_INJECT_DEBUG_POSTFIX=OFF
+)
+
+if (CMAKE_BUILD_TYPE)
+    list(APPEND _assimp_cmake_args -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE})
+endif()
+if (MSVC)
+    list(APPEND _assimp_cmake_args
+        -DCMAKE_C_FLAGS_DEBUG=/MDd
+        -DCMAKE_C_FLAGS_RELWITHDEBINFO=/MD
+        -DCMAKE_C_FLAGS_RELEASE=/MD
+        -DCMAKE_C_FLAGS_MINSIZEREL=/MD
+        -DCMAKE_CXX_FLAGS_DEBUG=/MDd
+        -DCMAKE_CXX_FLAGS_RELWITHDEBINFO=/MD
+        -DCMAKE_CXX_FLAGS_RELEASE=/MD
+        -DCMAKE_CXX_FLAGS_MINSIZEREL=/MD
+    )
+endif()
 
 ExternalProject_Add(assimp_ext
     SOURCE_DIR "${AssimpSourceDir}"
     BINARY_DIR "${AssimpBuildDir}"
-    CMAKE_ARGS
-        -DBUILD_SHARED_LIBS=OFF
-        -DASSIMP_NO_EXPORT=ON
-        -DASSIMP_BUILD_TESTS=OFF
-        -DASSIMP_BUILD_ASSIMP_TOOLS=OFF
-        -DASSIMP_INSTALL=OFF
-        -DASSIMP_WARNINGS_AS_ERRORS=OFF
-        -DASSIMP_INJECT_DEBUG_POSTFIX=OFF
-    BUILD_BYPRODUCTS "${_assimp_byproduct}"
+    CMAKE_ARGS ${_assimp_cmake_args}
+    BUILD_BYPRODUCTS
+        "${_assimp_byproduct}"
+        "${_assimp_zlib_byproduct}"
     INSTALL_COMMAND ""
 )
 
@@ -48,9 +74,17 @@ ExternalProject_Get_Property(assimp_ext SOURCE_DIR BINARY_DIR)
 add_library(assimp::assimp STATIC IMPORTED GLOBAL)
 add_dependencies(assimp::assimp assimp_ext)
 
+add_library(zlib::zlibstatic STATIC IMPORTED GLOBAL)
+add_dependencies(zlib::zlibstatic assimp_ext)
+
 set_target_properties(assimp::assimp PROPERTIES
     IMPORTED_LOCATION "${_assimp_byproduct}"
     INTERFACE_INCLUDE_DIRECTORIES "${SOURCE_DIR}/include;${BINARY_DIR}/include"
+    INTERFACE_LINK_LIBRARIES "zlib::zlibstatic"
+)
+
+set_target_properties(zlib::zlibstatic PROPERTIES
+    IMPORTED_LOCATION "${_assimp_zlib_byproduct}"
 )
 
 add_executable(${TargetName})
@@ -87,6 +121,11 @@ target_link_libraries(${TargetName}
         AltinaEngine::Imaging
         assimp::assimp
 )
+
+if (MSVC)
+    set_property(TARGET ${TargetName} PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+endif()
 
 target_compile_features(${TargetName}
     PRIVATE

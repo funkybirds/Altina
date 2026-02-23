@@ -16,6 +16,8 @@ namespace AltinaEngine::Rendering {
             Core::Container::TShared<RenderCore::FMaterialTemplate> templ) noexcept;
         static void SetOutputShaderKeys(const RenderCore::FShaderRegistry::FShaderKey& vs,
             const RenderCore::FShaderRegistry::FShaderKey&                             ps) noexcept;
+        static void SetLightingShaderKeys(const RenderCore::FShaderRegistry::FShaderKey& vs,
+            const RenderCore::FShaderRegistry::FShaderKey& ps) noexcept;
         [[nodiscard]] static auto RegisterShader(
             const RenderCore::FShaderRegistry::FShaderKey& key, Rhi::FRhiShaderRef shader) -> bool;
 

@@ -1,7 +1,9 @@
 #include "Engine/Runtime/SceneView.h"
 
 #include "Engine/GameScene/CameraComponent.h"
+#include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/PointLightComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
 #include "Math/LinAlg/Common.h"
@@ -12,6 +14,7 @@ namespace AltinaEngine::Engine {
         const FSceneViewBuildParams& params, FRenderScene& outScene) const {
         outScene.Views.Clear();
         outScene.StaticMeshes.Clear();
+        outScene.Lights.Clear();
 
         const auto& cameraIds = world.GetActiveCameraComponents();
         outScene.Views.Reserve(cameraIds.Size());
@@ -100,6 +103,70 @@ namespace AltinaEngine::Engine {
             entry.WorldMatrix         = worldTransform.ToMatrix();
             entry.PrevWorldMatrix     = entry.WorldMatrix;
             outScene.StaticMeshes.PushBack(entry);
+        }
+
+        // Lights (Phase1: single main directional + N points).
+        const auto& dirLightIds = world.GetActiveDirectionalLightComponents();
+        for (const auto& id : dirLightIds) {
+            if (!world.IsAlive(id)) {
+                continue;
+            }
+
+            const auto& component =
+                world.ResolveComponent<GameScene::FDirectionalLightComponent>(id);
+            if (!component.IsEnabled() || !world.IsGameObjectActive(component.GetOwner())) {
+                continue;
+            }
+
+            if (outScene.Lights.bHasMainDirectionalLight) {
+                // Phase1: first enabled directional is treated as the main light.
+                continue;
+            }
+
+            const auto transform = world.Object(component.GetOwner()).GetWorldTransform();
+            const auto forward =
+                transform.Rotation.RotateVector(Core::Math::FVector3f(0.0f, 0.0f, 1.0f));
+
+            RenderCore::Lighting::FDirectionalLight light{};
+            light.DirectionWS  = forward;
+            light.Color        = component.mColor;
+            light.Intensity    = component.mIntensity;
+            light.bCastShadows = component.mCastShadows;
+
+            outScene.Lights.bHasMainDirectionalLight = true;
+            outScene.Lights.MainDirectionalLight     = light;
+        }
+
+        const auto& pointLightIds = world.GetActivePointLightComponents();
+        outScene.Lights.PointLights.Reserve(pointLightIds.Size());
+        for (const auto& id : pointLightIds) {
+            if (!world.IsAlive(id)) {
+                continue;
+            }
+
+            const auto& component = world.ResolveComponent<GameScene::FPointLightComponent>(id);
+            if (!component.IsEnabled() || !world.IsGameObjectActive(component.GetOwner())) {
+                continue;
+            }
+
+            const auto transform = world.Object(component.GetOwner()).GetWorldTransform();
+
+            RenderCore::Lighting::FPointLight light{};
+            light.PositionWS = transform.Translation;
+            light.Range      = component.mRange;
+            light.Color      = component.mColor;
+            light.Intensity  = component.mIntensity;
+            outScene.Lights.PointLights.PushBack(light);
+        }
+
+        if (!outScene.Lights.bHasMainDirectionalLight) {
+            // Default main light so scenes are visible without explicit light authoring.
+            outScene.Lights.bHasMainDirectionalLight = true;
+            outScene.Lights.MainDirectionalLight.DirectionWS =
+                Core::Math::FVector3f(0.4f, 0.6f, 0.7f);
+            outScene.Lights.MainDirectionalLight.Color = Core::Math::FVector3f(1.0f, 1.0f, 1.0f);
+            outScene.Lights.MainDirectionalLight.Intensity    = 2.0f;
+            outScene.Lights.MainDirectionalLight.bCastShadows = false;
         }
     }
 } // namespace AltinaEngine::Engine

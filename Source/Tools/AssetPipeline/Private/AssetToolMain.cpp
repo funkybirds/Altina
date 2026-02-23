@@ -92,7 +92,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             Always
         };
 
-        constexpr u32 kCookPipelineVersion = 4;
+        constexpr u32 kCookPipelineVersion = 5;
         constexpr u64 kFnvOffsetBasis      = 14695981039346656037ULL;
         constexpr u64 kFnvPrime            = 1099511628211ULL;
         auto          ToLowerAscii(char value) -> char {

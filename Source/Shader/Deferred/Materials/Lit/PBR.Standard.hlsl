@@ -36,36 +36,43 @@ float3 EvaluateDeferredPbr(const FPbrGBufferData data)
     float3 N = normalize(data.Normal);
     float3 V = float3(0.0f, 0.0f, 1.0f);
     float3 L = normalize(float3(0.4f, 0.6f, 0.7f));
-    float3 H = normalize(V + L);
+    return EvaluatePbrDirect(data, N, V, L, float3(1.0f, 1.0f, 1.0f));
+}
 
-    float NdotL = saturate(dot(N, L));
-    float NdotV = saturate(dot(N, V));
-    float NdotH = saturate(dot(N, H));
-    float VdotH = saturate(dot(V, H));
+float3 EvaluatePbrDirect(
+    const FPbrGBufferData data, float3 N, float3 V, float3 L, float3 lightColor)
+{
+    N = normalize(N);
+    V = normalize(V);
+    L = normalize(L);
 
-    float rough = max(data.Roughness, 0.04f);
-    float a     = rough * rough;
-    float a2    = a * a;
-    float denom = (NdotH * NdotH) * (a2 - 1.0f) + 1.0f;
-    float D     = a2 / max(AE_PBR_PI * denom * denom, 1e-4f);
+    const float3 H = normalize(V + L);
+
+    const float NdotL = saturate(dot(N, L));
+    const float NdotV = saturate(dot(N, V));
+    const float NdotH = saturate(dot(N, H));
+    const float VdotH = saturate(dot(V, H));
+
+    const float rough = max(data.Roughness, 0.04f);
+    const float a     = rough * rough;
+    const float a2    = a * a;
+    const float denom = (NdotH * NdotH) * (a2 - 1.0f) + 1.0f;
+    const float D     = a2 / max(AE_PBR_PI * denom * denom, 1e-4f);
 
     float k    = (rough + 1.0f);
     k          = (k * k) * 0.125f;
-    float Gv   = NdotV / max(NdotV * (1.0f - k) + k, 1e-4f);
-    float Gl   = NdotL / max(NdotL * (1.0f - k) + k, 1e-4f);
-    float G    = Gv * Gl;
+    const float Gv   = NdotV / max(NdotV * (1.0f - k) + k, 1e-4f);
+    const float Gl   = NdotL / max(NdotL * (1.0f - k) + k, 1e-4f);
+    const float G    = Gv * Gl;
 
-    float3 F0  = lerp(float3(0.04f, 0.04f, 0.04f), data.BaseColor, data.Metallic);
-    float3 F   = F0 + (1.0f - F0) * pow(1.0f - VdotH, 5.0f);
+    const float3 F0  = lerp(float3(0.04f, 0.04f, 0.04f), data.BaseColor, data.Metallic);
+    const float3 F   = F0 + (1.0f - F0) * pow(1.0f - VdotH, 5.0f);
 
-    float3 spec = (D * G) * F / max(4.0f * NdotL * NdotV, 1e-4f);
-    float3 kd   = (1.0f - F) * (1.0f - data.Metallic);
-    float3 diff = kd * data.BaseColor / AE_PBR_PI;
+    const float3 spec = (D * G) * F / max(4.0f * NdotL * NdotV, 1e-4f);
+    const float3 kd   = (1.0f - F) * (1.0f - data.Metallic);
+    const float3 diff = kd * data.BaseColor / AE_PBR_PI;
 
-    const float3 lightColor = float3(1.0f, 1.0f, 1.0f);
-    float3       color      = (diff + spec) * lightColor * NdotL;
-    color += data.Emissive;
-    color *= lerp(0.35f, 1.0f, data.Occlusion);
+    float3 color = (diff + spec) * lightColor * NdotL;
     return color;
 }
 

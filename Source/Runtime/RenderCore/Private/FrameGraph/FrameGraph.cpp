@@ -3,6 +3,11 @@
 #include "Rhi/Command/RhiCmdContext.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiResourceView.h"
+#include "Logging/Log.h"
+#include "Utility/String/CodeConvert.h"
+
+#include <cstring>
+#include <string>
 
 namespace AltinaEngine::RenderCore {
 
@@ -246,12 +251,31 @@ namespace AltinaEngine::RenderCore {
 
         FFrameGraphPassResources resources(*this);
 
+        static bool              sLoggedOnce = false;
+        if (!sLoggedOnce) {
+            sLoggedOnce   = true;
+            u32 passIndex = 0U;
+            for (const auto& pass : mPasses) {
+                const std::string name =
+                    (pass.mDesc.mName != nullptr) ? std::string(pass.mDesc.mName) : "<null>";
+                Core::Logging::LogInfo(TEXT("FG Pass[{}]: {} type={} rtvs={} depth={}"), passIndex,
+                    name.c_str(), static_cast<u32>(pass.mDesc.mType),
+                    static_cast<u32>(pass.mCompiledColorAttachments.Size()),
+                    pass.mHasCompiledDepth ? 1U : 0U);
+                ++passIndex;
+            }
+        }
+
         for (auto& pass : mPasses) {
             const bool hasRenderPass = pass.mDesc.mType == EFrameGraphPassType::Raster
                 && (!pass.mCompiledColorAttachments.IsEmpty() || pass.mHasCompiledDepth);
 
             if (hasRenderPass) {
                 Rhi::FRhiRenderPassDesc renderPassDesc;
+                if (pass.mDesc.mName != nullptr) {
+                    renderPassDesc.mDebugName.Assign(Core::Utility::String::FromUtf8Bytes(
+                        pass.mDesc.mName, static_cast<usize>(std::strlen(pass.mDesc.mName))));
+                }
                 renderPassDesc.mColorAttachmentCount =
                     static_cast<u32>(pass.mCompiledColorAttachments.Size());
                 renderPassDesc.mColorAttachments = pass.mCompiledColorAttachments.Data();

@@ -4,7 +4,9 @@
 #include "Rendering/DrawListExecutor.h"
 
 #include "FrameGraph/FrameGraph.h"
+#include "Lighting/LightTypes.h"
 #include "Material/MaterialPass.h"
+#include "Shadow/CascadedShadowMapping.h"
 #include "View/ViewData.h"
 
 #include "Container/HashMap.h"
@@ -33,8 +35,46 @@ namespace AltinaEngine::Rendering {
         using Container::TVector;
         using RenderCore::EMaterialPass;
 
+        constexpr u32 kMaxPointLights = 16U;
+
+        // Shared per-frame constants.
+        //
+        // IMPORTANT: BasePass (VSBase) and ShadowDepth (VSShadowDepth) only read ViewProjection,
+        // so it must remain the first member.
         struct FPerFrameConstants {
             Core::Math::FMatrix4x4f ViewProjection;
+
+            Core::Math::FMatrix4x4f View;
+            Core::Math::FMatrix4x4f Proj;
+            Core::Math::FMatrix4x4f ViewProj;
+            Core::Math::FMatrix4x4f InvViewProj;
+
+            f32                     ViewOriginWS[3] = { 0.0f, 0.0f, 0.0f };
+            u32                     PointLightCount = 0U;
+
+            f32                     DirLightDirectionWS[3] = { 0.0f, -1.0f, 0.0f };
+            f32                     DirLightIntensity      = 0.0f;
+            f32                     DirLightColor[3]       = { 1.0f, 1.0f, 1.0f };
+            u32                     CSMCascadeCount        = 0U;
+
+            Core::Math::FMatrix4x4f CSM_LightViewProj[RenderCore::Shadow::kMaxCascades]{};
+            f32                     CSM_SplitsVS[RenderCore::Shadow::kMaxCascades][4] = {};
+
+            f32                     RenderTargetSize[2]    = { 0.0f, 0.0f };
+            f32                     InvRenderTargetSize[2] = { 0.0f, 0.0f };
+
+            u32                     bReverseZ           = 1U;
+            f32                     ShadowBias          = 0.0015f;
+            f32                     ShadowMapInvSize[2] = { 0.0f, 0.0f };
+            f32                     _pad0               = 0.0f;
+
+            struct FPointLight {
+                f32 PositionWS[3] = { 0.0f, 0.0f, 0.0f };
+                f32 Range         = 0.0f;
+                f32 Color[3]      = { 1.0f, 1.0f, 1.0f };
+                f32 Intensity     = 0.0f;
+            };
+            FPointLight PointLights[kMaxPointLights]{};
         };
 
         struct FPerDrawConstants {
@@ -45,7 +85,10 @@ namespace AltinaEngine::Rendering {
             RenderCore::FShaderRegistry                       Registry;
             RenderCore::FShaderRegistry::FShaderKey           OutputVSKey;
             RenderCore::FShaderRegistry::FShaderKey           OutputPSKey;
+            RenderCore::FShaderRegistry::FShaderKey           LightingVSKey;
+            RenderCore::FShaderRegistry::FShaderKey           LightingPSKey;
             RenderCore::FMaterialPassDesc                     DefaultPassDesc;
+            RenderCore::FMaterialPassDesc                     DefaultShadowPassDesc;
             Container::TShared<RenderCore::FMaterialTemplate> DefaultTemplate;
 
             Rhi::FRhiBindGroupLayoutRef                       PerFrameLayout;
@@ -54,6 +97,12 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiSamplerRef                               OutputSampler;
             Rhi::FRhiPipelineLayoutRef                        OutputPipelineLayout;
             Rhi::FRhiPipelineRef                              OutputPipeline;
+
+            // Deferred lighting (FSQ -> BackBuffer).
+            Rhi::FRhiBindGroupLayoutRef                       LightingLayout;
+            Rhi::FRhiPipelineLayoutRef                        LightingPipelineLayout;
+            Rhi::FRhiPipelineRef                              LightingPipeline;
+
             THashMap<u64, Rhi::FRhiPipelineRef>               BasePipelines;
             THashMap<u64, Rhi::FRhiBindGroupLayoutRef>        MaterialLayouts;
             THashMap<u64, Rhi::FRhiPipelineLayoutRef>         BasePipelineLayouts;
@@ -138,11 +187,16 @@ namespace AltinaEngine::Rendering {
             if (!resources.DefaultTemplate) {
                 return;
             }
-            const auto* baseDesc = resources.DefaultTemplate->FindPassDesc(EMaterialPass::BasePass);
-            const auto* anyDesc =
-                baseDesc ? baseDesc : resources.DefaultTemplate->FindAnyPassDesc();
-            if (anyDesc != nullptr) {
+            if (const auto* baseDesc =
+                    resources.DefaultTemplate->FindPassDesc(EMaterialPass::BasePass)) {
+                resources.DefaultPassDesc = *baseDesc;
+            } else if (const auto* anyDesc = resources.DefaultTemplate->FindAnyPassDesc()) {
                 resources.DefaultPassDesc = *anyDesc;
+            }
+
+            if (const auto* shadowDesc =
+                    resources.DefaultTemplate->FindPassDesc(EMaterialPass::ShadowPass)) {
+                resources.DefaultShadowPassDesc = *shadowDesc;
             }
         }
 
@@ -184,6 +238,47 @@ namespace AltinaEngine::Rendering {
             resources.OutputPipeline            = device.CreateGraphicsPipeline(outputDesc);
 
             return resources.OutputPipeline.Get() != nullptr;
+        }
+
+        auto EnsureLightingPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)
+            -> bool {
+            if (resources.LightingPipeline) {
+                return true;
+            }
+
+            if (!resources.LightingVSKey.IsValid() || !resources.LightingPSKey.IsValid()) {
+                LogError(TEXT("Deferred lighting shaders are not configured."));
+                return false;
+            }
+
+            auto vs = resources.Registry.FindShader(resources.LightingVSKey);
+            auto ps = resources.Registry.FindShader(resources.LightingPSKey);
+            if (!vs || !ps) {
+                LogError(TEXT("Deferred lighting shaders are not registered."));
+                return false;
+            }
+
+            if (!resources.LightingPipelineLayout) {
+                LogError(TEXT("Deferred lighting pipeline layout is missing."));
+                return false;
+            }
+
+            Rhi::FRhiGraphicsPipelineDesc desc{};
+            desc.mDebugName.Assign(TEXT("BasicDeferred.DeferredLightingPipeline"));
+            desc.mVertexShader   = vs.Get();
+            desc.mPixelShader    = ps.Get();
+            desc.mPipelineLayout = resources.LightingPipelineLayout.Get();
+            desc.mVertexLayout   = {};
+            desc.mRasterState    = {};
+            desc.mDepthState     = {};
+            desc.mBlendState     = {};
+            // Full-screen triangle; avoid culling.
+            desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+            desc.mDepthState.mDepthEnable = false;
+            desc.mDepthState.mDepthWrite  = false;
+            resources.LightingPipeline    = device.CreateGraphicsPipeline(desc);
+
+            return resources.LightingPipeline.Get() != nullptr;
         }
 
         void EnsureLayouts(Rhi::FRhiDevice& device, FDeferredSharedResources& resources) {
@@ -250,6 +345,45 @@ namespace AltinaEngine::Rendering {
                     layoutDesc.mBindGroupLayouts.PushBack(resources.OutputLayout.Get());
                 }
                 resources.OutputPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+            }
+
+            if (!resources.LightingLayout) {
+                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+                layoutDesc.mSetIndex = 0U;
+
+                // b0
+                Rhi::FRhiBindGroupLayoutEntry cbuffer{};
+                cbuffer.mBinding    = 0U;
+                cbuffer.mType       = Rhi::ERhiBindingType::ConstantBuffer;
+                cbuffer.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(cbuffer);
+
+                // t0..t4
+                for (u32 binding = 0U; binding < 5U; ++binding) {
+                    Rhi::FRhiBindGroupLayoutEntry texture{};
+                    texture.mBinding    = binding;
+                    texture.mType       = Rhi::ERhiBindingType::SampledTexture;
+                    texture.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                    layoutDesc.mEntries.PushBack(texture);
+                }
+
+                // s0
+                Rhi::FRhiBindGroupLayoutEntry sampler{};
+                sampler.mBinding    = 0U;
+                sampler.mType       = Rhi::ERhiBindingType::Sampler;
+                sampler.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(sampler);
+
+                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
+                resources.LightingLayout = device.CreateBindGroupLayout(layoutDesc);
+            }
+
+            if (!resources.LightingPipelineLayout) {
+                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
+                if (resources.LightingLayout) {
+                    layoutDesc.mBindGroupLayouts.PushBack(resources.LightingLayout.Get());
+                }
+                resources.LightingPipelineLayout = device.CreatePipelineLayout(layoutDesc);
             }
         }
 
@@ -323,11 +457,8 @@ namespace AltinaEngine::Rendering {
                 return nullptr;
             }
 
-            auto&       resources  = GetSharedResources();
-            const auto& passLayout = resolvedPass->Layout;
-            if (!passLayout.PropertyBag.IsValid() && passLayout.TextureBindings.IsEmpty()) {
-                return nullptr;
-            }
+            auto&                                  resources  = GetSharedResources();
+            const auto&                            passLayout = resolvedPass->Layout;
 
             TVector<Rhi::FRhiBindGroupLayoutEntry> layoutEntries;
             const u64                              materialLayoutHash =
@@ -410,6 +541,24 @@ namespace AltinaEngine::Rendering {
             return pipeline.Get();
         }
 
+        auto ResolveShadowPassPipeline(const RenderCore::Render::FDrawBatch& batch,
+            const RenderCore::FMaterialPassDesc* /*passDesc*/, void* userData)
+            -> Rhi::FRhiPipeline* {
+            // Always use the renderer's default shadow pass desc, even if a material provides a
+            // ShadowPass variant (prevents accidentally binding BasePass MRT shaders while
+            // rendering depth-only).
+            auto* data = static_cast<FBasePassPipelineData*>(userData);
+            if (!data || data->DefaultPassDesc == nullptr) {
+                return nullptr;
+            }
+
+            // Create a synthetic batch key by forcing the pipeline key to a stable constant so it
+            // can't collide with BasePass pipelines.
+            RenderCore::Render::FDrawBatch synthetic = batch;
+            synthetic.BatchKey.PipelineKey           = 0x43534D534841444FULL; // "CSMSHADO"
+            return ResolveBasePassPipeline(synthetic, nullptr, userData);
+        }
+
         struct FBasePassBindingData {
             Rhi::FRhiBuffer*    PerDrawBuffer   = nullptr;
             Rhi::FRhiBindGroup* PerDrawGroup    = nullptr;
@@ -443,9 +592,10 @@ namespace AltinaEngine::Rendering {
 
     void FBasicDeferredRenderer::SetDefaultMaterialTemplate(
         Core::Container::TShared<RenderCore::FMaterialTemplate> templ) noexcept {
-        auto& resources           = GetSharedResources();
-        resources.DefaultTemplate = Move(templ);
-        resources.DefaultPassDesc = {};
+        auto& resources                 = GetSharedResources();
+        resources.DefaultTemplate       = Move(templ);
+        resources.DefaultPassDesc       = {};
+        resources.DefaultShadowPassDesc = {};
         resources.MaterialLayouts.clear();
         resources.BasePipelineLayouts.clear();
         resources.BasePipelines.clear();
@@ -461,6 +611,15 @@ namespace AltinaEngine::Rendering {
         resources.OutputPipeline.Reset();
     }
 
+    void FBasicDeferredRenderer::SetLightingShaderKeys(
+        const RenderCore::FShaderRegistry::FShaderKey& vs,
+        const RenderCore::FShaderRegistry::FShaderKey& ps) noexcept {
+        auto& resources         = GetSharedResources();
+        resources.LightingVSKey = vs;
+        resources.LightingPSKey = ps;
+        resources.LightingPipeline.Reset();
+    }
+
     auto FBasicDeferredRenderer::RegisterShader(
         const RenderCore::FShaderRegistry::FShaderKey& key, Rhi::FRhiShaderRef shader) -> bool {
         auto& resources = GetSharedResources();
@@ -472,7 +631,7 @@ namespace AltinaEngine::Rendering {
         EnsureDefaultTemplate(resources);
         EnsureVertexLayout(resources);
         EnsureLayouts(device, resources);
-        if (!EnsureOutputPipeline(device, resources)) {
+        if (!EnsureLightingPipeline(device, resources)) {
             return;
         }
 
@@ -565,6 +724,7 @@ namespace AltinaEngine::Rendering {
         RenderCore::FFrameGraphTextureRef gbufferA;
         RenderCore::FFrameGraphTextureRef gbufferB;
         RenderCore::FFrameGraphTextureRef gbufferC;
+        RenderCore::FFrameGraphTextureRef sceneDepth;
 
         struct FBasePassData {
             RenderCore::FFrameGraphTextureRef GBufferA;
@@ -635,8 +795,9 @@ namespace AltinaEngine::Rendering {
                 depthDesc.mDesc.mDebugName.Assign(TEXT("GBufferDepth"));
                 depthDesc.mDesc.mWidth     = width;
                 depthDesc.mDesc.mHeight    = height;
-                depthDesc.mDesc.mFormat    = Rhi::ERhiFormat::D24UnormS8Uint;
-                depthDesc.mDesc.mBindFlags = Rhi::ERhiTextureBindFlags::DepthStencil;
+                depthDesc.mDesc.mFormat    = Rhi::ERhiFormat::D32Float;
+                depthDesc.mDesc.mBindFlags = Rhi::ERhiTextureBindFlags::DepthStencil
+                    | Rhi::ERhiTextureBindFlags::ShaderResource;
 
                 data.GBufferA = builder.CreateTexture(gbufferADesc);
                 data.GBufferB = builder.CreateTexture(gbufferBDesc);
@@ -703,9 +864,10 @@ namespace AltinaEngine::Rendering {
 
                 builder.SetRenderTargets(rtvs, 3U, &depthBinding);
 
-                gbufferA = data.GBufferA;
-                gbufferB = data.GBufferB;
-                gbufferC = data.GBufferC;
+                gbufferA   = data.GBufferA;
+                gbufferB   = data.GBufferB;
+                gbufferC   = data.GBufferC;
+                sceneDepth = data.Depth;
             },
             [drawList, drawBindings, pipelineData, bindingData, viewRect](Rhi::FRhiCmdContext& ctx,
                 const RenderCore::FFrameGraphPassResources&, const FBasePassData&) {
@@ -732,24 +894,157 @@ namespace AltinaEngine::Rendering {
                         BindPerDraw, const_cast<FBasePassBindingData*>(&bindingData));
                 }
             });
+        // Shadow (Directional CSM).
+        const auto*                      lights         = mViewContext.Lights;
+        const auto*                      shadowDrawList = mViewContext.ShadowDrawList;
+
+        RenderCore::Shadow::FCSMSettings csmSettings{};
+        csmSettings.CascadeCount  = RenderCore::Shadow::kMaxCascades;
+        csmSettings.MaxDistance   = 100.0f;
+        csmSettings.ShadowMapSize = 2048U;
+        csmSettings.ReceiverBias  = 0.0015f;
+
+        RenderCore::Shadow::FCSMData csmData{};
+        if (lights != nullptr && lights->bHasMainDirectionalLight
+            && lights->MainDirectionalLight.bCastShadows && shadowDrawList != nullptr) {
+            RenderCore::Shadow::BuildDirectionalCSM(
+                *view, lights->MainDirectionalLight, csmSettings, csmData);
+        }
+
+        RenderCore::FFrameGraphTextureRef shadowMap;
+
+        if (csmData.CascadeCount > 0U) {
+            RenderCore::FFrameGraphPassDesc shadowPassDesc{};
+            shadowPassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
+            shadowPassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
+
+            FBasePassPipelineData shadowPipelineData = pipelineData;
+            shadowPipelineData.DefaultPassDesc       = &resources.DefaultShadowPassDesc;
+
+            const u32 shadowSize = csmSettings.ShadowMapSize;
+            for (u32 cascade = 0U; cascade < csmData.CascadeCount; ++cascade) {
+                struct FShadowPassData {
+                    RenderCore::FFrameGraphTextureRef Shadow;
+                    RenderCore::FFrameGraphDSVRef     ShadowDSV;
+                };
+
+                switch (cascade) {
+                    case 0U:
+                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade0";
+                        break;
+                    case 1U:
+                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade1";
+                        break;
+                    case 2U:
+                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade2";
+                        break;
+                    case 3U:
+                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade3";
+                        break;
+                    default:
+                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade";
+                        break;
+                }
+
+                graph.AddPass<FShadowPassData>(
+                    shadowPassDesc,
+                    [&](RenderCore::FFrameGraphPassBuilder& builder, FShadowPassData& data) {
+                        if (!shadowMap.IsValid()) {
+                            RenderCore::FFrameGraphTextureDesc shadowDesc{};
+                            shadowDesc.mDesc.mDebugName.Assign(TEXT("ShadowMap.CSM"));
+                            shadowDesc.mDesc.mWidth       = shadowSize;
+                            shadowDesc.mDesc.mHeight      = shadowSize;
+                            shadowDesc.mDesc.mArrayLayers = csmData.CascadeCount;
+                            shadowDesc.mDesc.mFormat      = Rhi::ERhiFormat::D32Float;
+                            shadowDesc.mDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::DepthStencil
+                                | Rhi::ERhiTextureBindFlags::ShaderResource;
+                            shadowMap = builder.CreateTexture(shadowDesc);
+                        }
+
+                        data.Shadow = builder.Write(shadowMap, Rhi::ERhiResourceState::DepthWrite);
+
+                        Rhi::FRhiTextureViewRange range{};
+                        range.mBaseMip         = 0U;
+                        range.mMipCount        = 1U;
+                        range.mBaseArrayLayer  = cascade;
+                        range.mLayerCount      = 1U;
+                        range.mBaseDepthSlice  = 0U;
+                        range.mDepthSliceCount = 1U;
+
+                        Rhi::FRhiDepthStencilViewDesc dsvDesc{};
+                        dsvDesc.mDebugName.Assign(TEXT("ShadowMap.CSM.DSV"));
+                        dsvDesc.mFormat = Rhi::ERhiFormat::D32Float;
+                        dsvDesc.mRange  = range;
+                        data.ShadowDSV  = builder.CreateDSV(data.Shadow, dsvDesc);
+
+                        RenderCore::FRdgDepthStencilBinding ds{};
+                        ds.mDSV          = data.ShadowDSV;
+                        ds.mDepthLoadOp  = Rhi::ERhiLoadOp::Clear;
+                        ds.mDepthStoreOp = Rhi::ERhiStoreOp::Store;
+                        ds.mClearDepthStencil.mDepth =
+                            (view != nullptr && view->bReverseZ) ? 0.0f : 1.0f;
+                        builder.SetRenderTargets(nullptr, 0U, &ds);
+                    },
+                    [shadowDrawList, drawBindings, shadowPipelineData, bindingData, shadowSize,
+                        perFrameBuffer = mPerFrameBuffer.Get(),
+                        lightViewProj  = csmData.Cascades[cascade].LightViewProj](
+                        Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources&,
+                        const FShadowPassData&) {
+                        LogInfo(TEXT("FG Pass: BasicDeferred.ShadowCSM"));
+
+                        if (perFrameBuffer) {
+                            FPerFrameConstants constants{};
+                            constants.ViewProjection = lightViewProj;
+                            UpdateConstantBuffer(perFrameBuffer, &constants, sizeof(constants));
+                        }
+
+                        Rhi::FRhiViewportRect viewport{};
+                        viewport.mX        = 0.0f;
+                        viewport.mY        = 0.0f;
+                        viewport.mWidth    = static_cast<f32>(shadowSize);
+                        viewport.mHeight   = static_cast<f32>(shadowSize);
+                        viewport.mMinDepth = 0.0f;
+                        viewport.mMaxDepth = 1.0f;
+                        ctx.RHISetViewport(viewport);
+
+                        Rhi::FRhiScissorRect scissor{};
+                        scissor.mX      = 0;
+                        scissor.mY      = 0;
+                        scissor.mWidth  = shadowSize;
+                        scissor.mHeight = shadowSize;
+                        ctx.RHISetScissor(scissor);
+
+                        if (shadowDrawList != nullptr) {
+                            FDrawListExecutor::ExecuteBasePass(ctx, *shadowDrawList, drawBindings,
+                                ResolveShadowPassPipeline,
+                                const_cast<FBasePassPipelineData*>(&shadowPipelineData),
+                                BindPerDraw, const_cast<FBasePassBindingData*>(&bindingData));
+                        }
+                    });
+            }
+        }
+
+        // Deferred lighting (FSQ -> BackBuffer).
         auto outputTexture = graph.ImportTexture(outputTarget, Rhi::ERhiResourceState::Present);
 
-        struct FOutputPassData {
+        struct FLightingPassData {
             RenderCore::FFrameGraphTextureRef Output;
             RenderCore::FFrameGraphRTVRef     OutputRTV;
             RenderCore::FFrameGraphTextureRef GBufferA;
             RenderCore::FFrameGraphTextureRef GBufferB;
             RenderCore::FFrameGraphTextureRef GBufferC;
+            RenderCore::FFrameGraphTextureRef Depth;
+            RenderCore::FFrameGraphTextureRef Shadow;
         };
 
-        RenderCore::FFrameGraphPassDesc outputPassDesc{};
-        outputPassDesc.mName  = "BasicDeferred.Output";
-        outputPassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
-        outputPassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
+        RenderCore::FFrameGraphPassDesc lightingPassDesc{};
+        lightingPassDesc.mName  = "BasicDeferred.DeferredLighting";
+        lightingPassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
+        lightingPassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
 
-        graph.AddPass<FOutputPassData>(
-            outputPassDesc,
-            [&](RenderCore::FFrameGraphPassBuilder& builder, FOutputPassData& data) {
+        graph.AddPass<FLightingPassData>(
+            lightingPassDesc,
+            [&](RenderCore::FFrameGraphPassBuilder& builder, FLightingPassData& data) {
                 if (gbufferA.IsValid()) {
                     builder.Read(gbufferA, Rhi::ERhiResourceState::ShaderResource);
                 }
@@ -759,10 +1054,32 @@ namespace AltinaEngine::Rendering {
                 if (gbufferC.IsValid()) {
                     builder.Read(gbufferC, Rhi::ERhiResourceState::ShaderResource);
                 }
+                if (sceneDepth.IsValid()) {
+                    builder.Read(sceneDepth, Rhi::ERhiResourceState::ShaderResource);
+                }
+
+                if (shadowMap.IsValid()) {
+                    builder.Read(shadowMap, Rhi::ERhiResourceState::ShaderResource);
+                    data.Shadow = shadowMap;
+                } else {
+                    // Dummy resource (not sampled when CSMCascadeCount == 0).
+                    RenderCore::FFrameGraphTextureDesc shadowDesc{};
+                    shadowDesc.mDesc.mDebugName.Assign(TEXT("ShadowMap.Dummy"));
+                    shadowDesc.mDesc.mWidth       = 1U;
+                    shadowDesc.mDesc.mHeight      = 1U;
+                    shadowDesc.mDesc.mArrayLayers = 1U;
+                    shadowDesc.mDesc.mFormat      = Rhi::ERhiFormat::D32Float;
+                    shadowDesc.mDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::DepthStencil
+                        | Rhi::ERhiTextureBindFlags::ShaderResource;
+                    shadowMap = builder.CreateTexture(shadowDesc);
+                    builder.Read(shadowMap, Rhi::ERhiResourceState::ShaderResource);
+                    data.Shadow = shadowMap;
+                }
 
                 data.GBufferA = gbufferA;
                 data.GBufferB = gbufferB;
                 data.GBufferC = gbufferC;
+                data.Depth    = sceneDepth;
                 data.Output   = builder.Write(outputTexture, Rhi::ERhiResourceState::RenderTarget);
 
                 Rhi::FRhiTextureViewRange viewRange{};
@@ -785,59 +1102,163 @@ namespace AltinaEngine::Rendering {
                 builder.SetRenderTargets(&rtvBinding, 1U, nullptr);
                 builder.SetExternalOutput(data.Output, Rhi::ERhiResourceState::Present);
             },
-            [viewRect](Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources& res,
-                const FOutputPassData& data) {
-                LogInfo(TEXT("FG Pass: BasicDeferred.Output"));
+            [viewRect, view, lights, csmData, csmSettings, perFrameBuffer = mPerFrameBuffer.Get()](
+                Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources& res,
+                const FLightingPassData& data) {
+                LogInfo(TEXT("FG Pass: BasicDeferred.DeferredLighting"));
                 auto& shared = GetSharedResources();
-                if (!shared.OutputPipeline) {
+                if (!shared.LightingPipeline || !shared.LightingLayout || !shared.OutputSampler) {
                     return;
                 }
 
-                auto* textureA = res.GetTexture(data.GBufferA);
-                auto* textureB = res.GetTexture(data.GBufferB);
-                auto* textureC = res.GetTexture(data.GBufferC);
-                if (!textureA || !textureB || !textureC) {
+                auto* texA      = res.GetTexture(data.GBufferA);
+                auto* texB      = res.GetTexture(data.GBufferB);
+                auto* texC      = res.GetTexture(data.GBufferC);
+                auto* depthTex  = res.GetTexture(data.Depth);
+                auto* shadowTex = res.GetTexture(data.Shadow);
+                if (!texA || !texB || !texC || !depthTex || !shadowTex) {
                     return;
                 }
 
                 auto* device = Rhi::RHIGetDevice();
-                if (!device || !shared.OutputLayout || !shared.OutputSampler) {
+                if (!device) {
                     return;
                 }
 
+                if (perFrameBuffer == nullptr || view == nullptr) {
+                    return;
+                }
+
+                // Fill per-frame constants (b0).
+                FPerFrameConstants constants{};
+                constants.ViewProjection = view->Matrices.ViewProj;
+                constants.View           = view->Matrices.View;
+                constants.Proj           = view->Matrices.ProjUnjittered;
+                constants.ViewProj       = view->Matrices.ViewProj;
+                constants.InvViewProj    = view->Matrices.InvViewProj;
+
+                constants.ViewOriginWS[0] = view->ViewOrigin[0];
+                constants.ViewOriginWS[1] = view->ViewOrigin[1];
+                constants.ViewOriginWS[2] = view->ViewOrigin[2];
+                constants.bReverseZ       = view->bReverseZ ? 1U : 0U;
+
+                const f32 w                   = static_cast<f32>(view->RenderTargetExtent.Width);
+                const f32 h                   = static_cast<f32>(view->RenderTargetExtent.Height);
+                constants.RenderTargetSize[0] = w;
+                constants.RenderTargetSize[1] = h;
+                constants.InvRenderTargetSize[0] = (w > 0.0f) ? (1.0f / w) : 0.0f;
+                constants.InvRenderTargetSize[1] = (h > 0.0f) ? (1.0f / h) : 0.0f;
+
+                // Lighting inputs.
+                RenderCore::Lighting::FDirectionalLight dir{};
+                if (lights != nullptr && lights->bHasMainDirectionalLight) {
+                    dir = lights->MainDirectionalLight;
+                } else {
+                    dir.DirectionWS  = Core::Math::FVector3f(0.4f, 0.6f, 0.7f);
+                    dir.Color        = Core::Math::FVector3f(1.0f, 1.0f, 1.0f);
+                    dir.Intensity    = 2.0f;
+                    dir.bCastShadows = false;
+                }
+
+                constants.DirLightDirectionWS[0] = dir.DirectionWS[0];
+                constants.DirLightDirectionWS[1] = dir.DirectionWS[1];
+                constants.DirLightDirectionWS[2] = dir.DirectionWS[2];
+                constants.DirLightColor[0]       = dir.Color[0];
+                constants.DirLightColor[1]       = dir.Color[1];
+                constants.DirLightColor[2]       = dir.Color[2];
+                constants.DirLightIntensity      = dir.Intensity;
+
+                // Point lights.
+                constants.PointLightCount = 0U;
+                if (lights != nullptr && !lights->PointLights.IsEmpty()) {
+                    const u32 count           = static_cast<u32>(lights->PointLights.Size());
+                    const u32 clamped         = (count > kMaxPointLights) ? kMaxPointLights : count;
+                    constants.PointLightCount = clamped;
+                    for (u32 i = 0U; i < clamped; ++i) {
+                        const auto& src                        = lights->PointLights[i];
+                        constants.PointLights[i].PositionWS[0] = src.PositionWS[0];
+                        constants.PointLights[i].PositionWS[1] = src.PositionWS[1];
+                        constants.PointLights[i].PositionWS[2] = src.PositionWS[2];
+                        constants.PointLights[i].Range         = src.Range;
+                        constants.PointLights[i].Color[0]      = src.Color[0];
+                        constants.PointLights[i].Color[1]      = src.Color[1];
+                        constants.PointLights[i].Color[2]      = src.Color[2];
+                        constants.PointLights[i].Intensity     = src.Intensity;
+                    }
+                }
+
+                // CSM.
+                constants.CSMCascadeCount = csmData.CascadeCount;
+                constants.ShadowBias      = csmSettings.ReceiverBias;
+                if (csmSettings.ShadowMapSize > 0U) {
+                    const f32 inv = 1.0f / static_cast<f32>(csmSettings.ShadowMapSize);
+                    constants.ShadowMapInvSize[0] = inv;
+                    constants.ShadowMapInvSize[1] = inv;
+                }
+                for (u32 i = 0U; i < RenderCore::Shadow::kMaxCascades; ++i) {
+                    constants.CSM_LightViewProj[i] = csmData.Cascades[i].LightViewProj;
+                    constants.CSM_SplitsVS[i][0]   = csmData.Cascades[i].SplitVS[0];
+                    constants.CSM_SplitsVS[i][1]   = csmData.Cascades[i].SplitVS[1];
+                    constants.CSM_SplitsVS[i][2]   = 0.0f;
+                    constants.CSM_SplitsVS[i][3]   = 0.0f;
+                }
+
+                UpdateConstantBuffer(perFrameBuffer, &constants, sizeof(constants));
+
+                // Bind group (b0 + t0..t4 + s0).
                 Rhi::FRhiBindGroupDesc groupDesc{};
-                groupDesc.mLayout = shared.OutputLayout.Get();
+                groupDesc.mLayout = shared.LightingLayout.Get();
 
-                Rhi::FRhiBindGroupEntry texEntryA{};
-                texEntryA.mBinding = 0U;
-                texEntryA.mType    = Rhi::ERhiBindingType::SampledTexture;
-                texEntryA.mTexture = textureA;
-                groupDesc.mEntries.PushBack(texEntryA);
+                Rhi::FRhiBindGroupEntry cb{};
+                cb.mBinding = 0U;
+                cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
+                cb.mBuffer  = perFrameBuffer;
+                cb.mOffset  = 0ULL;
+                cb.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
+                groupDesc.mEntries.PushBack(cb);
 
-                Rhi::FRhiBindGroupEntry texEntryB{};
-                texEntryB.mBinding = 1U;
-                texEntryB.mType    = Rhi::ERhiBindingType::SampledTexture;
-                texEntryB.mTexture = textureB;
-                groupDesc.mEntries.PushBack(texEntryB);
+                Rhi::FRhiBindGroupEntry eA{};
+                eA.mBinding = 0U;
+                eA.mType    = Rhi::ERhiBindingType::SampledTexture;
+                eA.mTexture = texA;
+                groupDesc.mEntries.PushBack(eA);
 
-                Rhi::FRhiBindGroupEntry texEntryC{};
-                texEntryC.mBinding = 2U;
-                texEntryC.mType    = Rhi::ERhiBindingType::SampledTexture;
-                texEntryC.mTexture = textureC;
-                groupDesc.mEntries.PushBack(texEntryC);
+                Rhi::FRhiBindGroupEntry eB{};
+                eB.mBinding = 1U;
+                eB.mType    = Rhi::ERhiBindingType::SampledTexture;
+                eB.mTexture = texB;
+                groupDesc.mEntries.PushBack(eB);
 
-                Rhi::FRhiBindGroupEntry samplerEntry{};
-                samplerEntry.mBinding = 0U;
-                samplerEntry.mType    = Rhi::ERhiBindingType::Sampler;
-                samplerEntry.mSampler = shared.OutputSampler.Get();
-                groupDesc.mEntries.PushBack(samplerEntry);
+                Rhi::FRhiBindGroupEntry eC{};
+                eC.mBinding = 2U;
+                eC.mType    = Rhi::ERhiBindingType::SampledTexture;
+                eC.mTexture = texC;
+                groupDesc.mEntries.PushBack(eC);
+
+                Rhi::FRhiBindGroupEntry eDepth{};
+                eDepth.mBinding = 3U;
+                eDepth.mType    = Rhi::ERhiBindingType::SampledTexture;
+                eDepth.mTexture = depthTex;
+                groupDesc.mEntries.PushBack(eDepth);
+
+                Rhi::FRhiBindGroupEntry eShadow{};
+                eShadow.mBinding = 4U;
+                eShadow.mType    = Rhi::ERhiBindingType::SampledTexture;
+                eShadow.mTexture = shadowTex;
+                groupDesc.mEntries.PushBack(eShadow);
+
+                Rhi::FRhiBindGroupEntry sampler{};
+                sampler.mBinding = 0U;
+                sampler.mType    = Rhi::ERhiBindingType::Sampler;
+                sampler.mSampler = shared.OutputSampler.Get();
+                groupDesc.mEntries.PushBack(sampler);
 
                 auto bindGroup = device->CreateBindGroup(groupDesc);
                 if (!bindGroup) {
                     return;
                 }
 
-                ctx.RHISetGraphicsPipeline(shared.OutputPipeline.Get());
+                ctx.RHISetGraphicsPipeline(shared.LightingPipeline.Get());
 
                 Rhi::FRhiViewportRect viewport{};
                 viewport.mX        = static_cast<f32>(viewRect.X);

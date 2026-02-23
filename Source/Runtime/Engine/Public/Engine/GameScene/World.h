@@ -83,6 +83,10 @@ namespace AltinaEngine::GameScene {
             -> const TVector<FComponentId>&;
         [[nodiscard]] auto GetActiveMeshMaterialComponents() const noexcept
             -> const TVector<FComponentId>&;
+        [[nodiscard]] auto GetActiveDirectionalLightComponents() const noexcept
+            -> const TVector<FComponentId>&;
+        [[nodiscard]] auto GetActivePointLightComponents() const noexcept
+            -> const TVector<FComponentId>&;
 
         void        Serialize(Core::Reflection::ISerializer& serializer) const;
         void        SerializeJson(Core::Reflection::ISerializer& serializer) const;
@@ -299,6 +303,8 @@ namespace AltinaEngine::GameScene {
         TVector<FComponentId>                              mActiveCameraComponents{};
         TVector<FComponentId>                              mActiveStaticMeshComponents{};
         TVector<FComponentId>                              mActiveMeshMaterialComponents{};
+        TVector<FComponentId>                              mActiveDirectionalLightComponents{};
+        TVector<FComponentId>                              mActivePointLightComponents{};
         u32                                                mTransformUpdateId = 0;
     };
 

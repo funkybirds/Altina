@@ -32,6 +32,7 @@ namespace AltinaEngine::Rhi {
         ComPtr<ID3D11DeviceContext> mImmediateContext;
         ComPtr<IDXGISwapChain1>     mSwapChain;
         FRhiTextureRef              mBackBuffer;
+        u32                         mBackBufferIndex  = 0U;
         u32                         mWidth            = 0U;
         u32                         mHeight           = 0U;
         u32                         mBufferCount      = 2U;
@@ -285,6 +286,9 @@ namespace AltinaEngine::Rhi {
                 mState->mImmediateContext->Flush();
             }
         }
+
+        // Refresh cached back buffer wrapper for the next frame (flip-model rotation).
+        (void)CreateBackBuffer();
 #else
         (void)info;
 #endif
@@ -368,8 +372,18 @@ namespace AltinaEngine::Rhi {
 
         ReleaseBackBuffer();
 
+        UINT bufferIndex = 0U;
+        {
+            // Flip-model swap chains rotate the current back buffer index.
+            ComPtr<IDXGISwapChain3> swapChain3;
+            if (SUCCEEDED(mState->mSwapChain.As(&swapChain3)) && swapChain3) {
+                bufferIndex = swapChain3->GetCurrentBackBufferIndex();
+            }
+        }
+        mState->mBackBufferIndex = static_cast<u32>(bufferIndex);
+
         ComPtr<ID3D11Texture2D> backBuffer;
-        const HRESULT           hr = mState->mSwapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
+        const HRESULT hr = mState->mSwapChain->GetBuffer(bufferIndex, IID_PPV_ARGS(&backBuffer));
         if (FAILED(hr) || !backBuffer) {
             return false;
         }

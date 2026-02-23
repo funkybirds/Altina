@@ -47,6 +47,19 @@ namespace AltinaEngine::Rendering {
         constexpr FStringView kDeferredShaderSourcePath =
             TEXT("Source/Shader/Deferred/BasicDeferred.hlsl");
 
+        constexpr FStringView kDeferredLightingShaderAssetsRelPath =
+            TEXT("Assets/Shader/Deferred/DeferredLighting.hlsl");
+        constexpr FStringView kDeferredLightingShaderRelPath =
+            TEXT("Shader/Deferred/DeferredLighting.hlsl");
+        constexpr FStringView kDeferredLightingShaderSourcePath =
+            TEXT("Source/Shader/Deferred/DeferredLighting.hlsl");
+
+        constexpr FStringView kShadowDepthShaderAssetsRelPath =
+            TEXT("Assets/Shader/Shadow/ShadowDepth.hlsl");
+        constexpr FStringView kShadowDepthShaderRelPath = TEXT("Shader/Shadow/ShadowDepth.hlsl");
+        constexpr FStringView kShadowDepthShaderSourcePath =
+            TEXT("Source/Shader/Shadow/ShadowDepth.hlsl");
+
         auto FindBuiltinDeferredShaderPath() -> FPath {
             const FPath exeDir(Core::Platform::GetExecutableDir());
             if (!exeDir.IsEmpty()) {
@@ -57,6 +70,20 @@ namespace AltinaEngine::Rendering {
                 const auto candidate = exeDir / kDeferredShaderRelPath;
                 if (candidate.Exists()) {
                     return candidate;
+                }
+
+                // Multi-config generators often place the executable under <Binaries>/<Config>/.
+                // Demo assets are staged under <Binaries>/Assets, so also probe the parent folder.
+                const auto exeParent = exeDir.ParentPath();
+                if (!exeParent.IsEmpty() && exeParent != exeDir) {
+                    const auto parentAssets = exeParent / kDeferredShaderAssetsRelPath;
+                    if (parentAssets.Exists()) {
+                        return parentAssets;
+                    }
+                    const auto parentLegacy = exeParent / kDeferredShaderRelPath;
+                    if (parentLegacy.Exists()) {
+                        return parentLegacy;
+                    }
                 }
             }
 
@@ -92,6 +119,64 @@ namespace AltinaEngine::Rendering {
             return {};
         }
 
+        auto FindBuiltinShaderPath(FStringView assetsRel, FStringView rel, FStringView sourceRel)
+            -> FPath {
+            const FPath exeDir(Core::Platform::GetExecutableDir());
+            if (!exeDir.IsEmpty()) {
+                const auto candidateAssets = exeDir / assetsRel;
+                if (candidateAssets.Exists()) {
+                    return candidateAssets;
+                }
+                const auto candidate = exeDir / rel;
+                if (candidate.Exists()) {
+                    return candidate;
+                }
+
+                const auto exeParent = exeDir.ParentPath();
+                if (!exeParent.IsEmpty() && exeParent != exeDir) {
+                    const auto parentAssets = exeParent / assetsRel;
+                    if (parentAssets.Exists()) {
+                        return parentAssets;
+                    }
+                    const auto parentLegacy = exeParent / rel;
+                    if (parentLegacy.Exists()) {
+                        return parentLegacy;
+                    }
+                }
+            }
+
+            const auto cwd = Core::Utility::Filesystem::GetCurrentWorkingDir();
+            if (!cwd.IsEmpty()) {
+                const auto candidate = cwd / sourceRel;
+                if (candidate.Exists()) {
+                    return candidate;
+                }
+                const auto candidateAssets = cwd / assetsRel;
+                if (candidateAssets.Exists()) {
+                    return candidateAssets;
+                }
+                const auto candidate2 = cwd / rel;
+                if (candidate2.Exists()) {
+                    return candidate2;
+                }
+            }
+
+            FPath probe = cwd;
+            for (u32 i = 0U; i < 6U && !probe.IsEmpty(); ++i) {
+                const auto candidate = probe / sourceRel;
+                if (candidate.Exists()) {
+                    return candidate;
+                }
+                const auto parent = probe.ParentPath();
+                if (parent == probe) {
+                    break;
+                }
+                probe = parent;
+            }
+
+            return {};
+        }
+
         auto BuildIncludeDir(const FPath& shaderPath) -> FPath {
             auto includeDir = shaderPath.ParentPath().ParentPath().ParentPath();
             if (!includeDir.IsEmpty()) {
@@ -104,7 +189,8 @@ namespace AltinaEngine::Rendering {
             const FStringView keyPrefix, RenderCore::FShaderRegistry::FShaderKey& outKey,
             FShaderCompileResult& outResult) -> bool {
             if (path.IsEmpty() || !path.Exists()) {
-                LogError(TEXT("Deferred shader source not found."));
+                LogError(TEXT("Deferred shader source not found: path='{}' entry='{}' stage={}"),
+                    path.GetString().ToView(), entry, static_cast<u32>(stage));
                 return false;
             }
 
@@ -126,7 +212,9 @@ namespace AltinaEngine::Rendering {
             outResult = GetShaderCompiler().Compile(request);
             if (!outResult.mSucceeded) {
                 LogError(
-                    TEXT("Deferred shader compile failed: {}"), outResult.mDiagnostics.ToView());
+                    TEXT("Deferred shader compile failed: path='{}' entry='{}' stage={} diag={}"),
+                    path.GetString().ToView(), entry, static_cast<u32>(stage),
+                    outResult.mDiagnostics.ToView());
                 return false;
             }
 
@@ -140,7 +228,9 @@ namespace AltinaEngine::Rendering {
             shaderDesc.mDebugName.Assign(entry);
             auto shader = device->CreateShader(shaderDesc);
             if (!shader) {
-                LogError(TEXT("Failed to create deferred RHI shader."));
+                LogError(
+                    TEXT("Failed to create deferred RHI shader: path='{}' entry='{}' stage={}"),
+                    path.GetString().ToView(), entry, static_cast<u32>(stage));
                 return false;
             }
 
@@ -150,7 +240,8 @@ namespace AltinaEngine::Rendering {
             outKey = RenderCore::FShaderRegistry::MakeKey(keyName.ToView(), stage);
 
             if (!FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
-                LogError(TEXT("Failed to register deferred shader {}."), outKey.Name.ToView());
+                LogError(
+                    TEXT("Failed to register deferred shader: key='{}'"), outKey.Name.ToView());
                 return false;
             }
 
@@ -290,11 +381,6 @@ namespace AltinaEngine::Rendering {
 
         RenderCore::InitCommonShaders();
 
-        if (FBasicDeferredRenderer::GetDefaultMaterialTemplate()) {
-            sInitialized = true;
-            return;
-        }
-
         const auto shaderPath = FindBuiltinDeferredShaderPath();
         if (shaderPath.IsEmpty() || !shaderPath.Exists()) {
             LogError(
@@ -302,14 +388,40 @@ namespace AltinaEngine::Rendering {
             return;
         }
 
+        const auto lightingShaderPath = FindBuiltinShaderPath(kDeferredLightingShaderAssetsRelPath,
+            kDeferredLightingShaderRelPath, kDeferredLightingShaderSourcePath);
+        if (lightingShaderPath.IsEmpty() || !lightingShaderPath.Exists()) {
+            LogError(TEXT("Builtin deferred lighting shader not found. Expected {}."),
+                kDeferredLightingShaderRelPath);
+            return;
+        }
+
+        const auto shadowShaderPath = FindBuiltinShaderPath(kShadowDepthShaderAssetsRelPath,
+            kShadowDepthShaderRelPath, kShadowDepthShaderSourcePath);
+        if (shadowShaderPath.IsEmpty() || !shadowShaderPath.Exists()) {
+            LogError(TEXT("Builtin shadow depth shader not found. Expected {}."),
+                kShadowDepthShaderRelPath);
+            return;
+        }
+
+        LogInfo(TEXT("Deferred shader paths: base='{}' lighting='{}' shadow='{}'"),
+            shaderPath.GetString().ToView(), lightingShaderPath.GetString().ToView(),
+            shadowShaderPath.GetString().ToView());
+
         RenderCore::FShaderRegistry::FShaderKey vsKey{};
         RenderCore::FShaderRegistry::FShaderKey psKey{};
-        RenderCore::FShaderRegistry::FShaderKey outVsKey{};
-        RenderCore::FShaderRegistry::FShaderKey outPsKey{};
+        RenderCore::FShaderRegistry::FShaderKey fsqVsKey{};
+        RenderCore::FShaderRegistry::FShaderKey lightingVsKey{};
+        RenderCore::FShaderRegistry::FShaderKey lightingPsKey{};
+        RenderCore::FShaderRegistry::FShaderKey shadowVsKey{};
+        RenderCore::FShaderRegistry::FShaderKey shadowPsKey{};
         FShaderCompileResult                    vsResult{};
         FShaderCompileResult                    psResult{};
-        FShaderCompileResult                    outVsResult{};
-        FShaderCompileResult                    outPsResult{};
+        FShaderCompileResult                    fsqVsResult{};
+        FShaderCompileResult                    lightingVsResult{};
+        FShaderCompileResult                    lightingPsResult{};
+        FShaderCompileResult                    shadowVsResult{};
+        FShaderCompileResult                    shadowPsResult{};
 
         constexpr FStringView                   kKeyPrefix = TEXT("Builtin/Deferred/BasicDeferred");
         if (!CompileShaderFromFile(shaderPath, TEXT("VSBase"), Shader::EShaderStage::Vertex,
@@ -317,9 +429,19 @@ namespace AltinaEngine::Rendering {
             || !CompileShaderFromFile(shaderPath, TEXT("PSBase"), Shader::EShaderStage::Pixel,
                 kKeyPrefix, psKey, psResult)
             || !CompileShaderFromFile(shaderPath, TEXT("VSComposite"), Shader::EShaderStage::Vertex,
-                kKeyPrefix, outVsKey, outVsResult)
-            || !CompileShaderFromFile(shaderPath, TEXT("PSComposite"), Shader::EShaderStage::Pixel,
-                kKeyPrefix, outPsKey, outPsResult)) {
+                kKeyPrefix, fsqVsKey, fsqVsResult)
+            || !CompileShaderFromFile(lightingShaderPath, TEXT("VSFullScreenTriangle"),
+                Shader::EShaderStage::Vertex, TEXT("Builtin/Deferred/DeferredLighting"),
+                lightingVsKey, lightingVsResult)
+            || !CompileShaderFromFile(lightingShaderPath, TEXT("PSDeferredLighting"),
+                Shader::EShaderStage::Pixel, TEXT("Builtin/Deferred/DeferredLighting"),
+                lightingPsKey, lightingPsResult)
+            || !CompileShaderFromFile(shadowShaderPath, TEXT("VSShadowDepth"),
+                Shader::EShaderStage::Vertex, TEXT("Builtin/Shadow/ShadowDepth"), shadowVsKey,
+                shadowVsResult)
+            || !CompileShaderFromFile(shadowShaderPath, TEXT("PSShadowDepth"),
+                Shader::EShaderStage::Pixel, TEXT("Builtin/Shadow/ShadowDepth"), shadowPsKey,
+                shadowPsResult)) {
             return;
         }
 
@@ -342,8 +464,23 @@ namespace AltinaEngine::Rendering {
         passDesc.State.Raster.mCullMode = Rhi::ERhiRasterCullMode::Front;
 
         templ->SetPassDesc(EMaterialPass::BasePass, Move(passDesc));
+
+        // Shadow depth-only pass (Directional CSM).
+        RenderCore::FMaterialPassDesc shadowPass{};
+        shadowPass.Shaders.Vertex                     = shadowVsKey;
+        shadowPass.Shaders.Pixel                      = shadowPsKey;
+        shadowPass.State.Depth.mDepthEnable           = true;
+        shadowPass.State.Depth.mDepthWrite            = true;
+        shadowPass.State.Depth.mDepthCompare          = Rhi::ERhiCompareOp::GreaterEqual;
+        shadowPass.State.Raster.mCullMode             = Rhi::ERhiRasterCullMode::Front;
+        shadowPass.State.Raster.mDepthBias            = 1000;
+        shadowPass.State.Raster.mSlopeScaledDepthBias = 2.0f;
+        templ->SetPassDesc(EMaterialPass::ShadowPass, Move(shadowPass));
+
         FBasicDeferredRenderer::SetDefaultMaterialTemplate(templ);
-        FBasicDeferredRenderer::SetOutputShaderKeys(outVsKey, outPsKey);
+        FBasicDeferredRenderer::SetLightingShaderKeys(lightingVsKey, lightingPsKey);
+        LogInfo(TEXT("Deferred lighting shader keys configured: vs='{}' ps='{}'"),
+            lightingVsKey.Name.ToView(), lightingPsKey.Name.ToView());
         sInitialized = true;
     }
 } // namespace AltinaEngine::Rendering

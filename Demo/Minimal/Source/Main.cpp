@@ -3,6 +3,7 @@
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
 #include "Engine/GameScene/CameraComponent.h"
+#include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
 #include "Engine/GameScene/World.h"
 #include "Engine/GameSceneAsset/ModelAssetInstantiator.h"
@@ -11,6 +12,7 @@
 #include "Logging/Log.h"
 #include "Material/MaterialPass.h"
 #include "Container/SmartPtr.h"
+#include "Math/Common.h"
 #include "Math/LinAlg/SpatialTransform.h"
 #include "Math/Vector.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
@@ -61,12 +63,45 @@ namespace {
                 camera.SetNearPlane(0.1f);
                 camera.SetFarPlane(1000.0f);
 
-                auto transform        = cameraObject.GetWorldTransform();
-                transform.Translation = Core::Math::FVector3f(0.0f, 0.0f, -4.0f);
+                auto transform = cameraObject.GetWorldTransform();
+                // Rotate 180 degrees around Y (up), then move the camera backward a bit so the demo
+                // starts with the model in view.
+                transform.Rotation = Core::Math::FQuaternion::FromAxisAngle(
+                    Core::Math::FVector3f(0.0f, 1.0f, 0.0f), Core::Math::kPiF);
+
+                const Core::Math::FVector3f basePos(0.0f, 0.0f, -4.0f);
+                const Core::Math::FVector3f localBackward(0.0f, 0.0f, -1.0f);
+                const Core::Math::FVector3f backwardWorld =
+                    transform.Rotation.RotateVector(localBackward);
+                constexpr float kBackDistance = 8.0f;
+                // NOTE: Vector supports component-wise multiply; use a splat vector for scalar
+                // scaling.
+                transform.Translation =
+                    basePos + backwardWorld * Core::Math::FVector3f(kBackDistance);
                 cameraObject.SetWorldTransform(transform);
             }
             if (scriptComponent.IsValid()) {
                 scriptComponent.Get().SetScriptAsset(scriptHandle);
+            }
+
+            // Directional light (main). Used by deferred lighting + CSM (if enabled).
+            {
+                auto lightObject = world->CreateGameObject(TEXT("DirectionalLight"));
+                auto lightComponent =
+                    lightObject.AddComponent<GameScene::FDirectionalLightComponent>();
+                if (lightComponent.IsValid()) {
+                    auto& light        = lightComponent.Get();
+                    light.mColor       = Core::Math::FVector3f(1.0f, 1.0f, 1.0f);
+                    light.mIntensity   = 2.0f;
+                    light.mCastShadows = true;
+
+                    // +Z is treated as light propagation direction (see component comment).
+                    // Keep identity rotation for now: propagation = (0,0,1).
+                    auto t        = lightObject.GetWorldTransform();
+                    t.Rotation    = Core::Math::FQuaternion::Identity();
+                    t.Translation = Core::Math::FVector3f(0.0f, 0.0f, 0.0f);
+                    lightObject.SetWorldTransform(t);
+                }
             }
 
             auto modelResult = Engine::GameSceneAsset::FModelAssetInstantiator::Instantiate(

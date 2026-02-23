@@ -9,15 +9,25 @@ namespace AltinaEngine::RenderCore::View {
     struct FViewData;
 }
 
+namespace AltinaEngine::RenderCore::Lighting {
+    struct FLightSceneData;
+}
+
 namespace AltinaEngine::RenderCore::Render {
     struct FDrawList;
 }
 
 namespace AltinaEngine::Rendering {
     struct AE_RENDERING_API FRenderViewContext {
-        const RenderCore::View::FViewData*   View         = nullptr;
-        const RenderCore::Render::FDrawList* DrawList     = nullptr;
-        Rhi::FRhiTexture*                    OutputTarget = nullptr;
+        const RenderCore::View::FViewData*           View         = nullptr;
+        const RenderCore::Render::FDrawList*         DrawList     = nullptr;
+        Rhi::FRhiTexture*                            OutputTarget = nullptr;
+
+        // Deferred lighting input.
+        const RenderCore::Lighting::FLightSceneData* Lights = nullptr;
+
+        // Optional shadow caster list (e.g., directional CSM).
+        const RenderCore::Render::FDrawList*         ShadowDrawList = nullptr;
     };
 
     /**

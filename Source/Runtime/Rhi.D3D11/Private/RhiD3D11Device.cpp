@@ -151,9 +151,13 @@ namespace AltinaEngine::Rhi {
         FRhiD3D11GraphicsPipeline*   mCurrentGraphicsPipeline                             = nullptr;
         FRhiD3D11ComputePipeline*    mCurrentComputePipeline                              = nullptr;
         bool                         mUseComputeBindings                                  = false;
+        bool                         mHasActiveRenderPassMarker                           = false;
         ID3D11RenderTargetView*      mCurrentRtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
         UINT                         mCurrentRtvCount                                     = 0U;
         ID3D11DepthStencilView*      mCurrentDsv                                          = nullptr;
+        // Transient per-pass view objects (needed to support subresource ranges).
+        TVector<ComPtr<ID3D11RenderTargetView>> mTransientRtvs;
+        TVector<ComPtr<ID3D11DepthStencilView>> mTransientDsvs;
     };
 #else
     struct FRhiD3D11Device::FState {};
@@ -741,22 +745,20 @@ namespace AltinaEngine::Rhi {
             return (type == ERhiIndexType::Uint16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
         }
 
-        auto GetRenderTargetViewHandle(FRhiRenderTargetView* view) noexcept
-            -> ID3D11RenderTargetView* {
-            if (!view) {
-                return nullptr;
-            }
-            auto* texture = static_cast<FRhiD3D11Texture*>(view->GetTexture());
-            return texture ? texture->GetRenderTargetView() : nullptr;
-        }
+        // Forward declaration (defined later in this translation unit).
+        auto               ToD3D11Format(ERhiFormat format) noexcept -> DXGI_FORMAT;
 
-        auto GetDepthStencilViewHandle(FRhiDepthStencilView* view) noexcept
-            -> ID3D11DepthStencilView* {
-            if (!view) {
-                return nullptr;
-            }
-            auto* texture = static_cast<FRhiD3D11Texture*>(view->GetTexture());
-            return texture ? texture->GetDepthStencilView() : nullptr;
+        [[nodiscard]] auto IsFullTextureViewRange(
+            const FRhiTextureDesc& texDesc, const FRhiTextureViewRange& range) noexcept -> bool {
+            const u32 mipCount = (range.mMipCount == 0U) ? texDesc.mMipLevels : range.mMipCount;
+            const u32 layerCount =
+                (range.mLayerCount == 0U) ? texDesc.mArrayLayers : range.mLayerCount;
+            const u32 depthCount =
+                (range.mDepthSliceCount == 0U) ? texDesc.mDepth : range.mDepthSliceCount;
+
+            return range.mBaseMip == 0U && mipCount == texDesc.mMipLevels
+                && range.mBaseArrayLayer == 0U && layerCount == texDesc.mArrayLayers
+                && range.mBaseDepthSlice == 0U && depthCount == texDesc.mDepth;
         }
 #endif
     } // namespace
@@ -1063,6 +1065,28 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
+        mState->mHasActiveRenderPassMarker = false;
+        if (!desc.mDebugName.IsEmptyString()) {
+            ComPtr<ID3DUserDefinedAnnotation> annotation;
+            if (SUCCEEDED(context->QueryInterface(IID_PPV_ARGS(&annotation))) && annotation) {
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+                annotation->BeginEvent(desc.mDebugName.CStr());
+    #else
+                std::wstring wide;
+                wide.reserve(desc.mDebugName.Length());
+                for (usize i = 0; i < desc.mDebugName.Length(); ++i) {
+                    wide.push_back(static_cast<wchar_t>(desc.mDebugName[i]));
+                }
+                annotation->BeginEvent(wide.c_str());
+    #endif
+                mState->mHasActiveRenderPassMarker = true;
+            }
+        }
+
+        // Ensure temporary view handles stay alive for the duration of this render pass.
+        mState->mTransientRtvs.Clear();
+        mState->mTransientDsvs.Clear();
+
         const UINT maxTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
         const UINT rtvCount   = (desc.mColorAttachments && desc.mColorAttachmentCount > 0U)
               ? ((desc.mColorAttachmentCount > maxTargets)
@@ -1073,13 +1097,134 @@ namespace AltinaEngine::Rhi {
         ID3D11RenderTargetView* rtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
         if (desc.mColorAttachments) {
             for (UINT i = 0; i < rtvCount; ++i) {
-                rtvs[i] = GetRenderTargetViewHandle(desc.mColorAttachments[i].mView);
+                auto* view = desc.mColorAttachments[i].mView;
+                if (view == nullptr) {
+                    rtvs[i] = nullptr;
+                    continue;
+                }
+
+                auto* texture = static_cast<FRhiD3D11Texture*>(view->GetTexture());
+                if (texture == nullptr) {
+                    rtvs[i] = nullptr;
+                    continue;
+                }
+
+                const auto& texDesc  = texture->GetDesc();
+                const auto& viewDesc = view->GetDesc();
+
+                if (IsFullTextureViewRange(texDesc, viewDesc.mRange)) {
+                    rtvs[i] = texture->GetRenderTargetView();
+                    continue;
+                }
+
+                ID3D11Device*   device   = mState->mDevice.Get();
+                ID3D11Resource* resource = texture->GetNativeResource();
+                if (!device || !resource) {
+                    rtvs[i] = texture->GetRenderTargetView();
+                    continue;
+                }
+
+                DXGI_FORMAT format = (viewDesc.mFormat != ERhiFormat::Unknown)
+                    ? ToD3D11Format(viewDesc.mFormat)
+                    : ToD3D11Format(texDesc.mFormat);
+                if (format == DXGI_FORMAT_UNKNOWN) {
+                    rtvs[i] = texture->GetRenderTargetView();
+                    continue;
+                }
+
+                const u32 baseMip   = viewDesc.mRange.mBaseMip;
+                const u32 baseLayer = viewDesc.mRange.mBaseArrayLayer;
+                const u32 layerCount =
+                    (viewDesc.mRange.mLayerCount == 0U) ? 1U : viewDesc.mRange.mLayerCount;
+
+                D3D11_RENDER_TARGET_VIEW_DESC rtv{};
+                rtv.Format = format;
+                if (texDesc.mSampleCount > 1U) {
+                    if (texDesc.mArrayLayers > 1U) {
+                        rtv.ViewDimension                    = D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY;
+                        rtv.Texture2DMSArray.FirstArraySlice = baseLayer;
+                        rtv.Texture2DMSArray.ArraySize       = layerCount;
+                    } else {
+                        rtv.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMS;
+                    }
+                } else if (texDesc.mArrayLayers > 1U) {
+                    rtv.ViewDimension                  = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
+                    rtv.Texture2DArray.MipSlice        = baseMip;
+                    rtv.Texture2DArray.FirstArraySlice = baseLayer;
+                    rtv.Texture2DArray.ArraySize       = layerCount;
+                } else {
+                    rtv.ViewDimension      = D3D11_RTV_DIMENSION_TEXTURE2D;
+                    rtv.Texture2D.MipSlice = baseMip;
+                }
+
+                ComPtr<ID3D11RenderTargetView> handle;
+                if (FAILED(device->CreateRenderTargetView(resource, &rtv, &handle)) || !handle) {
+                    rtvs[i] = texture->GetRenderTargetView();
+                    continue;
+                }
+                rtvs[i] = handle.Get();
+                mState->mTransientRtvs.PushBack(Move(handle));
             }
         }
 
         ID3D11DepthStencilView* dsv = nullptr;
         if (desc.mDepthStencilAttachment) {
-            dsv = GetDepthStencilViewHandle(desc.mDepthStencilAttachment->mView);
+            auto* view = desc.mDepthStencilAttachment->mView;
+            if (view != nullptr) {
+                auto* texture = static_cast<FRhiD3D11Texture*>(view->GetTexture());
+                if (texture != nullptr) {
+                    const auto& texDesc  = texture->GetDesc();
+                    const auto& viewDesc = view->GetDesc();
+                    if (IsFullTextureViewRange(texDesc, viewDesc.mRange)) {
+                        dsv = texture->GetDepthStencilView();
+                    } else {
+                        ID3D11Device*   device   = mState->mDevice.Get();
+                        ID3D11Resource* resource = texture->GetNativeResource();
+                        DXGI_FORMAT     format   = (viewDesc.mFormat != ERhiFormat::Unknown)
+                                  ? ToD3D11Format(viewDesc.mFormat)
+                                  : ToD3D11Format(texDesc.mFormat);
+                        if (device && resource && format != DXGI_FORMAT_UNKNOWN) {
+                            const u32 baseMip    = viewDesc.mRange.mBaseMip;
+                            const u32 baseLayer  = viewDesc.mRange.mBaseArrayLayer;
+                            const u32 layerCount = (viewDesc.mRange.mLayerCount == 0U)
+                                ? 1U
+                                : viewDesc.mRange.mLayerCount;
+
+                            D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+                            dsvDesc.Format = format;
+                            if (texDesc.mSampleCount > 1U) {
+                                if (texDesc.mArrayLayers > 1U) {
+                                    dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMSARRAY;
+                                    dsvDesc.Texture2DMSArray.FirstArraySlice = baseLayer;
+                                    dsvDesc.Texture2DMSArray.ArraySize       = layerCount;
+                                } else {
+                                    dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
+                                }
+                            } else if (texDesc.mArrayLayers > 1U) {
+                                dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+                                dsvDesc.Texture2DArray.MipSlice        = baseMip;
+                                dsvDesc.Texture2DArray.FirstArraySlice = baseLayer;
+                                dsvDesc.Texture2DArray.ArraySize       = layerCount;
+                            } else {
+                                dsvDesc.ViewDimension      = D3D11_DSV_DIMENSION_TEXTURE2D;
+                                dsvDesc.Texture2D.MipSlice = baseMip;
+                            }
+
+                            ComPtr<ID3D11DepthStencilView> handle;
+                            if (SUCCEEDED(
+                                    device->CreateDepthStencilView(resource, &dsvDesc, &handle))
+                                && handle) {
+                                dsv = handle.Get();
+                                mState->mTransientDsvs.PushBack(Move(handle));
+                            } else {
+                                dsv = texture->GetDepthStencilView();
+                            }
+                        } else {
+                            dsv = texture->GetDepthStencilView();
+                        }
+                    }
+                }
+            }
         }
 
         context->OMSetRenderTargets(rtvCount, rtvCount ? rtvs : nullptr, dsv);
@@ -1126,7 +1271,14 @@ namespace AltinaEngine::Rhi {
 
     void FRhiD3D11CommandContext::RHIEndRenderPass() {
 #if AE_PLATFORM_WIN
-        (void)mState;
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (context && mState && mState->mHasActiveRenderPassMarker) {
+            ComPtr<ID3DUserDefinedAnnotation> annotation;
+            if (SUCCEEDED(context->QueryInterface(IID_PPV_ARGS(&annotation))) && annotation) {
+                annotation->EndEvent();
+            }
+            mState->mHasActiveRenderPassMarker = false;
+        }
 #endif
     }
 

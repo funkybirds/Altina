@@ -624,6 +624,28 @@ namespace AltinaEngine::Rhi {
             }
         }
 
+        auto ToD3D11TypelessDepthFormat(ERhiFormat format) noexcept -> DXGI_FORMAT {
+            switch (format) {
+                case ERhiFormat::D24UnormS8Uint:
+                    return DXGI_FORMAT_R24G8_TYPELESS;
+                case ERhiFormat::D32Float:
+                    return DXGI_FORMAT_R32_TYPELESS;
+                default:
+                    return DXGI_FORMAT_UNKNOWN;
+            }
+        }
+
+        auto ToD3D11DepthSrvFormat(ERhiFormat format) noexcept -> DXGI_FORMAT {
+            switch (format) {
+                case ERhiFormat::D24UnormS8Uint:
+                    return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+                case ERhiFormat::D32Float:
+                    return DXGI_FORMAT_R32_FLOAT;
+                default:
+                    return DXGI_FORMAT_UNKNOWN;
+            }
+        }
+
         auto CreateTextureRtv(ID3D11Device* device, ID3D11Resource* resource,
             const FRhiTextureDesc& desc) -> ComPtr<ID3D11RenderTargetView> {
             ComPtr<ID3D11RenderTargetView> rtv;
@@ -776,9 +798,16 @@ namespace AltinaEngine::Rhi {
             if (device == nullptr || resource == nullptr) {
                 return srv;
             }
-            const DXGI_FORMAT format = ToD3D11Format(desc.mFormat);
+            DXGI_FORMAT format = ToD3D11Format(desc.mFormat);
             if (format == DXGI_FORMAT_UNKNOWN) {
                 return srv;
+            }
+            if (IsDepthStencilFormat(desc.mFormat)) {
+                const DXGI_FORMAT depthSrv = ToD3D11DepthSrvFormat(desc.mFormat);
+                if (depthSrv == DXGI_FORMAT_UNKNOWN) {
+                    return srv;
+                }
+                format = depthSrv;
             }
 
             D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
@@ -904,6 +933,11 @@ namespace AltinaEngine::Rhi {
         bufferDesc.MiscFlags           = miscFlags;
         bufferDesc.StructureByteStride = 0U;
 
+        // D3D11 requires constant buffers to be 16-byte aligned in size.
+        if ((bindFlags & D3D11_BIND_CONSTANT_BUFFER) != 0U) {
+            bufferDesc.ByteWidth = (bufferDesc.ByteWidth + 15U) & ~15U;
+        }
+
         ComPtr<ID3D11Buffer> buffer;
         const HRESULT        hr = device->CreateBuffer(&bufferDesc, nullptr, &buffer);
         if (FAILED(hr) || (buffer == nullptr)) {
@@ -944,6 +978,14 @@ namespace AltinaEngine::Rhi {
         if (format == DXGI_FORMAT_UNKNOWN) {
             return {};
         }
+        DXGI_FORMAT resourceFormat = format;
+        if (IsDepthStencilFormat(desc.mFormat)
+            && HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::ShaderResource)) {
+            const DXGI_FORMAT typeless = ToD3D11TypelessDepthFormat(desc.mFormat);
+            if (typeless != DXGI_FORMAT_UNKNOWN) {
+                resourceFormat = typeless;
+            }
+        }
 
         const D3D11_USAGE usage     = ToD3D11Usage(desc.mUsage);
         UINT              bindFlags = ToD3D11TextureBindFlags(desc.mBindFlags);
@@ -977,7 +1019,7 @@ namespace AltinaEngine::Rhi {
             texDesc.Height               = desc.mHeight;
             texDesc.Depth                = desc.mDepth;
             texDesc.MipLevels            = desc.mMipLevels;
-            texDesc.Format               = format;
+            texDesc.Format               = resourceFormat;
             texDesc.Usage                = usage;
             texDesc.BindFlags            = bindFlags;
             texDesc.CPUAccessFlags       = cpuAccess;
@@ -1025,7 +1067,7 @@ namespace AltinaEngine::Rhi {
         texDesc.Height               = desc.mHeight;
         texDesc.MipLevels            = desc.mMipLevels;
         texDesc.ArraySize            = desc.mArrayLayers;
-        texDesc.Format               = format;
+        texDesc.Format               = resourceFormat;
         texDesc.SampleDesc.Count     = desc.mSampleCount;
         texDesc.SampleDesc.Quality   = 0U;
         texDesc.Usage                = usage;

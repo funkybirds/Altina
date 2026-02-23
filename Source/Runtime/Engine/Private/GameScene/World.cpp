@@ -1,7 +1,9 @@
 #include "Engine/GameScene/World.h"
 
 #include "Engine/GameScene/CameraComponent.h"
+#include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/PointLightComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Reflection/Serializer.h"
@@ -30,11 +32,15 @@ namespace AltinaEngine::GameScene {
         const FComponentTypeHash kMeshMaterialComponentType =
             GetComponentTypeHash<FMeshMaterialComponent>();
         const FComponentTypeHash kScriptComponentType = GetComponentTypeHash<FScriptComponent>();
+        const FComponentTypeHash kDirectionalLightComponentType =
+            GetComponentTypeHash<FDirectionalLightComponent>();
+        const FComponentTypeHash kPointLightComponentType =
+            GetComponentTypeHash<FPointLightComponent>();
 
-        constexpr u32            kWorldSerializationVersion = 1U;
+        constexpr u32 kWorldSerializationVersion = 1U;
 
-        auto                     WriteTransform(Core::Reflection::ISerializer& serializer,
-                                const Core::Math::LinAlg::FSpatialTransform&   transform) -> void {
+        auto          WriteTransform(Core::Reflection::ISerializer& serializer,
+                     const Core::Math::LinAlg::FSpatialTransform&   transform) -> void {
             serializer.Write(transform.Rotation.x);
             serializer.Write(transform.Rotation.y);
             serializer.Write(transform.Rotation.z);
@@ -481,6 +487,15 @@ namespace AltinaEngine::GameScene {
         return mActiveMeshMaterialComponents;
     }
 
+    auto FWorld::GetActiveDirectionalLightComponents() const noexcept
+        -> const TVector<FComponentId>& {
+        return mActiveDirectionalLightComponents;
+    }
+
+    auto FWorld::GetActivePointLightComponents() const noexcept -> const TVector<FComponentId>& {
+        return mActivePointLightComponents;
+    }
+
     void FWorld::Serialize(Core::Reflection::ISerializer& serializer) const {
         serializer.Write(kWorldSerializationVersion);
         serializer.Write(mWorldId);
@@ -809,6 +824,21 @@ namespace AltinaEngine::GameScene {
                 AddActiveComponent(mActiveMeshMaterialComponents, id);
             }
         }
+
+        if (id.Type == kDirectionalLightComponentType) {
+            const auto& component = ResolveComponent<FDirectionalLightComponent>(id);
+            if (component.IsEnabled()) {
+                AddActiveComponent(mActiveDirectionalLightComponents, id);
+            }
+            return;
+        }
+
+        if (id.Type == kPointLightComponentType) {
+            const auto& component = ResolveComponent<FPointLightComponent>(id);
+            if (component.IsEnabled()) {
+                AddActiveComponent(mActivePointLightComponents, id);
+            }
+        }
     }
 
     void FWorld::OnComponentDestroyed(FComponentId id, FGameObjectId /*owner*/) {
@@ -824,6 +854,16 @@ namespace AltinaEngine::GameScene {
 
         if (id.Type == kMeshMaterialComponentType) {
             RemoveActiveComponent(mActiveMeshMaterialComponents, id);
+            return;
+        }
+
+        if (id.Type == kDirectionalLightComponentType) {
+            RemoveActiveComponent(mActiveDirectionalLightComponents, id);
+            return;
+        }
+
+        if (id.Type == kPointLightComponentType) {
+            RemoveActiveComponent(mActivePointLightComponents, id);
         }
     }
 
@@ -851,6 +891,24 @@ namespace AltinaEngine::GameScene {
                 AddActiveComponent(mActiveMeshMaterialComponents, id);
             } else {
                 RemoveActiveComponent(mActiveMeshMaterialComponents, id);
+            }
+            return;
+        }
+
+        if (id.Type == kDirectionalLightComponentType) {
+            if (enabled && IsGameObjectActive(owner)) {
+                AddActiveComponent(mActiveDirectionalLightComponents, id);
+            } else {
+                RemoveActiveComponent(mActiveDirectionalLightComponents, id);
+            }
+            return;
+        }
+
+        if (id.Type == kPointLightComponentType) {
+            if (enabled && IsGameObjectActive(owner)) {
+                AddActiveComponent(mActivePointLightComponents, id);
+            } else {
+                RemoveActiveComponent(mActivePointLightComponents, id);
             }
         }
     }
@@ -890,6 +948,24 @@ namespace AltinaEngine::GameScene {
                     AddActiveComponent(mActiveMeshMaterialComponents, id);
                 } else {
                     RemoveActiveComponent(mActiveMeshMaterialComponents, id);
+                }
+                continue;
+            }
+
+            if (id.Type == kDirectionalLightComponentType) {
+                if (active && ResolveComponent<FDirectionalLightComponent>(id).IsEnabled()) {
+                    AddActiveComponent(mActiveDirectionalLightComponents, id);
+                } else {
+                    RemoveActiveComponent(mActiveDirectionalLightComponents, id);
+                }
+                continue;
+            }
+
+            if (id.Type == kPointLightComponentType) {
+                if (active && ResolveComponent<FPointLightComponent>(id).IsEnabled()) {
+                    AddActiveComponent(mActivePointLightComponents, id);
+                } else {
+                    RemoveActiveComponent(mActivePointLightComponents, id);
                 }
             }
         }

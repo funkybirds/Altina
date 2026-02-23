@@ -98,7 +98,10 @@ set(Target_Private_Sources
     Private/Importers/Material/MaterialImporter.cpp
     Private/Importers/Mesh/MeshImporter.cpp
     Private/Importers/Model/GltfImporter.cpp
+    Private/Importers/Model/AssimpModelImporter.cpp
+    Private/Importers/Model/FbxImporter.cpp
     Private/Importers/Model/ModelImporter.cpp
+    Private/Importers/Model/PmxImporter.cpp
     Private/Importers/Shader/ShaderImporter.cpp
     Private/Importers/Texture/TextureImporter.cpp
 )

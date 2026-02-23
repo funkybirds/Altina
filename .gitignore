@@ -1,11 +1,13 @@
 # Build directories
 out/
 build/
+build_*/
 CMakeFiles/
 CMakeCache.txt
 
 # Demo binaries staged by post-build steps
 Demo/*/Binaries/
+Demo/*/Shipping/
 
 # Generated files
 *.sln

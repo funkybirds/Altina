@@ -2,6 +2,8 @@ set(TargetName AltinaEngineDemoMinimal)
 
 add_executable(${TargetName})
 
+option(AE_DEMO_ENABLE_SHIPPING "Stage Demo/<Name>/Shipping from Demo/<Name>/Binaries (copies Assets + *.exe/*.dll only)" ON)
+
 set(Target_Private_Sources
     Source/Main.cpp
 )
@@ -33,12 +35,14 @@ target_compile_features(${TargetName}
 )
 
 set(DemoBinaryDir ${CMAKE_SOURCE_DIR}/Demo/Minimal/Binaries)
+set(DemoShippingDir ${CMAKE_CURRENT_SOURCE_DIR}/Shipping)
 set(DemoAssetCookOutput ${DemoBinaryDir}/Assets/Registry/AssetRegistry.json)
 set(DemoAssetsRoot ${CMAKE_CURRENT_SOURCE_DIR}/Assets)
 set(DemoConfigRoot ${CMAKE_CURRENT_SOURCE_DIR}/Config)
 set(DemoCookedRoot ${DemoBinaryDir}/Assets)
 set(EngineShaderRoot ${CMAKE_SOURCE_DIR}/Source/Shader)
 set(DemoStagedShaderRoot ${DemoBinaryDir}/Assets/Shader)
+set(AE_DEMO_STAGE_SHIPPING_SCRIPT ${CMAKE_SOURCE_DIR}/Scripts/StageDemoShipping.cmake)
 file(GLOB_RECURSE DemoAssetSources CONFIGURE_DEPENDS
     ${DemoAssetsRoot}/*
 )
@@ -91,6 +95,19 @@ if(WIN32)
             ${DemoBinaryDir}
         COMMAND_EXPAND_LISTS
         COMMENT "Staging Minimal demo runtime DLLs"
+    )
+endif()
+
+if(AE_DEMO_ENABLE_SHIPPING)
+    add_custom_command(
+        TARGET ${TargetName}
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -DDEMO_BIN_DIR:PATH=${DemoBinaryDir}
+            -DDEMO_SHIP_DIR:PATH=${DemoShippingDir}
+            -P ${AE_DEMO_STAGE_SHIPPING_SCRIPT}
+        COMMENT "Staging Minimal demo Shipping folder"
+        VERBATIM
     )
 endif()
 

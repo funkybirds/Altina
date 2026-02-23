@@ -4,6 +4,7 @@
 #include "Engine/GameScene/Ids.h"
 #include "Asset/AssetTypes.h"
 #include "Container/Vector.h"
+#include "Lighting/LightTypes.h"
 #include "Math/Matrix.h"
 #include "Types/Aliases.h"
 #include "View/ViewData.h"
@@ -69,8 +70,9 @@ namespace AltinaEngine::Engine {
     };
 
     struct AE_ENGINE_API FRenderScene {
-        TVector<FSceneView>       Views{};
-        TVector<FSceneStaticMesh> StaticMeshes{};
+        TVector<FSceneView>                   Views{};
+        TVector<FSceneStaticMesh>             StaticMeshes{};
+        RenderCore::Lighting::FLightSceneData Lights{};
     };
 
     struct AE_ENGINE_API FSceneViewBuildParams {

@@ -203,6 +203,7 @@ namespace AltinaEngine::Launch {
         void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
             const Engine::FRenderScene&                              scene,
             const Container::TVector<RenderCore::Render::FDrawList>& drawLists,
+            const Container::TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
             Rendering::ERendererType                                 rendererType) {
             if (scene.Views.IsEmpty()) {
                 return;
@@ -229,9 +230,12 @@ namespace AltinaEngine::Launch {
                 }
 
                 Rendering::FRenderViewContext viewContext{};
-                viewContext.View         = &view.View;
-                viewContext.DrawList     = (i < drawLists.Size()) ? &drawLists[i] : nullptr;
+                viewContext.View     = &view.View;
+                viewContext.DrawList = (i < drawLists.Size()) ? &drawLists[i] : nullptr;
+                viewContext.ShadowDrawList =
+                    (i < shadowDrawLists.Size()) ? &shadowDrawLists[i] : nullptr;
                 viewContext.OutputTarget = outputTarget;
+                viewContext.Lights       = &scene.Lights;
                 renderer->SetViewContext(viewContext);
 
                 RenderCore::FFrameGraph graph(device);
@@ -572,6 +576,7 @@ namespace AltinaEngine::Launch {
 
         Engine::FRenderScene                              renderScene;
         Container::TVector<RenderCore::Render::FDrawList> drawLists;
+        Container::TVector<RenderCore::Render::FDrawList> shadowDrawLists;
 
         if (width > 0U && height > 0U) {
             if (auto* world = mEngineRuntime.GetWorldManager().GetActiveWorld()) {
@@ -603,11 +608,26 @@ namespace AltinaEngine::Launch {
                     Engine::FSceneBatchBuildParams batchParams{};
                     batchParams.bAllowInstancing = false;
                     drawLists.Resize(renderScene.Views.Size());
+                    shadowDrawLists.Resize(renderScene.Views.Size());
                     for (usize i = 0; i < renderScene.Views.Size(); ++i) {
                         batchBuilder.Build(renderScene, renderScene.Views[i], batchParams,
                             mMaterialCache, drawLists[i]);
+
+                        // Shadow pass draw list (Directional CSM).
+                        Engine::FSceneBatchBuildParams shadowParams = batchParams;
+                        shadowParams.Pass = RenderCore::EMaterialPass::ShadowPass;
+                        batchBuilder.Build(renderScene, renderScene.Views[i], shadowParams,
+                            mMaterialCache, shadowDrawLists[i]);
                     }
                     for (auto& drawList : drawLists) {
+                        for (const auto& batch : drawList.Batches) {
+                            if (batch.Material != nullptr) {
+                                auto* material = const_cast<RenderCore::FMaterial*>(batch.Material);
+                                mMaterialCache.PrepareMaterialForRendering(*material);
+                            }
+                        }
+                    }
+                    for (auto& drawList : shadowDrawLists) {
                         for (const auto& batch : drawList.Batches) {
                             if (batch.Material != nullptr) {
                                 auto* material = const_cast<RenderCore::FMaterial*>(batch.Material);
@@ -631,7 +651,7 @@ namespace AltinaEngine::Launch {
         auto handle = RenderCore::EnqueueRenderTask(Container::FString(TEXT("RenderFrame")),
             [device, viewport, callback, frameIndex, width, height, shouldResize,
                 renderScene = Move(renderScene), drawLists = Move(drawLists),
-                rendererType]() mutable -> void {
+                shadowDrawLists = Move(shadowDrawLists), rendererType]() mutable -> void {
                 if (!device)
                     return;
 
@@ -643,8 +663,8 @@ namespace AltinaEngine::Launch {
                     }
 
                     if (!renderScene.Views.IsEmpty()) {
-                        SendSceneRenderingRequest(
-                            *device, viewport.Get(), renderScene, drawLists, rendererType);
+                        SendSceneRenderingRequest(*device, viewport.Get(), renderScene, drawLists,
+                            shadowDrawLists, rendererType);
                     }
 
                     if (callback) {

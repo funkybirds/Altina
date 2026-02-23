@@ -2,5 +2,9 @@
     "Graphics":{
         "PreferredApis":["DX11","Vulkan"],
         "DebugMode":true
+    },
+    "GameClient":{
+        "ResolutionX":1280,
+        "ResolutionY":720
     }
 }

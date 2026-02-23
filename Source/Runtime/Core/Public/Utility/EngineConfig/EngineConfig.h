@@ -29,6 +29,13 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
         void               Clear() noexcept;
 
         [[nodiscard]] auto GetBool(FStringView path) const noexcept -> bool;
+        [[nodiscard]] auto GetString(FStringView path) const -> FString;
+        [[nodiscard]] auto GetInt32(FStringView path) const noexcept -> i32;
+        [[nodiscard]] auto GetInt64(FStringView path) const noexcept -> i64;
+        [[nodiscard]] auto GetFloat32(FStringView path) const noexcept -> f32;
+        [[nodiscard]] auto GetFloat64(FStringView path) const noexcept -> f64;
+        [[nodiscard]] auto GetUint32(FStringView path) const noexcept -> u32;
+        [[nodiscard]] auto GetUint64(FStringView path) const noexcept -> u64;
         [[nodiscard]] auto GetStringArray(FStringView path) const -> TVector<FString>;
 
     private:

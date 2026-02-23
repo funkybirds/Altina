@@ -27,6 +27,7 @@
 #endif
 
 #include <type_traits>
+#include <fstream>
 
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
@@ -239,6 +240,35 @@ namespace AltinaEngine::Rhi {
         }
         LogInfo(TEXT("RHI(D3D11): Initializing (DebugLayer={}, GPUValidation={})."),
             desc.mEnableDebugLayer, desc.mEnableGpuValidation);
+
+        // GUI demos often have no console; emit a temp file stamp so we can verify the backend
+        // runs.
+        {
+            char        buffer[512] = {};
+            const DWORD written     = ::GetTempPathA(static_cast<DWORD>(sizeof(buffer)), buffer);
+            std::string path;
+            if (written > 0 && written < sizeof(buffer)) {
+                path.assign(buffer, buffer + written);
+            }
+            if (path.empty()) {
+                path = ".\\";
+            }
+            if (!path.empty()) {
+                const char last = path.back();
+                if (last != '\\' && last != '/') {
+                    path.push_back('\\');
+                }
+            }
+            path.append("AltinaEngine.rhi_d3d11_init.log");
+
+            std::ofstream file(path.c_str(), std::ios::out | std::ios::app);
+            if (file.good()) {
+                file << "InitializeBackend DebugLayer="
+                     << (desc.mEnableDebugLayer ? "true" : "false")
+                     << " GPUValidation=" << (desc.mEnableGpuValidation ? "true" : "false") << "\n";
+                file.flush();
+            }
+        }
 
         const bool ok = CreateFactory(*mState, desc);
         if (!ok) {

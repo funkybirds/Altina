@@ -8,7 +8,7 @@ public sealed class DemoScript : ScriptComponent
     private float _elapsedSeconds;
     private bool _loggedCreate;
     private bool _loggedFirstTick;
-    private const float MoveSpeed = 12.5f;
+    private const float MoveSpeed = 24.0f;
 
     public override void OnCreate()
     {

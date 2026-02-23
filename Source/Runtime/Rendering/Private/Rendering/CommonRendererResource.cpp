@@ -330,12 +330,16 @@ namespace AltinaEngine::Rendering {
         passDesc.Layout         = BuildMaterialLayout(&vsResult.mReflection, &psResult.mReflection);
         passDesc.State.Depth.mDepthEnable  = true;
         passDesc.State.Depth.mDepthWrite   = true;
-        passDesc.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::LessEqual;
+        passDesc.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::GreaterEqual;
 
         Shader::FShaderRasterState rasterState{};
         if (TryParseRasterState(shaderPath, rasterState)) {
             passDesc.State.ApplyRasterState(rasterState);
         }
+
+        // Renderer default: cull front (can still be overridden by material raster overrides
+        // later).
+        passDesc.State.Raster.mCullMode = Rhi::ERhiRasterCullMode::Front;
 
         templ->SetPassDesc(EMaterialPass::BasePass, Move(passDesc));
         FBasicDeferredRenderer::SetDefaultMaterialTemplate(templ);

@@ -482,6 +482,29 @@ namespace AltinaEngine::Rendering {
             return true;
         }
 
+        auto TryParseRasterStateFromFile(const FPath& shaderPath, Shader::FShaderRasterState& out)
+            -> bool {
+            if (shaderPath.IsEmpty() || !shaderPath.Exists()) {
+                return false;
+            }
+
+            Container::FNativeString source;
+            if (!Core::Platform::ReadFileTextUtf8(shaderPath.GetString(), source)) {
+                return false;
+            }
+
+            ShaderCompiler::FShaderPermutationParseResult parse{};
+            const auto sourceText = Core::Utility::String::FromUtf8(source);
+            if (!ShaderCompiler::ParseShaderPermutationSource(sourceText.ToView(), parse)) {
+                return false;
+            }
+            if (!parse.mHasRasterState) {
+                return false;
+            }
+            out = parse.mRasterState;
+            return true;
+        }
+
         auto ToRhiFormat(const Asset::FTexture2DDesc& desc) -> Rhi::ERhiFormat {
             const bool srgb = desc.SRGB;
             switch (desc.Format) {
@@ -672,6 +695,7 @@ namespace AltinaEngine::Rendering {
                 }
 
                 const auto shaderPath = ResolveShaderPath(presetPath->ToView());
+                hasRasterState        = TryParseRasterStateFromFile(shaderPath, rasterState);
                 const auto vsEntry    = SelectPresetEntry(passType, Shader::EShaderStage::Vertex);
                 const auto psEntry    = SelectPresetEntry(passType, Shader::EShaderStage::Pixel);
                 if (vsEntry.IsEmpty() || psEntry.IsEmpty()) {
@@ -752,7 +776,7 @@ namespace AltinaEngine::Rendering {
                 || passType == RenderCore::EMaterialPass::ShadowPass) {
                 passDesc.State.Depth.mDepthEnable  = true;
                 passDesc.State.Depth.mDepthWrite   = true;
-                passDesc.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::LessEqual;
+                passDesc.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::GreaterEqual;
             }
 
             if (hasRasterState) {

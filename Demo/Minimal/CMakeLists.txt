@@ -42,6 +42,9 @@ set(DemoStagedShaderRoot ${DemoBinaryDir}/Assets/Shader)
 file(GLOB_RECURSE DemoAssetSources CONFIGURE_DEPENDS
     ${DemoAssetsRoot}/*
 )
+file(GLOB_RECURSE EngineShaderSources CONFIGURE_DEPENDS
+    ${EngineShaderRoot}/*
+)
 
 set_target_properties(${TargetName}
     PROPERTIES
@@ -58,10 +61,25 @@ add_custom_command(
         ${DemoBinaryDir}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}/Assets/Config
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${DemoConfigRoot} ${DemoBinaryDir}/Assets/Config
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoStagedShaderRoot}
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${EngineShaderRoot} ${DemoStagedShaderRoot}
     COMMENT "Staging Minimal demo executable"
 )
+
+set(DemoShaderStageStamp ${CMAKE_BINARY_DIR}/Demo/Minimal/StageShaders.stamp)
+add_custom_command(
+    OUTPUT ${DemoShaderStageStamp}
+    COMMAND ${CMAKE_COMMAND} -E rm -rf ${DemoStagedShaderRoot}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoStagedShaderRoot}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${EngineShaderRoot} ${DemoStagedShaderRoot}
+    COMMAND ${CMAKE_COMMAND} -E touch ${DemoShaderStageStamp}
+    DEPENDS ${EngineShaderSources}
+    COMMENT "Staging engine shaders for Minimal demo"
+    VERBATIM
+)
+add_custom_target(AltinaEngineDemoMinimalStageShaders ALL
+    DEPENDS ${DemoShaderStageStamp}
+)
+set_property(TARGET AltinaEngineDemoMinimalStageShaders PROPERTY FOLDER "Demo/Minimal")
+add_dependencies(${TargetName} AltinaEngineDemoMinimalStageShaders)
 
 if(WIN32)
     add_custom_command(

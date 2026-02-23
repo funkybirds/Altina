@@ -174,7 +174,14 @@ namespace AltinaEngine::Rendering {
             outputDesc.mPixelShader    = outputPs.Get();
             outputDesc.mPipelineLayout = resources.OutputPipelineLayout.Get();
             outputDesc.mVertexLayout   = {};
-            resources.OutputPipeline   = device.CreateGraphicsPipeline(outputDesc);
+            outputDesc.mRasterState    = {};
+            outputDesc.mDepthState     = {};
+            outputDesc.mBlendState     = {};
+            // Full-screen triangle in VSComposite is CW in NDC; avoid culling it.
+            outputDesc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+            outputDesc.mDepthState.mDepthEnable = false;
+            outputDesc.mDepthState.mDepthWrite  = false;
+            resources.OutputPipeline            = device.CreateGraphicsPipeline(outputDesc);
 
             return resources.OutputPipeline.Get() != nullptr;
         }
@@ -390,6 +397,9 @@ namespace AltinaEngine::Rendering {
             desc.mPixelShader    = ps.Get();
             desc.mPipelineLayout = pipelineLayout.Get();
             desc.mVertexLayout   = data->VertexLayout;
+            desc.mRasterState    = resolvedPass->State.Raster;
+            desc.mDepthState     = resolvedPass->State.Depth;
+            desc.mBlendState     = resolvedPass->State.Blend;
 
             auto pipeline = data->Device->CreateGraphicsPipeline(desc);
             if (!pipeline) {
@@ -684,10 +694,12 @@ namespace AltinaEngine::Rendering {
                 rtvs[2].mClearColor = kEmissiveClear;
 
                 RenderCore::FRdgDepthStencilBinding depthBinding{};
-                depthBinding.mDSV                      = data.DepthDSV;
-                depthBinding.mDepthLoadOp              = Rhi::ERhiLoadOp::Clear;
-                depthBinding.mDepthStoreOp             = Rhi::ERhiStoreOp::Store;
-                depthBinding.mClearDepthStencil.mDepth = 1.0f;
+                depthBinding.mDSV          = data.DepthDSV;
+                depthBinding.mDepthLoadOp  = Rhi::ERhiLoadOp::Clear;
+                depthBinding.mDepthStoreOp = Rhi::ERhiStoreOp::Store;
+                // Reverse-Z view clears depth to 0.0f (far), non-reversed clears to 1.0f.
+                depthBinding.mClearDepthStencil.mDepth =
+                    (view != nullptr && view->bReverseZ) ? 0.0f : 1.0f;
 
                 builder.SetRenderTargets(rtvs, 3U, &depthBinding);
 

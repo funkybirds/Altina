@@ -6,6 +6,8 @@
 
 struct ID3D11Device;
 struct ID3D11InputLayout;
+struct ID3D11RasterizerState;
+struct ID3D11DepthStencilState;
 
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
@@ -31,6 +33,8 @@ namespace AltinaEngine::Rhi {
         auto operator=(FRhiD3D11GraphicsPipeline&&) -> FRhiD3D11GraphicsPipeline&      = delete;
 
         [[nodiscard]] auto GetInputLayout() const noexcept -> ID3D11InputLayout*;
+        [[nodiscard]] auto GetRasterizerState() const noexcept -> ID3D11RasterizerState*;
+        [[nodiscard]] auto GetDepthStencilState() const noexcept -> ID3D11DepthStencilState*;
         [[nodiscard]] auto GetBindingMappings() const noexcept
             -> const TVector<FD3D11BindingMappingEntry>&;
 

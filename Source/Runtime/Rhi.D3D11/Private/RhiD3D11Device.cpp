@@ -52,6 +52,7 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <fstream>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
@@ -299,7 +300,258 @@ namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
         constexpr TChar kD3D11DebugCategory[] = TEXT("RHI.D3D11.Debug");
 
-        auto            IsComputeStage(EShaderStage stage) noexcept -> bool {
+        auto            ToD3D11FillMode(ERhiRasterFillMode mode) noexcept -> D3D11_FILL_MODE {
+            switch (mode) {
+                case ERhiRasterFillMode::Wireframe:
+                    return D3D11_FILL_WIREFRAME;
+                case ERhiRasterFillMode::Solid:
+                default:
+                    return D3D11_FILL_SOLID;
+            }
+        }
+
+        auto ToD3D11CullMode(ERhiRasterCullMode mode) noexcept -> D3D11_CULL_MODE {
+            switch (mode) {
+                case ERhiRasterCullMode::None:
+                    return D3D11_CULL_NONE;
+                case ERhiRasterCullMode::Front:
+                    return D3D11_CULL_FRONT;
+                case ERhiRasterCullMode::Back:
+                default:
+                    return D3D11_CULL_BACK;
+            }
+        }
+
+        auto ToD3D11FrontCCW(ERhiRasterFrontFace face) noexcept -> BOOL {
+            // D3D11 uses "FrontCounterClockwise": TRUE means CCW winding is front-facing.
+            return (face == ERhiRasterFrontFace::CCW) ? TRUE : FALSE;
+        }
+
+        auto ToD3D11CompareFunc(ERhiCompareOp op) noexcept -> D3D11_COMPARISON_FUNC {
+            switch (op) {
+                case ERhiCompareOp::Never:
+                    return D3D11_COMPARISON_NEVER;
+                case ERhiCompareOp::Less:
+                    return D3D11_COMPARISON_LESS;
+                case ERhiCompareOp::Equal:
+                    return D3D11_COMPARISON_EQUAL;
+                case ERhiCompareOp::LessEqual:
+                    return D3D11_COMPARISON_LESS_EQUAL;
+                case ERhiCompareOp::Greater:
+                    return D3D11_COMPARISON_GREATER;
+                case ERhiCompareOp::NotEqual:
+                    return D3D11_COMPARISON_NOT_EQUAL;
+                case ERhiCompareOp::GreaterEqual:
+                    return D3D11_COMPARISON_GREATER_EQUAL;
+                case ERhiCompareOp::Always:
+                default:
+                    return D3D11_COMPARISON_ALWAYS;
+            }
+        }
+
+        auto GetRasterLogPathA() -> const char* {
+            static std::string sPath;
+            if (!sPath.empty()) {
+                return sPath.c_str();
+            }
+
+            // Always log to the temp directory so GUI builds without a console still capture it.
+            char        buffer[512] = {};
+            const DWORD written     = ::GetTempPathA(static_cast<DWORD>(sizeof(buffer)), buffer);
+            if (written == 0 || written >= sizeof(buffer)) {
+                sPath = "AltinaEngine.rhi_d3d11_raster.log";
+                return sPath.c_str();
+            }
+
+            sPath.assign(buffer, buffer + written);
+            if (!sPath.empty()) {
+                const char last = sPath.back();
+                if (last != '\\' && last != '/') {
+                    sPath.push_back('\\');
+                }
+            }
+            sPath.append("AltinaEngine.rhi_d3d11_raster.log");
+            return sPath.c_str();
+        }
+
+        auto ToTextA(D3D11_CULL_MODE mode) noexcept -> const char* {
+            switch (mode) {
+                case D3D11_CULL_NONE:
+                    return "None";
+                case D3D11_CULL_FRONT:
+                    return "Front";
+                case D3D11_CULL_BACK:
+                    return "Back";
+                default:
+                    return "Unknown";
+            }
+        }
+
+        auto ToTextA(D3D11_FILL_MODE mode) noexcept -> const char* {
+            switch (mode) {
+                case D3D11_FILL_WIREFRAME:
+                    return "Wireframe";
+                case D3D11_FILL_SOLID:
+                    return "Solid";
+                default:
+                    return "Unknown";
+            }
+        }
+
+        auto ToTextA(D3D11_COMPARISON_FUNC func) noexcept -> const char* {
+            switch (func) {
+                case D3D11_COMPARISON_NEVER:
+                    return "Never";
+                case D3D11_COMPARISON_LESS:
+                    return "Less";
+                case D3D11_COMPARISON_EQUAL:
+                    return "Equal";
+                case D3D11_COMPARISON_LESS_EQUAL:
+                    return "LessEqual";
+                case D3D11_COMPARISON_GREATER:
+                    return "Greater";
+                case D3D11_COMPARISON_NOT_EQUAL:
+                    return "NotEqual";
+                case D3D11_COMPARISON_GREATER_EQUAL:
+                    return "GreaterEqual";
+                case D3D11_COMPARISON_ALWAYS:
+                default:
+                    return "Always";
+            }
+        }
+
+        auto ToText(D3D11_CULL_MODE mode) noexcept -> const TChar* {
+            switch (mode) {
+                case D3D11_CULL_NONE:
+                    return TEXT("None");
+                case D3D11_CULL_FRONT:
+                    return TEXT("Front");
+                case D3D11_CULL_BACK:
+                    return TEXT("Back");
+                default:
+                    return TEXT("Unknown");
+            }
+        }
+
+        auto ToText(D3D11_FILL_MODE mode) noexcept -> const TChar* {
+            switch (mode) {
+                case D3D11_FILL_WIREFRAME:
+                    return TEXT("Wireframe");
+                case D3D11_FILL_SOLID:
+                    return TEXT("Solid");
+                default:
+                    return TEXT("Unknown");
+            }
+        }
+
+        void LogCurrentRasterizerState(
+            ID3D11DeviceContext* context, const TChar* where, Container::FStringView pipelineName) {
+            if (!context) {
+                return;
+            }
+
+            static std::atomic<u32>       sRasterLogCount{ 0U };
+            const u32                     logIndex = sRasterLogCount.fetch_add(1U);
+
+            ComPtr<ID3D11RasterizerState> state;
+            context->RSGetState(&state);
+            if (!state) {
+                LogInfoCat(kD3D11DebugCategory,
+                    TEXT("{}: RS state is null (D3D11 default). Pipeline='{}'."),
+                    (where != nullptr) ? where : TEXT("RHI"), pipelineName);
+
+                if (logIndex < 256U) {
+                    std::ofstream file(GetRasterLogPathA(), std::ios::out | std::ios::app);
+                    if (file.good()) {
+                        file << "[RS=null] Pipeline='";
+                        for (usize i = 0U; i < pipelineName.Length(); ++i) {
+                            const auto ch = pipelineName[i];
+                            file << ((static_cast<u32>(ch) <= 0x7fU) ? static_cast<char>(ch) : '?');
+                        }
+                        file << "'\n";
+                        file.flush();
+                    }
+                }
+                return;
+            }
+
+            D3D11_RASTERIZER_DESC desc{};
+            state->GetDesc(&desc);
+            LogInfoCat(kD3D11DebugCategory,
+                TEXT(
+                    "{}: RasterizerState Pipeline='{}' Fill={} Cull={} FrontCCW={} DepthClip={} DepthBias={} SlopeBias={} BiasClamp={}"),
+                (where != nullptr) ? where : TEXT("RHI"), pipelineName, ToText(desc.FillMode),
+                ToText(desc.CullMode), desc.FrontCounterClockwise != FALSE,
+                desc.DepthClipEnable != FALSE, desc.DepthBias, desc.SlopeScaledDepthBias,
+                desc.DepthBiasClamp);
+
+            if (logIndex < 256U) {
+                std::ofstream file(GetRasterLogPathA(), std::ios::out | std::ios::app);
+                if (file.good()) {
+                    file << "[RasterizerState] Pipeline='";
+                    for (usize i = 0U; i < pipelineName.Length(); ++i) {
+                        const auto ch = pipelineName[i];
+                        file << ((static_cast<u32>(ch) <= 0x7fU) ? static_cast<char>(ch) : '?');
+                    }
+                    file << "' Fill=" << ToTextA(desc.FillMode)
+                         << " Cull=" << ToTextA(desc.CullMode) << " FrontCCW="
+                         << ((desc.FrontCounterClockwise != FALSE) ? "true" : "false")
+                         << " DepthClip=" << ((desc.DepthClipEnable != FALSE) ? "true" : "false")
+                         << " DepthBias=" << desc.DepthBias
+                         << " SlopeBias=" << desc.SlopeScaledDepthBias
+                         << " BiasClamp=" << desc.DepthBiasClamp << "\n";
+                    file.flush();
+                }
+            }
+        }
+
+        void LogCurrentDepthStencilState(
+            ID3D11DeviceContext* context, Container::FStringView pipelineName) {
+            if (!context) {
+                return;
+            }
+
+            static std::atomic<u32> sDepthLogCount{ 0U };
+            const u32               logIndex = sDepthLogCount.fetch_add(1U);
+            if (logIndex >= 256U) {
+                return;
+            }
+
+            ComPtr<ID3D11DepthStencilState> state;
+            UINT                            stencilRef = 0U;
+            context->OMGetDepthStencilState(&state, &stencilRef);
+
+            if (!state) {
+                std::ofstream file(GetRasterLogPathA(), std::ios::out | std::ios::app);
+                if (file.good()) {
+                    file << "[DepthStencilState] Pipeline='";
+                    for (usize i = 0U; i < pipelineName.Length(); ++i) {
+                        const auto ch = pipelineName[i];
+                        file << ((static_cast<u32>(ch) <= 0x7fU) ? static_cast<char>(ch) : '?');
+                    }
+                    file << "' State=null\n";
+                }
+                return;
+            }
+
+            D3D11_DEPTH_STENCIL_DESC desc{};
+            state->GetDesc(&desc);
+
+            std::ofstream file(GetRasterLogPathA(), std::ios::out | std::ios::app);
+            if (file.good()) {
+                file << "[DepthStencilState] Pipeline='";
+                for (usize i = 0U; i < pipelineName.Length(); ++i) {
+                    const auto ch = pipelineName[i];
+                    file << ((static_cast<u32>(ch) <= 0x7fU) ? static_cast<char>(ch) : '?');
+                }
+                file << "' Enable=" << ((desc.DepthEnable != FALSE) ? "true" : "false") << " Write="
+                     << ((desc.DepthWriteMask == D3D11_DEPTH_WRITE_MASK_ALL) ? "all" : "zero")
+                     << " Func=" << ToTextA(desc.DepthFunc) << " StencilRef=" << stencilRef << "\n";
+                file.flush();
+            }
+        }
+
+        auto IsComputeStage(EShaderStage stage) noexcept -> bool {
             return stage == EShaderStage::Compute;
         }
 
@@ -511,8 +763,62 @@ namespace AltinaEngine::Rhi {
 
     void FRhiD3D11CommandContext::RHISetGraphicsPipeline(FRhiPipeline* pipeline) {
 #if AE_PLATFORM_WIN
+        // Stamp a file so we can verify this path runs even in GUI builds (no console).
+        {
+            static std::atomic<u32> sHitCount{ 0U };
+            const u32               hit = sHitCount.fetch_add(1U);
+            if (hit < 16U) {
+                char        buffer[512] = {};
+                const DWORD written = ::GetTempPathA(static_cast<DWORD>(sizeof(buffer)), buffer);
+                std::string path;
+                if (written > 0 && written < sizeof(buffer)) {
+                    path.assign(buffer, buffer + written);
+                }
+                if (path.empty()) {
+                    path = ".\\";
+                }
+                if (!path.empty()) {
+                    const char last = path.back();
+                    if (last != '\\' && last != '/') {
+                        path.push_back('\\');
+                    }
+                }
+                path.append("AltinaEngine.rhi_d3d11_hits.log");
+                std::ofstream file(path.c_str(), std::ios::out | std::ios::app);
+                if (file.good()) {
+                    file << "RHISetGraphicsPipeline hit=" << hit
+                         << " isPipeline=" << ((pipeline != nullptr) ? "true" : "false") << "\n";
+                    file.flush();
+                }
+            }
+        }
+
         ID3D11DeviceContext* context = GetDeferredContext();
         if (!context || !mState) {
+            // Record why we didn't reach state logging.
+            char        buffer[512] = {};
+            const DWORD written     = ::GetTempPathA(static_cast<DWORD>(sizeof(buffer)), buffer);
+            std::string path;
+            if (written > 0 && written < sizeof(buffer)) {
+                path.assign(buffer, buffer + written);
+            }
+            if (path.empty()) {
+                path = ".\\";
+            }
+            if (!path.empty()) {
+                const char last = path.back();
+                if (last != '\\' && last != '/') {
+                    path.push_back('\\');
+                }
+            }
+            path.append("AltinaEngine.rhi_d3d11_hits.log");
+            std::ofstream file(path.c_str(), std::ios::out | std::ios::app);
+            if (file.good()) {
+                file << "RHISetGraphicsPipeline early_return"
+                     << " context=" << ((context != nullptr) ? "true" : "false")
+                     << " mState=" << ((mState != nullptr) ? "true" : "false") << "\n";
+                file.flush();
+            }
             return;
         }
 
@@ -563,6 +869,20 @@ namespace AltinaEngine::Rhi {
         context->GSSetShader(geometryShader, nullptr, 0);
         context->HSSetShader(hullShader, nullptr, 0);
         context->DSSetShader(domainShader, nullptr, 0);
+
+        // Fixed-function state
+        if (graphicsPipeline != nullptr) {
+            context->RSSetState(graphicsPipeline->GetRasterizerState());
+            context->OMSetDepthStencilState(graphicsPipeline->GetDepthStencilState(), 0U);
+        } else {
+            context->RSSetState(nullptr);
+            context->OMSetDepthStencilState(nullptr, 0U);
+        }
+
+        LogCurrentRasterizerState(context, TEXT("After RHISetGraphicsPipeline"),
+            pipeline ? pipeline->GetDebugName() : Container::FStringView{});
+        LogCurrentDepthStencilState(
+            context, pipeline ? pipeline->GetDebugName() : Container::FStringView{});
 #else
         (void)pipeline;
 #endif
@@ -1631,7 +1951,9 @@ namespace AltinaEngine::Rhi {
 
 #if AE_PLATFORM_WIN
     struct FRhiD3D11GraphicsPipeline::FState {
-        ComPtr<ID3D11InputLayout> mInputLayout;
+        ComPtr<ID3D11InputLayout>       mInputLayout;
+        ComPtr<ID3D11RasterizerState>   mRasterizerState;
+        ComPtr<ID3D11DepthStencilState> mDepthStencilState;
     };
 #else
     struct FRhiD3D11GraphicsPipeline::FState {};
@@ -1650,6 +1972,37 @@ namespace AltinaEngine::Rhi {
         mState = new FState{};
         if (mState) {
             mState->mInputLayout = BuildInputLayout(desc, device);
+            if (device != nullptr) {
+                D3D11_RASTERIZER_DESC rs{};
+                rs.FillMode              = ToD3D11FillMode(desc.mRasterState.mFillMode);
+                rs.CullMode              = ToD3D11CullMode(desc.mRasterState.mCullMode);
+                rs.FrontCounterClockwise = ToD3D11FrontCCW(desc.mRasterState.mFrontFace);
+                rs.DepthBias             = desc.mRasterState.mDepthBias;
+                rs.DepthBiasClamp        = desc.mRasterState.mDepthBiasClamp;
+                rs.SlopeScaledDepthBias  = desc.mRasterState.mSlopeScaledDepthBias;
+                rs.DepthClipEnable       = desc.mRasterState.mDepthClip ? TRUE : FALSE;
+                rs.ScissorEnable         = TRUE;
+                rs.MultisampleEnable     = FALSE;
+                rs.AntialiasedLineEnable = FALSE;
+
+                ComPtr<ID3D11RasterizerState> raster;
+                if (SUCCEEDED(device->CreateRasterizerState(&rs, &raster)) && raster) {
+                    mState->mRasterizerState = Move(raster);
+                }
+
+                D3D11_DEPTH_STENCIL_DESC ds{};
+                ds.DepthEnable    = desc.mDepthState.mDepthEnable ? TRUE : FALSE;
+                ds.DepthWriteMask = desc.mDepthState.mDepthWrite ? D3D11_DEPTH_WRITE_MASK_ALL
+                                                                 : D3D11_DEPTH_WRITE_MASK_ZERO;
+                ds.DepthFunc      = ToD3D11CompareFunc(desc.mDepthState.mDepthCompare);
+                ds.StencilEnable  = FALSE;
+
+                ComPtr<ID3D11DepthStencilState> depthStencil;
+                if (SUCCEEDED(device->CreateDepthStencilState(&ds, &depthStencil))
+                    && depthStencil) {
+                    mState->mDepthStencilState = Move(depthStencil);
+                }
+            }
         }
         const FRhiPipelineLayout* layout = desc.mPipelineLayout;
         if (desc.mVertexShader) {
@@ -1688,6 +2041,23 @@ namespace AltinaEngine::Rhi {
     auto FRhiD3D11GraphicsPipeline::GetInputLayout() const noexcept -> ID3D11InputLayout* {
 #if AE_PLATFORM_WIN
         return mState ? mState->mInputLayout.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11GraphicsPipeline::GetRasterizerState() const noexcept -> ID3D11RasterizerState* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mRasterizerState.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11GraphicsPipeline::GetDepthStencilState() const noexcept
+        -> ID3D11DepthStencilState* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mDepthStencilState.Get() : nullptr;
 #else
         return nullptr;
 #endif

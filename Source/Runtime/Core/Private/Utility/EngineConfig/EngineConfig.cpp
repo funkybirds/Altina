@@ -7,7 +7,10 @@
 #include "Utility/String/CodeConvert.h"
 
 #include <cctype>
+#include <cerrno>
+#include <cstdlib>
 #include <cstring>
+#include <limits>
 
 using AltinaEngine::Move;
 using AltinaEngine::Core::Algorithm::ToLowerChar;
@@ -23,6 +26,7 @@ using AltinaEngine::Core::Utility::Json::EJsonType;
 using AltinaEngine::Core::Utility::Json::FindObjectValue;
 using AltinaEngine::Core::Utility::Json::FJsonValue;
 using AltinaEngine::Core::Utility::Json::GetBoolValue;
+using AltinaEngine::Core::Utility::Json::GetNumberValue;
 using AltinaEngine::Core::Utility::Json::GetStringValue;
 using AltinaEngine::Core::Utility::String::FromUtf8;
 
@@ -161,6 +165,80 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
                 return true;
             }
             return false;
+        }
+
+        auto ParseInt64Override(FNativeStringView text, i64& outValue) -> bool {
+            auto trimmed = TrimAsciiWhitespace(text);
+            trimmed      = StripQuotes(trimmed);
+            if (trimmed.Length() == 0) {
+                return false;
+            }
+
+            FNativeString buffer;
+            buffer.Append(trimmed.Data(), trimmed.Length());
+
+            errno          = 0;
+            char*      end = nullptr;
+            const auto value =
+                static_cast<long long>(std::strtoll(buffer.CStr(), &end, 0 /* base */));
+            if (end == buffer.CStr() || end == nullptr || *end != '\0') {
+                return false;
+            }
+            if (errno == ERANGE) {
+                return false;
+            }
+            outValue = static_cast<i64>(value);
+            return true;
+        }
+
+        auto ParseUint64Override(FNativeStringView text, u64& outValue) -> bool {
+            auto trimmed = TrimAsciiWhitespace(text);
+            trimmed      = StripQuotes(trimmed);
+            if (trimmed.Length() == 0) {
+                return false;
+            }
+            if (trimmed[0] == '-') {
+                return false;
+            }
+
+            FNativeString buffer;
+            buffer.Append(trimmed.Data(), trimmed.Length());
+
+            errno          = 0;
+            char*      end = nullptr;
+            const auto value =
+                static_cast<unsigned long long>(std::strtoull(buffer.CStr(), &end, 0 /* base */));
+            if (end == buffer.CStr() || end == nullptr || *end != '\0') {
+                return false;
+            }
+            if (errno == ERANGE) {
+                return false;
+            }
+            outValue = static_cast<u64>(value);
+            return true;
+        }
+
+        auto ParseFloat64Override(FNativeStringView text, f64& outValue) -> bool {
+            auto trimmed = TrimAsciiWhitespace(text);
+            trimmed      = StripQuotes(trimmed);
+            if (trimmed.Length() == 0) {
+                return false;
+            }
+
+            FNativeString buffer;
+            buffer.Append(trimmed.Data(), trimmed.Length());
+
+            errno            = 0;
+            char*      end   = nullptr;
+            const auto value = std::strtod(buffer.CStr(), &end);
+            if (end == buffer.CStr() || end == nullptr || *end != '\0') {
+                return false;
+            }
+            if (errno == ERANGE) {
+                return false;
+            }
+            outValue = static_cast<f64>(value);
+            return true;
         }
 
         auto ParseStringArrayOverride(FNativeStringView text, TVector<FString>& outValues) -> bool {
@@ -391,6 +469,220 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
         const auto* root  = mDocument.GetRoot();
         const auto* value = FindJsonValueByPath(root, path);
         return ReadStringArrayFromJson(value);
+    }
+
+    auto FConfigCollection::GetString(FStringView path) const -> FString {
+        if (const auto* overrideValue = FindOverride(path)) {
+            if (overrideValue->Type == EOverrideType::String) {
+                return overrideValue->StringValue;
+            }
+            if (overrideValue->Type == EOverrideType::StringArray) {
+                if (!overrideValue->StringArrayValue.IsEmpty()) {
+                    return overrideValue->StringArrayValue[0];
+                }
+                return {};
+            }
+            if (overrideValue->Type == EOverrideType::Bool) {
+                return overrideValue->BoolValue ? FString(TEXT("true")) : FString(TEXT("false"));
+            }
+            return {};
+        }
+
+        const auto* root  = mDocument.GetRoot();
+        const auto* value = FindJsonValueByPath(root, path);
+        if (value == nullptr) {
+            return {};
+        }
+
+        FNativeString native;
+        if (GetStringValue(value, native)) {
+            return FromUtf8(native);
+        }
+
+        if (value->Type == EJsonType::Bool) {
+            return value->Bool ? FString(TEXT("true")) : FString(TEXT("false"));
+        }
+        if (value->Type == EJsonType::Number) {
+            return FString::ToString(value->Number);
+        }
+        return {};
+    }
+
+    auto FConfigCollection::GetInt32(FStringView path) const noexcept -> i32 {
+        const auto value = GetInt64(path);
+        if (value < std::numeric_limits<i32>::min() || value > std::numeric_limits<i32>::max()) {
+            return 0;
+        }
+        return static_cast<i32>(value);
+    }
+
+    auto FConfigCollection::GetInt64(FStringView path) const noexcept -> i64 {
+        if (const auto* overrideValue = FindOverride(path)) {
+            if (overrideValue->Type == EOverrideType::Bool) {
+                return overrideValue->BoolValue ? 1 : 0;
+            }
+
+            const auto parseFromString = [&](FStringView text) -> i64 {
+                FNativeString native = ToNativeString(text);
+                i64           out    = 0;
+                if (ParseInt64Override(native.ToView(), out)) {
+                    return out;
+                }
+                return 0;
+            };
+
+            if (overrideValue->Type == EOverrideType::String) {
+                return parseFromString(overrideValue->StringValue.ToView());
+            }
+            if (overrideValue->Type == EOverrideType::StringArray) {
+                if (!overrideValue->StringArrayValue.IsEmpty()) {
+                    return parseFromString(overrideValue->StringArrayValue[0].ToView());
+                }
+                return 0;
+            }
+            return 0;
+        }
+
+        const auto* root  = mDocument.GetRoot();
+        const auto* value = FindJsonValueByPath(root, path);
+        if (value == nullptr) {
+            return 0;
+        }
+
+        double number = 0.0;
+        if (GetNumberValue(value, number)) {
+            if (number < static_cast<double>(std::numeric_limits<i64>::min())
+                || number > static_cast<double>(std::numeric_limits<i64>::max())) {
+                return 0;
+            }
+            return static_cast<i64>(number);
+        }
+
+        if (value->Type == EJsonType::Bool) {
+            return value->Bool ? 1 : 0;
+        }
+        if (value->Type == EJsonType::String) {
+            i64 out = 0;
+            if (ParseInt64Override(value->String.ToView(), out)) {
+                return out;
+            }
+        }
+        return 0;
+    }
+
+    auto FConfigCollection::GetFloat32(FStringView path) const noexcept -> f32 {
+        return static_cast<f32>(GetFloat64(path));
+    }
+
+    auto FConfigCollection::GetFloat64(FStringView path) const noexcept -> f64 {
+        if (const auto* overrideValue = FindOverride(path)) {
+            if (overrideValue->Type == EOverrideType::Bool) {
+                return overrideValue->BoolValue ? 1.0 : 0.0;
+            }
+
+            const auto parseFromString = [&](FStringView text) -> f64 {
+                FNativeString native = ToNativeString(text);
+                f64           out    = 0.0;
+                if (ParseFloat64Override(native.ToView(), out)) {
+                    return out;
+                }
+                return 0.0;
+            };
+
+            if (overrideValue->Type == EOverrideType::String) {
+                return parseFromString(overrideValue->StringValue.ToView());
+            }
+            if (overrideValue->Type == EOverrideType::StringArray) {
+                if (!overrideValue->StringArrayValue.IsEmpty()) {
+                    return parseFromString(overrideValue->StringArrayValue[0].ToView());
+                }
+                return 0.0;
+            }
+            return 0.0;
+        }
+
+        const auto* root  = mDocument.GetRoot();
+        const auto* value = FindJsonValueByPath(root, path);
+        if (value == nullptr) {
+            return 0.0;
+        }
+
+        double number = 0.0;
+        if (GetNumberValue(value, number)) {
+            return static_cast<f64>(number);
+        }
+
+        if (value->Type == EJsonType::Bool) {
+            return value->Bool ? 1.0 : 0.0;
+        }
+        if (value->Type == EJsonType::String) {
+            f64 out = 0.0;
+            if (ParseFloat64Override(value->String.ToView(), out)) {
+                return out;
+            }
+        }
+        return 0.0;
+    }
+
+    auto FConfigCollection::GetUint32(FStringView path) const noexcept -> u32 {
+        const auto value = GetUint64(path);
+        if (value > std::numeric_limits<u32>::max()) {
+            return 0;
+        }
+        return static_cast<u32>(value);
+    }
+
+    auto FConfigCollection::GetUint64(FStringView path) const noexcept -> u64 {
+        if (const auto* overrideValue = FindOverride(path)) {
+            if (overrideValue->Type == EOverrideType::Bool) {
+                return overrideValue->BoolValue ? 1u : 0u;
+            }
+
+            const auto parseFromString = [&](FStringView text) -> u64 {
+                FNativeString native = ToNativeString(text);
+                u64           out    = 0;
+                if (ParseUint64Override(native.ToView(), out)) {
+                    return out;
+                }
+                return 0;
+            };
+
+            if (overrideValue->Type == EOverrideType::String) {
+                return parseFromString(overrideValue->StringValue.ToView());
+            }
+            if (overrideValue->Type == EOverrideType::StringArray) {
+                if (!overrideValue->StringArrayValue.IsEmpty()) {
+                    return parseFromString(overrideValue->StringArrayValue[0].ToView());
+                }
+                return 0;
+            }
+            return 0;
+        }
+
+        const auto* root  = mDocument.GetRoot();
+        const auto* value = FindJsonValueByPath(root, path);
+        if (value == nullptr) {
+            return 0;
+        }
+
+        double number = 0.0;
+        if (GetNumberValue(value, number)) {
+            if (number < 0.0 || number > static_cast<double>(std::numeric_limits<u64>::max())) {
+                return 0;
+            }
+            return static_cast<u64>(number);
+        }
+
+        if (value->Type == EJsonType::Bool) {
+            return value->Bool ? 1u : 0u;
+        }
+        if (value->Type == EJsonType::String) {
+            u64 out = 0;
+            if (ParseUint64Override(value->String.ToView(), out)) {
+                return out;
+            }
+        }
+        return 0;
     }
 
     auto FConfigCollection::FindOverride(FStringView path) const -> const FOverrideValue* {

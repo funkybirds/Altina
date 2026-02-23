@@ -314,6 +314,11 @@ namespace AltinaEngine::Rhi {
         FRhiShader*          mHullShader     = nullptr;
         FRhiShader*          mDomainShader   = nullptr;
         FRhiVertexLayoutDesc mVertexLayout;
+
+        // Fixed-function state. Backends that don't support these yet should at least honor Raster.
+        FRhiRasterStateDesc  mRasterState;
+        FRhiDepthStateDesc   mDepthState;
+        FRhiBlendStateDesc   mBlendState;
     };
 
     struct FRhiComputePipelineDesc {

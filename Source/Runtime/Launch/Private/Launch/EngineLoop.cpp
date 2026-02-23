@@ -19,6 +19,7 @@
 #include "Console/ConsoleVariable.h"
 #include "Logging/Log.h"
 #include "Platform/PlatformFileSystem.h"
+#include "Utility/EngineConfig/EngineConfig.h"
 #include "Utility/Filesystem/Path.h"
 #include "Utility/Filesystem/PathUtils.h"
 #include "Threading/RenderingThread.h"
@@ -342,6 +343,23 @@ namespace AltinaEngine::Launch {
 
         if (mAppMessageHandler) {
             mApplication->RegisterMessageHandler(mAppMessageHandler.Get());
+        }
+
+        // Demo/client window size overrides (if present) must be applied before window creation.
+        {
+            const auto& config = Core::Utility::EngineConfig::GetGlobalConfig();
+            auto        props  = mApplication->GetWindowProperties();
+
+            const u32   resolutionX = config.GetUint32(TEXT("GameClient/ResolutionX"));
+            const u32   resolutionY = config.GetUint32(TEXT("GameClient/ResolutionY"));
+            if (resolutionX > 0U) {
+                props.mWidth = resolutionX;
+            }
+            if (resolutionY > 0U) {
+                props.mHeight = resolutionY;
+            }
+
+            mApplication->SetWindowProperties(props);
         }
 
         mApplication->Initialize();

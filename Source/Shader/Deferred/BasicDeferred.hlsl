@@ -107,5 +107,5 @@ float4 PSComposite(FSQOutput input) : SV_Target0
     const FPbrGBufferData data = DecodePbrGBuffer(gbufferA, gbufferB, gbufferC);
     
     return float4(data.BaseColor, 1.0f);
-    //return float4(EvaluateDeferredPbr(data), 1.0f);
+    //return float4(EvaluateDeferredPbr(data), 1.0f); 2
 }

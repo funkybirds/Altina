@@ -4,7 +4,9 @@
 #include "Asset/AssetRegistry.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/DirectionalLightComponent.h"
+#include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
+#include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
 #include "Engine/GameSceneAsset/ModelAssetInstantiator.h"
 #include "Launch/EngineLoop.h"
@@ -19,6 +21,7 @@
 #include "Platform/Generic/GenericPlatformDecl.h"
 #include "Platform/PlatformFileSystem.h"
 #include "Rendering/BasicDeferredRenderer.h"
+#include "Rendering/PostProcess/PostProcessSettings.h"
 #include "Reflection/JsonSerializer.h"
 #include "Rhi/RhiInit.h"
 #include "Types/Aliases.h"
@@ -36,7 +39,10 @@ namespace {
     class FMinimalGameClient final : public Launch::FGameClient {
     public:
         auto OnInit(Launch::FEngineLoop& engineLoop) -> bool override {
-            auto&      assetManager = engineLoop.GetAssetManager();
+            auto& assetManager = engineLoop.GetAssetManager();
+
+            // Enable FXAA in the Minimal demo so RenderDoc captures show the pass by default.
+            Rendering::rPostProcessFxaa.Set(1);
 
             const auto modelHandle = engineLoop.GetAssetRegistry().FindByPath(
                 TEXT("demo/minimal/models/hoshino/hoshino_battle"));
@@ -87,6 +93,39 @@ namespace {
             }
             if (scriptComponent.IsValid()) {
                 scriptComponent.Get().SetScriptAsset(scriptHandle);
+            }
+
+            // Floor (static mesh + material) at world Y=0. We author the plane in XY (z=0) so the
+            // demo shader's UV mapping (Position.xy) is usable, then rotate it onto XZ.
+            {
+                const auto floorMeshHandle = engineLoop.GetAssetRegistry().FindByPath(
+                    TEXT("demo/minimal/models/floor_plane"));
+                const auto floorMaterialHandle =
+                    engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/materials/floor"));
+
+                if (!floorMeshHandle.IsValid() || !floorMaterialHandle.IsValid()) {
+                    LogWarning(TEXT("Floor assets missing; skipping floor (mesh or material)."));
+                } else {
+                    auto floorObject = world->CreateGameObject(TEXT("Floor"));
+
+                    auto t        = floorObject.GetWorldTransform();
+                    t.Translation = Core::Math::FVector3f(0.0f, 0.0f, 0.0f);
+                    t.Rotation    = Core::Math::FEulerRotator(-Core::Math::kPiF * 0.5f, 0.0f, 0.0f)
+                                     .ToQuaternion();
+                    floorObject.SetWorldTransform(t);
+
+                    auto meshFilter =
+                        floorObject.AddComponent<GameScene::FStaticMeshFilterComponent>();
+                    if (meshFilter.IsValid()) {
+                        meshFilter.Get().SetStaticMeshAsset(floorMeshHandle);
+                    }
+
+                    auto materialComp =
+                        floorObject.AddComponent<GameScene::FMeshMaterialComponent>();
+                    if (materialComp.IsValid()) {
+                        materialComp.Get().SetMaterialTemplate(0, floorMaterialHandle);
+                    }
+                }
             }
 
             // Directional light (main). Used by deferred lighting + CSM (if enabled).

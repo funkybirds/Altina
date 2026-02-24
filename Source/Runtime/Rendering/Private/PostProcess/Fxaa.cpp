@@ -2,6 +2,7 @@
 
 #include "PostProcess/PostProcessResources.h"
 
+#include "Logging/Log.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
 #include "Rhi/Command/RhiCmdContext.h"
 #include "Rhi/RhiBuffer.h"
@@ -13,7 +14,7 @@
 
 namespace AltinaEngine::Rendering::PostProcess::Builtin {
     namespace {
-        using Detail::FPostProcessConstants;
+        using Detail::FFxaaConstants;
 
         void UpdateConstantBuffer(Rhi::FRhiBuffer* buffer, const void* data, u64 sizeBytes) {
             if (buffer == nullptr || data == nullptr || sizeBytes == 0ULL) {
@@ -67,6 +68,12 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
         }
 
         if (!Detail::EnsurePostProcessSharedResources()) {
+            static bool sLoggedOnce = false;
+            if (!sLoggedOnce) {
+                sLoggedOnce = true;
+                LogWarning(TEXT(
+                    "PostProcess.Fxaa skipped: shared resources not ready (shader/pipeline creation failed?)"));
+            }
             return;
         }
 
@@ -134,7 +141,7 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                 const RenderCore::FFrameGraphPassResources& res, const FPassData& data) {
                 auto& shared = Detail::GetPostProcessSharedResources();
                 if (!shared.FxaaPipeline || !shared.Layout || !shared.LinearSampler
-                    || !shared.ConstantsBuffer) {
+                    || !shared.FxaaConstantsBuffer) {
                     return;
                 }
 
@@ -144,11 +151,12 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                     return;
                 }
 
-                FPostProcessConstants constants{};
-                constants.FxaaEdgeThreshold    = data.EdgeThreshold;
-                constants.FxaaEdgeThresholdMin = data.EdgeThresholdMin;
-                constants.FxaaSubpix           = data.Subpix;
-                UpdateConstantBuffer(shared.ConstantsBuffer.Get(), &constants, sizeof(constants));
+                FFxaaConstants constants{};
+                constants.EdgeThreshold    = data.EdgeThreshold;
+                constants.EdgeThresholdMin = data.EdgeThresholdMin;
+                constants.Subpix           = data.Subpix;
+                UpdateConstantBuffer(
+                    shared.FxaaConstantsBuffer.Get(), &constants, sizeof(constants));
 
                 Rhi::FRhiBindGroupDesc groupDesc{};
                 groupDesc.mLayout = shared.Layout.Get();
@@ -157,9 +165,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                 Rhi::FRhiBindGroupEntry cb{};
                 cb.mBinding = 0U;
                 cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                cb.mBuffer  = shared.ConstantsBuffer.Get();
+                cb.mBuffer  = shared.FxaaConstantsBuffer.Get();
                 cb.mOffset  = 0ULL;
-                cb.mSize    = static_cast<u64>(sizeof(FPostProcessConstants));
+                cb.mSize    = static_cast<u64>(sizeof(FFxaaConstants));
                 groupDesc.mEntries.PushBack(cb);
 
                 // t0

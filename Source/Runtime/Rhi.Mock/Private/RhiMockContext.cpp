@@ -424,6 +424,19 @@ namespace AltinaEngine::Rhi {
                 return mCommandList.Get();
             }
 
+            void RHIUpdateDynamicBufferDiscard(
+                FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) override {
+                if (buffer == nullptr || data == nullptr || sizeBytes == 0ULL) {
+                    return;
+                }
+                auto lock = buffer->Lock(offsetBytes, sizeBytes, ERhiBufferLockMode::WriteDiscard);
+                if (!lock.IsValid()) {
+                    return;
+                }
+                Core::Platform::Generic::Memcpy(lock.mData, data, static_cast<usize>(sizeBytes));
+                buffer->Unlock(lock);
+            }
+
             void RHISetGraphicsPipeline(FRhiPipeline* /*pipeline*/) override {}
             void RHISetComputePipeline(FRhiPipeline* /*pipeline*/) override {}
             void RHISetPrimitiveTopology(ERhiPrimitiveTopology /*topology*/) override {}

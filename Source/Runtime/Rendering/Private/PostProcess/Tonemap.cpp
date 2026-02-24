@@ -14,7 +14,7 @@
 
 namespace AltinaEngine::Rendering::PostProcess::Builtin {
     namespace {
-        using Detail::FPostProcessConstants;
+        using Detail::FTonemapConstants;
 
         void UpdateConstantBuffer(Rhi::FRhiBuffer* buffer, const void* data, u64 sizeBytes) {
             if (buffer == nullptr || data == nullptr || sizeBytes == 0ULL) {
@@ -134,7 +134,7 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                 const RenderCore::FFrameGraphPassResources& res, const FPassData& data) {
                 auto& shared = Detail::GetPostProcessSharedResources();
                 if (!shared.TonemapPipeline || !shared.Layout || !shared.LinearSampler
-                    || !shared.ConstantsBuffer) {
+                    || !shared.TonemapConstantsBuffer) {
                     return;
                 }
 
@@ -144,10 +144,11 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                     return;
                 }
 
-                FPostProcessConstants constants{};
+                FTonemapConstants constants{};
                 constants.Exposure = data.Exposure;
                 constants.Gamma    = data.Gamma;
-                UpdateConstantBuffer(shared.ConstantsBuffer.Get(), &constants, sizeof(constants));
+                UpdateConstantBuffer(
+                    shared.TonemapConstantsBuffer.Get(), &constants, sizeof(constants));
 
                 Rhi::FRhiBindGroupDesc groupDesc{};
                 groupDesc.mLayout = shared.Layout.Get();
@@ -156,9 +157,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                 Rhi::FRhiBindGroupEntry cb{};
                 cb.mBinding = 0U;
                 cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                cb.mBuffer  = shared.ConstantsBuffer.Get();
+                cb.mBuffer  = shared.TonemapConstantsBuffer.Get();
                 cb.mOffset  = 0ULL;
-                cb.mSize    = static_cast<u64>(sizeof(FPostProcessConstants));
+                cb.mSize    = static_cast<u64>(sizeof(FTonemapConstants));
                 groupDesc.mEntries.PushBack(cb);
 
                 // t0

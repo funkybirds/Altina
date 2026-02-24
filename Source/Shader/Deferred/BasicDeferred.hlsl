@@ -16,6 +16,8 @@ AE_PER_FRAME_CBUFFER(ViewConstants)
 AE_PER_DRAW_CBUFFER(ObjectConstants)
 {
     row_major float4x4 World;
+    // Inverse-transpose(World) for correct normal transforms under non-uniform scale.
+    row_major float4x4 NormalMatrix;
 };
 
 AE_PER_MATERIAL_CBUFFER(MaterialConstants)
@@ -47,7 +49,7 @@ VSOutput VSBase(VSInput input)
     VSOutput output;
     float4 worldPos = mul(World, float4(input.Position, 1.0f));
     output.Position = mul(ViewProjection, worldPos);
-    output.Normal   = normalize(mul((float3x3)World, input.Normal));
+    output.Normal   = normalize(mul((float3x3)NormalMatrix, input.Normal));
     output.TexCoord = input.TexCoord;
     return output;
 }

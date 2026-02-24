@@ -11,6 +11,12 @@ namespace AltinaEngine::Rhi {
         IRhiCmdContextOps();
         virtual ~IRhiCmdContextOps();
 
+        // Update a dynamic buffer (typically constant buffers) during command recording.
+        // Backends must ensure this update targets the same underlying command context that will
+        // execute subsequent draw/dispatch calls (e.g. D3D11 deferred contexts).
+        virtual void RHIUpdateDynamicBufferDiscard(
+            FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes = 0ULL) = 0;
+
         virtual void RHISetGraphicsPipeline(FRhiPipeline* pipeline)                 = 0;
         virtual void RHISetComputePipeline(FRhiPipeline* pipeline)                  = 0;
         virtual void RHISetPrimitiveTopology(ERhiPrimitiveTopology topology)        = 0;

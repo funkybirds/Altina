@@ -462,7 +462,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
                 const auto* fieldBinding = FindObjectValue(*field, "binding");
 
-                u32 offsetBytes = 0U;
+                u32         offsetBytes = 0U;
                 if (!GetLayoutOffsetBytes(fieldBinding, offsetBytes)) {
                     const auto* offsetValue = FindObjectValue(*field, "offset");
                     if (!GetLayoutOffsetBytes(offsetValue, offsetBytes)) {
@@ -708,8 +708,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                             }
 
                             if (cbInfo.mMembers.IsEmpty()) {
-                                ParseSlangTypeFieldsFromTypeObject(
-                                    typeObj, FString{}, 0U, cbInfo);
+                                ParseSlangTypeFieldsFromTypeObject(typeObj, FString{}, 0U, cbInfo);
                             }
                         }
                         if (cbInfo.mSizeBytes == 0U && !cbInfo.mMembers.IsEmpty()) {
@@ -950,6 +949,13 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
         AddArg(args, TEXT("-target"));
         args.PushBack(FString(GetTargetForBackend(request.mOptions.mTargetBackend)));
+
+        // Slang defaults to column-major matrix layout when invoked via `slangc` (legacy behavior).
+        // The engine uploads matrices from host code in row-major order (e.g.
+        // Core::Math::FMatrix4x4f is stored as rows), so force a consistent packing to avoid
+        // implicit transposes at the shader/host boundary (notably for matrix arrays like `float4x4
+        // M[4]`).
+        AddArg(args, TEXT("-matrix-layout-row-major"));
 
         if (!request.mOptions.mTargetProfile.IsEmptyString()) {
             AddArg(args, TEXT("-profile"));

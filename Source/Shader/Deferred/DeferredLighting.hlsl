@@ -29,7 +29,15 @@ AE_PER_FRAME_CBUFFER(DeferredView)
     float3   DirLightColor;
     uint     CSMCascadeCount;
 
-    row_major float4x4 CSM_LightViewProj[4];
+    // NOTE:
+    // Avoid matrix arrays here.
+    // Slang -> DXBC has shown inconsistent handling of `row_major` on `float4x4[4]` (matrix arrays),
+    // effectively transposing the uploaded CPU matrices in shaders.
+    // Using 4 explicit matrices avoids needing a shader-side `transpose()` workaround.
+    row_major float4x4 CSM_LightViewProj0;
+    row_major float4x4 CSM_LightViewProj1;
+    row_major float4x4 CSM_LightViewProj2;
+    row_major float4x4 CSM_LightViewProj3;
     float4   CSM_SplitsVS[4]; // x=near, y=far
 
     float2   RenderTargetSize;
@@ -106,32 +114,39 @@ float CompareShadowDepth(float receiverDepth, float storedDepth)
     return (receiverDepth <= storedDepth) ? 1.0f : 0.0f;
 }
 
+float4x4 GetCSMLightViewProj(uint cascadeIndex)
+{
+    // Branching here is fine (runs once per pixel) and avoids matrix-array layout pitfalls.
+    if (cascadeIndex == 0) return CSM_LightViewProj0;
+    if (cascadeIndex == 1) return CSM_LightViewProj1;
+    if (cascadeIndex == 2) return CSM_LightViewProj2;
+    return CSM_LightViewProj3;
+}
+
 float SampleShadowPCF(uint cascadeIndex, float3 positionWS)
 {
     if (CSMCascadeCount == 0 || cascadeIndex >= CSMCascadeCount)
     {
         return 1.0f;
     }
-
-    const float4 shadowPos = mul(CSM_LightViewProj[cascadeIndex], float4(positionWS, 1.0f));
-    const float2 uv = shadowPos.xy / max(shadowPos.w, 1e-6f) * 0.5f + 0.5f;
+    
+    const float4 shadowPos = mul(GetCSMLightViewProj(cascadeIndex), float4(positionWS, 1.0f));
+    float2 uv = shadowPos.xy / max(shadowPos.w, 1e-6f) * 0.5f + 0.5f;
+    uv.y = 1.0f - uv.y;
     float depth = shadowPos.z / max(shadowPos.w, 1e-6f);
+
+    float val = ShadowMap.Sample(LinearSampler, float3(uv, cascadeIndex)).r;
 
     // Receiver bias in NDC depth.
     if (bReverseZ != 0)
     {
-        depth -= ShadowBias;
+        depth += ShadowBias;
     }
     else
     {
-        depth += ShadowBias;
+        depth -= ShadowBias;
     }
 
-    // Outside the atlas slice -> treat as lit.
-    if (any(uv < 0.0f) || any(uv > 1.0f))
-    {
-        return 1.0f;
-    }
 
     const float2 texel = ShadowMapInvSize;
     float sum = 0.0f;
@@ -173,17 +188,18 @@ float4 PSDeferredLighting(FSQOutput input) : SV_Target0
 {
     const float2 uv = input.UV;
 
-    const float4 gbufferA = GBufferA.Sample(LinearSampler, uv);
-    const float4 gbufferB = GBufferB.Sample(LinearSampler, uv);
-    const float4 gbufferC = GBufferC.Sample(LinearSampler, uv);
-    const FPbrGBufferData data = DecodePbrGBuffer(gbufferA, gbufferB, gbufferC);
-
     const float depth = SceneDepth.Sample(LinearSampler, uv).r;
     // Reverse-Z clears depth to 0 (far). Treat that as background.
     if (depth <= 1e-6f)
     {
         return float4(0.0f, 0.0f, 0.0f, 1.0f);
     }
+
+    const float4 gbufferA = GBufferA.Sample(LinearSampler, uv);
+
+    const float4 gbufferB = GBufferB.Sample(LinearSampler, uv);
+    const float4 gbufferC = GBufferC.Sample(LinearSampler, uv);
+    const FPbrGBufferData data = DecodePbrGBuffer(gbufferA, gbufferB, gbufferC);
 
     const float3 positionWS = ReconstructWorldPosition(uv, depth);
     const float4 positionVS4 = mul(View, float4(positionWS, 1.0f));
@@ -200,7 +216,6 @@ float4 PSDeferredLighting(FSQOutput input) : SV_Target0
     const float shadow = SampleShadowPCF(cascadeIndex, positionWS);
 
     float3 color = data.Emissive;
-
     // Simple ambient term.
     color += data.BaseColor * 0.02f;
 

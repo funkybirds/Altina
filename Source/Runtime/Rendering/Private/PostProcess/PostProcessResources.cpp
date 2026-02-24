@@ -27,32 +27,102 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         using ShaderCompiler::FShaderCompileResult;
         using ShaderCompiler::GetShaderCompiler;
 
-        constexpr FStringView kPostProcessShaderAssetsRelPath =
+        constexpr FStringView kPostProcessShaderAssetsRelDir = TEXT("Assets/Shader/PostProcess");
+        constexpr FStringView kPostProcessShaderRelDir       = TEXT("Shader/PostProcess");
+        constexpr FStringView kPostProcessShaderSourceRelDir = TEXT("Source/Shader/PostProcess");
+
+        // Legacy monolithic file (fallback only).
+        constexpr FStringView kPostProcessLegacyShaderAssetsRelPath =
             TEXT("Assets/Shader/PostProcess/PostProcess.hlsl");
-        constexpr FStringView kPostProcessShaderRelPath =
+        constexpr FStringView kPostProcessLegacyShaderRelPath =
             TEXT("Shader/PostProcess/PostProcess.hlsl");
-        constexpr FStringView kPostProcessShaderSourceRelPath =
+        constexpr FStringView kPostProcessLegacyShaderSourceRelPath =
             TEXT("Source/Shader/PostProcess/PostProcess.hlsl");
 
-        auto FindBuiltinPostProcessShaderPath() -> FPath {
+        [[nodiscard]] auto DirHasPostProcessShaders(const FPath& dir) -> bool {
+            if (dir.IsEmpty() || !dir.Exists()) {
+                return false;
+            }
+            // Use VS file as the probe; the other files live next to it.
+            const auto probe = dir / TEXT("FullscreenTriangle.hlsl");
+            return probe.Exists();
+        }
+
+        auto FindBuiltinPostProcessShaderDir() -> FPath {
             const FPath exeDir(Core::Platform::GetExecutableDir());
             if (!exeDir.IsEmpty()) {
-                const auto candidateAssets = exeDir / kPostProcessShaderAssetsRelPath;
+                const auto candidateAssetsDir = exeDir / kPostProcessShaderAssetsRelDir;
+                if (DirHasPostProcessShaders(candidateAssetsDir)) {
+                    return candidateAssetsDir;
+                }
+                const auto candidateLegacyDir = exeDir / kPostProcessShaderRelDir;
+                if (DirHasPostProcessShaders(candidateLegacyDir)) {
+                    return candidateLegacyDir;
+                }
+
+                const auto exeParent = exeDir.ParentPath();
+                if (!exeParent.IsEmpty() && exeParent != exeDir) {
+                    const auto parentAssetsDir = exeParent / kPostProcessShaderAssetsRelDir;
+                    if (DirHasPostProcessShaders(parentAssetsDir)) {
+                        return parentAssetsDir;
+                    }
+                    const auto parentLegacyDir = exeParent / kPostProcessShaderRelDir;
+                    if (DirHasPostProcessShaders(parentLegacyDir)) {
+                        return parentLegacyDir;
+                    }
+                }
+            }
+
+            const auto cwd = Core::Utility::Filesystem::GetCurrentWorkingDir();
+            if (!cwd.IsEmpty()) {
+                const auto candidateSourceDir = cwd / kPostProcessShaderSourceRelDir;
+                if (DirHasPostProcessShaders(candidateSourceDir)) {
+                    return candidateSourceDir;
+                }
+                const auto candidateAssetsDir = cwd / kPostProcessShaderAssetsRelDir;
+                if (DirHasPostProcessShaders(candidateAssetsDir)) {
+                    return candidateAssetsDir;
+                }
+                const auto candidateLegacyDir = cwd / kPostProcessShaderRelDir;
+                if (DirHasPostProcessShaders(candidateLegacyDir)) {
+                    return candidateLegacyDir;
+                }
+            }
+
+            FPath probe = cwd;
+            for (u32 i = 0U; i < 6U && !probe.IsEmpty(); ++i) {
+                const auto candidate = probe / kPostProcessShaderSourceRelDir;
+                if (DirHasPostProcessShaders(candidate)) {
+                    return candidate;
+                }
+                const auto parent = probe.ParentPath();
+                if (parent == probe) {
+                    break;
+                }
+                probe = parent;
+            }
+            return {};
+        }
+
+        auto FindLegacyBuiltinPostProcessShaderPath() -> FPath {
+            const FPath exeDir(Core::Platform::GetExecutableDir());
+            if (!exeDir.IsEmpty()) {
+                const auto candidateAssets = exeDir / kPostProcessLegacyShaderAssetsRelPath;
                 if (candidateAssets.Exists()) {
                     return candidateAssets;
                 }
-                const auto candidateLegacy = exeDir / kPostProcessShaderRelPath;
+                const auto candidateLegacy = exeDir / kPostProcessLegacyShaderRelPath;
                 if (candidateLegacy.Exists()) {
                     return candidateLegacy;
                 }
 
                 const auto exeParent = exeDir.ParentPath();
                 if (!exeParent.IsEmpty() && exeParent != exeDir) {
-                    const auto parentAssets = exeParent / kPostProcessShaderAssetsRelPath;
+                    const auto parentAssets = exeParent / kPostProcessLegacyShaderAssetsRelPath;
                     if (parentAssets.Exists()) {
                         return parentAssets;
                     }
-                    const auto parentLegacy = exeParent / kPostProcessShaderRelPath;
+                    const auto parentLegacy = exeParent / kPostProcessLegacyShaderRelPath;
                     if (parentLegacy.Exists()) {
                         return parentLegacy;
                     }
@@ -61,15 +131,15 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
 
             const auto cwd = Core::Utility::Filesystem::GetCurrentWorkingDir();
             if (!cwd.IsEmpty()) {
-                const auto candidateSource = cwd / kPostProcessShaderSourceRelPath;
+                const auto candidateSource = cwd / kPostProcessLegacyShaderSourceRelPath;
                 if (candidateSource.Exists()) {
                     return candidateSource;
                 }
-                const auto candidateAssets = cwd / kPostProcessShaderAssetsRelPath;
+                const auto candidateAssets = cwd / kPostProcessLegacyShaderAssetsRelPath;
                 if (candidateAssets.Exists()) {
                     return candidateAssets;
                 }
-                const auto candidateLegacy = cwd / kPostProcessShaderRelPath;
+                const auto candidateLegacy = cwd / kPostProcessLegacyShaderRelPath;
                 if (candidateLegacy.Exists()) {
                     return candidateLegacy;
                 }
@@ -77,7 +147,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
 
             FPath probe = cwd;
             for (u32 i = 0U; i < 6U && !probe.IsEmpty(); ++i) {
-                const auto candidate = probe / kPostProcessShaderSourceRelPath;
+                const auto candidate = probe / kPostProcessLegacyShaderSourceRelPath;
                 if (candidate.Exists()) {
                     return candidate;
                 }
@@ -91,7 +161,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         }
 
         auto BuildIncludeDir(const FPath& shaderPath) -> FPath {
-            // <...>/Source/Shader/PostProcess/PostProcess.hlsl -> include root is <...>/Source
+            // <...>/Source/Shader/PostProcess/*.hlsl -> include root is <...>/Source
             auto includeDir = shaderPath.ParentPath().ParentPath().ParentPath();
             if (!includeDir.IsEmpty()) {
                 return includeDir;
@@ -118,9 +188,13 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 request.mSource.mIncludeDirs.PushBack(includeDir.GetString());
             }
 
-            request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
-            request.mOptions.mOptimization  = EShaderOptimization::Default;
-            request.mOptions.mDebugInfo     = false;
+            // Compile for the currently active RHI backend (so RenderDoc captures via Vulkan/D3D
+            // see the same passes).
+            const auto backend = Rhi::RHIGetBackend();
+            request.mOptions.mTargetBackend =
+                (backend != Rhi::ERhiBackend::Unknown) ? backend : Rhi::ERhiBackend::DirectX11;
+            request.mOptions.mOptimization = EShaderOptimization::Default;
+            request.mOptions.mDebugInfo    = false;
 
             FShaderCompileResult result = GetShaderCompiler().Compile(request);
             if (!result.mSucceeded) {
@@ -251,47 +325,83 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 }
             }
 
-            if (!res.ConstantsBuffer) {
+            auto EnsureCB = [&](Rhi::FRhiBufferRef& out, const TChar* debugName, u64 sizeBytes,
+                                const void* defaults) -> bool {
+                if (out) {
+                    return true;
+                }
                 Rhi::FRhiBufferDesc desc{};
-                desc.mDebugName.Assign(TEXT("PostProcess.Constants"));
-                desc.mSizeBytes     = sizeof(FPostProcessConstants);
-                desc.mUsage         = Rhi::ERhiResourceUsage::Dynamic;
-                desc.mBindFlags     = Rhi::ERhiBufferBindFlags::Constant;
-                desc.mCpuAccess     = Rhi::ERhiCpuAccess::Write;
-                res.ConstantsBuffer = device.CreateBuffer(desc);
-                if (!res.ConstantsBuffer) {
+                desc.mDebugName.Assign(debugName);
+                desc.mSizeBytes = sizeBytes;
+                desc.mUsage     = Rhi::ERhiResourceUsage::Dynamic;
+                desc.mBindFlags = Rhi::ERhiBufferBindFlags::Constant;
+                desc.mCpuAccess = Rhi::ERhiCpuAccess::Write;
+                out             = device.CreateBuffer(desc);
+                if (!out) {
                     LogError(TEXT("Failed to create PostProcess constant buffer."));
                     return false;
                 }
+                UpdateConstantBuffer(out.Get(), defaults, sizeBytes);
+                return true;
+            };
 
-                // Initialize once to sane defaults.
-                FPostProcessConstants defaults{};
-                UpdateConstantBuffer(res.ConstantsBuffer.Get(), &defaults, sizeof(defaults));
+            // Initialize once to sane defaults (per-pass CBs).
+            const FBlitConstants    blitDefaults{};
+            const FTonemapConstants tonemapDefaults{};
+            const FFxaaConstants    fxaaDefaults{};
+            const FBloomConstants   bloomDefaults{};
+
+            if (!EnsureCB(res.BlitConstantsBuffer, TEXT("PostProcess.Constants.Blit"),
+                    sizeof(FBlitConstants), &blitDefaults)
+                || !EnsureCB(res.TonemapConstantsBuffer, TEXT("PostProcess.Constants.Tonemap"),
+                    sizeof(FTonemapConstants), &tonemapDefaults)
+                || !EnsureCB(res.FxaaConstantsBuffer, TEXT("PostProcess.Constants.Fxaa"),
+                    sizeof(FFxaaConstants), &fxaaDefaults)
+                || !EnsureCB(res.BloomConstantsBuffer, TEXT("PostProcess.Constants.Bloom"),
+                    sizeof(FBloomConstants), &bloomDefaults)) {
+                return false;
             }
 
             return true;
         }
 
         auto EnsurePipelines(Rhi::FRhiDevice& device, FPostProcessSharedResources& res) -> bool {
-            if (!res.FullscreenVS || !res.BlitPS || !res.TonemapPS || !res.FxaaPS) {
-                const auto shaderPath = FindBuiltinPostProcessShaderPath();
-                if (shaderPath.IsEmpty() || !shaderPath.Exists()) {
-                    LogError(TEXT("PostProcess shader not found. Expected '{}' or '{}' or '{}'"),
-                        kPostProcessShaderAssetsRelPath, kPostProcessShaderRelPath,
-                        kPostProcessShaderSourceRelPath);
-                    return false;
-                }
+            if (!res.FullscreenVS || !res.BlitPS || !res.TonemapPS || !res.FxaaPS
+                || !res.BloomPrefilterPS || !res.BloomDownsamplePS || !res.BloomUpsamplePS
+                || !res.BloomApplyPS) {
+                const auto shaderDir = FindBuiltinPostProcessShaderDir();
+                if (!shaderDir.IsEmpty()) {
+                    const auto vsPath      = shaderDir / TEXT("FullscreenTriangle.hlsl");
+                    const auto blitPath    = shaderDir / TEXT("Blit.hlsl");
+                    const auto tonemapPath = shaderDir / TEXT("Tonemap.hlsl");
+                    const auto fxaaPath    = shaderDir / TEXT("Fxaa.hlsl");
+                    const auto bloomPath   = shaderDir / TEXT("Bloom.hlsl");
 
-                LogInfo(TEXT("PostProcess shader path: '{}'"), shaderPath.GetString().ToView());
+                    LogInfo(TEXT("PostProcess shader dir: '{}'"), shaderDir.GetString().ToView());
 
-                if (!CompileShaderFromFile(shaderPath, TEXT("VSFullScreenTriangle"),
-                        Shader::EShaderStage::Vertex, res.FullscreenVS)
-                    || !CompileShaderFromFile(
-                        shaderPath, TEXT("PSBlit"), Shader::EShaderStage::Pixel, res.BlitPS)
-                    || !CompileShaderFromFile(
-                        shaderPath, TEXT("PSTonemap"), Shader::EShaderStage::Pixel, res.TonemapPS)
-                    || !CompileShaderFromFile(
-                        shaderPath, TEXT("PSFxaa"), Shader::EShaderStage::Pixel, res.FxaaPS)) {
+                    if (!CompileShaderFromFile(vsPath, TEXT("VSFullScreenTriangle"),
+                            Shader::EShaderStage::Vertex, res.FullscreenVS)
+                        || !CompileShaderFromFile(
+                            blitPath, TEXT("PSBlit"), Shader::EShaderStage::Pixel, res.BlitPS)
+                        || !CompileShaderFromFile(tonemapPath, TEXT("PSTonemap"),
+                            Shader::EShaderStage::Pixel, res.TonemapPS)
+                        || !CompileShaderFromFile(
+                            fxaaPath, TEXT("PSFxaa"), Shader::EShaderStage::Pixel, res.FxaaPS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomPrefilter"),
+                            Shader::EShaderStage::Pixel, res.BloomPrefilterPS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomDownsample"),
+                            Shader::EShaderStage::Pixel, res.BloomDownsamplePS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomUpsample"),
+                            Shader::EShaderStage::Pixel, res.BloomUpsamplePS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomApply"),
+                            Shader::EShaderStage::Pixel, res.BloomApplyPS)) {
+                        return false;
+                    }
+                } else {
+                    LogError(
+                        TEXT("PostProcess shaders not found. Expected dir '{}' or '{}' or '{}'"),
+                        kPostProcessShaderAssetsRelDir, kPostProcessShaderRelDir,
+                        kPostProcessShaderSourceRelDir);
                     return false;
                 }
             }
@@ -352,6 +462,100 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 res.FxaaPipeline              = device.CreateGraphicsPipeline(desc);
                 if (!res.FxaaPipeline) {
                     LogError(TEXT("Failed to create PostProcess fxaa pipeline."));
+                    return false;
+                }
+            }
+
+            if (!res.BloomPrefilterPipeline) {
+                Rhi::FRhiGraphicsPipelineDesc desc{};
+                desc.mDebugName.Assign(TEXT("PostProcess.BloomPrefilterPipeline"));
+                desc.mVertexShader            = res.FullscreenVS.Get();
+                desc.mPixelShader             = res.BloomPrefilterPS.Get();
+                desc.mPipelineLayout          = res.PipelineLayout.Get();
+                desc.mVertexLayout            = {};
+                desc.mRasterState             = {};
+                desc.mDepthState              = {};
+                desc.mBlendState              = {};
+                desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+                desc.mDepthState.mDepthEnable = false;
+                desc.mDepthState.mDepthWrite  = false;
+                res.BloomPrefilterPipeline    = device.CreateGraphicsPipeline(desc);
+                if (!res.BloomPrefilterPipeline) {
+                    LogError(TEXT("Failed to create PostProcess bloom prefilter pipeline."));
+                    return false;
+                }
+            }
+
+            if (!res.BloomDownsamplePipeline) {
+                Rhi::FRhiGraphicsPipelineDesc desc{};
+                desc.mDebugName.Assign(TEXT("PostProcess.BloomDownsamplePipeline"));
+                desc.mVertexShader            = res.FullscreenVS.Get();
+                desc.mPixelShader             = res.BloomDownsamplePS.Get();
+                desc.mPipelineLayout          = res.PipelineLayout.Get();
+                desc.mVertexLayout            = {};
+                desc.mRasterState             = {};
+                desc.mDepthState              = {};
+                desc.mBlendState              = {};
+                desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+                desc.mDepthState.mDepthEnable = false;
+                desc.mDepthState.mDepthWrite  = false;
+                res.BloomDownsamplePipeline   = device.CreateGraphicsPipeline(desc);
+                if (!res.BloomDownsamplePipeline) {
+                    LogError(TEXT("Failed to create PostProcess bloom downsample pipeline."));
+                    return false;
+                }
+            }
+
+            if (!res.BloomUpsampleAddPipeline) {
+                Rhi::FRhiGraphicsPipelineDesc desc{};
+                desc.mDebugName.Assign(TEXT("PostProcess.BloomUpsampleAddPipeline"));
+                desc.mVertexShader            = res.FullscreenVS.Get();
+                desc.mPixelShader             = res.BloomUpsamplePS.Get();
+                desc.mPipelineLayout          = res.PipelineLayout.Get();
+                desc.mVertexLayout            = {};
+                desc.mRasterState             = {};
+                desc.mDepthState              = {};
+                desc.mBlendState              = {};
+                desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+                desc.mDepthState.mDepthEnable = false;
+                desc.mDepthState.mDepthWrite  = false;
+                desc.mBlendState.mBlendEnable = true;
+                desc.mBlendState.mSrcColor    = Rhi::ERhiBlendFactor::One;
+                desc.mBlendState.mDstColor    = Rhi::ERhiBlendFactor::One;
+                desc.mBlendState.mColorOp     = Rhi::ERhiBlendOp::Add;
+                desc.mBlendState.mSrcAlpha    = Rhi::ERhiBlendFactor::One;
+                desc.mBlendState.mDstAlpha    = Rhi::ERhiBlendFactor::One;
+                desc.mBlendState.mAlphaOp     = Rhi::ERhiBlendOp::Add;
+                res.BloomUpsampleAddPipeline  = device.CreateGraphicsPipeline(desc);
+                if (!res.BloomUpsampleAddPipeline) {
+                    LogError(TEXT("Failed to create PostProcess bloom upsample pipeline."));
+                    return false;
+                }
+            }
+
+            if (!res.BloomApplyAddPipeline) {
+                Rhi::FRhiGraphicsPipelineDesc desc{};
+                desc.mDebugName.Assign(TEXT("PostProcess.BloomApplyAddPipeline"));
+                desc.mVertexShader            = res.FullscreenVS.Get();
+                desc.mPixelShader             = res.BloomApplyPS.Get();
+                desc.mPipelineLayout          = res.PipelineLayout.Get();
+                desc.mVertexLayout            = {};
+                desc.mRasterState             = {};
+                desc.mDepthState              = {};
+                desc.mBlendState              = {};
+                desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+                desc.mDepthState.mDepthEnable = false;
+                desc.mDepthState.mDepthWrite  = false;
+                desc.mBlendState.mBlendEnable = true;
+                desc.mBlendState.mSrcColor    = Rhi::ERhiBlendFactor::One;
+                desc.mBlendState.mDstColor    = Rhi::ERhiBlendFactor::One;
+                desc.mBlendState.mColorOp     = Rhi::ERhiBlendOp::Add;
+                desc.mBlendState.mSrcAlpha    = Rhi::ERhiBlendFactor::One;
+                desc.mBlendState.mDstAlpha    = Rhi::ERhiBlendFactor::One;
+                desc.mBlendState.mAlphaOp     = Rhi::ERhiBlendOp::Add;
+                res.BloomApplyAddPipeline     = device.CreateGraphicsPipeline(desc);
+                if (!res.BloomApplyAddPipeline) {
+                    LogError(TEXT("Failed to create PostProcess bloom apply pipeline."));
                     return false;
                 }
             }

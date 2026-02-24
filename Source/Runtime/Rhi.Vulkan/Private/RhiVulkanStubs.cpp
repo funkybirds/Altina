@@ -367,6 +367,19 @@ namespace AltinaEngine::Rhi {
         return VK_NULL_HANDLE;
     }
 
+    void FRhiVulkanCommandContext::RHIUpdateDynamicBufferDiscard(
+        FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) {
+        if (buffer == nullptr || data == nullptr || sizeBytes == 0ULL) {
+            return;
+        }
+        auto lock = buffer->Lock(offsetBytes, sizeBytes, ERhiBufferLockMode::WriteDiscard);
+        if (!lock.IsValid()) {
+            return;
+        }
+        Core::Platform::Generic::Memcpy(lock.mData, data, static_cast<usize>(sizeBytes));
+        buffer->Unlock(lock);
+    }
+
     void FRhiVulkanCommandContext::RHIBeginTransition(const FRhiTransitionCreateInfo& info) {
         (void)info;
     }

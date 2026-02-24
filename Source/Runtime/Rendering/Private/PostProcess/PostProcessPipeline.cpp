@@ -15,6 +15,8 @@
 #include <mutex>
 
 namespace AltinaEngine::Rendering::PostProcess::Builtin {
+    void AddBloom(RenderCore::FFrameGraph& graph, const RenderCore::View::FViewData& view,
+        const FPostProcessNode& node, const FPostProcessBuildContext& ctx, FPostProcessIO& io);
     void AddTonemap(RenderCore::FFrameGraph& graph, const RenderCore::View::FViewData& view,
         const FPostProcessNode& node, const FPostProcessBuildContext& ctx, FPostProcessIO& io);
     void AddFxaa(RenderCore::FFrameGraph& graph, const RenderCore::View::FViewData& view,
@@ -51,8 +53,12 @@ namespace AltinaEngine::Rendering {
             }
 
             // Built-ins.
+            s.Effects[FString(TEXT("Bloom"))]   = FEffectEntry{ &PostProcess::Builtin::AddBloom };
             s.Effects[FString(TEXT("Tonemap"))] = FEffectEntry{ &PostProcess::Builtin::AddTonemap };
             s.Effects[FString(TEXT("Fxaa"))]    = FEffectEntry{ &PostProcess::Builtin::AddFxaa };
+            // Common alias.
+            s.Effects[FString(TEXT("FXAA"))]  = FEffectEntry{ &PostProcess::Builtin::AddFxaa };
+            s.Effects[FString(TEXT("BLOOM"))] = FEffectEntry{ &PostProcess::Builtin::AddBloom };
 
             s.bBuiltinsRegistered = true;
         }
@@ -119,7 +125,7 @@ namespace AltinaEngine::Rendering {
 
                     auto& shared = PostProcess::Detail::GetPostProcessSharedResources();
                     if (!shared.BlitPipeline || !shared.Layout || !shared.LinearSampler
-                        || !shared.ConstantsBuffer) {
+                        || !shared.BlitConstantsBuffer) {
                         return;
                     }
 
@@ -136,9 +142,9 @@ namespace AltinaEngine::Rendering {
                     Rhi::FRhiBindGroupEntry cb{};
                     cb.mBinding = 0U;
                     cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                    cb.mBuffer  = shared.ConstantsBuffer.Get();
+                    cb.mBuffer  = shared.BlitConstantsBuffer.Get();
                     cb.mOffset  = 0ULL;
-                    cb.mSize = static_cast<u64>(sizeof(PostProcess::Detail::FPostProcessConstants));
+                    cb.mSize    = static_cast<u64>(sizeof(PostProcess::Detail::FBlitConstants));
                     groupDesc.mEntries.PushBack(cb);
 
                     Rhi::FRhiBindGroupEntry tex{};

@@ -300,6 +300,65 @@ namespace AltinaEngine::Rhi {
         return mCommandList.Get();
     }
 
+    void FRhiD3D11CommandContext::RHIUpdateDynamicBufferDiscard(
+        FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) {
+#if AE_PLATFORM_WIN
+        if (buffer == nullptr || data == nullptr || sizeBytes == 0ULL) {
+            return;
+        }
+
+        const auto& desc = buffer->GetDesc();
+        if (offsetBytes >= desc.mSizeBytes) {
+            return;
+        }
+        if (sizeBytes > (desc.mSizeBytes - offsetBytes)) {
+            sizeBytes = desc.mSizeBytes - offsetBytes;
+        }
+
+        // This path is primarily intended for dynamic constant buffers (WriteDiscard).
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (context == nullptr) {
+            return;
+        }
+
+        auto*         d3dBuffer    = static_cast<FRhiD3D11Buffer*>(buffer);
+        ID3D11Buffer* nativeBuffer = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
+        if (nativeBuffer == nullptr) {
+            return;
+        }
+
+        // Prefer Map(WRITE_DISCARD) for dynamic CPU-write buffers at offset 0.
+        const bool cpuWrite  = HasAnyFlags(desc.mCpuAccess, ERhiCpuAccess::Write);
+        const bool isDynamic = desc.mUsage == ERhiResourceUsage::Dynamic;
+        if (isDynamic && cpuWrite && offsetBytes == 0ULL) {
+            D3D11_MAPPED_SUBRESOURCE mapped = {};
+            const HRESULT hr = context->Map(nativeBuffer, 0U, D3D11_MAP_WRITE_DISCARD, 0U, &mapped);
+            if (FAILED(hr) || mapped.pData == nullptr) {
+                return;
+            }
+            Core::Platform::Generic::Memcpy(mapped.pData, data, static_cast<usize>(sizeBytes));
+            context->Unmap(nativeBuffer, 0U);
+            return;
+        }
+
+        // Fallback: UpdateSubresource with a byte-range box (works for non-dynamic too).
+        // D3D11 buffers are treated as 1D resources in bytes.
+        D3D11_BOX box = {};
+        box.left      = static_cast<UINT>(offsetBytes);
+        box.right     = static_cast<UINT>(offsetBytes + sizeBytes);
+        box.top       = 0U;
+        box.bottom    = 1U;
+        box.front     = 0U;
+        box.back      = 1U;
+        context->UpdateSubresource(nativeBuffer, 0U, &box, data, 0U, 0U);
+#else
+        (void)buffer;
+        (void)data;
+        (void)sizeBytes;
+        (void)offsetBytes;
+#endif
+    }
+
     namespace {
 #if AE_PLATFORM_WIN
         constexpr TChar kD3D11DebugCategory[] = TEXT("RHI.D3D11.Debug");

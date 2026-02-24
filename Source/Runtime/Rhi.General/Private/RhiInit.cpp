@@ -8,7 +8,9 @@
 namespace AltinaEngine::Rhi {
     namespace {
         TShared<FRhiDevice> gRhiDevice;
-    }
+        FRhiInitDesc        gRhiInitDesc;
+        bool                gHasRhiInitDesc = false;
+    } // namespace
 
     auto RHIInit(FRhiContext& context, const FRhiInitDesc& initDesc,
         const FRhiDeviceDesc& deviceDesc, u32 adapterIndex) -> TShared<FRhiDevice> {
@@ -22,8 +24,14 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        gRhiDevice = device;
+        gRhiDevice      = device;
+        gRhiInitDesc    = initDesc;
+        gHasRhiInitDesc = true;
         return device;
+    }
+
+    auto RHIGetBackend() noexcept -> ERhiBackend {
+        return gHasRhiInitDesc ? gRhiInitDesc.mBackend : ERhiBackend::Unknown;
     }
 
     auto RHIGetDevice() noexcept -> FRhiDevice* { return gRhiDevice.Get(); }
@@ -50,6 +58,7 @@ namespace AltinaEngine::Rhi {
 
     void RHIExit(FRhiContext& context) noexcept {
         gRhiDevice.Reset();
+        gHasRhiInitDesc = false;
         context.Shutdown();
     }
 } // namespace AltinaEngine::Rhi

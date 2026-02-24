@@ -28,6 +28,8 @@
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiTexture.h"
 
+#include "Math/LinAlg/Common.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -65,7 +67,12 @@ namespace AltinaEngine::Rendering {
             f32                     DirLightColor[3]       = { 1.0f, 1.0f, 1.0f };
             u32                     CSMCascadeCount        = 0U;
 
-            Core::Math::FMatrix4x4f CSM_LightViewProj[RenderCore::Shadow::kMaxCascades]{};
+            // Keep these as explicit members (not an array). See DeferredLighting.hlsl:
+            // Slang -> DXBC can mishandle row_major on matrix arrays, causing implicit transposes.
+            Core::Math::FMatrix4x4f CSM_LightViewProj0{};
+            Core::Math::FMatrix4x4f CSM_LightViewProj1{};
+            Core::Math::FMatrix4x4f CSM_LightViewProj2{};
+            Core::Math::FMatrix4x4f CSM_LightViewProj3{};
             f32                     CSM_SplitsVS[RenderCore::Shadow::kMaxCascades][4] = {};
 
             f32                     RenderTargetSize[2]    = { 0.0f, 0.0f };
@@ -89,7 +96,37 @@ namespace AltinaEngine::Rendering {
 
         struct FPerDrawConstants {
             Core::Math::FMatrix4x4f World;
+            Core::Math::FMatrix4x4f NormalMatrix;
         };
+
+        [[nodiscard]] auto ComputeNormalMatrix(const Core::Math::FMatrix4x4f& world) noexcept
+            -> Core::Math::FMatrix4x4f {
+            using Core::Math::FMatrix3x3f;
+            using Core::Math::FMatrix4x4f;
+
+            // Normal matrix = transpose(inverse(upper3x3(World))).
+            FMatrix3x3f upper{};
+            for (u32 r = 0U; r < 3U; ++r) {
+                for (u32 c = 0U; c < 3U; ++c) {
+                    upper(r, c) = world(r, c);
+                }
+            }
+
+            const f32         det         = Core::Math::LinAlg::Determinant(upper);
+            const bool        bInvertible = std::abs(det) > 1e-8f;
+
+            const FMatrix3x3f normal3 = bInvertible
+                ? Core::Math::Transpose(Core::Math::LinAlg::Inverse(upper))
+                : Core::Math::LinAlg::Identity<f32, 3U>();
+
+            FMatrix4x4f       normal4 = Core::Math::LinAlg::Identity<f32, 4U>();
+            for (u32 r = 0U; r < 3U; ++r) {
+                for (u32 c = 0U; c < 3U; ++c) {
+                    normal4(r, c) = normal3(r, c);
+                }
+            }
+            return normal4;
+        }
 
         struct FWorldBoundsDebug {
             bool                  bValid        = false;
@@ -688,8 +725,12 @@ namespace AltinaEngine::Rendering {
             }
 
             FPerDrawConstants constants{};
-            constants.World = batch.Instances[0].World;
-            UpdateConstantBuffer(data->PerDrawBuffer, &constants, sizeof(constants));
+            constants.World        = batch.Instances[0].World;
+            constants.NormalMatrix = ComputeNormalMatrix(constants.World);
+            // Update through the command context so D3D11 deferred contexts record the update with
+            // the correct ordering relative to draws.
+            ctx.RHIUpdateDynamicBufferDiscard(
+                data->PerDrawBuffer, &constants, sizeof(constants), 0ULL);
             ctx.RHISetBindGroup(data->PerDrawSetIndex, data->PerDrawGroup, nullptr, 0U);
         }
     } // namespace
@@ -1260,7 +1301,8 @@ namespace AltinaEngine::Rendering {
                         if (perFrameBuffer) {
                             FPerFrameConstants constants{};
                             constants.ViewProjection = lightViewProj;
-                            UpdateConstantBuffer(perFrameBuffer, &constants, sizeof(constants));
+                            ctx.RHIUpdateDynamicBufferDiscard(
+                                perFrameBuffer, &constants, sizeof(constants), 0ULL);
                         }
 
                         Rhi::FRhiViewportRect viewport{};
@@ -1478,14 +1520,20 @@ namespace AltinaEngine::Rendering {
                     constants.ShadowMapInvSize[1] = inv;
                 }
                 for (u32 i = 0U; i < RenderCore::Shadow::kMaxCascades; ++i) {
-                    constants.CSM_LightViewProj[i] = csmData.Cascades[i].LightViewProj;
-                    constants.CSM_SplitsVS[i][0]   = csmData.Cascades[i].SplitVS[0];
-                    constants.CSM_SplitsVS[i][1]   = csmData.Cascades[i].SplitVS[1];
-                    constants.CSM_SplitsVS[i][2]   = 0.0f;
-                    constants.CSM_SplitsVS[i][3]   = 0.0f;
+                    constants.CSM_SplitsVS[i][0] = csmData.Cascades[i].SplitVS[0];
+                    constants.CSM_SplitsVS[i][1] = csmData.Cascades[i].SplitVS[1];
+                    constants.CSM_SplitsVS[i][2] = 0.0f;
+                    constants.CSM_SplitsVS[i][3] = 0.0f;
                 }
+                // Avoid matrix arrays in the shared constant buffer (see FPerFrameConstants comment
+                // above).
+                constants.CSM_LightViewProj0 = csmData.Cascades[0].LightViewProj;
+                constants.CSM_LightViewProj1 = csmData.Cascades[1].LightViewProj;
+                constants.CSM_LightViewProj2 = csmData.Cascades[2].LightViewProj;
+                constants.CSM_LightViewProj3 = csmData.Cascades[3].LightViewProj;
 
-                UpdateConstantBuffer(perFrameBuffer, &constants, sizeof(constants));
+                ctx.RHIUpdateDynamicBufferDiscard(
+                    perFrameBuffer, &constants, sizeof(constants), 0ULL);
 
                 // Bind group (b0 + t0..t4 + s0).
                 Rhi::FRhiBindGroupDesc groupDesc{};
@@ -1572,6 +1620,17 @@ namespace AltinaEngine::Rendering {
                 FPostProcessNode node{};
                 node.EffectId.Assign(TEXT("Bloom"));
                 node.bEnabled = true;
+                // Defaults can be tuned via CVars; can be overridden later via stack params.
+                node.Params[Container::FString(TEXT("Threshold"))] =
+                    FPostProcessParamValue(rPostProcessBloomThreshold.Get());
+                node.Params[Container::FString(TEXT("Knee"))] =
+                    FPostProcessParamValue(rPostProcessBloomKnee.Get());
+                node.Params[Container::FString(TEXT("Intensity"))] =
+                    FPostProcessParamValue(rPostProcessBloomIntensity.Get());
+                node.Params[Container::FString(TEXT("KawaseOffset"))] =
+                    FPostProcessParamValue(rPostProcessBloomKawaseOffset.Get());
+                node.Params[Container::FString(TEXT("Iterations"))] =
+                    FPostProcessParamValue(rPostProcessBloomIterations.Get());
                 pp.Stack.PushBack(Move(node));
             }
 
@@ -1589,6 +1648,13 @@ namespace AltinaEngine::Rendering {
                 FPostProcessNode node{};
                 node.EffectId.Assign(TEXT("Fxaa"));
                 node.bEnabled = true;
+                // Defaults can be tuned via CVars; can be overridden later via stack params.
+                node.Params[Container::FString(TEXT("EdgeThreshold"))] =
+                    FPostProcessParamValue(rPostProcessFxaaEdgeThreshold.Get());
+                node.Params[Container::FString(TEXT("EdgeThresholdMin"))] =
+                    FPostProcessParamValue(rPostProcessFxaaEdgeThresholdMin.Get());
+                node.Params[Container::FString(TEXT("Subpix"))] =
+                    FPostProcessParamValue(rPostProcessFxaaSubpix.Get());
                 pp.Stack.PushBack(Move(node));
             }
 

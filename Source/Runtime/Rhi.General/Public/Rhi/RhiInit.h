@@ -10,6 +10,9 @@ namespace AltinaEngine::Rhi {
         const FRhiDeviceDesc& deviceDesc   = FRhiDeviceDesc{},
         u32                   adapterIndex = kRhiInvalidAdapterIndex) -> TShared<FRhiDevice>;
 
+    // Returns the backend requested at RHIInit(). This is what shader compilation should target.
+    AE_RHI_GENERAL_API auto RHIGetBackend() noexcept -> ERhiBackend;
+
     AE_RHI_GENERAL_API auto RHIGetDevice() noexcept -> FRhiDevice*;
     AE_RHI_GENERAL_API auto RHICreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef;
     AE_RHI_GENERAL_API auto RHICreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef;

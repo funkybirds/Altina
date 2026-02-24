@@ -27,13 +27,16 @@ namespace AltinaEngine::Rhi {
         void               End() override;
         [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override;
 
-        void               RHISetGraphicsPipeline(FRhiPipeline* pipeline) override;
-        void               RHISetComputePipeline(FRhiPipeline* pipeline) override;
-        void               RHISetPrimitiveTopology(ERhiPrimitiveTopology topology) override;
-        void               RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) override;
-        void               RHISetIndexBuffer(const FRhiIndexBufferView& view) override;
-        void               RHISetViewport(const FRhiViewportRect& viewport) override;
-        void               RHISetScissor(const FRhiScissorRect& scissor) override;
+        void               RHIUpdateDynamicBufferDiscard(
+                          FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) override;
+
+        void RHISetGraphicsPipeline(FRhiPipeline* pipeline) override;
+        void RHISetComputePipeline(FRhiPipeline* pipeline) override;
+        void RHISetPrimitiveTopology(ERhiPrimitiveTopology topology) override;
+        void RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) override;
+        void RHISetIndexBuffer(const FRhiIndexBufferView& view) override;
+        void RHISetViewport(const FRhiViewportRect& viewport) override;
+        void RHISetScissor(const FRhiScissorRect& scissor) override;
         void RHISetRenderTargets(u32 colorTargetCount, FRhiTexture* const* colorTargets,
             FRhiTexture* depthTarget) override;
         void RHIBeginRenderPass(const FRhiRenderPassDesc& desc) override;

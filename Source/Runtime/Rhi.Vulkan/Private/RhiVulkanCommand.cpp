@@ -459,6 +459,21 @@ namespace AltinaEngine::Rhi {
         return mCommandList.Get();
     }
 
+    void FRhiVulkanCommandContext::RHIUpdateDynamicBufferDiscard(
+        FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) {
+        // Minimal implementation for now: go through the generic buffer lock API.
+        // This keeps the interface functional for dynamic constant buffer updates.
+        if (buffer == nullptr || data == nullptr || sizeBytes == 0ULL) {
+            return;
+        }
+        auto lock = buffer->Lock(offsetBytes, sizeBytes, ERhiBufferLockMode::WriteDiscard);
+        if (!lock.IsValid()) {
+            return;
+        }
+        Core::Platform::Generic::Memcpy(lock.mData, data, static_cast<usize>(sizeBytes));
+        buffer->Unlock(lock);
+    }
+
     auto FRhiVulkanCommandContext::GetNativeCommandBuffer() const noexcept -> VkCommandBuffer {
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         return mState ? mState->mCmd : VK_NULL_HANDLE;

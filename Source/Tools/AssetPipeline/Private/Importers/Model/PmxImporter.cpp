@@ -13,8 +13,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
         FModelCookResult& outResult, std::string& outError) -> bool {
         Assimp::Importer importer;
         const aiScene*   scene = importer.ReadFile(sourcePath.string(),
-              aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_ImproveCacheLocality
-                  | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_LimitBoneWeights);
+              aiProcess_Triangulate | aiProcess_JoinIdenticalVertices
+                  | aiProcess_ImproveCacheLocality
+                  // Prefer smooth vertex normals when the source mesh doesn't provide them.
+                  | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace
+                  | aiProcess_LimitBoneWeights);
         if (scene == nullptr || scene->mRootNode == nullptr) {
             outError = "Assimp failed to load PMX.";
             return false;

@@ -388,6 +388,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         auto BuildMaterialCookedJson(const std::string&                      name,
             const std::vector<std::pair<std::string, std::string>>&          textureOverrides,
             const std::vector<std::pair<std::string, std::array<float, 4>>>& vectorOverrides,
+            const std::vector<std::pair<std::string, double>>&               scalarOverrides,
             std::string&                                                     outJson) -> bool {
             std::ostringstream stream;
             stream << "{\n";
@@ -406,6 +407,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
                 first = false;
             };
+
+            for (const auto& scalar : scalarOverrides) {
+                emitComma();
+                stream << "        \"" << scalar.first
+                       << "\": { \"Type\": \"float\", \"Value\": " << scalar.second << " }";
+            }
 
             for (const auto& vec : vectorOverrides) {
                 emitComma();
@@ -837,9 +844,17 @@ namespace AltinaEngine::Tools::AssetPipeline {
             resolveTexture(aiTextureType_AMBIENT_OCCLUSION, "OcclusionTex", false);
             resolveTexture(aiTextureType_DISPLACEMENT, "DisplacementTex", false);
 
+            // If the source model doesn't provide a normal map, disable normal mapping so the
+            // renderer falls back to vertex normals (avoids incorrect derivative-based TBN on
+            // albedo-only assets).
+            const bool hasNormalTex = std::any_of(textureOverrides.begin(), textureOverrides.end(),
+                [](const auto& p) { return p.first == "NormalTex"; });
+            std::vector<std::pair<std::string, double>> scalarOverrides;
+            scalarOverrides.push_back({ "NormalMapStrength", hasNormalTex ? 1.0 : 0.0 });
+
             std::string materialJson;
             if (!BuildMaterialCookedJson(
-                    matNameRaw, textureOverrides, vectorOverrides, materialJson)) {
+                    matNameRaw, textureOverrides, vectorOverrides, scalarOverrides, materialJson)) {
                 return false;
             }
 

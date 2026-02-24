@@ -34,8 +34,10 @@ VSOutput VSShadowDepth(VSInput input)
     return output;
 }
 
-float4 PSShadowDepth(VSOutput input) : SV_Target0
+// Keep a pixel shader (some toolchains/backends don't like a "void" PS here), but write depth
+// explicitly so we don't need any color RTV bound.
+float PSShadowDepth(VSOutput input) : SV_Depth
 {
-    //(void)input;
-    return float4(0.0f, 0.0f, 0.0f, 0.0f);
+    // SV_Position is in clip-space; SV_Depth expects post-projection depth in [0,1].
+    return input.Position.z / input.Position.w;
 }

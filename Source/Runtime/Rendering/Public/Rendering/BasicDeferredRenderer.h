@@ -7,6 +7,8 @@
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiRefs.h"
 
+#include <array>
+
 namespace AltinaEngine::Rendering {
     class AE_RENDERING_API FBasicDeferredRenderer final : public IRenderer {
     public:
@@ -21,14 +23,24 @@ namespace AltinaEngine::Rendering {
         [[nodiscard]] static auto RegisterShader(
             const RenderCore::FShaderRegistry::FShaderKey& key, Rhi::FRhiShaderRef shader) -> bool;
 
-        void PrepareForRendering(Rhi::FRhiDevice& device) override;
-        void Render(RenderCore::FFrameGraph& graph) override;
-        void FinalizeRendering() override;
+        // Debug: use Lambert (diffuse-only) shading in PSDeferredLighting instead of PBR.
+        static void SetDeferredLightingDebugLambert(bool bEnabled) noexcept;
+
+        void        PrepareForRendering(Rhi::FRhiDevice& device) override;
+        void        Render(RenderCore::FFrameGraph& graph) override;
+        void        FinalizeRendering() override;
 
     private:
-        Rhi::FRhiBufferRef    mPerFrameBuffer;
-        Rhi::FRhiBindGroupRef mPerFrameGroup;
-        Rhi::FRhiBufferRef    mPerDrawBuffer;
-        Rhi::FRhiBindGroupRef mPerDrawGroup;
+        static constexpr u32                               kShadowCascades = 4U;
+
+        Rhi::FRhiBufferRef                                 mPerFrameBuffer;
+        Rhi::FRhiBindGroupRef                              mPerFrameGroup;
+        Rhi::FRhiBufferRef                                 mPerDrawBuffer;
+        Rhi::FRhiBindGroupRef                              mPerDrawGroup;
+
+        // D3D11 deferred context: updating the same cbuffer multiple times while recording can
+        // make all draws see the "last written" data at Execute time. Use per-cascade cbuffers.
+        std::array<Rhi::FRhiBufferRef, kShadowCascades>    mShadowPerFrameBuffers{};
+        std::array<Rhi::FRhiBindGroupRef, kShadowCascades> mShadowPerFrameGroups{};
     };
 } // namespace AltinaEngine::Rendering

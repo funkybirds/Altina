@@ -881,10 +881,10 @@ namespace AltinaEngine::Rhi {
             context->OMSetDepthStencilState(nullptr, 0U);
         }
 
-        LogCurrentRasterizerState(context, TEXT("After RHISetGraphicsPipeline"),
-            pipeline ? pipeline->GetDebugName() : Container::FStringView{});
-        LogCurrentDepthStencilState(
-            context, pipeline ? pipeline->GetDebugName() : Container::FStringView{});
+        // LogCurrentRasterizerState(context, TEXT("After RHISetGraphicsPipeline"),
+        //     pipeline ? pipeline->GetDebugName() : Container::FStringView{});
+        // LogCurrentDepthStencilState(
+        //     context, pipeline ? pipeline->GetDebugName() : Container::FStringView{});
 #else
         (void)pipeline;
 #endif
@@ -1539,6 +1539,18 @@ namespace AltinaEngine::Rhi {
 
                         const UINT slot = static_cast<UINT>(entry.mBinding);
                         switch (entry.mType) {
+                            case ERhiBindingType::ConstantBuffer:
+                            {
+                                auto*         buffer = static_cast<FRhiD3D11Buffer*>(entry.mBuffer);
+                                ID3D11Buffer* nativeBuffer =
+                                    buffer ? buffer->GetNativeBuffer() : nullptr;
+                                // D3D11 "fallback" binding path: bind by binding index as register
+                                // slot (this matches our auto-binding scheme: b0/b4/b8...).
+                                forEachStage([&](EShaderStage stage) {
+                                    BindConstantBuffer(context, stage, slot, nativeBuffer);
+                                });
+                                break;
+                            }
                             case ERhiBindingType::SampledTexture:
                             {
                                 auto* texture = static_cast<FRhiD3D11Texture*>(entry.mTexture);
@@ -1598,8 +1610,8 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        LogInfo(TEXT("RHI Draw: vtx={} inst={} firstV={} firstI={}"), vertexCount, instanceCount,
-            firstVertex, firstInstance);
+        // LogInfo(TEXT("RHI Draw: vtx={} inst={} firstV={} firstI={}"), vertexCount, instanceCount,
+        //     firstVertex, firstInstance);
 
         if (instanceCount == 1U) {
             context->Draw(vertexCount, firstVertex);
@@ -1622,8 +1634,9 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        LogInfo(TEXT("RHI DrawIndexed: idx={} inst={} firstIdx={} baseV={} firstI={}"), indexCount,
-            instanceCount, firstIndex, vertexOffset, firstInstance);
+        // LogInfo(TEXT("RHI DrawIndexed: idx={} inst={} firstIdx={} baseV={} firstI={}"),
+        // indexCount,
+        //     instanceCount, firstIndex, vertexOffset, firstInstance);
 
         const UINT idxCount      = static_cast<UINT>(indexCount);
         const UINT instCount     = static_cast<UINT>(instanceCount);

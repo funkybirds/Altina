@@ -50,6 +50,19 @@ file(GLOB_RECURSE EngineShaderSources CONFIGURE_DEPENDS
     ${EngineShaderRoot}/*
 )
 
+# Clean demo output folders at the very start of a demo build (ignore if missing).
+# This avoids stale files in Demo/<Name>/Binaries and Demo/<Name>/Shipping.
+set(DemoPreCleanTarget ${TargetName}PreClean)
+add_custom_target(${DemoPreCleanTarget}
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${DemoBinaryDir}"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${DemoShippingDir}"
+    # Ensure the linker has a valid output directory even if other staging steps are up-to-date.
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${DemoBinaryDir}"
+    COMMENT "Cleaning Minimal demo output folders (Binaries/Shipping)"
+    VERBATIM
+)
+set_property(TARGET ${DemoPreCleanTarget} PROPERTY FOLDER "Demo/Minimal")
+
 set_target_properties(${TargetName}
     PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${DemoBinaryDir}

@@ -19,4 +19,6 @@ if [[ "${FORCE_CONFIGURE}" == "1" || ! -d "${BUILD_DIR}" ]]; then
 fi
 
 echo "[CMake] Building AltinaEngineDemoMinimal via preset '${PRESET}'"
+echo "[CMake] Cleaning Demo/Minimal output folders (Binaries/Shipping)"
+cmake --build --preset "${PRESET}" --target AltinaEngineDemoMinimalPreClean
 cmake --build --preset "${PRESET}" --target AltinaEngineDemoMinimal

@@ -2,6 +2,7 @@
 
 #include "Math/LinAlg/Common.h"
 #include "Math/LinAlg/LookAt.h"
+#include "Logging/Log.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -111,6 +112,19 @@ namespace AltinaEngine::RenderCore::Shadow {
 
         const FVector3f dirWS = SafeNormalize(light.DirectionWS);
 
+        static bool     sLoggedOnce = false;
+        if (!sLoggedOnce) {
+            sLoggedOnce = true;
+            LogInfo(TEXT("CSM Build: cascades={} splitLambda={} maxDist={} shadowMapSize={}"),
+                cascadeCount, settings.SplitLambda, settings.MaxDistance, settings.ShadowMapSize);
+            LogInfo(TEXT("CSM Light: dirWS=({}, {}, {}) castShadows={}"), dirWS[0], dirWS[1],
+                dirWS[2], light.bCastShadows ? 1 : 0);
+            LogInfo(
+                TEXT("CSM View: originWS=({}, {}, {}) nearVS={} farVS={} fovY(rad)={} reverseZ={}"),
+                view.ViewOrigin[0], view.ViewOrigin[1], view.ViewOrigin[2], nearVS, farVS,
+                view.Camera.VerticalFovRadians, view.bReverseZ ? 1 : 0);
+        }
+
         for (u32 cascadeIndex = 0U; cascadeIndex < cascadeCount; ++cascadeIndex) {
             const f32 splitNear = outCsm.Cascades[cascadeIndex].SplitVS[0];
             const f32 splitFar  = outCsm.Cascades[cascadeIndex].SplitVS[1];
@@ -205,6 +219,19 @@ namespace AltinaEngine::RenderCore::Shadow {
 
             outCsm.Cascades[cascadeIndex].LightViewProj =
                 Math::MatMul(lightProj, lightViewCentered);
+
+            if (sLoggedOnce) {
+                LogInfo(
+                    TEXT(
+                        "CSM Cascade{}: splitVS=({}, {}) centerWS=({}, {}, {}) eyeWS=({}, {}, {})"),
+                    cascadeIndex, splitNear, splitFar, centerWS[0], centerWS[1], centerWS[2],
+                    eyeWS[0], eyeWS[1], eyeWS[2]);
+                LogInfo(
+                    TEXT(
+                        "CSM Cascade{}: minLS=({}, {}, {}) maxLS=({}, {}, {}) ortho(w={}, h={}, near={}, far={})"),
+                    cascadeIndex, minLS[0], minLS[1], minLS[2], maxLS[0], maxLS[1], maxLS[2], width,
+                    height, nearZ, farZ);
+            }
         }
     }
 } // namespace AltinaEngine::RenderCore::Shadow

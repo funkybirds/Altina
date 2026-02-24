@@ -10,6 +10,12 @@
 
 AE_PER_FRAME_CBUFFER(DeferredView)
 {
+    // IMPORTANT:
+    // This cbuffer is backed by the engine's shared `FPerFrameConstants` which also feeds the
+    // base pass / shadow pass view constants. `ViewProjection` must remain the first member to
+    // keep the layout compatible across shaders.
+    row_major float4x4 ViewProjection;
+
     row_major float4x4 View;
     row_major float4x4 Proj;
     row_major float4x4 ViewProj;
@@ -30,9 +36,11 @@ AE_PER_FRAME_CBUFFER(DeferredView)
     float2   InvRenderTargetSize;
 
     uint     bReverseZ;
+    uint     DebugShadingMode; // 0=PBR, 1=Lambert (debug)
     float    ShadowBias;
-    float2   ShadowMapInvSize;
     float    _pad0;
+    float2   ShadowMapInvSize;
+    float2   _pad1;
 
     struct FPointLight
     {
@@ -178,11 +186,16 @@ float4 PSDeferredLighting(FSQOutput input) : SV_Target0
     }
 
     const float3 positionWS = ReconstructWorldPosition(uv, depth);
-    const float3 V = normalize(ViewOriginWS - positionWS);
+    const float4 positionVS4 = mul(View, float4(positionWS, 1.0f));
+
+    // View vector in world space.
+    float3 V = ViewOriginWS - positionWS;
+    const float vLen2 = dot(V, V);
+    V = (vLen2 > 1e-8f) ? (V * rsqrt(vLen2)) : float3(0.0f, 0.0f, 1.0f);
     const float3 N = normalize(data.Normal);
 
     // Cascade selection uses view-space depth (positive forward).
-    const float viewDepthVS = mul(View, float4(positionWS, 1.0f)).z;
+    const float viewDepthVS = positionVS4.z;
     const uint cascadeIndex = SelectCascade(viewDepthVS);
     const float shadow = SampleShadowPCF(cascadeIndex, positionWS);
 
@@ -193,7 +206,17 @@ float4 PSDeferredLighting(FSQOutput input) : SV_Target0
 
     // Main directional.
     const float3 Ld = normalize(-DirLightDirectionWS);
-    const float3 dirLight = EvaluatePbrDirect(data, N, V, Ld, DirLightColor * DirLightIntensity);
+    float3 dirLight = 0.0f;
+    if (DebugShadingMode != 0)
+    {
+        // Lambert diffuse for debugging material/lighting correctness without PBR inputs.
+        const float NdotL = saturate(dot(N, Ld));
+        dirLight = data.BaseColor * (DirLightColor * DirLightIntensity) * NdotL;
+    }
+    else
+    {
+        dirLight = EvaluatePbrDirect(data, N, V, Ld, DirLightColor * DirLightIntensity);
+    }
     color += dirLight * shadow;
 
     // Points.
@@ -211,7 +234,15 @@ float4 PSDeferredLighting(FSQOutput input) : SV_Target0
         const float3 L = toL / max(dist, 1e-3f);
         const float att = saturate(1.0f - dist / range);
         const float intensity = PointLights[i].Intensity * (att * att);
-        color += EvaluatePbrDirect(data, N, V, L, PointLights[i].Color * intensity);
+        if (DebugShadingMode != 0)
+        {
+            const float NdotL = saturate(dot(N, L));
+            color += data.BaseColor * (PointLights[i].Color * intensity) * NdotL;
+        }
+        else
+        {
+            color += EvaluatePbrDirect(data, N, V, L, PointLights[i].Color * intensity);
+        }
     }
 
     // AO (very simple: darken everything a bit).

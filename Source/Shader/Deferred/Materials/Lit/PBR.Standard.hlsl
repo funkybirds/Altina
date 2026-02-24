@@ -98,6 +98,9 @@ AE_PER_MATERIAL_CBUFFER(MaterialConstants)
     float  Occlusion;
     float3 Emissive;
     float  EmissiveIntensity;
+    // 0 = ignore NormalTex (use vertex normal), 1 = apply normal map.
+    float  NormalMapStrength;
+    float3 _MaterialPadding0;
 };
 
 Texture2D    BaseColorTex : register(t0);
@@ -129,6 +132,7 @@ struct VSOutput
     float4 Position : SV_POSITION;
     float3 Normal   : TEXCOORD0;
     float2 TexCoord : TEXCOORD1;
+    float3 WorldPos : TEXCOORD2;
 };
 
 VSOutput VSBase(VSInput input)
@@ -136,8 +140,11 @@ VSOutput VSBase(VSInput input)
     VSOutput output;
     float4 worldPos = mul(World, float4(input.Position, 1.0f));
     output.Position = mul(ViewProjection, worldPos);
+    // NOTE: This is only strictly correct for uniform scale. For non-uniform scale we'd need
+    // inverse-transpose(World) for the normal matrix.
     output.Normal   = normalize(mul((float3x3)World, input.Normal));
     output.TexCoord = input.TexCoord;
+    output.WorldPos = worldPos.xyz;
     return output;
 }
 
@@ -155,8 +162,31 @@ PSOutput PSBase(VSOutput input)
     float4 baseColorSample = BaseColorTex.Sample(BaseColorTexSampler, input.TexCoord);
     float3 baseColor       = BaseColor.rgb * baseColorSample.rgb;
 
-    float3 normalSample = NormalTex.Sample(NormalTexSampler, input.TexCoord).xyz * 2.0f - 1.0f;
-    float3 normalWorld  = normalize(input.Normal + normalSample);
+    float3 normalWorld = normalize(input.Normal);
+    if (NormalMapStrength > 1e-3f)
+    {
+        // Normal mapping (tangent space) without requiring per-vertex tangents:
+        // build a TBN basis from screen-space derivatives. For a flat normal map (0,0,1), this
+        // produces the original geometric normal.
+        const float3 normalTS = normalize(NormalTex.Sample(NormalTexSampler, input.TexCoord).xyz
+            * 2.0f - 1.0f);
+
+        const float3 dp1  = ddx(input.WorldPos);
+        const float3 dp2  = ddy(input.WorldPos);
+        const float2 duv1 = ddx(input.TexCoord);
+        const float2 duv2 = ddy(input.TexCoord);
+
+        float3 T = dp1 * duv2.y - dp2 * duv1.y;
+        // Avoid NaNs if UVs are degenerate.
+        T = (dot(T, T) > 1e-8f) ? normalize(T) : float3(1.0f, 0.0f, 0.0f);
+        // Orthonormalize tangent to the normal.
+        T = normalize(T - normalWorld * dot(normalWorld, T));
+        float3 B = cross(normalWorld, T);
+
+        const float3 normalMapped =
+            normalize(T * normalTS.x + B * normalTS.y + normalWorld * normalTS.z);
+        normalWorld = normalize(lerp(normalWorld, normalMapped, saturate(NormalMapStrength)));
+    }
 
     float metallic  = saturate(Metallic * MetallicTex.Sample(MetallicTexSampler, input.TexCoord).r);
     float roughness = saturate(Roughness

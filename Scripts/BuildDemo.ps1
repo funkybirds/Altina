@@ -68,6 +68,9 @@ try {
         Invoke-Configure $Preset
     }
 
+    Write-Host "[CMake] Cleaning Demo/Minimal output folders (Binaries/Shipping)"
+    Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoMinimalPreClean")
+
     Write-Host "[CMake] Building AltinaEngineDemoMinimal via preset '$Preset'"
     Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoMinimal")
 }

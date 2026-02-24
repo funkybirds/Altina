@@ -43,19 +43,23 @@ namespace AltinaEngine::Rendering {
 
             u32 formatCount = 0U;
             switch (format) {
-                case Asset::kMeshVertexFormatR32Float: {
+                case Asset::kMeshVertexFormatR32Float:
+                {
                     formatCount = 1U;
                     break;
                 }
-                case Asset::kMeshVertexFormatR32G32Float: {
+                case Asset::kMeshVertexFormatR32G32Float:
+                {
                     formatCount = 2U;
                     break;
                 }
-                case Asset::kMeshVertexFormatR32G32B32Float: {
+                case Asset::kMeshVertexFormatR32G32B32Float:
+                {
                     formatCount = 3U;
                     break;
                 }
-                case Asset::kMeshVertexFormatR32G32B32A32Float: {
+                case Asset::kMeshVertexFormatR32G32B32A32Float:
+                {
                     formatCount = 4U;
                     break;
                 }
@@ -123,8 +127,8 @@ namespace AltinaEngine::Rendering {
             return false;
         }
 
-        const u32 indexStride = RenderCore::Geometry::FStaticMeshLodData::GetIndexStrideBytes(
-            indexType);
+        const u32 indexStride =
+            RenderCore::Geometry::FStaticMeshLodData::GetIndexStrideBytes(indexType);
         const u64 expectedIndexBytes =
             static_cast<u64>(desc.IndexCount) * static_cast<u64>(indexStride);
         if (indexData.Size() < static_cast<usize>(expectedIndexBytes)) {
@@ -149,8 +153,7 @@ namespace AltinaEngine::Rendering {
                 return;
             }
             const u32 sizeBytes = GetFormatSizeBytes(attr.Desc.Format);
-            if (sizeBytes == 0U
-                || (attr.Desc.AlignedOffset + sizeBytes) > desc.VertexStride) {
+            if (sizeBytes == 0U || (attr.Desc.AlignedOffset + sizeBytes) > desc.VertexStride) {
                 attr.Valid = false;
             }
         };
@@ -171,19 +174,27 @@ namespace AltinaEngine::Rendering {
         Core::Container::TVector<Core::Math::FVector3f> positions;
         positions.Reserve(static_cast<usize>(desc.VertexCount));
 
-        const bool hasTangents = tangentAttr.Valid || normalAttr.Valid;
-        Core::Container::TVector<Core::Math::FVector4f> tangents;
-        if (hasTangents) {
-            tangents.Reserve(static_cast<usize>(desc.VertexCount));
+        // NOTE:
+        // Our base-pass vertex shader currently consumes slot1 as `NORMAL` (float3). The runtime
+        // binding uses `lod.TangentBuffer` for slot1, so the xyz of this buffer must contain the
+        // *vertex normal*, not the tangent. Many imported meshes provide tangents, but if we feed
+        // tangents into the NORMAL semantic the shading will look "blocky"/wrong.
+        //
+        // Until we add a dedicated tangent stream + TBN normal mapping, store normals in the
+        // TangentBuffer's xyz and keep w=1.
+        const bool                                      hasNormals = normalAttr.Valid;
+        Core::Container::TVector<Core::Math::FVector4f> packedNormals;
+        if (hasNormals) {
+            packedNormals.Reserve(static_cast<usize>(desc.VertexCount));
         }
 
-        const bool hasUv0 = uv0Attr.Valid;
+        const bool                                      hasUv0 = uv0Attr.Valid;
         Core::Container::TVector<Core::Math::FVector2f> uv0;
         if (hasUv0) {
             uv0.Reserve(static_cast<usize>(desc.VertexCount));
         }
 
-        const bool hasUv1 = uv1Attr.Valid;
+        const bool                                      hasUv1 = uv1Attr.Valid;
         Core::Container::TVector<Core::Math::FVector2f> uv1;
         if (hasUv1) {
             uv1.Reserve(static_cast<usize>(desc.VertexCount));
@@ -202,20 +213,20 @@ namespace AltinaEngine::Rendering {
                 positions.PushBack(Core::Math::FVector3f(values[0], values[1], values[2]));
             }
 
-            if (hasTangents) {
-                const auto& sourceAttr = tangentAttr.Valid ? tangentAttr : normalAttr;
-                f32 values[4]          = { 0.0f, 0.0f, 0.0f, 1.0f };
-                if (!ReadFloats(vertex + sourceAttr.Desc.AlignedOffset, sourceAttr.Desc.Format,
+            if (hasNormals) {
+                f32 values[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+                if (!ReadFloats(vertex + normalAttr.Desc.AlignedOffset, normalAttr.Desc.Format,
                         values, 3U)) {
                     return false;
                 }
-                tangents.PushBack(Core::Math::FVector4f(values[0], values[1], values[2], 1.0f));
+                packedNormals.PushBack(
+                    Core::Math::FVector4f(values[0], values[1], values[2], 1.0f));
             }
 
             if (hasUv0) {
                 f32 values[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                if (!ReadFloats(vertex + uv0Attr.Desc.AlignedOffset, uv0Attr.Desc.Format, values,
-                        2U)) {
+                if (!ReadFloats(
+                        vertex + uv0Attr.Desc.AlignedOffset, uv0Attr.Desc.Format, values, 2U)) {
                     return false;
                 }
                 uv0.PushBack(Core::Math::FVector2f(values[0], values[1]));
@@ -223,8 +234,8 @@ namespace AltinaEngine::Rendering {
 
             if (hasUv1) {
                 f32 values[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                if (!ReadFloats(vertex + uv1Attr.Desc.AlignedOffset, uv1Attr.Desc.Format, values,
-                        2U)) {
+                if (!ReadFloats(
+                        vertex + uv1Attr.Desc.AlignedOffset, uv1Attr.Desc.Format, values, 2U)) {
                     return false;
                 }
                 uv1.PushBack(Core::Math::FVector2f(values[0], values[1]));
@@ -234,8 +245,8 @@ namespace AltinaEngine::Rendering {
         RenderCore::Geometry::FStaticMeshLodData lod{};
         lod.ScreenSize = 1.0f;
         lod.SetPositions(positions.Data(), desc.VertexCount);
-        if (!tangents.IsEmpty()) {
-            lod.SetTangents(tangents.Data(), desc.VertexCount);
+        if (!packedNormals.IsEmpty()) {
+            lod.SetTangents(packedNormals.Data(), desc.VertexCount);
         }
         if (!uv0.IsEmpty()) {
             lod.SetUV0(uv0.Data(), desc.VertexCount);
@@ -247,10 +258,10 @@ namespace AltinaEngine::Rendering {
         lod.SetIndices(indexData.Data(), desc.IndexCount, indexType);
         lod.PrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
 
-        lod.Bounds.Min = Core::Math::FVector3f(
-            desc.BoundsMin[0], desc.BoundsMin[1], desc.BoundsMin[2]);
-        lod.Bounds.Max = Core::Math::FVector3f(
-            desc.BoundsMax[0], desc.BoundsMax[1], desc.BoundsMax[2]);
+        lod.Bounds.Min =
+            Core::Math::FVector3f(desc.BoundsMin[0], desc.BoundsMin[1], desc.BoundsMin[2]);
+        lod.Bounds.Max =
+            Core::Math::FVector3f(desc.BoundsMax[0], desc.BoundsMax[1], desc.BoundsMax[2]);
 
         if (!subMeshes.IsEmpty()) {
             lod.Sections.Reserve(subMeshes.Size());

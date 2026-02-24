@@ -467,14 +467,18 @@ namespace AltinaEngine::Rendering {
 
         // Shadow depth-only pass (Directional CSM).
         RenderCore::FMaterialPassDesc shadowPass{};
-        shadowPass.Shaders.Vertex                     = shadowVsKey;
-        shadowPass.Shaders.Pixel                      = shadowPsKey;
-        shadowPass.State.Depth.mDepthEnable           = true;
-        shadowPass.State.Depth.mDepthWrite            = true;
-        shadowPass.State.Depth.mDepthCompare          = Rhi::ERhiCompareOp::GreaterEqual;
-        shadowPass.State.Raster.mCullMode             = Rhi::ERhiRasterCullMode::Front;
-        shadowPass.State.Raster.mDepthBias            = 1000;
-        shadowPass.State.Raster.mSlopeScaledDepthBias = 2.0f;
+        shadowPass.Shaders.Vertex            = shadowVsKey;
+        shadowPass.Shaders.Pixel             = shadowPsKey;
+        shadowPass.State.Depth.mDepthEnable  = true;
+        shadowPass.State.Depth.mDepthWrite   = true;
+        shadowPass.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::GreaterEqual;
+        // NOTE:
+        // Reverse-Z + D32F depth makes the traditional large positive depth-bias values extremely
+        // aggressive and can effectively flatten the shadow map to the clear value in some
+        // scenes/drivers. Start bias-free for correctness; we can re-introduce tuned bias later.
+        shadowPass.State.Raster.mCullMode             = Rhi::ERhiRasterCullMode::None;
+        shadowPass.State.Raster.mDepthBias            = 0;
+        shadowPass.State.Raster.mSlopeScaledDepthBias = 0.0f;
         templ->SetPassDesc(EMaterialPass::ShadowPass, Move(shadowPass));
 
         FBasicDeferredRenderer::SetDefaultMaterialTemplate(templ);

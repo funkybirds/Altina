@@ -9,6 +9,9 @@
 #include "Shadow/CascadedShadowMapping.h"
 #include "View/ViewData.h"
 
+#include "Rendering/PostProcess/PostProcess.h"
+#include "Rendering/PostProcess/PostProcessSettings.h"
+
 #include "Container/HashMap.h"
 #include "Container/SmartPtr.h"
 #include "Container/Vector.h"
@@ -26,6 +29,8 @@
 #include "Rhi/RhiTexture.h"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rendering {
@@ -36,6 +41,9 @@ namespace AltinaEngine::Rendering {
         using RenderCore::EMaterialPass;
 
         constexpr u32 kMaxPointLights = 16U;
+
+        // 0=PBR, 1=Lambert(debug). Written into the DeferredLighting cbuffer.
+        u32           gDeferredLightingDebugShadingMode = 0U;
 
         // Shared per-frame constants.
         //
@@ -64,9 +72,11 @@ namespace AltinaEngine::Rendering {
             f32                     InvRenderTargetSize[2] = { 0.0f, 0.0f };
 
             u32                     bReverseZ           = 1U;
+            u32                     DebugShadingMode    = 0U; // 0=PBR, 1=Lambert(debug)
             f32                     ShadowBias          = 0.0015f;
-            f32                     ShadowMapInvSize[2] = { 0.0f, 0.0f };
             f32                     _pad0               = 0.0f;
+            f32                     ShadowMapInvSize[2] = { 0.0f, 0.0f };
+            f32                     _pad1[2]            = { 0.0f, 0.0f };
 
             struct FPointLight {
                 f32 PositionWS[3] = { 0.0f, 0.0f, 0.0f };
@@ -80,6 +90,103 @@ namespace AltinaEngine::Rendering {
         struct FPerDrawConstants {
             Core::Math::FMatrix4x4f World;
         };
+
+        struct FWorldBoundsDebug {
+            bool                  bValid        = false;
+            Core::Math::FVector3f MinWS         = Core::Math::FVector3f(0.0f);
+            Core::Math::FVector3f MaxWS         = Core::Math::FVector3f(0.0f);
+            u32                   BatchCount    = 0U;
+            u32                   InstanceCount = 0U;
+        };
+
+        [[nodiscard]] auto TransformAabbToWorld(const Core::Math::FMatrix4x4f& world,
+            const RenderCore::Geometry::FStaticMeshBounds3f&                   localBounds,
+            Core::Math::FVector3f& outMinWS, Core::Math::FVector3f& outMaxWS) -> bool {
+            if (!localBounds.IsValid()) {
+                return false;
+            }
+
+            using Core::Math::FVector3f;
+            using Core::Math::FVector4f;
+
+            const FVector3f& bmin = localBounds.Min;
+            const FVector3f& bmax = localBounds.Max;
+
+            FVector3f        minWS(std::numeric_limits<f32>::max());
+            FVector3f        maxWS(-std::numeric_limits<f32>::max());
+
+            const f32        xs[2] = { bmin[0], bmax[0] };
+            const f32        ys[2] = { bmin[1], bmax[1] };
+            const f32        zs[2] = { bmin[2], bmax[2] };
+
+            for (u32 xi = 0U; xi < 2U; ++xi) {
+                for (u32 yi = 0U; yi < 2U; ++yi) {
+                    for (u32 zi = 0U; zi < 2U; ++zi) {
+                        const auto p4 =
+                            Core::Math::MatMul(world, FVector4f(xs[xi], ys[yi], zs[zi], 1.0f));
+                        const f32 invW = (std::abs(p4[3]) > 1e-6f) ? (1.0f / p4[3]) : 1.0f;
+                        const f32 x    = p4[0] * invW;
+                        const f32 y    = p4[1] * invW;
+                        const f32 z    = p4[2] * invW;
+                        minWS[0]       = std::min(minWS[0], x);
+                        minWS[1]       = std::min(minWS[1], y);
+                        minWS[2]       = std::min(minWS[2], z);
+                        maxWS[0]       = std::max(maxWS[0], x);
+                        maxWS[1]       = std::max(maxWS[1], y);
+                        maxWS[2]       = std::max(maxWS[2], z);
+                    }
+                }
+            }
+
+            outMinWS = minWS;
+            outMaxWS = maxWS;
+            return true;
+        }
+
+        [[nodiscard]] auto ComputeDrawListWorldBounds(const RenderCore::Render::FDrawList& list)
+            -> FWorldBoundsDebug {
+            FWorldBoundsDebug out{};
+            out.BatchCount = static_cast<u32>(list.Batches.Size());
+
+            Core::Math::FVector3f minWS(std::numeric_limits<f32>::max());
+            Core::Math::FVector3f maxWS(-std::numeric_limits<f32>::max());
+
+            for (const auto& batch : list.Batches) {
+                const auto* mesh = batch.Static.Mesh;
+                if (mesh == nullptr) {
+                    continue;
+                }
+                if (batch.Static.LodIndex >= mesh->Lods.Size()) {
+                    continue;
+                }
+
+                const auto& lodBounds = mesh->Lods[batch.Static.LodIndex].Bounds;
+                if (!lodBounds.IsValid()) {
+                    continue;
+                }
+
+                for (const auto& inst : batch.Instances) {
+                    Core::Math::FVector3f instMinWS(0.0f);
+                    Core::Math::FVector3f instMaxWS(0.0f);
+                    if (!TransformAabbToWorld(inst.World, lodBounds, instMinWS, instMaxWS)) {
+                        continue;
+                    }
+
+                    minWS[0] = std::min(minWS[0], instMinWS[0]);
+                    minWS[1] = std::min(minWS[1], instMinWS[1]);
+                    minWS[2] = std::min(minWS[2], instMinWS[2]);
+                    maxWS[0] = std::max(maxWS[0], instMaxWS[0]);
+                    maxWS[1] = std::max(maxWS[1], instMaxWS[1]);
+                    maxWS[2] = std::max(maxWS[2], instMaxWS[2]);
+                    out.InstanceCount += 1U;
+                }
+            }
+
+            out.bValid = (minWS[0] <= maxWS[0]) && (minWS[1] <= maxWS[1]) && (minWS[2] <= maxWS[2]);
+            out.MinWS  = out.bValid ? minWS : Core::Math::FVector3f(0.0f);
+            out.MaxWS  = out.bValid ? maxWS : Core::Math::FVector3f(0.0f);
+            return out;
+        }
 
         struct FDeferredSharedResources {
             RenderCore::FShaderRegistry                       Registry;
@@ -180,6 +287,9 @@ namespace AltinaEngine::Rendering {
                 return lhs.mType < rhs.mType;
             });
 
+            // D3D11 backend does not expose descriptor sets/spaces in reflection in our pipeline;
+            // we treat all resources as set 0 and separate them by register index ranges (b0/b4/b8,
+            // t0/t16/t32, ...). Therefore the "setIndex" must stay 0 here.
             return BuildLayoutHash(outEntries, 0U);
         }
 
@@ -560,9 +670,10 @@ namespace AltinaEngine::Rendering {
         }
 
         struct FBasePassBindingData {
-            Rhi::FRhiBuffer*    PerDrawBuffer   = nullptr;
-            Rhi::FRhiBindGroup* PerDrawGroup    = nullptr;
-            u32                 PerDrawSetIndex = 1U;
+            Rhi::FRhiBuffer*    PerDrawBuffer = nullptr;
+            Rhi::FRhiBindGroup* PerDrawGroup  = nullptr;
+            // D3D11 backend uses a single set index (0) and distinguishes resources by register.
+            u32                 PerDrawSetIndex = 0U;
         };
 
         void BindPerDraw(
@@ -626,6 +737,10 @@ namespace AltinaEngine::Rendering {
         return resources.Registry.RegisterShader(key, Move(shader));
     }
 
+    void FBasicDeferredRenderer::SetDeferredLightingDebugLambert(bool bEnabled) noexcept {
+        gDeferredLightingDebugShadingMode = bEnabled ? 1U : 0U;
+    }
+
     void FBasicDeferredRenderer::PrepareForRendering(Rhi::FRhiDevice& device) {
         auto& resources = GetSharedResources();
         EnsureDefaultTemplate(resources);
@@ -666,6 +781,44 @@ namespace AltinaEngine::Rendering {
             }
 
             mPerFrameGroup = device.CreateBindGroup(groupDesc);
+        }
+
+        // Shadow per-cascade per-frame buffers (avoid "last update wins" on deferred contexts).
+        if (resources.PerFrameLayout) {
+            for (u32 i = 0U; i < kShadowCascades; ++i) {
+                if (!mShadowPerFrameBuffers[i]) {
+                    Rhi::FRhiBufferDesc desc{};
+                    desc.mDebugName.Assign(TEXT("Deferred.Shadow.PerFrame"));
+                    desc.mSizeBytes           = sizeof(FPerFrameConstants);
+                    desc.mUsage               = Rhi::ERhiResourceUsage::Dynamic;
+                    desc.mBindFlags           = Rhi::ERhiBufferBindFlags::Constant;
+                    desc.mCpuAccess           = Rhi::ERhiCpuAccess::Write;
+                    mShadowPerFrameBuffers[i] = device.CreateBuffer(desc);
+                }
+
+                if (!mShadowPerFrameGroups[i] && mShadowPerFrameBuffers[i]) {
+                    Rhi::FRhiBindGroupDesc groupDesc{};
+                    groupDesc.mLayout = resources.PerFrameLayout.Get();
+
+                    Rhi::FRhiBindGroupEntry entry{};
+                    entry.mBinding = 0U;
+                    entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
+                    entry.mBuffer  = mShadowPerFrameBuffers[i].Get();
+                    entry.mOffset  = 0ULL;
+                    entry.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
+                    groupDesc.mEntries.PushBack(entry);
+
+                    if (resources.OutputSampler) {
+                        Rhi::FRhiBindGroupEntry samplerEntry{};
+                        samplerEntry.mBinding = 0U;
+                        samplerEntry.mType    = Rhi::ERhiBindingType::Sampler;
+                        samplerEntry.mSampler = resources.OutputSampler.Get();
+                        groupDesc.mEntries.PushBack(samplerEntry);
+                    }
+
+                    mShadowPerFrameGroups[i] = device.CreateBindGroup(groupDesc);
+                }
+            }
         }
 
         if (!mPerDrawBuffer) {
@@ -715,6 +868,51 @@ namespace AltinaEngine::Rendering {
             FPerFrameConstants constants{};
             constants.ViewProjection = view->Matrices.ViewProj;
             UpdateConstantBuffer(mPerFrameBuffer.Get(), &constants, sizeof(constants));
+        }
+
+        {
+            static bool sLoggedBoundsOnce = false;
+            if (!sLoggedBoundsOnce) {
+                sLoggedBoundsOnce = true;
+
+                if (drawList != nullptr) {
+                    const auto bounds = ComputeDrawListWorldBounds(*drawList);
+                    if (bounds.bValid) {
+                        LogInfo(
+                            TEXT(
+                                "Scene WorldBounds(BasePass): instances={} batches={} min=({}, {}, {}) max=({}, {}, {})"),
+                            bounds.InstanceCount, bounds.BatchCount, bounds.MinWS[0],
+                            bounds.MinWS[1], bounds.MinWS[2], bounds.MaxWS[0], bounds.MaxWS[1],
+                            bounds.MaxWS[2]);
+                    } else {
+                        LogInfo(
+                            TEXT("Scene WorldBounds(BasePass): <invalid> instances={} batches={}"),
+                            bounds.InstanceCount, bounds.BatchCount);
+                    }
+                }
+
+                if (mViewContext.ShadowDrawList != nullptr) {
+                    const auto bounds = ComputeDrawListWorldBounds(*mViewContext.ShadowDrawList);
+                    if (bounds.bValid) {
+                        LogInfo(
+                            TEXT(
+                                "Scene WorldBounds(ShadowPass): instances={} batches={} min=({}, {}, {}) max=({}, {}, {})"),
+                            bounds.InstanceCount, bounds.BatchCount, bounds.MinWS[0],
+                            bounds.MinWS[1], bounds.MinWS[2], bounds.MaxWS[0], bounds.MaxWS[1],
+                            bounds.MaxWS[2]);
+                    } else {
+                        LogInfo(
+                            TEXT(
+                                "Scene WorldBounds(ShadowPass): <invalid> instances={} batches={}"),
+                            bounds.InstanceCount, bounds.BatchCount);
+                    }
+                }
+
+                LogInfo(TEXT("View OriginWS=({}, {}, {}) Near={} Far={} FovY(rad)={} ReverseZ={}"),
+                    view->ViewOrigin[0], view->ViewOrigin[1], view->ViewOrigin[2],
+                    view->Camera.NearPlane, view->Camera.FarPlane, view->Camera.VerticalFovRadians,
+                    view->bReverseZ ? 1 : 0);
+            }
         }
 
         constexpr Rhi::FRhiClearColor     kAlbedoClear{ 0.12f, 0.12f, 0.12f, 1.0f };
@@ -871,7 +1069,7 @@ namespace AltinaEngine::Rendering {
             },
             [drawList, drawBindings, pipelineData, bindingData, viewRect](Rhi::FRhiCmdContext& ctx,
                 const RenderCore::FFrameGraphPassResources&, const FBasePassData&) {
-                LogInfo(TEXT("FG Pass: BasicDeferred.BasePass"));
+                // LogInfo(TEXT("FG Pass: BasicDeferred.BasePass"));
                 Rhi::FRhiViewportRect viewport{};
                 viewport.mX        = static_cast<f32>(viewRect.X);
                 viewport.mY        = static_cast<f32>(viewRect.Y);
@@ -899,8 +1097,10 @@ namespace AltinaEngine::Rendering {
         const auto*                      shadowDrawList = mViewContext.ShadowDrawList;
 
         RenderCore::Shadow::FCSMSettings csmSettings{};
-        csmSettings.CascadeCount  = RenderCore::Shadow::kMaxCascades;
-        csmSettings.MaxDistance   = 100.0f;
+        csmSettings.CascadeCount = RenderCore::Shadow::kMaxCascades;
+        // Keep this reasonably large; too small will clip all casters/receivers out of the
+        // shadow frustum (common in demo scenes).
+        csmSettings.MaxDistance   = 1000.0f;
         csmSettings.ShadowMapSize = 2048U;
         csmSettings.ReceiverBias  = 0.0015f;
 
@@ -909,6 +1109,66 @@ namespace AltinaEngine::Rendering {
             && lights->MainDirectionalLight.bCastShadows && shadowDrawList != nullptr) {
             RenderCore::Shadow::BuildDirectionalCSM(
                 *view, lights->MainDirectionalLight, csmSettings, csmData);
+        }
+
+        // Debug: verify that the scene world AABB is actually inside each cascade's light
+        // clip-space. This helps catch "shadow camera doesn't see the scene" issues quickly.
+        {
+            static bool sLoggedCsmCoverageOnce = false;
+            if (!sLoggedCsmCoverageOnce && csmData.CascadeCount > 0U && shadowDrawList != nullptr) {
+                sLoggedCsmCoverageOnce = true;
+
+                const auto bounds = ComputeDrawListWorldBounds(*shadowDrawList);
+                if (bounds.bValid) {
+                    const Core::Math::FVector3f bmin = bounds.MinWS;
+                    const Core::Math::FVector3f bmax = bounds.MaxWS;
+
+                    Core::Math::FVector4f       cornersWS[8] = {
+                        Core::Math::FVector4f(bmin[0], bmin[1], bmin[2], 1.0f),
+                        Core::Math::FVector4f(bmax[0], bmin[1], bmin[2], 1.0f),
+                        Core::Math::FVector4f(bmax[0], bmax[1], bmin[2], 1.0f),
+                        Core::Math::FVector4f(bmin[0], bmax[1], bmin[2], 1.0f),
+                        Core::Math::FVector4f(bmin[0], bmin[1], bmax[2], 1.0f),
+                        Core::Math::FVector4f(bmax[0], bmin[1], bmax[2], 1.0f),
+                        Core::Math::FVector4f(bmax[0], bmax[1], bmax[2], 1.0f),
+                        Core::Math::FVector4f(bmin[0], bmax[1], bmax[2], 1.0f),
+                    };
+
+                    for (u32 cascade = 0U; cascade < csmData.CascadeCount; ++cascade) {
+                        const auto& m = csmData.Cascades[cascade].LightViewProj;
+
+                        f32         minNdcX = std::numeric_limits<f32>::max();
+                        f32         minNdcY = std::numeric_limits<f32>::max();
+                        f32         minNdcZ = std::numeric_limits<f32>::max();
+                        f32         maxNdcX = -std::numeric_limits<f32>::max();
+                        f32         maxNdcY = -std::numeric_limits<f32>::max();
+                        f32         maxNdcZ = -std::numeric_limits<f32>::max();
+
+                        for (u32 i = 0U; i < 8U; ++i) {
+                            const auto clip = Core::Math::MatMul(m, cornersWS[i]);
+                            const f32  invW = (std::abs(clip[3]) > 1e-6f) ? (1.0f / clip[3]) : 1.0f;
+                            const f32  x    = clip[0] * invW;
+                            const f32  y    = clip[1] * invW;
+                            const f32  z    = clip[2] * invW;
+                            minNdcX         = std::min(minNdcX, x);
+                            minNdcY         = std::min(minNdcY, y);
+                            minNdcZ         = std::min(minNdcZ, z);
+                            maxNdcX         = std::max(maxNdcX, x);
+                            maxNdcY         = std::max(maxNdcY, y);
+                            maxNdcZ         = std::max(maxNdcZ, z);
+                        }
+
+                        // D3D NDC: x/y in [-1,1], z in [0,1].
+                        LogInfo(
+                            TEXT(
+                                "CSM Coverage Cascade{}: sceneAabbNdc x=[{}, {}] y=[{}, {}] z=[{}, {}]"),
+                            cascade, minNdcX, maxNdcX, minNdcY, maxNdcY, minNdcZ, maxNdcZ);
+                    }
+                } else {
+                    LogInfo(TEXT("CSM Coverage: scene bounds invalid (shadowDrawList batches={})"),
+                        bounds.BatchCount);
+                }
+            }
         }
 
         RenderCore::FFrameGraphTextureRef shadowMap;
@@ -986,11 +1246,16 @@ namespace AltinaEngine::Rendering {
                         builder.SetRenderTargets(nullptr, 0U, &ds);
                     },
                     [shadowDrawList, drawBindings, shadowPipelineData, bindingData, shadowSize,
-                        perFrameBuffer = mPerFrameBuffer.Get(),
+                        perFrameBuffer = (cascade < kShadowCascades)
+                            ? mShadowPerFrameBuffers[cascade].Get()
+                            : mPerFrameBuffer.Get(),
+                        perFrameGroup  = (cascade < kShadowCascades)
+                             ? mShadowPerFrameGroups[cascade].Get()
+                             : mPerFrameGroup.Get(),
                         lightViewProj  = csmData.Cascades[cascade].LightViewProj](
                         Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources&,
                         const FShadowPassData&) {
-                        LogInfo(TEXT("FG Pass: BasicDeferred.ShadowCSM"));
+                        // LogInfo(TEXT("FG Pass: BasicDeferred.ShadowCSM"));
 
                         if (perFrameBuffer) {
                             FPerFrameConstants constants{};
@@ -1015,7 +1280,11 @@ namespace AltinaEngine::Rendering {
                         ctx.RHISetScissor(scissor);
 
                         if (shadowDrawList != nullptr) {
-                            FDrawListExecutor::ExecuteBasePass(ctx, *shadowDrawList, drawBindings,
+                            // Use the cascade-specific per-frame group so each pass reads the
+                            // correct ViewProjection even on deferred contexts.
+                            auto bindings     = drawBindings;
+                            bindings.PerFrame = perFrameGroup;
+                            FDrawListExecutor::ExecuteBasePass(ctx, *shadowDrawList, bindings,
                                 ResolveShadowPassPipeline,
                                 const_cast<FBasePassPipelineData*>(&shadowPipelineData),
                                 BindPerDraw, const_cast<FBasePassBindingData*>(&bindingData));
@@ -1024,8 +1293,8 @@ namespace AltinaEngine::Rendering {
             }
         }
 
-        // Deferred lighting (FSQ -> BackBuffer).
         auto outputTexture = graph.ImportTexture(outputTarget, Rhi::ERhiResourceState::Present);
+        RenderCore::FFrameGraphTextureRef sceneColorHDR;
 
         struct FLightingPassData {
             RenderCore::FFrameGraphTextureRef Output;
@@ -1080,7 +1349,20 @@ namespace AltinaEngine::Rendering {
                 data.GBufferB = gbufferB;
                 data.GBufferC = gbufferC;
                 data.Depth    = sceneDepth;
-                data.Output   = builder.Write(outputTexture, Rhi::ERhiResourceState::RenderTarget);
+
+                // Lighting output goes to an internal HDR texture; post-process will write
+                // backbuffer.
+                RenderCore::FFrameGraphTextureDesc hdrDesc{};
+                hdrDesc.mDesc.mDebugName.Assign(TEXT("SceneColorHDR"));
+                hdrDesc.mDesc.mWidth       = width;
+                hdrDesc.mDesc.mHeight      = height;
+                hdrDesc.mDesc.mArrayLayers = 1U;
+                hdrDesc.mDesc.mFormat      = Rhi::ERhiFormat::R16G16B16A16Float;
+                hdrDesc.mDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::RenderTarget
+                    | Rhi::ERhiTextureBindFlags::ShaderResource;
+                sceneColorHDR = builder.CreateTexture(hdrDesc);
+
+                data.Output = builder.Write(sceneColorHDR, Rhi::ERhiResourceState::RenderTarget);
 
                 Rhi::FRhiTextureViewRange viewRange{};
                 viewRange.mMipCount        = 1U;
@@ -1088,8 +1370,8 @@ namespace AltinaEngine::Rendering {
                 viewRange.mDepthSliceCount = 1U;
 
                 Rhi::FRhiRenderTargetViewDesc rtvDesc{};
-                rtvDesc.mDebugName.Assign(TEXT("BackBuffer.RTV"));
-                rtvDesc.mFormat = outputTarget->GetDesc().mFormat;
+                rtvDesc.mDebugName.Assign(TEXT("SceneColorHDR.RTV"));
+                rtvDesc.mFormat = hdrDesc.mDesc.mFormat;
                 rtvDesc.mRange  = viewRange;
                 data.OutputRTV  = builder.CreateRTV(data.Output, rtvDesc);
 
@@ -1097,15 +1379,14 @@ namespace AltinaEngine::Rendering {
                 rtvBinding.mRTV        = data.OutputRTV;
                 rtvBinding.mLoadOp     = Rhi::ERhiLoadOp::Clear;
                 rtvBinding.mStoreOp    = Rhi::ERhiStoreOp::Store;
-                rtvBinding.mClearColor = kAlbedoClear;
+                rtvBinding.mClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 
                 builder.SetRenderTargets(&rtvBinding, 1U, nullptr);
-                builder.SetExternalOutput(data.Output, Rhi::ERhiResourceState::Present);
             },
             [viewRect, view, lights, csmData, csmSettings, perFrameBuffer = mPerFrameBuffer.Get()](
                 Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources& res,
                 const FLightingPassData& data) {
-                LogInfo(TEXT("FG Pass: BasicDeferred.DeferredLighting"));
+                // LogInfo(TEXT("FG Pass: BasicDeferred.DeferredLighting"));
                 auto& shared = GetSharedResources();
                 if (!shared.LightingPipeline || !shared.LightingLayout || !shared.OutputSampler) {
                     return;
@@ -1137,10 +1418,11 @@ namespace AltinaEngine::Rendering {
                 constants.ViewProj       = view->Matrices.ViewProj;
                 constants.InvViewProj    = view->Matrices.InvViewProj;
 
-                constants.ViewOriginWS[0] = view->ViewOrigin[0];
-                constants.ViewOriginWS[1] = view->ViewOrigin[1];
-                constants.ViewOriginWS[2] = view->ViewOrigin[2];
-                constants.bReverseZ       = view->bReverseZ ? 1U : 0U;
+                constants.ViewOriginWS[0]  = view->ViewOrigin[0];
+                constants.ViewOriginWS[1]  = view->ViewOrigin[1];
+                constants.ViewOriginWS[2]  = view->ViewOrigin[2];
+                constants.bReverseZ        = view->bReverseZ ? 1U : 0U;
+                constants.DebugShadingMode = gDeferredLightingDebugShadingMode;
 
                 const f32 w                   = static_cast<f32>(view->RenderTargetExtent.Width);
                 const f32 h                   = static_cast<f32>(view->RenderTargetExtent.Height);
@@ -1280,6 +1562,46 @@ namespace AltinaEngine::Rendering {
                 ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
                 ctx.RHIDraw(3U, 1U, 0U, 0U);
             });
+
+        // Post-process chain (stack + registry) -> Present.
+        {
+            FPostProcessStack pp{};
+            pp.bEnable = (rPostProcessEnable.Get() != 0);
+
+            if (rPostProcessBloom.Get() != 0) {
+                FPostProcessNode node{};
+                node.EffectId.Assign(TEXT("Bloom"));
+                node.bEnabled = true;
+                pp.Stack.PushBack(Move(node));
+            }
+
+            if (rPostProcessTonemap.Get() != 0) {
+                FPostProcessNode node{};
+                node.EffectId.Assign(TEXT("Tonemap"));
+                node.bEnabled = true;
+                // Defaults; user can override via stack params later.
+                node.Params[Container::FString(TEXT("Exposure"))] = FPostProcessParamValue(1.0f);
+                node.Params[Container::FString(TEXT("Gamma"))]    = FPostProcessParamValue(2.2f);
+                pp.Stack.PushBack(Move(node));
+            }
+
+            if (rPostProcessFxaa.Get() != 0) {
+                FPostProcessNode node{};
+                node.EffectId.Assign(TEXT("Fxaa"));
+                node.bEnabled = true;
+                pp.Stack.PushBack(Move(node));
+            }
+
+            FPostProcessIO io{};
+            io.SceneColor = sceneColorHDR;
+            io.Depth      = sceneDepth;
+
+            FPostProcessBuildContext buildCtx{};
+            buildCtx.BackBuffer       = outputTexture;
+            buildCtx.BackBufferFormat = outputTarget->GetDesc().mFormat;
+
+            BuildPostProcess(graph, *view, pp, io, buildCtx);
+        }
     }
 
     void FBasicDeferredRenderer::FinalizeRendering() {}

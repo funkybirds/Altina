@@ -79,6 +79,72 @@ namespace AltinaEngine::RenderCore {
                     return Rhi::ERhiRasterFrontFace::CCW;
             }
         }
+
+        struct FDefaultMaterialFallbacks {
+            bool                bReady = false;
+            Rhi::FRhiSamplerRef Sampler;
+            Rhi::FRhiTextureRef WhiteTex;      // (1,1,1,1)
+            Rhi::FRhiTextureRef BlackTex;      // (0,0,0,1)
+            Rhi::FRhiTextureRef NormalFlatTex; // (0.5,0.5,1,1)
+            Rhi::FRhiTextureRef GrayTex;       // (0.6,0.6,0.6,1)
+        };
+
+        auto EnsureDefaultMaterialFallbacks() -> FDefaultMaterialFallbacks& {
+            static FDefaultMaterialFallbacks s;
+            if (s.bReady) {
+                return s;
+            }
+
+            auto* device = Rhi::RHIGetDevice();
+            if (!device) {
+                return s;
+            }
+
+            // Default sampler (linear). Exact filter/wrap are backend defaults in this engine.
+            if (!s.Sampler) {
+                Rhi::FRhiSamplerDesc desc{};
+                desc.mDebugName.Assign(TEXT("DefaultMaterial.Sampler"));
+                s.Sampler = Rhi::RHICreateSampler(desc);
+            }
+
+            auto create1x1 = [&](const TChar* debugName, u8 r, u8 g, u8 b,
+                                 u8 a) -> Rhi::FRhiTextureRef {
+                Rhi::FRhiTextureDesc desc{};
+                desc.mDebugName.Assign(debugName);
+                desc.mWidth       = 1U;
+                desc.mHeight      = 1U;
+                desc.mMipLevels   = 1U;
+                desc.mArrayLayers = 1U;
+                desc.mSampleCount = 1U;
+                desc.mFormat      = Rhi::ERhiFormat::R8G8B8A8Unorm;
+                desc.mUsage       = Rhi::ERhiResourceUsage::Default;
+                desc.mBindFlags   = Rhi::ERhiTextureBindFlags::ShaderResource;
+                auto tex          = Rhi::RHICreateTexture(desc);
+                if (tex) {
+                    const u8 pixel[4] = { r, g, b, a };
+                    device->UpdateTextureSubresource(tex.Get(), 0U, pixel, 4U, 4U);
+                }
+                return tex;
+            };
+
+            if (!s.WhiteTex) {
+                s.WhiteTex = create1x1(TEXT("DefaultMaterial.White"), 255, 255, 255, 255);
+            }
+            if (!s.BlackTex) {
+                s.BlackTex = create1x1(TEXT("DefaultMaterial.Black"), 0, 0, 0, 255);
+            }
+            if (!s.NormalFlatTex) {
+                // Tangent-space flat normal encoded in [0,1]: (0.5, 0.5, 1.0).
+                s.NormalFlatTex = create1x1(TEXT("DefaultMaterial.NormalFlat"), 128, 128, 255, 255);
+            }
+            if (!s.GrayTex) {
+                // 0.6 * 255 ~= 153.
+                s.GrayTex = create1x1(TEXT("DefaultMaterial.Gray"), 153, 153, 153, 255);
+            }
+
+            s.bReady = true;
+            return s;
+        }
     } // namespace
 
     auto HashMaterialParamName(FStringView name) noexcept -> FMaterialParamId {
@@ -460,6 +526,42 @@ namespace AltinaEngine::RenderCore {
             Memset(mCBufferData.Data(), 0, static_cast<usize>(mCBufferData.Size()));
         }
 
+        // Reasonable defaults for common PBR parameters so "albedo-only" materials are still
+        // visible without requiring every asset to author metallic/roughness/occlusion/emissive.
+        auto writeDefault = [&](const TChar* name, const void* value, u32 valueSize) {
+            const auto  id   = HashMaterialParamName(name);
+            const auto* prop = layout.FindProperty(id);
+            if (!prop) {
+                return;
+            }
+            if (prop->mSize == 0U || prop->mOffset + prop->mSize > mCBufferData.Size()) {
+                return;
+            }
+            const u32 copySize = (valueSize < prop->mSize) ? valueSize : prop->mSize;
+            Memcpy(mCBufferData.Data() + prop->mOffset, value, copySize);
+        };
+
+        {
+            const Math::FVector4f baseColor(1.0f, 1.0f, 1.0f, 1.0f);
+            const f32             metallic  = 0.0f;
+            const f32             roughness = 0.6f;
+            const f32             occlusion = 1.0f;
+            const Math::FVector4f emissive(0.0f, 0.0f, 0.0f, 0.0f);
+            const f32             emissiveIntensity = 0.0f;
+            const f32             normalMapStrength = 1.0f;
+
+            writeDefault(
+                TEXT("BaseColor"), &baseColor.mComponents[0], sizeof(baseColor.mComponents));
+            writeDefault(TEXT("Metallic"), &metallic, sizeof(metallic));
+            writeDefault(TEXT("Roughness"), &roughness, sizeof(roughness));
+            writeDefault(TEXT("Occlusion"), &occlusion, sizeof(occlusion));
+            // cbuffer member is float3, but may be padded; writing 16 bytes is harmless within
+            // prop->mSize.
+            writeDefault(TEXT("Emissive"), &emissive.mComponents[0], sizeof(emissive.mComponents));
+            writeDefault(TEXT("EmissiveIntensity"), &emissiveIntensity, sizeof(emissiveIntensity));
+            writeDefault(TEXT("NormalMapStrength"), &normalMapStrength, sizeof(normalMapStrength));
+        }
+
         auto applyParam = [&](FMaterialParamId id, const void* data, u32 size) {
             const auto* prop = layout.FindProperty(id);
             if (!prop || data == nullptr) {
@@ -608,6 +710,36 @@ namespace AltinaEngine::RenderCore {
                 texEntry.mBinding = layout.TextureBindings[i];
                 texEntry.mType    = Rhi::ERhiBindingType::SampledTexture;
                 texEntry.mTexture = (param && param->SRV) ? param->SRV->GetTexture() : nullptr;
+
+                if (texEntry.mTexture == nullptr) {
+                    // Bind safe fallbacks for missing textures so the shader doesn't sample null
+                    // SRVs (which returns 0 and can collapse lighting to black).
+                    auto&      fb            = EnsureDefaultMaterialFallbacks();
+                    const auto hBaseColor    = HashMaterialParamName(TEXT("BaseColorTex"));
+                    const auto hNormal       = HashMaterialParamName(TEXT("NormalTex"));
+                    const auto hMetallic     = HashMaterialParamName(TEXT("MetallicTex"));
+                    const auto hRoughness    = HashMaterialParamName(TEXT("RoughnessTex"));
+                    const auto hEmissive     = HashMaterialParamName(TEXT("EmissiveTex"));
+                    const auto hOcclusion    = HashMaterialParamName(TEXT("OcclusionTex"));
+                    const auto hSpecular     = HashMaterialParamName(TEXT("SpecularTex"));
+                    const auto hDisplacement = HashMaterialParamName(TEXT("DisplacementTex"));
+
+                    if (nameHash == hBaseColor) {
+                        texEntry.mTexture = fb.WhiteTex.Get();
+                    } else if (nameHash == hNormal) {
+                        texEntry.mTexture = fb.NormalFlatTex.Get();
+                    } else if (nameHash == hRoughness) {
+                        texEntry.mTexture = fb.GrayTex.Get();
+                    } else if (nameHash == hOcclusion) {
+                        texEntry.mTexture = fb.WhiteTex.Get();
+                    } else if (nameHash == hMetallic || nameHash == hEmissive
+                        || nameHash == hSpecular || nameHash == hDisplacement) {
+                        texEntry.mTexture = fb.BlackTex.Get();
+                    } else {
+                        // Unknown texture slot: default to white to avoid multiplying to black.
+                        texEntry.mTexture = fb.WhiteTex.Get();
+                    }
+                }
                 groupDesc.mEntries.PushBack(texEntry);
 
                 if (i < layout.SamplerBindings.Size()) {
@@ -616,7 +748,9 @@ namespace AltinaEngine::RenderCore {
                         Rhi::FRhiBindGroupEntry samplerEntry{};
                         samplerEntry.mBinding = samplerBinding;
                         samplerEntry.mType    = Rhi::ERhiBindingType::Sampler;
-                        samplerEntry.mSampler = param ? param->Sampler.Get() : nullptr;
+                        samplerEntry.mSampler = (param && param->Sampler)
+                            ? param->Sampler.Get()
+                            : EnsureDefaultMaterialFallbacks().Sampler.Get();
                         groupDesc.mEntries.PushBack(samplerEntry);
                     }
                 }

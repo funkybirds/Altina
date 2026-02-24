@@ -72,6 +72,9 @@ namespace {
         void Begin() override {}
         void End() override {}
 
+        void RHIUpdateDynamicBufferDiscard(AltinaEngine::Rhi::FRhiBuffer* /*buffer*/,
+            const void* /*data*/, u64 /*sizeBytes*/, u64 /*offsetBytes*/) override {}
+
         void RHISetGraphicsPipeline(AltinaEngine::Rhi::FRhiPipeline* /*pipeline*/) override {}
         void RHISetComputePipeline(AltinaEngine::Rhi::FRhiPipeline* /*pipeline*/) override {}
         void RHISetPrimitiveTopology(

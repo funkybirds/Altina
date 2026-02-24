@@ -2627,8 +2627,9 @@ namespace AltinaEngine::Rhi {
         return MakeResource<FRhiD3D11BindGroup>(desc);
     }
 
-    void FRhiD3D11Device::UpdateTextureSubresource(FRhiTexture* texture, u32 mipLevel,
-        const void* data, u32 rowPitchBytes, u32 slicePitchBytes) {
+    void FRhiD3D11Device::UpdateTextureSubresource(FRhiTexture* texture,
+        const FRhiTextureSubresource& subresource, const void* data, u32 rowPitchBytes,
+        u32 slicePitchBytes) {
 #if AE_PLATFORM_WIN
         if (texture == nullptr || data == nullptr || rowPitchBytes == 0U) {
             return;
@@ -2645,10 +2646,59 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        context->UpdateSubresource(native, mipLevel, nullptr, data, rowPitchBytes, slicePitchBytes);
+        const FRhiTextureDesc& desc = texture->GetDesc();
+        if (subresource.mMipLevel >= desc.mMipLevels) {
+            return;
+        }
+
+        if (desc.mDimension == ERhiTextureDimension::Tex3D) {
+            if (subresource.mArrayLayer != 0U) {
+                return;
+            }
+
+            const auto mipDim = [](u32 dim, u32 mip) noexcept -> u32 {
+                const u32 v = dim >> mip;
+                return v ? v : 1U;
+            };
+
+            const u32 mipWidth  = mipDim(desc.mWidth, subresource.mMipLevel);
+            const u32 mipHeight = mipDim(desc.mHeight, subresource.mMipLevel);
+            const u32 mipDepth  = mipDim(desc.mDepth, subresource.mMipLevel);
+            if (subresource.mDepthSlice >= mipDepth) {
+                return;
+            }
+
+            D3D11_BOX box{};
+            box.left   = 0U;
+            box.top    = 0U;
+            box.front  = static_cast<UINT>(subresource.mDepthSlice);
+            box.right  = static_cast<UINT>(mipWidth);
+            box.bottom = static_cast<UINT>(mipHeight);
+            box.back   = static_cast<UINT>(subresource.mDepthSlice + 1U);
+
+            context->UpdateSubresource(
+                native, subresource.mMipLevel, &box, data, rowPitchBytes, slicePitchBytes);
+            return;
+        }
+
+        if (subresource.mDepthSlice != 0U) {
+            return;
+        }
+
+        if (desc.mDimension == ERhiTextureDimension::Tex2D && subresource.mArrayLayer != 0U) {
+            return;
+        }
+        if (subresource.mArrayLayer >= desc.mArrayLayers) {
+            return;
+        }
+
+        const UINT d3dSubresource =
+            D3D11CalcSubresource(subresource.mMipLevel, subresource.mArrayLayer, desc.mMipLevels);
+        context->UpdateSubresource(
+            native, d3dSubresource, nullptr, data, rowPitchBytes, slicePitchBytes);
 #else
         (void)texture;
-        (void)mipLevel;
+        (void)subresource;
         (void)data;
         (void)rowPitchBytes;
         (void)slicePitchBytes;

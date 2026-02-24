@@ -25,19 +25,6 @@
     #undef CreateSemaphoreW
 #endif
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
-    #include <vulkan/vulkan.h>
-#else
-struct VkInstance_T;
-struct VkPhysicalDevice_T;
-struct VkDevice_T;
-struct VkQueue_T;
-using VkInstance       = VkInstance_T*;
-using VkPhysicalDevice = VkPhysicalDevice_T*;
-using VkDevice         = VkDevice_T*;
-using VkQueue          = VkQueue_T*;
-#endif
-
 namespace AltinaEngine::Rhi {
     class AE_RHI_VULKAN_API FRhiVulkanDevice final : public FRhiDevice {
     public:
@@ -87,8 +74,9 @@ namespace AltinaEngine::Rhi {
             -> FRhiBindGroupLayoutRef override;
         auto CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef override;
 
-        void UpdateTextureSubresource(FRhiTexture* texture, u32 mipLevel, const void* data,
-            u32 rowPitchBytes, u32 slicePitchBytes) override;
+        void UpdateTextureSubresource(FRhiTexture* texture,
+            const FRhiTextureSubresource& subresource, const void* data, u32 rowPitchBytes,
+            u32 slicePitchBytes) override;
 
         auto CreateFence(u64 initialValue) -> FRhiFenceRef override;
 #ifdef CreateSemaphore

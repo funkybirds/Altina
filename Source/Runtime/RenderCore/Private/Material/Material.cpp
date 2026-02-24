@@ -122,7 +122,8 @@ namespace AltinaEngine::RenderCore {
                 auto tex          = Rhi::RHICreateTexture(desc);
                 if (tex) {
                     const u8 pixel[4] = { r, g, b, a };
-                    device->UpdateTextureSubresource(tex.Get(), 0U, pixel, 4U, 4U);
+                    device->UpdateTextureSubresource(
+                        tex.Get(), Rhi::FRhiTextureSubresource{}, pixel, 4U, 4U);
                 }
                 return tex;
             };

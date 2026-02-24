@@ -7,19 +7,6 @@
 #include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiRefs.h"
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
-    #include <vulkan/vulkan.h>
-#else
-struct VkPipeline_T;
-struct VkPipelineLayout_T;
-struct VkDescriptorSetLayout_T;
-struct VkDescriptorSet_T;
-using VkPipeline            = VkPipeline_T*;
-using VkPipelineLayout      = VkPipelineLayout_T*;
-using VkDescriptorSetLayout = VkDescriptorSetLayout_T*;
-using VkDescriptorSet       = VkDescriptorSet_T*;
-#endif
-
 namespace AltinaEngine::Rhi {
     class AE_RHI_VULKAN_API FRhiVulkanPipelineLayout final : public FRhiPipelineLayout {
     public:

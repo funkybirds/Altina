@@ -813,7 +813,17 @@ namespace AltinaEngine::Rhi {
             D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
             viewDesc.Format                          = format;
 
-            if (desc.mDepth > 1U) {
+            if (desc.mDimension == ERhiTextureDimension::Cube) {
+                viewDesc.ViewDimension               = D3D11_SRV_DIMENSION_TEXTURECUBE;
+                viewDesc.TextureCube.MostDetailedMip = 0U;
+                viewDesc.TextureCube.MipLevels       = desc.mMipLevels;
+            } else if (desc.mDimension == ERhiTextureDimension::CubeArray) {
+                viewDesc.ViewDimension                     = D3D11_SRV_DIMENSION_TEXTURECUBEARRAY;
+                viewDesc.TextureCubeArray.MostDetailedMip  = 0U;
+                viewDesc.TextureCubeArray.MipLevels        = desc.mMipLevels;
+                viewDesc.TextureCubeArray.First2DArrayFace = 0U;
+                viewDesc.TextureCubeArray.NumCubes         = desc.mArrayLayers / 6U;
+            } else if (desc.mDepth > 1U) {
                 viewDesc.ViewDimension             = D3D11_SRV_DIMENSION_TEXTURE3D;
                 viewDesc.Texture3D.MostDetailedMip = 0U;
                 viewDesc.Texture3D.MipLevels       = desc.mMipLevels;
@@ -974,6 +984,29 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
+        const auto validDimension = [&]() noexcept -> bool {
+            switch (desc.mDimension) {
+                case ERhiTextureDimension::Tex2D:
+                    return (desc.mDepth == 1U) && (desc.mArrayLayers == 1U);
+                case ERhiTextureDimension::Tex2DArray:
+                    return (desc.mDepth == 1U) && (desc.mArrayLayers > 1U);
+                case ERhiTextureDimension::Tex3D:
+                    return (desc.mDepth > 1U) && (desc.mArrayLayers == 1U);
+                case ERhiTextureDimension::Cube:
+                    return (desc.mWidth == desc.mHeight) && (desc.mDepth == 1U)
+                        && (desc.mArrayLayers == 6U) && (desc.mSampleCount == 1U);
+                case ERhiTextureDimension::CubeArray:
+                    return (desc.mWidth == desc.mHeight) && (desc.mDepth == 1U)
+                        && (desc.mArrayLayers % 6U == 0U) && (desc.mSampleCount == 1U);
+                default:
+                    return false;
+            }
+        }();
+
+        if (!validDimension) {
+            return {};
+        }
+
         const DXGI_FORMAT format = ToD3D11Format(desc.mFormat);
         if (format == DXGI_FORMAT_UNKNOWN) {
             return {};
@@ -1006,7 +1039,7 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        if (desc.mDepth > 1U) {
+        if (desc.mDimension == ERhiTextureDimension::Tex3D) {
             if (desc.mArrayLayers > 1U) {
                 return {};
             }
@@ -1073,6 +1106,10 @@ namespace AltinaEngine::Rhi {
         texDesc.Usage                = usage;
         texDesc.BindFlags            = bindFlags;
         texDesc.CPUAccessFlags       = cpuAccess;
+        if (desc.mDimension == ERhiTextureDimension::Cube
+            || desc.mDimension == ERhiTextureDimension::CubeArray) {
+            texDesc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+        }
 
         ComPtr<ID3D11Texture2D> texture;
         const HRESULT           hr = device->CreateTexture2D(&texDesc, nullptr, &texture);

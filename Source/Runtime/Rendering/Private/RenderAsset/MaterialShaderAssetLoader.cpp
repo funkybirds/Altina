@@ -554,8 +554,11 @@ namespace AltinaEngine::Rendering {
                     if (offset + slicePitch > pixels.Size()) {
                         break;
                     }
-                    device->UpdateTextureSubresource(texture.Get(), mip, pixels.Data() + offset,
-                        static_cast<u32>(rowPitch), static_cast<u32>(slicePitch));
+                    Rhi::FRhiTextureSubresource subresource{};
+                    subresource.mMipLevel = mip;
+                    device->UpdateTextureSubresource(texture.Get(), subresource,
+                        pixels.Data() + offset, static_cast<u32>(rowPitch),
+                        static_cast<u32>(slicePitch));
                     offset += slicePitch;
                     width  = (width > 1U) ? (width >> 1U) : 1U;
                     height = (height > 1U) ? (height >> 1U) : 1U;

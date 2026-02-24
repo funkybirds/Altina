@@ -142,6 +142,7 @@ namespace AltinaEngine::Rhi {
 
     struct FRhiTextureDesc {
         FString              mDebugName;
+        ERhiTextureDimension mDimension   = ERhiTextureDimension::Tex2D;
         u32                  mWidth       = 0U;
         u32                  mHeight      = 0U;
         u32                  mDepth       = 1U;
@@ -152,6 +153,12 @@ namespace AltinaEngine::Rhi {
         ERhiResourceUsage    mUsage       = ERhiResourceUsage::Default;
         ERhiTextureBindFlags mBindFlags   = ERhiTextureBindFlags::ShaderResource;
         ERhiCpuAccess        mCpuAccess   = ERhiCpuAccess::None;
+    };
+
+    struct FRhiTextureSubresource {
+        u32 mMipLevel   = 0U;
+        u32 mArrayLayer = 0U; // For cube textures, this is face index [0..5] (or face-in-array).
+        u32 mDepthSlice = 0U; // For 3D textures.
     };
 
     struct FRhiTextureViewRange {

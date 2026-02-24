@@ -4,6 +4,7 @@
 #include "AssetToolIO.h"
 #include "AssetToolTypes.h"
 #include "Importers/Audio/AudioImporter.h"
+#include "Importers/EnvMap/EnvMapImporter.h"
 #include "Importers/Material/MaterialImporter.h"
 #include "Importers/Mesh/MeshImporter.h"
 #include "Importers/Model/ModelImporter.h"
@@ -247,10 +248,22 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
         }
 
+        auto GetImporterNameForSource(
+            Asset::EAssetType type, const std::filesystem::path& sourcePath) -> std::string {
+            if (type == Asset::EAssetType::Texture2D) {
+                std::string ext = sourcePath.extension().string();
+                ToLowerAscii(ext);
+                if (ext == ".hdr") {
+                    return "EnvMapImporter";
+                }
+            }
+            return GetImporterName(type);
+        }
+
         auto IsTextureExtension(const std::filesystem::path& path) -> bool {
             std::string ext = path.extension().string();
             ToLowerAscii(ext);
-            return ext == ".png" || ext == ".jpg" || ext == ".jpeg";
+            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".hdr";
         }
 
         auto IsMeshExtension(const std::filesystem::path& path) -> bool {
@@ -626,7 +639,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 record.SourcePathRel   = sourceRel;
                 record.VirtualPath     = virtualPath;
                 record.Type            = type;
-                record.ImporterName    = GetImporterName(type);
+                record.ImporterName    = GetImporterNameForSource(type, sourcePath);
                 record.ImporterVersion = 1U;
 
                 outAssets.push_back(record);
@@ -680,7 +693,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 if (!metaVirtualPath.empty()) {
                     asset.VirtualPath = metaVirtualPath;
                 }
-                asset.ImporterName = GetImporterName(asset.Type);
+                asset.ImporterName = GetImporterNameForSource(asset.Type, asset.SourcePath);
 
                 if (mode == EMetaWriteMode::MissingOnly) {
                     return true;
@@ -689,7 +702,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             asset.Uuid         = FUuid::New();
-            asset.ImporterName = GetImporterName(asset.Type);
+            asset.ImporterName = GetImporterNameForSource(asset.Type, asset.SourcePath);
             return WriteMetaFile(asset);
         }
         auto ParseCommandLine(
@@ -1113,6 +1126,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 bool        hasScriptDesc = false;
                 std::vector<Asset::FAssetHandle> materialDeps;
                 FModelCookResult                 modelResult{};
+                FEnvMapCookResult                envMapResult{};
+                std::vector<FGeneratedAsset>     generatedAssets;
                 if (isScript) {
                     if (!ParseScriptDescriptor(bytes, scriptAssemblyPath, scriptTypeName)) {
                         std::cerr << "Failed to read script descriptor: "
@@ -1122,11 +1137,34 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     hasScriptDesc = true;
                 }
                 if (isTexture) {
-                    constexpr bool kDefaultSrgb = true;
-                    if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
-                        std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
-                                  << "\n";
-                        continue;
+                    std::string ext = asset.SourcePath.extension().string();
+                    ToLowerAscii(ext);
+                    if (ext == ".hdr") {
+                        Asset::FAssetHandle baseHandle{};
+                        baseHandle.Uuid = asset.Uuid;
+                        baseHandle.Type = asset.Type;
+
+                        std::string envError;
+                        if (!CookEnvMapFromHdr(asset.SourcePath, bytes, baseHandle,
+                                asset.VirtualPath, envMapResult, envError)) {
+                            std::cerr << "Failed to cook envmap HDR: " << asset.SourcePath.string();
+                            if (!envError.empty()) {
+                                std::cerr << " (" << envError << ")";
+                            }
+                            std::cerr << "\n";
+                            continue;
+                        }
+                        cookedBytes     = envMapResult.CookedBytes;
+                        textureDesc     = envMapResult.Desc;
+                        cookKeyExtras   = envMapResult.CookKeyExtras;
+                        generatedAssets = Move(envMapResult.Generated);
+                    } else {
+                        constexpr bool kDefaultSrgb = true;
+                        if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
+                            std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
+                                      << "\n";
+                            continue;
+                        }
                     }
                 } else if (isMesh) {
                     if (!CookMesh(asset.SourcePath, cookedBytes, meshDesc, cookKeyExtras)) {
@@ -1147,9 +1185,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         std::cerr << "\n";
                         continue;
                     }
-                    cookedBytes   = modelResult.CookedBytes;
-                    modelDesc     = modelResult.Desc;
-                    cookKeyExtras = modelResult.CookKeyExtras;
+                    cookedBytes     = modelResult.CookedBytes;
+                    modelDesc       = modelResult.Desc;
+                    cookKeyExtras   = modelResult.CookKeyExtras;
+                    generatedAssets = Move(modelResult.Generated);
                 } else if (isMaterial) {
                     if (!CookMaterial(
                             bytes, assetsByVirtualPath, materialDeps, materialDesc, cookedBytes)) {
@@ -1241,8 +1280,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
                 registryAssets.push_back(registryEntry);
 
-                if (isModel && !modelResult.Generated.empty()) {
-                    for (const auto& generated : modelResult.Generated) {
+                if (!generatedAssets.empty()) {
+                    for (const auto& generated : generatedAssets) {
                         if (!generated.Handle.IsValid()) {
                             continue;
                         }

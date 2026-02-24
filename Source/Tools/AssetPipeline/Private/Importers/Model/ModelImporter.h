@@ -1,23 +1,13 @@
 #pragma once
 
 #include "Asset/AssetTypes.h"
+#include "Importers/GeneratedAsset.h"
 
 #include <vector>
 #include <string>
 #include <filesystem>
 
 namespace AltinaEngine::Tools::AssetPipeline {
-    struct FGeneratedAsset {
-        Asset::FAssetHandle              Handle{};
-        Asset::EAssetType                Type = Asset::EAssetType::Unknown;
-        std::string                      VirtualPath;
-        std::vector<u8>                  CookedBytes;
-        std::vector<Asset::FAssetHandle> Dependencies;
-        Asset::FTexture2DDesc            TextureDesc{};
-        Asset::FMeshDesc                 MeshDesc{};
-        Asset::FMaterialDesc             MaterialDesc{};
-    };
-
     struct FModelCookResult {
         std::vector<u8>                  CookedBytes;
         Asset::FModelDesc                Desc{};

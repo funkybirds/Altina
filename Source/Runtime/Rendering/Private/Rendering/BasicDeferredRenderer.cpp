@@ -1256,6 +1256,9 @@ namespace AltinaEngine::Rendering {
                             shadowDesc.mDesc.mWidth       = shadowSize;
                             shadowDesc.mDesc.mHeight      = shadowSize;
                             shadowDesc.mDesc.mArrayLayers = csmData.CascadeCount;
+                            shadowDesc.mDesc.mDimension   = (csmData.CascadeCount > 1U)
+                                  ? Rhi::ERhiTextureDimension::Tex2DArray
+                                  : Rhi::ERhiTextureDimension::Tex2D;
                             shadowDesc.mDesc.mFormat      = Rhi::ERhiFormat::D32Float;
                             shadowDesc.mDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::DepthStencil
                                 | Rhi::ERhiTextureBindFlags::ShaderResource;

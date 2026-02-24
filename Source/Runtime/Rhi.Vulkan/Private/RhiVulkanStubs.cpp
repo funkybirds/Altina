@@ -8,6 +8,11 @@
 #include "Rhi/RhiFence.h"
 #include "Rhi/RhiSemaphore.h"
 
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+// Vulkan is available: real implementations are compiled in other translation units.
+// This file provides stubs only when Vulkan is unavailable.
+#else
+
 namespace AltinaEngine::Rhi {
     struct FRhiVulkanDevice::FState {};
     struct FRhiVulkanViewport::FState {};
@@ -130,10 +135,11 @@ namespace AltinaEngine::Rhi {
         return {};
     }
 
-    void FRhiVulkanDevice::UpdateTextureSubresource(FRhiTexture* texture, u32 mipLevel,
-        const void* data, u32 rowPitchBytes, u32 slicePitchBytes) {
+    void FRhiVulkanDevice::UpdateTextureSubresource(FRhiTexture* texture,
+        const FRhiTextureSubresource& subresource, const void* data, u32 rowPitchBytes,
+        u32 slicePitchBytes) {
         (void)texture;
-        (void)mipLevel;
+        (void)subresource;
         (void)data;
         (void)rowPitchBytes;
         (void)slicePitchBytes;
@@ -419,3 +425,5 @@ namespace AltinaEngine::Rhi {
         (void)groupCountZ;
     }
 } // namespace AltinaEngine::Rhi
+
+#endif // defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE

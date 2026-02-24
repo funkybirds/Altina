@@ -95,6 +95,7 @@ set(Target_Private_Sources
     Private/AssetToolMain.cpp
     Private/AssetToolIO.cpp
     Private/Importers/Audio/AudioImporter.cpp
+    Private/Importers/EnvMap/EnvMapImporter.cpp
     Private/Importers/Material/MaterialImporter.cpp
     Private/Importers/Mesh/MeshImporter.cpp
     Private/Importers/Model/GltfImporter.cpp

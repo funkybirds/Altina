@@ -122,6 +122,19 @@ if(AE_DEMO_ENABLE_SHIPPING)
         COMMENT "Staging Minimal demo Shipping folder"
         VERBATIM
     )
+
+    # Keep Shipping in sync even when only assets/shaders change (the executable may not relink,
+    # so its POST_BUILD step would not run).
+    add_custom_command(
+        TARGET AltinaEngineDemoMinimalStageShaders
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -DDEMO_BIN_DIR:PATH=${DemoBinaryDir}
+            -DDEMO_SHIP_DIR:PATH=${DemoShippingDir}
+            -P ${AE_DEMO_STAGE_SHIPPING_SCRIPT}
+        COMMENT "Staging Minimal demo Shipping folder (shader changes)"
+        VERBATIM
+    )
 endif()
 
 find_program(AE_DOTNET_HOST dotnet)
@@ -219,5 +232,18 @@ add_custom_command(
 add_custom_target(AltinaEngineDemoMinimalCookAssets
     DEPENDS ${DemoAssetCookOutput}
 )
+
+if(AE_DEMO_ENABLE_SHIPPING)
+    add_custom_command(
+        TARGET AltinaEngineDemoMinimalCookAssets
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -DDEMO_BIN_DIR:PATH=${DemoBinaryDir}
+            -DDEMO_SHIP_DIR:PATH=${DemoShippingDir}
+            -P ${AE_DEMO_STAGE_SHIPPING_SCRIPT}
+        COMMENT "Staging Minimal demo Shipping folder (asset changes)"
+        VERBATIM
+    )
+endif()
 
 add_dependencies(${TargetName} AltinaEngineDemoMinimalCookAssets)

@@ -102,6 +102,14 @@ namespace AltinaEngine::Rhi {
         D32Float
     };
 
+    enum class ERhiTextureDimension : u8 {
+        Tex2D = 0,
+        Tex2DArray,
+        Tex3D,
+        Cube,
+        CubeArray
+    };
+
     enum class ERhiResourceViewType : u8 {
         Unknown = 0,
         ShaderResource,

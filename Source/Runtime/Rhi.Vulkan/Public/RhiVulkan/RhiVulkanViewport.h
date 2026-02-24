@@ -3,17 +3,6 @@
 #include "RhiVulkanAPI.h"
 #include "Rhi/RhiViewport.h"
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
-    #include <vulkan/vulkan.h>
-#else
-struct VkSurfaceKHR_T;
-struct VkSwapchainKHR_T;
-struct VkSemaphore_T;
-using VkSurfaceKHR   = VkSurfaceKHR_T*;
-using VkSwapchainKHR = VkSwapchainKHR_T*;
-using VkSemaphore    = VkSemaphore_T*;
-#endif
-
 namespace AltinaEngine::Rhi {
     class AE_RHI_VULKAN_API FRhiVulkanViewport final : public FRhiViewport {
     public:

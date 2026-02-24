@@ -3,6 +3,7 @@
 #include "RhiMock/RhiMockContext.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiTexture.h"
 #include "Rhi/RhiFence.h"
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiSemaphore.h"
@@ -13,8 +14,11 @@ namespace {
     using AltinaEngine::u32;
     using AltinaEngine::u64;
     using AltinaEngine::Rhi::ERhiAdapterType;
+    using AltinaEngine::Rhi::ERhiFormat;
     using AltinaEngine::Rhi::ERhiGpuPreference;
     using AltinaEngine::Rhi::ERhiQueueType;
+    using AltinaEngine::Rhi::ERhiTextureBindFlags;
+    using AltinaEngine::Rhi::ERhiTextureDimension;
     using AltinaEngine::Rhi::ERhiVendorId;
     using AltinaEngine::Rhi::FRhiAdapterDesc;
     using AltinaEngine::Rhi::FRhiBufferDesc;
@@ -24,6 +28,7 @@ namespace {
     using AltinaEngine::Rhi::FRhiQueueSignal;
     using AltinaEngine::Rhi::FRhiQueueWait;
     using AltinaEngine::Rhi::FRhiSubmitInfo;
+    using AltinaEngine::Rhi::FRhiTextureDesc;
     using AltinaEngine::Rhi::kRhiInvalidAdapterIndex;
 
     auto MakeAdapterDesc(const TChar* name, ERhiAdapterType type, ERhiVendorId vendor,
@@ -162,4 +167,84 @@ TEST_CASE("RhiMock.SubmitPropagatesSyncValues") {
 
     REQUIRE_EQ(semaphore->GetCurrentValue(), 5ULL);
     REQUIRE_EQ(fence->GetCompletedValue(), 7ULL);
+}
+
+TEST_CASE("RhiMock.TextureDescValidation") {
+    FRhiMockContext context;
+    context.AddAdapter(MakeAdapterDesc(
+        TEXT("Mock Discrete"), ERhiAdapterType::Discrete, ERhiVendorId::Nvidia, 2ULL << 30));
+
+    REQUIRE(context.Init(FRhiInitDesc{}));
+    auto device = context.CreateDevice(0);
+    REQUIRE(device);
+
+    FRhiTextureDesc base{};
+    base.mWidth     = 4U;
+    base.mHeight    = 4U;
+    base.mMipLevels = 1U;
+    base.mFormat    = ERhiFormat::R8G8B8A8Unorm;
+    base.mBindFlags = ERhiTextureBindFlags::ShaderResource;
+
+    // Default (Tex2D) is valid.
+    REQUIRE(device->CreateTexture(base));
+
+    // Tex2D rejects depth != 1.
+    {
+        auto desc   = base;
+        desc.mDepth = 2U;
+        REQUIRE(!device->CreateTexture(desc));
+    }
+
+    // Tex2DArray requires arrayLayers > 1.
+    {
+        auto desc         = base;
+        desc.mDimension   = ERhiTextureDimension::Tex2DArray;
+        desc.mArrayLayers = 4U;
+        REQUIRE(device->CreateTexture(desc));
+
+        desc.mArrayLayers = 1U;
+        REQUIRE(!device->CreateTexture(desc));
+    }
+
+    // Tex3D requires depth > 1 and arrayLayers == 1.
+    {
+        auto desc       = base;
+        desc.mDimension = ERhiTextureDimension::Tex3D;
+        desc.mDepth     = 4U;
+        REQUIRE(device->CreateTexture(desc));
+
+        desc.mArrayLayers = 2U;
+        REQUIRE(!device->CreateTexture(desc));
+    }
+
+    // Cube requires width == height, arrayLayers == 6, sampleCount == 1.
+    {
+        auto desc         = base;
+        desc.mDimension   = ERhiTextureDimension::Cube;
+        desc.mArrayLayers = 6U;
+        desc.mSampleCount = 1U;
+        REQUIRE(device->CreateTexture(desc));
+
+        desc.mWidth  = 2U;
+        desc.mHeight = 4U;
+        REQUIRE(!device->CreateTexture(desc));
+
+        desc              = base;
+        desc.mDimension   = ERhiTextureDimension::Cube;
+        desc.mArrayLayers = 6U;
+        desc.mSampleCount = 4U;
+        REQUIRE(!device->CreateTexture(desc));
+    }
+
+    // CubeArray requires width == height, arrayLayers % 6 == 0, sampleCount == 1.
+    {
+        auto desc         = base;
+        desc.mDimension   = ERhiTextureDimension::CubeArray;
+        desc.mArrayLayers = 12U;
+        desc.mSampleCount = 1U;
+        REQUIRE(device->CreateTexture(desc));
+
+        desc.mArrayLayers = 10U;
+        REQUIRE(!device->CreateTexture(desc));
+    }
 }

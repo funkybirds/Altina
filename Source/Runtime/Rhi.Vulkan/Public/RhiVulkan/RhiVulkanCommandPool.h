@@ -3,13 +3,6 @@
 #include "RhiVulkanAPI.h"
 #include "Rhi/RhiCommandPool.h"
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
-    #include <vulkan/vulkan.h>
-#else
-struct VkCommandPool_T;
-using VkCommandPool = VkCommandPool_T*;
-#endif
-
 namespace AltinaEngine::Rhi {
     class AE_RHI_VULKAN_API FRhiVulkanCommandPool final : public FRhiCommandPool {
     public:

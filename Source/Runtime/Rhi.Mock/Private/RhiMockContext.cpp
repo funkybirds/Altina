@@ -29,6 +29,30 @@ using AltinaEngine::Core::Container::TAllocatorTraits;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     namespace {
+        [[nodiscard]] auto ValidateTextureDesc(const FRhiTextureDesc& desc) noexcept -> bool {
+            if (desc.mWidth == 0U || desc.mHeight == 0U || desc.mMipLevels == 0U
+                || desc.mArrayLayers == 0U || desc.mDepth == 0U || desc.mSampleCount == 0U) {
+                return false;
+            }
+
+            switch (desc.mDimension) {
+                case ERhiTextureDimension::Tex2D:
+                    return (desc.mDepth == 1U) && (desc.mArrayLayers == 1U);
+                case ERhiTextureDimension::Tex2DArray:
+                    return (desc.mDepth == 1U) && (desc.mArrayLayers > 1U);
+                case ERhiTextureDimension::Tex3D:
+                    return (desc.mDepth > 1U) && (desc.mArrayLayers == 1U);
+                case ERhiTextureDimension::Cube:
+                    return (desc.mWidth == desc.mHeight) && (desc.mDepth == 1U)
+                        && (desc.mArrayLayers == 6U) && (desc.mSampleCount == 1U);
+                case ERhiTextureDimension::CubeArray:
+                    return (desc.mWidth == desc.mHeight) && (desc.mDepth == 1U)
+                        && (desc.mArrayLayers % 6U == 0U) && (desc.mSampleCount == 1U);
+                default:
+                    return false;
+            }
+        }
+
         template <typename TBase, typename TDerived, typename... Args>
         auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
             using AllocatorType = TAllocator<TDerived>;
@@ -546,6 +570,9 @@ namespace AltinaEngine::Rhi {
                 return MakeResource<FRhiMockBuffer>(desc, mCounters);
             }
             auto CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef override {
+                if (!ValidateTextureDesc(desc)) {
+                    return {};
+                }
                 return MakeResource<FRhiMockTexture>(desc, mCounters);
             }
             auto CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef override {
@@ -579,10 +606,11 @@ namespace AltinaEngine::Rhi {
                 return MakeResource<FRhiMockBindGroup>(desc, mCounters);
             }
 
-            void UpdateTextureSubresource(FRhiTexture* texture, u32 mipLevel, const void* data,
-                u32 rowPitchBytes, u32 slicePitchBytes) override {
+            void UpdateTextureSubresource(FRhiTexture* texture,
+                const FRhiTextureSubresource& subresource, const void* data, u32 rowPitchBytes,
+                u32 slicePitchBytes) override {
                 (void)texture;
-                (void)mipLevel;
+                (void)subresource;
                 (void)data;
                 (void)rowPitchBytes;
                 (void)slicePitchBytes;

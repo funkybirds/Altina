@@ -1,6 +1,8 @@
 param(
     [string]$Preset = "windows-msvc-relwithdebinfo",
-    [switch]$ForceConfigure
+    [switch]$ForceConfigure,
+    [ValidateSet("Keep", "On", "Off")]
+    [string]$Shipping = "Keep"
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,17 +57,31 @@ function Invoke-WithVisualStudioEnv {
     }
 }
 
-function Invoke-Configure($presetName) {
-    Write-Host "[CMake] Configuring preset '$presetName'"
-    Invoke-WithVisualStudioEnv @("cmake", "--preset", $presetName)
+function Invoke-Configure {
+    param(
+        [Parameter(Mandatory)] [string] $PresetName,
+        [string[]] $ExtraArgs = @()
+    )
+    Write-Host "[CMake] Configuring preset '$PresetName'"
+    Invoke-WithVisualStudioEnv (@("cmake", "--preset", $PresetName) + $ExtraArgs)
 }
 
 try {
     Set-Location $repoRoot
 
     $buildDir = Join-Path $repoRoot "out\build\$Preset"
-    if ($ForceConfigure.IsPresent -or -not (Test-Path $buildDir)) {
-        Invoke-Configure $Preset
+
+    $configureArgs = @()
+    if ($Shipping -eq "On") {
+        $configureArgs += "-DAE_DEMO_ENABLE_SHIPPING=ON"
+    }
+    elseif ($Shipping -eq "Off") {
+        $configureArgs += "-DAE_DEMO_ENABLE_SHIPPING=OFF"
+    }
+
+    # Changing cache variables requires a configure pass even if the build dir already exists.
+    if ($ForceConfigure.IsPresent -or -not (Test-Path $buildDir) -or $configureArgs.Count -gt 0) {
+        Invoke-Configure -PresetName $Preset -ExtraArgs $configureArgs
     }
 
     Write-Host "[CMake] Cleaning Demo/Minimal output folders (Binaries/Shipping)"

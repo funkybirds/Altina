@@ -27,7 +27,12 @@ file(MAKE_DIRECTORY "${DEMO_SHIP_DIR}")
 if(EXISTS "${DEMO_BIN_DIR}/Assets")
     # Avoid stale assets when the source tree changes.
     file(REMOVE_RECURSE "${DEMO_SHIP_DIR}/Assets")
-    file(COPY "${DEMO_BIN_DIR}/Assets" DESTINATION "${DEMO_SHIP_DIR}")
+    # Use cmake -E copy_directory for robustness (file(COPY) can fail when destination
+    # intermediate directories don't exist under parallel staging).
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEMO_SHIP_DIR}/Assets")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E copy_directory
+        "${DEMO_BIN_DIR}/Assets" "${DEMO_SHIP_DIR}/Assets"
+    )
 else()
     message(STATUS "StageDemoShipping: '${DEMO_BIN_DIR}/Assets' not found; skipping asset copy")
 endif()
@@ -44,4 +49,3 @@ foreach(_f IN LISTS _shipping_files)
 endforeach()
 
 message(STATUS "StageDemoShipping: staged to '${DEMO_SHIP_DIR}'")
-

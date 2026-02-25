@@ -13,6 +13,7 @@
 #include "Launch/EngineLoop.h"
 #include "Launch/GameClient.h"
 #include "Logging/Log.h"
+#include "Input/InputSystem.h"
 #include "Material/MaterialPass.h"
 #include "Container/SmartPtr.h"
 #include "Math/Common.h"
@@ -96,6 +97,14 @@ namespace {
             }
             if (scriptComponent.IsValid()) {
                 scriptComponent.Get().SetScriptAsset(scriptHandle);
+            }
+
+            mWorldHandle    = worldHandle;
+            mCameraObjectId = cameraObject.GetId();
+            {
+                const Core::Math::FEulerRotator euler(cameraRotationWS);
+                mCameraPitchRadians = euler.pitch;
+                mCameraYawRadians   = euler.yaw;
             }
 
             // Skybox (asset may be missing until cooked; component still exists for demo wiring).
@@ -225,10 +234,62 @@ namespace {
         }
 
         auto OnTick(Launch::FEngineLoop& engineLoop, float deltaSeconds) -> bool override {
+            // Mouse look: hold RMB and move the mouse to rotate the camera.
+            // NOTE: We apply last frame's mouse delta before EngineLoop::Tick clears input state,
+            // so the updated camera takes effect in the current frame.
+            if (const auto* input = engineLoop.GetInputSystem();
+                input != nullptr && input->HasFocus()) {
+                constexpr u32 kRmb = 1U;
+                if (input->IsMouseButtonDown(kRmb)) {
+                    UpdateCameraMouseLook(engineLoop, *input);
+                }
+            }
+
             engineLoop.Tick(deltaSeconds);
             Core::Platform::Generic::PlatformSleepMilliseconds(16);
             return engineLoop.IsRunning();
         }
+
+    private:
+        void UpdateCameraMouseLook(
+            Launch::FEngineLoop& engineLoop, const Input::FInputSystem& input) noexcept {
+            auto& worldManager = engineLoop.GetWorldManager();
+            auto* world        = worldManager.GetWorld(mWorldHandle);
+            if (world == nullptr || !world->IsAlive(mCameraObjectId)) {
+                return;
+            }
+
+            const i32 dx = input.GetMouseDeltaX();
+            const i32 dy = input.GetMouseDeltaY();
+            if (dx == 0 && dy == 0) {
+                return;
+            }
+
+            // Sensitivity is radians per pixel.
+            constexpr f32 kSensitivity = 0.0025f;
+            mCameraYawRadians += static_cast<f32>(dx) * kSensitivity;
+            mCameraPitchRadians -= static_cast<f32>(dy) * kSensitivity;
+
+            // Clamp pitch to avoid flipping.
+            constexpr f32 kPitchLimit = Core::Math::kHalfPiF - 0.01f;
+            if (mCameraPitchRadians > kPitchLimit) {
+                mCameraPitchRadians = kPitchLimit;
+            } else if (mCameraPitchRadians < -kPitchLimit) {
+                mCameraPitchRadians = -kPitchLimit;
+            }
+
+            auto obj       = world->Object(mCameraObjectId);
+            auto transform = obj.GetWorldTransform();
+            transform.Rotation =
+                Core::Math::FEulerRotator(mCameraPitchRadians, mCameraYawRadians, 0.0f)
+                    .ToQuaternion();
+            obj.SetWorldTransform(transform);
+        }
+
+        GameScene::FWorldHandle  mWorldHandle{};
+        GameScene::FGameObjectId mCameraObjectId{};
+        f32                      mCameraPitchRadians = 0.0f;
+        f32                      mCameraYawRadians   = 0.0f;
     };
 } // namespace
 

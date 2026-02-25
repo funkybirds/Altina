@@ -5,6 +5,11 @@ set(AE_TEST_SHARED_SOURCES
     ${AE_TESTS_SHARED_DIR}/TestMain.cpp
 )
 
+# Aggregate target used by CI/pre-push scripts to build all tests.
+# Define it up-front so individual test targets can depend on it regardless of
+# declaration order in this file.
+add_custom_target(AltinaEngineTests)
+
 function(ae_add_test_target TargetName)
     set(oneValueArgs FOLDER)
     set(multiValueArgs SOURCES LIBS)
@@ -26,8 +31,8 @@ function(ae_add_test_target TargetName)
 
     add_test(NAME ${TargetName} COMMAND $<TARGET_FILE:${TargetName}>)
 
-    # Track test targets for a single aggregate build target.
-    set_property(GLOBAL APPEND PROPERTY AE_TEST_TARGETS ${TargetName})
+    # Make sure the aggregate build target always includes this test executable.
+    add_dependencies(AltinaEngineTests ${TargetName})
 endfunction()
 
 file(GLOB_RECURSE AE_TEST_CORE_SOURCES
@@ -78,11 +83,6 @@ if(WIN32)
             AltinaEngine::Rhi::D3D11
             d3dcompiler
     )
-endif()
-
-get_property(AE_ALL_TEST_TARGETS GLOBAL PROPERTY AE_TEST_TARGETS)
-if(AE_ALL_TEST_TARGETS)
-    add_custom_target(AltinaEngineTests DEPENDS ${AE_ALL_TEST_TARGETS})
 endif()
 
 file(GLOB_RECURSE AE_TEST_SHADER_COMPILER_SOURCES

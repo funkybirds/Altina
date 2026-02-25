@@ -76,6 +76,12 @@ namespace AltinaEngine::Input {
 
     auto FInputSystem::HasFocus() const noexcept -> bool { return mHasFocus; }
 
+    void FInputSystem::SetMousePositionNoDelta(i32 x, i32 y) noexcept {
+        mHasMousePosition = true;
+        mMouseX           = x;
+        mMouseY           = y;
+    }
+
     void FInputSystem::OnWindowResized(u32 InWidth, u32 InHeight) {
         mWindowWidth  = InWidth;
         mWindowHeight = InHeight;

@@ -43,6 +43,12 @@ namespace AltinaEngine::Application {
         [[nodiscard]] virtual auto GetProperties() const -> FPlatformWindowProperty = 0;
         [[nodiscard]] virtual auto GetNativeHandle() const noexcept -> void*        = 0;
         [[nodiscard]] virtual auto IsClosed() const noexcept -> bool                = 0;
+
+        // Cursor control utilities (implemented per platform).
+        // NOTE: These are intended for FPS-style "mouse lock to center" workflows.
+        virtual void               SetCursorVisible(bool visible)         = 0;
+        virtual void               SetCursorClippedToClient(bool clipped) = 0;
+        virtual void               SetCursorPositionClient(i32 x, i32 y)  = 0;
     };
 
 } // namespace AltinaEngine::Application

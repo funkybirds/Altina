@@ -41,6 +41,12 @@ namespace AltinaEngine::Scripting::CoreCLR {
         const Input::FInputSystem* gInputSystem         = nullptr;
         FGetWorldTranslationFn     gGetWorldTranslation = nullptr;
         FSetWorldTranslationFn     gSetWorldTranslation = nullptr;
+        FGetLocalTranslationFn     gGetLocalTranslation = nullptr;
+        FSetLocalTranslationFn     gSetLocalTranslation = nullptr;
+        FGetWorldRotationFn        gGetWorldRotation    = nullptr;
+        FSetWorldRotationFn        gSetWorldRotation    = nullptr;
+        FGetLocalRotationFn        gGetLocalRotation    = nullptr;
+        FSetLocalRotationFn        gSetLocalRotation    = nullptr;
 
         auto ToFStringFromUtf8(const char* message) -> Core::Container::FString {
             using Core::Container::FNativeStringView;
@@ -183,12 +189,69 @@ namespace AltinaEngine::Scripting::CoreCLR {
             }
             return gSetWorldTranslation(worldId, ownerIndex, ownerGeneration, value);
         }
+
+        auto GetLocalTranslation(
+            u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptVector3* outValue) -> bool {
+            if (!gGetLocalTranslation || outValue == nullptr) {
+                return false;
+            }
+            return gGetLocalTranslation(worldId, ownerIndex, ownerGeneration, outValue);
+        }
+
+        auto SetLocalTranslation(
+            u32 worldId, u32 ownerIndex, u32 ownerGeneration, const FScriptVector3* value) -> bool {
+            if (!gSetLocalTranslation || value == nullptr) {
+                return false;
+            }
+            return gSetLocalTranslation(worldId, ownerIndex, ownerGeneration, value);
+        }
+
+        auto GetWorldRotation(
+            u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptQuaternion* outValue) -> bool {
+            if (!gGetWorldRotation || outValue == nullptr) {
+                return false;
+            }
+            return gGetWorldRotation(worldId, ownerIndex, ownerGeneration, outValue);
+        }
+
+        auto SetWorldRotation(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            const FScriptQuaternion* value) -> bool {
+            if (!gSetWorldRotation || value == nullptr) {
+                return false;
+            }
+            return gSetWorldRotation(worldId, ownerIndex, ownerGeneration, value);
+        }
+
+        auto GetLocalRotation(
+            u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptQuaternion* outValue) -> bool {
+            if (!gGetLocalRotation || outValue == nullptr) {
+                return false;
+            }
+            return gGetLocalRotation(worldId, ownerIndex, ownerGeneration, outValue);
+        }
+
+        auto SetLocalRotation(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            const FScriptQuaternion* value) -> bool {
+            if (!gSetLocalRotation || value == nullptr) {
+                return false;
+            }
+            return gSetLocalRotation(worldId, ownerIndex, ownerGeneration, value);
+        }
     } // namespace
 
-    void SetWorldTranslationAccess(
-        FGetWorldTranslationFn getFn, FSetWorldTranslationFn setFn) noexcept {
-        gGetWorldTranslation = getFn;
-        gSetWorldTranslation = setFn;
+    void SetTransformAccess(FGetWorldTranslationFn getWorldTranslationFn,
+        FSetWorldTranslationFn setWorldTranslationFn, FGetLocalTranslationFn getLocalTranslationFn,
+        FSetLocalTranslationFn setLocalTranslationFn, FGetWorldRotationFn getWorldRotationFn,
+        FSetWorldRotationFn setWorldRotationFn, FGetLocalRotationFn getLocalRotationFn,
+        FSetLocalRotationFn setLocalRotationFn) noexcept {
+        gGetWorldTranslation = getWorldTranslationFn;
+        gSetWorldTranslation = setWorldTranslationFn;
+        gGetLocalTranslation = getLocalTranslationFn;
+        gSetLocalTranslation = setLocalTranslationFn;
+        gGetWorldRotation    = getWorldRotationFn;
+        gSetWorldRotation    = setWorldRotationFn;
+        gGetLocalRotation    = getLocalRotationFn;
+        gSetLocalRotation    = setLocalRotationFn;
     }
 
     auto FScriptSystem::Initialize(const FScriptRuntimeConfig& runtimeConfig,
@@ -222,6 +285,12 @@ namespace AltinaEngine::Scripting::CoreCLR {
         mNativeApi.GetCharInputAt         = &GetCharInputAt;
         mNativeApi.GetWorldTranslation    = &GetWorldTranslation;
         mNativeApi.SetWorldTranslation    = &SetWorldTranslation;
+        mNativeApi.GetLocalTranslation    = &GetLocalTranslation;
+        mNativeApi.SetLocalTranslation    = &SetLocalTranslation;
+        mNativeApi.GetWorldRotation       = &GetWorldRotation;
+        mNativeApi.SetWorldRotation       = &SetWorldRotation;
+        mNativeApi.GetLocalRotation       = &GetLocalRotation;
+        mNativeApi.SetLocalRotation       = &SetLocalRotation;
 
         if (!mRuntime.Initialize(runtimeConfig, managedConfig, mNativeApi)) {
             gInputSystem = nullptr;

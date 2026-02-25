@@ -139,6 +139,178 @@ namespace AltinaEngine::Launch {
             view.SetWorldTransform(transform);
             return true;
         }
+
+        auto GetScriptLocalTranslation(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            Scripting::FScriptVector3* outValue) -> bool {
+            if (gScriptWorldManager == nullptr || outValue == nullptr) {
+                return false;
+            }
+
+            GameScene::FWorldHandle handle{};
+            handle.Id   = worldId;
+            auto* world = gScriptWorldManager->GetWorld(handle);
+            if (world == nullptr) {
+                return false;
+            }
+
+            GameScene::FGameObjectId objectId{};
+            objectId.Index      = ownerIndex;
+            objectId.Generation = ownerGeneration;
+            objectId.WorldId    = worldId;
+            if (!world->IsAlive(objectId)) {
+                return false;
+            }
+
+            const auto transform = world->Object(objectId).GetLocalTransform();
+            outValue->X          = transform.Translation.X();
+            outValue->Y          = transform.Translation.Y();
+            outValue->Z          = transform.Translation.Z();
+            return true;
+        }
+
+        auto SetScriptLocalTranslation(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            const Scripting::FScriptVector3* value) -> bool {
+            if (gScriptWorldManager == nullptr || value == nullptr) {
+                return false;
+            }
+
+            GameScene::FWorldHandle handle{};
+            handle.Id   = worldId;
+            auto* world = gScriptWorldManager->GetWorld(handle);
+            if (world == nullptr) {
+                return false;
+            }
+
+            GameScene::FGameObjectId objectId{};
+            objectId.Index      = ownerIndex;
+            objectId.Generation = ownerGeneration;
+            objectId.WorldId    = worldId;
+            if (!world->IsAlive(objectId)) {
+                return false;
+            }
+
+            auto view             = world->Object(objectId);
+            auto transform        = view.GetLocalTransform();
+            transform.Translation = Core::Math::FVector3f(value->X, value->Y, value->Z);
+            view.SetLocalTransform(transform);
+            return true;
+        }
+
+        auto GetScriptWorldRotation(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            Scripting::FScriptQuaternion* outValue) -> bool {
+            if (gScriptWorldManager == nullptr || outValue == nullptr) {
+                return false;
+            }
+
+            GameScene::FWorldHandle handle{};
+            handle.Id   = worldId;
+            auto* world = gScriptWorldManager->GetWorld(handle);
+            if (world == nullptr) {
+                return false;
+            }
+
+            GameScene::FGameObjectId objectId{};
+            objectId.Index      = ownerIndex;
+            objectId.Generation = ownerGeneration;
+            objectId.WorldId    = worldId;
+            if (!world->IsAlive(objectId)) {
+                return false;
+            }
+
+            const auto transform = world->Object(objectId).GetWorldTransform();
+            outValue->X          = transform.Rotation.x;
+            outValue->Y          = transform.Rotation.y;
+            outValue->Z          = transform.Rotation.z;
+            outValue->W          = transform.Rotation.w;
+            return true;
+        }
+
+        auto SetScriptWorldRotation(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            const Scripting::FScriptQuaternion* value) -> bool {
+            if (gScriptWorldManager == nullptr || value == nullptr) {
+                return false;
+            }
+
+            GameScene::FWorldHandle handle{};
+            handle.Id   = worldId;
+            auto* world = gScriptWorldManager->GetWorld(handle);
+            if (world == nullptr) {
+                return false;
+            }
+
+            GameScene::FGameObjectId objectId{};
+            objectId.Index      = ownerIndex;
+            objectId.Generation = ownerGeneration;
+            objectId.WorldId    = worldId;
+            if (!world->IsAlive(objectId)) {
+                return false;
+            }
+
+            auto view      = world->Object(objectId);
+            auto transform = view.GetWorldTransform();
+            transform.Rotation =
+                Core::Math::FQuaternion(value->X, value->Y, value->Z, value->W).Normalized();
+            view.SetWorldTransform(transform);
+            return true;
+        }
+
+        auto GetScriptLocalRotation(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            Scripting::FScriptQuaternion* outValue) -> bool {
+            if (gScriptWorldManager == nullptr || outValue == nullptr) {
+                return false;
+            }
+
+            GameScene::FWorldHandle handle{};
+            handle.Id   = worldId;
+            auto* world = gScriptWorldManager->GetWorld(handle);
+            if (world == nullptr) {
+                return false;
+            }
+
+            GameScene::FGameObjectId objectId{};
+            objectId.Index      = ownerIndex;
+            objectId.Generation = ownerGeneration;
+            objectId.WorldId    = worldId;
+            if (!world->IsAlive(objectId)) {
+                return false;
+            }
+
+            const auto transform = world->Object(objectId).GetLocalTransform();
+            outValue->X          = transform.Rotation.x;
+            outValue->Y          = transform.Rotation.y;
+            outValue->Z          = transform.Rotation.z;
+            outValue->W          = transform.Rotation.w;
+            return true;
+        }
+
+        auto SetScriptLocalRotation(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            const Scripting::FScriptQuaternion* value) -> bool {
+            if (gScriptWorldManager == nullptr || value == nullptr) {
+                return false;
+            }
+
+            GameScene::FWorldHandle handle{};
+            handle.Id   = worldId;
+            auto* world = gScriptWorldManager->GetWorld(handle);
+            if (world == nullptr) {
+                return false;
+            }
+
+            GameScene::FGameObjectId objectId{};
+            objectId.Index      = ownerIndex;
+            objectId.Generation = ownerGeneration;
+            objectId.WorldId    = worldId;
+            if (!world->IsAlive(objectId)) {
+                return false;
+            }
+
+            auto view      = world->Object(objectId);
+            auto transform = view.GetLocalTransform();
+            transform.Rotation =
+                Core::Math::FQuaternion(value->X, value->Y, value->Z, value->W).Normalized();
+            view.SetLocalTransform(transform);
+            return true;
+        }
 #endif
 
         auto GetRenderThreadLagFrames() noexcept -> u32 {
@@ -569,8 +741,10 @@ namespace AltinaEngine::Launch {
         }
         if (mScriptSystem) {
             gScriptWorldManager = &mEngineRuntime.GetWorldManager();
-            Scripting::CoreCLR::SetWorldTranslationAccess(
-                &GetScriptWorldTranslation, &SetScriptWorldTranslation);
+            Scripting::CoreCLR::SetTransformAccess(&GetScriptWorldTranslation,
+                &SetScriptWorldTranslation, &GetScriptLocalTranslation, &SetScriptLocalTranslation,
+                &GetScriptWorldRotation, &SetScriptWorldRotation, &GetScriptLocalRotation,
+                &SetScriptLocalRotation);
             Scripting::FScriptRuntimeConfig runtimeConfig{};
             const auto                      exeDir =
                 Core::Utility::Filesystem::FPath(Core::Platform::GetExecutableDir());
@@ -836,7 +1010,8 @@ namespace AltinaEngine::Launch {
             mScriptSystem.Reset();
         }
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
-        Scripting::CoreCLR::SetWorldTranslationAccess(nullptr, nullptr);
+        Scripting::CoreCLR::SetTransformAccess(
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
         gScriptWorldManager = nullptr;
 #endif
 
@@ -850,8 +1025,16 @@ namespace AltinaEngine::Launch {
         mRenderCallback = Move(callback);
     }
 
+    auto FEngineLoop::GetInputSystem() noexcept -> Input::FInputSystem* {
+        return mInputSystem.Get();
+    }
+
     auto FEngineLoop::GetInputSystem() const noexcept -> const Input::FInputSystem* {
         return mInputSystem.Get();
+    }
+
+    auto FEngineLoop::GetMainWindow() noexcept -> Application::FPlatformWindow* {
+        return mApplication ? mApplication->GetMainWindow() : nullptr;
     }
 
     auto FEngineLoop::GetWorldManager() noexcept -> GameScene::FWorldManager& {

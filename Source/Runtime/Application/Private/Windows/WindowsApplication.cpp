@@ -154,6 +154,61 @@ namespace AltinaEngine::Application {
         ShowWindow(static_cast<HWND>(mWindowHandle), SW_MAXIMIZE);
     }
 
+    void FWindowsPlatformWindow::SetCursorVisible(bool visible) {
+        if (mCursorVisible == visible) {
+            return;
+        }
+        mCursorVisible = visible;
+
+        // ShowCursor maintains an internal display counter. Force it to the desired state.
+        if (visible) {
+            while (ShowCursor(TRUE) < 0) {}
+        } else {
+            while (ShowCursor(FALSE) >= 0) {}
+        }
+    }
+
+    void FWindowsPlatformWindow::SetCursorClippedToClient(bool clipped) {
+        if (!mWindowHandle) {
+            return;
+        }
+        if (mCursorClipped == clipped) {
+            return;
+        }
+        mCursorClipped = clipped;
+
+        if (!clipped) {
+            ClipCursor(nullptr);
+            return;
+        }
+
+        RECT clientRect{};
+        GetClientRect(static_cast<HWND>(mWindowHandle), &clientRect);
+
+        // Convert to screen-space rectangle for ClipCursor.
+        POINT tl{ clientRect.left, clientRect.top };
+        POINT br{ clientRect.right, clientRect.bottom };
+        ClientToScreen(static_cast<HWND>(mWindowHandle), &tl);
+        ClientToScreen(static_cast<HWND>(mWindowHandle), &br);
+
+        RECT screenRect{};
+        screenRect.left   = tl.x;
+        screenRect.top    = tl.y;
+        screenRect.right  = br.x;
+        screenRect.bottom = br.y;
+        ClipCursor(&screenRect);
+    }
+
+    void FWindowsPlatformWindow::SetCursorPositionClient(i32 x, i32 y) {
+        if (!mWindowHandle) {
+            return;
+        }
+
+        POINT p{ x, y };
+        ClientToScreen(static_cast<HWND>(mWindowHandle), &p);
+        SetCursorPos(p.x, p.y);
+    }
+
     auto FWindowsPlatformWindow::GetSize() const noexcept -> FWindowExtent { return mCachedSize; }
 
     auto FWindowsPlatformWindow::GetProperties() const -> FPlatformWindowProperty {

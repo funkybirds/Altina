@@ -10,6 +10,13 @@ namespace AltinaEngine::Scripting {
         f32 Z = 0.0f;
     };
 
+    struct AE_SCRIPTING_API FScriptQuaternion {
+        f32 X = 0.0f;
+        f32 Y = 0.0f;
+        f32 Z = 0.0f;
+        f32 W = 1.0f;
+    };
+
     struct AE_SCRIPTING_API FNativeApi {
         void (*LogInfo)(const char* message)  = nullptr;
         void (*LogError)(const char* message) = nullptr;
@@ -39,6 +46,21 @@ namespace AltinaEngine::Scripting {
             u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptVector3* outValue) = nullptr;
         bool (*SetWorldTranslation)(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
             const FScriptVector3* value)                                                = nullptr;
+
+        bool (*GetLocalTranslation)(
+            u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptVector3* outValue) = nullptr;
+        bool (*SetLocalTranslation)(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            const FScriptVector3* value)                                                = nullptr;
+
+        bool (*GetWorldRotation)(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            FScriptQuaternion* outValue)    = nullptr;
+        bool (*SetWorldRotation)(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            const FScriptQuaternion* value) = nullptr;
+
+        bool (*GetLocalRotation)(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            FScriptQuaternion* outValue)    = nullptr;
+        bool (*SetLocalRotation)(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
+            const FScriptQuaternion* value) = nullptr;
     };
 
     struct AE_SCRIPTING_API FManagedCreateArgs {

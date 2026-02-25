@@ -14,8 +14,26 @@ namespace AltinaEngine::Scripting::CoreCLR {
     using FSetWorldTranslationFn = bool (*)(
         u32 worldId, u32 ownerIndex, u32 ownerGeneration, const FScriptVector3* value);
 
-    AE_SCRIPTING_CORECLR_API void SetWorldTranslationAccess(
-        FGetWorldTranslationFn getFn, FSetWorldTranslationFn setFn) noexcept;
+    using FGetLocalTranslationFn = bool (*)(
+        u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptVector3* outValue);
+    using FSetLocalTranslationFn = bool (*)(
+        u32 worldId, u32 ownerIndex, u32 ownerGeneration, const FScriptVector3* value);
+
+    using FGetWorldRotationFn = bool (*)(
+        u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptQuaternion* outValue);
+    using FSetWorldRotationFn = bool (*)(
+        u32 worldId, u32 ownerIndex, u32 ownerGeneration, const FScriptQuaternion* value);
+
+    using FGetLocalRotationFn = bool (*)(
+        u32 worldId, u32 ownerIndex, u32 ownerGeneration, FScriptQuaternion* outValue);
+    using FSetLocalRotationFn = bool (*)(
+        u32 worldId, u32 ownerIndex, u32 ownerGeneration, const FScriptQuaternion* value);
+
+    AE_SCRIPTING_CORECLR_API void SetTransformAccess(FGetWorldTranslationFn getWorldTranslationFn,
+        FSetWorldTranslationFn setWorldTranslationFn, FGetLocalTranslationFn getLocalTranslationFn,
+        FSetLocalTranslationFn setLocalTranslationFn, FGetWorldRotationFn getWorldRotationFn,
+        FSetWorldRotationFn setWorldRotationFn, FGetLocalRotationFn getLocalRotationFn,
+        FSetLocalRotationFn setLocalRotationFn) noexcept;
 
     class AE_SCRIPTING_CORECLR_API FScriptSystem {
     public:

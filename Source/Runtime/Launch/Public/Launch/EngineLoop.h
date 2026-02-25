@@ -73,7 +73,9 @@ namespace AltinaEngine::Launch {
         void               Exit();
         void               SetRenderCallback(FRenderCallback callback);
         [[nodiscard]] auto IsRunning() const noexcept -> bool { return mIsRunning; }
+        [[nodiscard]] auto GetInputSystem() noexcept -> Input::FInputSystem*;
         [[nodiscard]] auto GetInputSystem() const noexcept -> const Input::FInputSystem*;
+        [[nodiscard]] auto GetMainWindow() noexcept -> Application::FPlatformWindow*;
         [[nodiscard]] auto GetWorldManager() noexcept -> GameScene::FWorldManager&;
         [[nodiscard]] auto GetWorldManager() const noexcept -> const GameScene::FWorldManager&;
         [[nodiscard]] auto GetAssetRegistry() noexcept -> Asset::FAssetRegistry&;

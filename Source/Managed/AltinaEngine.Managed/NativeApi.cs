@@ -33,6 +33,15 @@ public unsafe struct NativeApi
 
     public delegate* unmanaged[Cdecl]<uint, uint, uint, Vector3*, bool> GetWorldTranslation;
     public delegate* unmanaged[Cdecl]<uint, uint, uint, Vector3*, bool> SetWorldTranslation;
+
+    public delegate* unmanaged[Cdecl]<uint, uint, uint, Vector3*, bool> GetLocalTranslation;
+    public delegate* unmanaged[Cdecl]<uint, uint, uint, Vector3*, bool> SetLocalTranslation;
+
+    public delegate* unmanaged[Cdecl]<uint, uint, uint, Quaternion*, bool> GetWorldRotation;
+    public delegate* unmanaged[Cdecl]<uint, uint, uint, Quaternion*, bool> SetWorldRotation;
+
+    public delegate* unmanaged[Cdecl]<uint, uint, uint, Quaternion*, bool> GetLocalRotation;
+    public delegate* unmanaged[Cdecl]<uint, uint, uint, Quaternion*, bool> SetLocalRotation;
 }
 
 internal static unsafe class Native

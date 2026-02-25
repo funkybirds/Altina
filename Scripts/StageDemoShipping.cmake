@@ -42,6 +42,8 @@ file(GLOB _shipping_files
     LIST_DIRECTORIES false
     "${DEMO_BIN_DIR}/*.exe"
     "${DEMO_BIN_DIR}/*.dll"
+    # Managed host config + deps live next to the exe.
+    "${DEMO_BIN_DIR}/*.json"
 )
 
 foreach(_f IN LISTS _shipping_files)

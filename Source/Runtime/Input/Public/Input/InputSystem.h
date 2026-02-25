@@ -48,6 +48,9 @@ namespace AltinaEngine::Input {
         [[nodiscard]] auto GetWindowHeight() const noexcept -> u32;
         [[nodiscard]] auto HasFocus() const noexcept -> bool;
 
+        // Used for FPS-style cursor warping without injecting artificial mouse deltas.
+        void               SetMousePositionNoDelta(i32 x, i32 y) noexcept;
+
         void               OnWindowResized(u32 InWidth, u32 InHeight);
         void               OnWindowFocusGained();
         void               OnWindowFocusLost();

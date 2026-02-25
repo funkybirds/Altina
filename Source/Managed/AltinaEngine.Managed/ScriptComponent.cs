@@ -38,6 +38,99 @@ public abstract class ScriptComponent
         return fn(WorldId, OwnerIndex, OwnerGeneration, buffer);
     }
 
+    protected unsafe bool TryGetLocalPosition(out Vector3 position)
+    {
+        position = Vector3.Zero;
+        var fn = Native.Api.GetLocalTranslation;
+        if (fn == null)
+        {
+            return false;
+        }
+
+        Vector3* buffer = stackalloc Vector3[1];
+        if (!fn(WorldId, OwnerIndex, OwnerGeneration, buffer))
+        {
+            return false;
+        }
+        position = buffer[0];
+        return true;
+    }
+
+    protected unsafe bool TrySetLocalPosition(Vector3 position)
+    {
+        var fn = Native.Api.SetLocalTranslation;
+        if (fn == null)
+        {
+            return false;
+        }
+
+        Vector3* buffer = stackalloc Vector3[1];
+        buffer[0] = position;
+        return fn(WorldId, OwnerIndex, OwnerGeneration, buffer);
+    }
+
+    protected unsafe bool TryGetWorldRotation(out Quaternion rotation)
+    {
+        rotation = Quaternion.Identity;
+        var fn = Native.Api.GetWorldRotation;
+        if (fn == null)
+        {
+            return false;
+        }
+
+        Quaternion* buffer = stackalloc Quaternion[1];
+        if (!fn(WorldId, OwnerIndex, OwnerGeneration, buffer))
+        {
+            return false;
+        }
+        rotation = buffer[0];
+        return true;
+    }
+
+    protected unsafe bool TrySetWorldRotation(Quaternion rotation)
+    {
+        var fn = Native.Api.SetWorldRotation;
+        if (fn == null)
+        {
+            return false;
+        }
+
+        Quaternion* buffer = stackalloc Quaternion[1];
+        buffer[0] = rotation;
+        return fn(WorldId, OwnerIndex, OwnerGeneration, buffer);
+    }
+
+    protected unsafe bool TryGetLocalRotation(out Quaternion rotation)
+    {
+        rotation = Quaternion.Identity;
+        var fn = Native.Api.GetLocalRotation;
+        if (fn == null)
+        {
+            return false;
+        }
+
+        Quaternion* buffer = stackalloc Quaternion[1];
+        if (!fn(WorldId, OwnerIndex, OwnerGeneration, buffer))
+        {
+            return false;
+        }
+        rotation = buffer[0];
+        return true;
+    }
+
+    protected unsafe bool TrySetLocalRotation(Quaternion rotation)
+    {
+        var fn = Native.Api.SetLocalRotation;
+        if (fn == null)
+        {
+            return false;
+        }
+
+        Quaternion* buffer = stackalloc Quaternion[1];
+        buffer[0] = rotation;
+        return fn(WorldId, OwnerIndex, OwnerGeneration, buffer);
+    }
+
     public virtual void OnCreate() { }
     public virtual void OnDestroy() { }
     public virtual void OnEnable() { }

@@ -45,6 +45,11 @@ namespace AltinaEngine::Application {
         [[nodiscard]] auto GetProperties() const -> FPlatformWindowProperty override;
         [[nodiscard]] auto GetNativeHandle() const noexcept -> void* override;
         [[nodiscard]] auto IsClosed() const noexcept -> bool override { return mIsClosed; }
+
+        void               SetCursorVisible(bool visible) override;
+        void               SetCursorClippedToClient(bool clipped) override;
+        void               SetCursorPositionClient(i32 x, i32 y) override;
+
         [[nodiscard]] auto GetWindowHandle() const noexcept -> void*;
         void               SetMessageRouter(FAppMessageRouter* InRouter) noexcept;
 
@@ -64,6 +69,8 @@ namespace AltinaEngine::Application {
         FWindowExtent           mCachedSize{};
         bool                    mIsMouseTracking = false;
         bool                    mIsClosed        = false;
+        bool                    mCursorVisible   = true;
+        bool                    mCursorClipped   = false;
     };
 
     class AE_APPLICATION_API FWindowsApplication final : public FApplication {

@@ -30,14 +30,19 @@ namespace {
                 engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/spaceshipgame/materials/ship"));
 
             const auto shipScriptHandle = engineLoop.GetAssetRegistry().FindByPath(
-                TEXT("demo/spaceshipgame/scripts/shipfreemove"));
+                TEXT("demo/spaceshipgame/scripts/shiporbit"));
             const auto cameraScriptHandle = engineLoop.GetAssetRegistry().FindByPath(
-                TEXT("demo/spaceshipgame/scripts/fpscamera"));
+                TEXT("demo/spaceshipgame/scripts/fpscamerafollow"));
+            const auto earthScriptHandle = engineLoop.GetAssetRegistry().FindByPath(
+                TEXT("demo/spaceshipgame/scripts/earthrevolve"));
+            const auto moonScriptHandle = engineLoop.GetAssetRegistry().FindByPath(
+                TEXT("demo/spaceshipgame/scripts/moonrevolve"));
 
             if (!sphereMeshHandle.IsValid() || !sunMaterialHandle.IsValid()
                 || !earthMaterialHandle.IsValid() || !moonMaterialHandle.IsValid()
                 || !shipMaterialHandle.IsValid() || !shipScriptHandle.IsValid()
-                || !cameraScriptHandle.IsValid()) {
+                || !cameraScriptHandle.IsValid() || !earthScriptHandle.IsValid()
+                || !moonScriptHandle.IsValid()) {
                 return false;
             }
 
@@ -52,35 +57,48 @@ namespace {
                 return false;
             }
 
-            // Ship.
-            GameScene::FGameObjectView shipObject;
+            // Ship root (logic + transform). Keep renderable mesh on a child so hiding the ship
+            // does not accidentally break camera transforms by setting parent scale to zero.
+            GameScene::FGameObjectView shipRootObject;
             {
-                shipObject    = world->CreateGameObject(TEXT("Ship"));
-                auto t        = shipObject.GetWorldTransform();
-                t.Translation = Core::Math::FVector3f(20.0f, 0.0f, 6.0f);
-                t.Scale       = Core::Math::FVector3f(0.6f);
-                shipObject.SetWorldTransform(t);
+                shipRootObject = world->CreateGameObject(TEXT("Ship"));
+                auto t         = shipRootObject.GetWorldTransform();
+                t.Translation  = Core::Math::FVector3f(401.2f, 0.0f, 0.0f);
+                t.Scale        = Core::Math::FVector3f(1.0f);
+                shipRootObject.SetWorldTransform(t);
 
-                auto meshFilter = shipObject.AddComponent<GameScene::FStaticMeshFilterComponent>();
+                auto scriptComp = shipRootObject.AddComponent<GameScene::FScriptComponent>();
+                if (scriptComp.IsValid()) {
+                    scriptComp.Get().SetScriptAsset(shipScriptHandle);
+                }
+            }
+
+            // Ship visual.
+            {
+                auto shipVisualObject = world->CreateGameObject(TEXT("ShipVisual"));
+                shipVisualObject.SetParent(shipRootObject.GetId());
+
+                auto t  = shipVisualObject.GetLocalTransform();
+                t.Scale = Core::Math::FVector3f(0.00f);
+                shipVisualObject.SetLocalTransform(t);
+
+                auto meshFilter =
+                    shipVisualObject.AddComponent<GameScene::FStaticMeshFilterComponent>();
                 if (meshFilter.IsValid()) {
                     meshFilter.Get().SetStaticMeshAsset(sphereMeshHandle);
                 }
 
-                auto materialComp = shipObject.AddComponent<GameScene::FMeshMaterialComponent>();
+                auto materialComp =
+                    shipVisualObject.AddComponent<GameScene::FMeshMaterialComponent>();
                 if (materialComp.IsValid()) {
                     materialComp.Get().SetMaterialTemplate(0, shipMaterialHandle);
-                }
-
-                auto scriptComp = shipObject.AddComponent<GameScene::FScriptComponent>();
-                if (scriptComp.IsValid()) {
-                    scriptComp.Get().SetScriptAsset(shipScriptHandle);
                 }
             }
 
             // Camera (first-person).
             {
                 auto cameraObject = world->CreateGameObject(TEXT("Camera"));
-                cameraObject.SetParent(shipObject.GetId());
+                cameraObject.SetParent(shipRootObject.GetId());
 
                 auto cameraComp = cameraObject.AddComponent<GameScene::FCameraComponent>();
                 if (cameraComp.IsValid()) {
@@ -96,7 +114,8 @@ namespace {
 
             auto CreateBody = [&](Core::Container::FStringView name, const Asset::FAssetHandle mesh,
                                   const Asset::FAssetHandle    material,
-                                  const Core::Math::FVector3f& pos, float scale) {
+                                  const Core::Math::FVector3f& pos,
+                                  float scale) -> GameScene::FGameObjectView {
                 auto obj      = world->CreateGameObject(name);
                 auto t        = obj.GetWorldTransform();
                 t.Translation = pos;
@@ -112,14 +131,29 @@ namespace {
                 if (materialComp.IsValid()) {
                     materialComp.Get().SetMaterialTemplate(0, material);
                 }
+
+                return obj;
             };
 
-            CreateBody(TEXT("Sun"), sphereMeshHandle, sunMaterialHandle,
-                Core::Math::FVector3f(0.0f, 0.0f, 0.0f), 6.0f);
-            CreateBody(TEXT("Earth"), sphereMeshHandle, earthMaterialHandle,
-                Core::Math::FVector3f(20.0f, 0.0f, 0.0f), 2.0f);
-            CreateBody(TEXT("Moon"), sphereMeshHandle, moonMaterialHandle,
-                Core::Math::FVector3f(26.0f, 0.0f, 0.0f), 0.8f);
+            (void)CreateBody(TEXT("Sun"), sphereMeshHandle, sunMaterialHandle,
+                Core::Math::FVector3f(0.0f, 0.0f, 0.0f), 6.9634f);
+            auto earthObject = CreateBody(TEXT("Earth"), sphereMeshHandle, earthMaterialHandle,
+                Core::Math::FVector3f(400.0f, 0.0f, 0.0f), 0.6371f);
+            auto moonObject  = CreateBody(TEXT("Moon"), sphereMeshHandle, moonMaterialHandle,
+                 Core::Math::FVector3f(438.44f, 0.0f, 0.0f), 0.1737f);
+
+            // Celestial revolution scripts (Milestone 3).
+            {
+                auto earthScript = earthObject.AddComponent<GameScene::FScriptComponent>();
+                if (earthScript.IsValid()) {
+                    earthScript.Get().SetScriptAsset(earthScriptHandle);
+                }
+
+                auto moonScript = moonObject.AddComponent<GameScene::FScriptComponent>();
+                if (moonScript.IsValid()) {
+                    moonScript.Get().SetScriptAsset(moonScriptHandle);
+                }
+            }
 
             // Directional light.
             {

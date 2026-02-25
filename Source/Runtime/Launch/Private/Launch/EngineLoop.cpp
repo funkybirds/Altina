@@ -466,9 +466,11 @@ namespace AltinaEngine::Launch {
             mAssetManager.RegisterLoader(&mScriptLoader);
             mAssetManager.RegisterLoader(&mShaderLoader);
             mAssetManager.RegisterLoader(&mTexture2DLoader);
+            mAssetManager.RegisterLoader(&mCubeMapLoader);
             GameScene::FScriptComponent::SetAssetManager(&mAssetManager);
             BindMeshMaterialConverter(mAssetRegistry, mAssetManager);
             BindStaticMeshConverter(mAssetRegistry, mAssetManager);
+            BindSkyCubeConverter(mAssetManager);
             mAssetReady = true;
         }
 

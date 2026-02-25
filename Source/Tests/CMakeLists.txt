@@ -152,7 +152,9 @@ file(GLOB_RECURSE AE_TEST_GAMESCENE_SOURCES
 ae_add_test_target(AltinaEngineTestsGameScene
     FOLDER "GameScene"
     SOURCES ${AE_TEST_GAMESCENE_SOURCES}
-    LIBS AltinaEngine::Engine
+    LIBS
+        AltinaEngine::Engine
+        AltinaEngine::Rhi::Mock
 )
 
 if(AE_ENABLE_SCRIPTING_CORECLR)

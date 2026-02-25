@@ -37,6 +37,13 @@ namespace AltinaEngine::Asset {
         u32 RowPitch = 0;
     };
 
+    struct AE_ASSET_API FCubeMapBlobDesc {
+        u32 Size     = 0;
+        u32 Format   = 0;
+        u32 MipCount = 0;
+        u32 RowPitch = 0; // Row pitch for mip 0 (tightly packed).
+    };
+
     struct AE_ASSET_API FMeshBlobDesc {
         u32 VertexCount      = 0;
         u32 IndexCount       = 0;
@@ -181,6 +188,7 @@ namespace AltinaEngine::Asset {
     constexpr u32                kTextureFormatR8      = 1;
     constexpr u32                kTextureFormatRGB8    = 2;
     constexpr u32                kTextureFormatRGBA8   = 3;
+    constexpr u32                kTextureFormatRGBA16F = 4;
 
     [[nodiscard]] constexpr auto GetTextureBytesPerPixel(u32 format) noexcept -> u32 {
         switch (format) {
@@ -190,6 +198,8 @@ namespace AltinaEngine::Asset {
                 return 3;
             case kTextureFormatRGBA8:
                 return 4;
+            case kTextureFormatRGBA16F:
+                return 8;
             default:
                 return 0;
         }

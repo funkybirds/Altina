@@ -11,6 +11,10 @@ using AltinaEngine::Core::Container::FNativeStringView;
 using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Container::FStringView;
 using AltinaEngine::Core::Container::TArray;
+namespace AltinaEngine::Core::Reflection {
+    class ISerializer;
+    class IDeserializer;
+} // namespace AltinaEngine::Core::Reflection
 namespace AltinaEngine {
     namespace Container = Core::Container;
 
@@ -45,6 +49,11 @@ namespace AltinaEngine {
 
         [[nodiscard]] auto           ToString() const -> FString;
         [[nodiscard]] auto           ToNativeString() const -> FNativeString;
+
+        // Make FUuid compatible with Core::Reflection::SerializeInvoker / DeserializeInvokerImpl.
+        void                         Serialize(Core::Reflection::ISerializer& serializer) const;
+        [[nodiscard]] static auto    Deserialize(Core::Reflection::IDeserializer& deserializer)
+            -> FUuid;
 
         [[nodiscard]] constexpr auto operator==(const FUuid& other) const noexcept -> bool {
             for (usize i = 0; i < kByteCount; ++i) {

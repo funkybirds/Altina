@@ -25,11 +25,17 @@ namespace AltinaEngine::Asset {
         MaterialInstance = 7,
         Shader           = 8,
         Model            = 9,
+        CubeMap          = 10,
     };
 
     struct AE_ASSET_API FAssetHandle {
-        FUuid                        Uuid;
-        EAssetType                   Type = EAssetType::Unknown;
+        FUuid                     Uuid;
+        EAssetType                Type = EAssetType::Unknown;
+
+        // Reflection serialization support (used by GameScene component serialization).
+        void                      Serialize(Core::Reflection::ISerializer& serializer) const;
+        [[nodiscard]] static auto Deserialize(Core::Reflection::IDeserializer& deserializer)
+            -> FAssetHandle;
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {
             return !Uuid.IsNil() && Type != EAssetType::Unknown;
@@ -56,6 +62,14 @@ namespace AltinaEngine::Asset {
         u32  MipCount = 0;
         u32  Format   = 0;
         bool SRGB     = true;
+    };
+
+    struct AE_ASSET_API FCubeMapDesc {
+        // Cube maps are always square (Size x Size) with 6 faces.
+        u32  Size     = 0;
+        u32  MipCount = 0;
+        u32  Format   = 0;
+        bool SRGB     = false;
     };
 
     struct AE_ASSET_API FMeshDesc {
@@ -102,6 +116,7 @@ namespace AltinaEngine::Asset {
         TVector<FAssetHandle> Dependencies;
 
         FTexture2DDesc        Texture;
+        FCubeMapDesc          CubeMap;
         FMeshDesc             Mesh;
         FMaterialDesc         Material;
         FModelDesc            Model;

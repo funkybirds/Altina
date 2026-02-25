@@ -1,5 +1,6 @@
 #include "TestHarness.h"
 #include "Base/AltinaBase.h"
+#include "Engine/EngineReflection.h"
 #include "Engine/GameScene/World.h"
 #include "Reflection/BinaryDeserializer.h"
 #include "Reflection/BinarySerializer.h"
@@ -52,6 +53,7 @@ namespace {
 } // namespace
 
 TEST_CASE("GameScene.World.Serialization.RoundTrip") {
+    AltinaEngine::Engine::RegisterEngineReflection();
     RegisterTestComponent();
 
     FWorld                                world(42);

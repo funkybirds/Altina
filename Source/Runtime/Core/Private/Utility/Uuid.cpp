@@ -1,5 +1,7 @@
 #include "Utility/Uuid.h"
 
+#include "Reflection/Serializer.h"
+
 #include <random>
 
 using AltinaEngine::Core::Container::FNativeString;
@@ -129,5 +131,20 @@ namespace AltinaEngine {
     auto FUuid::ToString() const -> FString { return ToStringImpl<TChar>(*this); }
 
     auto FUuid::ToNativeString() const -> FNativeString { return ToStringImpl<char>(*this); }
+
+    void FUuid::Serialize(Core::Reflection::ISerializer& serializer) const {
+        const auto& bytes = GetBytes();
+        for (usize i = 0; i < kByteCount; ++i) {
+            serializer.Write(bytes[i]);
+        }
+    }
+
+    auto FUuid::Deserialize(Core::Reflection::IDeserializer& deserializer) -> FUuid {
+        FBytes bytes{};
+        for (usize i = 0; i < kByteCount; ++i) {
+            bytes[i] = deserializer.Read<u8>();
+        }
+        return FUuid(bytes);
+    }
 
 } // namespace AltinaEngine

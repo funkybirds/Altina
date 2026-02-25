@@ -8,6 +8,7 @@
 #include "Application/Application.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetRegistry.h"
+#include "Asset/AssetBinary.h"
 #include "Asset/AudioLoader.h"
 #include "Asset/MaterialLoader.h"
 #include "Asset/ModelLoader.h"
@@ -15,6 +16,7 @@
 #include "Asset/ShaderLoader.h"
 #include "Asset/ScriptLoader.h"
 #include "Asset/Texture2DLoader.h"
+#include "Asset/CubeMapLoader.h"
 #include "Input/InputMessageHandler.h"
 #include "Input/InputSystem.h"
 #include "Threading/RenderingThread.h"
@@ -22,15 +24,18 @@
 #include "Jobs/JobSystem.h"
 #include "Rhi/RhiContext.h"
 #include "Rhi/RhiDevice.h"
+#include "Rhi/RhiInit.h"
 #include "Rhi/RhiRefs.h"
 #include "Rhi/RhiViewport.h"
 #include "Engine/Runtime/EngineRuntime.h"
 #include "Engine/Runtime/MaterialCache.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "RenderAsset/MaterialShaderAssetLoader.h"
 #include "RenderAsset/MeshAssetConversion.h"
 #include "Asset/MeshAsset.h"
+#include "Asset/CubeMapAsset.h"
 #include "Types/CheckedCast.h"
 
 using AltinaEngine::Core::Container::TFunction;
@@ -129,6 +134,115 @@ namespace AltinaEngine::Launch {
             };
         }
 
+        static void BindSkyCubeConverter(Asset::FAssetManager& manager) {
+            GameScene::FSkyCubeComponent::AssetToSkyCubeConverter =
+                [&manager](const Asset::FAssetHandle& handle)
+                -> GameScene::FSkyCubeComponent::FSkyCubeRhiResources {
+                GameScene::FSkyCubeComponent::FSkyCubeRhiResources out{};
+
+                if (!handle.IsValid()) {
+                    return out;
+                }
+
+                auto* device = Rhi::RHIGetDevice();
+                if (device == nullptr) {
+                    return out;
+                }
+
+                const auto assetRef = manager.Load(handle);
+                if (!assetRef) {
+                    return out;
+                }
+
+                const auto* cubeAsset =
+                    AltinaEngine::CheckedCast<const Asset::FCubeMapAsset*>(assetRef.Get());
+                if (cubeAsset == nullptr) {
+                    return out;
+                }
+
+                const auto& assetDesc     = cubeAsset->GetDesc();
+                const u32   bytesPerPixel = Asset::GetTextureBytesPerPixel(assetDesc.Format);
+                if (bytesPerPixel == 0U || assetDesc.Size == 0U || assetDesc.MipCount == 0U) {
+                    return out;
+                }
+
+                Rhi::ERhiFormat format = Rhi::ERhiFormat::Unknown;
+                switch (assetDesc.Format) {
+                    case Asset::kTextureFormatRGBA8:
+                        format = assetDesc.SRGB ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
+                                                : Rhi::ERhiFormat::R8G8B8A8Unorm;
+                        break;
+                    case Asset::kTextureFormatRGBA16F:
+                        format = Rhi::ERhiFormat::R16G16B16A16Float;
+                        break;
+                    case Asset::kTextureFormatR8:
+                    case Asset::kTextureFormatRGB8:
+                    default:
+                        // Cook pipeline should output supported formats; fall back to RGBA8.
+                        format = assetDesc.SRGB ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
+                                                : Rhi::ERhiFormat::R8G8B8A8Unorm;
+                        break;
+                }
+
+                Rhi::FRhiTextureDesc texDesc{};
+                texDesc.mDebugName.Assign(TEXT("SkyCube"));
+                texDesc.mWidth       = assetDesc.Size;
+                texDesc.mHeight      = assetDesc.Size;
+                texDesc.mDepth       = 1U;
+                texDesc.mMipLevels   = assetDesc.MipCount;
+                texDesc.mArrayLayers = 6U;
+                texDesc.mFormat      = format;
+                texDesc.mDimension   = Rhi::ERhiTextureDimension::Cube;
+                texDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::ShaderResource;
+
+                out.Texture = Rhi::RHICreateTexture(texDesc);
+                if (!out.Texture) {
+                    return {};
+                }
+
+                const auto& pixels = cubeAsset->GetPixels();
+                if (!pixels.IsEmpty()) {
+                    u32   size   = assetDesc.Size;
+                    usize offset = 0U;
+                    for (u32 mip = 0U; mip < assetDesc.MipCount; ++mip) {
+                        const u32 rowPitch   = size * bytesPerPixel;
+                        const u32 slicePitch = rowPitch * size;
+                        if (rowPitch == 0U || slicePitch == 0U) {
+                            break;
+                        }
+                        const usize faceSize = static_cast<usize>(slicePitch);
+                        const usize mipSize  = faceSize * 6U;
+                        if (offset + mipSize > pixels.Size()) {
+                            break;
+                        }
+
+                        for (u32 face = 0U; face < 6U; ++face) {
+                            Rhi::FRhiTextureSubresource subresource{};
+                            subresource.mMipLevel   = mip;
+                            subresource.mArrayLayer = face;
+                            device->UpdateTextureSubresource(out.Texture.Get(), subresource,
+                                pixels.Data() + offset, rowPitch, slicePitch);
+                            offset += faceSize;
+                        }
+
+                        size = (size > 1U) ? (size >> 1U) : 1U;
+                    }
+                }
+
+                Rhi::FRhiShaderResourceViewDesc srvDesc{};
+                srvDesc.mDebugName.Assign(TEXT("SkyCube.SRV"));
+                srvDesc.mTexture                      = out.Texture.Get();
+                srvDesc.mFormat                       = texDesc.mFormat;
+                srvDesc.mTextureRange.mBaseMip        = 0U;
+                srvDesc.mTextureRange.mMipCount       = texDesc.mMipLevels;
+                srvDesc.mTextureRange.mBaseArrayLayer = 0U;
+                srvDesc.mTextureRange.mLayerCount     = texDesc.mArrayLayers;
+
+                out.SRV = device->CreateShaderResourceView(srvDesc);
+                return out;
+            };
+        }
+
         void                                Draw();
         void                                FlushRenderFrames();
         void                                EnforceRenderLag(u32 maxLagFrames);
@@ -158,6 +272,7 @@ namespace AltinaEngine::Launch {
         Asset::FShaderLoader                 mShaderLoader;
         Asset::FScriptLoader                 mScriptLoader;
         Asset::FTexture2DLoader              mTexture2DLoader;
+        Asset::FCubeMapLoader                mCubeMapLoader;
         Engine::FMaterialCache               mMaterialCache;
         TOwner<RenderCore::FRenderingThread> mRenderingThread;
         TQueue<Core::Jobs::FJobHandle>       mPendingRenderFrames;

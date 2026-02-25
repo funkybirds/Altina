@@ -3,6 +3,7 @@
 #include "Base/AltinaBase.h"
 #include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/World.h"
+#include "Engine/EngineReflection.h"
 #include "Reflection/BinaryDeserializer.h"
 #include "Reflection/BinarySerializer.h"
 #include "Utility/Uuid.h"
@@ -10,19 +11,19 @@
 #include <array>
 
 namespace {
+    using AltinaEngine::FUuid;
     using AltinaEngine::u32;
     using AltinaEngine::u8;
     using AltinaEngine::Asset::EAssetType;
     using AltinaEngine::Asset::FAssetHandle;
     using AltinaEngine::Core::Reflection::FBinaryDeserializer;
     using AltinaEngine::Core::Reflection::FBinarySerializer;
-    using AltinaEngine::Core::Utility::FUuid;
     using AltinaEngine::GameScene::FComponentId;
     using AltinaEngine::GameScene::FSkyCubeComponent;
     using AltinaEngine::GameScene::FWorld;
 
     auto MakeUuid(u8 seed) -> FUuid {
-        std::array<u8, FUuid::kByteCount> bytes{};
+        FUuid::FBytes bytes{};
         for (u32 i = 0U; i < FUuid::kByteCount; ++i) {
             bytes[i] = static_cast<u8>(seed + static_cast<u8>(i));
         }
@@ -64,6 +65,8 @@ TEST_CASE("GameScene.SkyCubeComponent.ActiveList") {
 }
 
 TEST_CASE("GameScene.SkyCubeComponent.Serialization.BinaryRoundTrip") {
+    AltinaEngine::Engine::RegisterEngineReflection();
+
     FWorld world(7);
     auto   obj = world.CreateGameObject(TEXT("Sky"));
     REQUIRE(obj.IsValid());

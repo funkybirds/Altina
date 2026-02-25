@@ -5,5 +5,12 @@ namespace AltinaEngine::Core::Reflection {
 }
 
 namespace AltinaEngine::Engine {
-    void RegisterEngineReflection() { Core::Reflection::RegisterReflection_AltinaEngineEngine(); }
+    void RegisterEngineReflection() {
+        static bool gRegistered = false;
+        if (gRegistered) {
+            return;
+        }
+        gRegistered = true;
+        Core::Reflection::RegisterReflection_AltinaEngineEngine();
+    }
 } // namespace AltinaEngine::Engine

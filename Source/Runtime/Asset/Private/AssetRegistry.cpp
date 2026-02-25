@@ -24,6 +24,11 @@ namespace AltinaEngine::Asset {
             if (Core::Utility::String::EqualLiteralI(text, "texture2d")) {
                 return EAssetType::Texture2D;
             }
+            if (Core::Utility::String::EqualLiteralI(text, "cubemap")
+                || Core::Utility::String::EqualLiteralI(text, "texturecube")
+                || Core::Utility::String::EqualLiteralI(text, "texturecubemap")) {
+                return EAssetType::CubeMap;
+            }
             if (Core::Utility::String::EqualLiteralI(text, "mesh")) {
                 return EAssetType::Mesh;
             }
@@ -93,6 +98,12 @@ namespace AltinaEngine::Asset {
                     ReadU32Field(descObject, "MipCount", desc.Texture.MipCount);
                     ReadU32Field(descObject, "Format", desc.Texture.Format);
                     ReadBoolField(descObject, "SRGB", desc.Texture.SRGB);
+                    break;
+                case EAssetType::CubeMap:
+                    ReadU32Field(descObject, "Size", desc.CubeMap.Size);
+                    ReadU32Field(descObject, "MipCount", desc.CubeMap.MipCount);
+                    ReadU32Field(descObject, "Format", desc.CubeMap.Format);
+                    ReadBoolField(descObject, "SRGB", desc.CubeMap.SRGB);
                     break;
                 case EAssetType::Mesh:
                     ReadU32Field(descObject, "VertexFormat", desc.Mesh.VertexFormat);

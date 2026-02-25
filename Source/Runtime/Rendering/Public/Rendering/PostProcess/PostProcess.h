@@ -46,6 +46,7 @@ namespace AltinaEngine::Rendering {
     };
 
     struct AE_RENDERING_API FPostProcessBuildContext {
+        u64 ViewKey = 0ULL; // For per-view persistent effects (e.g. TAA history).
         RenderCore::FFrameGraphTextureRef BackBuffer;
         Rhi::ERhiFormat                   BackBufferFormat = Rhi::ERhiFormat::Unknown;
     };

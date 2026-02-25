@@ -5,6 +5,7 @@ namespace AltinaEngine::Rendering {
     Core::Console::TConsoleVariable<i32> rPostProcessTonemap(TEXT("r.PostProcess.Tonemap"), 1);
     Core::Console::TConsoleVariable<i32> rPostProcessBloom(TEXT("r.PostProcess.Bloom"), 0);
     Core::Console::TConsoleVariable<i32> rPostProcessFxaa(TEXT("r.PostProcess.Fxaa"), 0);
+    Core::Console::TConsoleVariable<i32> rPostProcessTaa(TEXT("r.PostProcess.Taa"), 0);
 
     Core::Console::TConsoleVariable<f32> rPostProcessBloomThreshold(
         TEXT("r.PostProcess.Bloom.Threshold"), 1.0f);
@@ -23,4 +24,13 @@ namespace AltinaEngine::Rendering {
         TEXT("r.PostProcess.Fxaa.EdgeThresholdMin"), 0.0312f);
     Core::Console::TConsoleVariable<f32> rPostProcessFxaaSubpix(
         TEXT("r.PostProcess.Fxaa.Subpix"), 0.75f);
+
+    Core::Console::TConsoleVariable<f32> rPostProcessTaaAlpha(
+        TEXT("r.PostProcess.Taa.Alpha"), 0.9f);
+    Core::Console::TConsoleVariable<f32> rPostProcessTaaClampK(
+        TEXT("r.PostProcess.Taa.ClampK"), 1.0f);
+
+    Core::Console::TConsoleVariable<i32> rTemporalJitter(TEXT("r.TemporalJitter"), 0);
+    Core::Console::TConsoleVariable<i32> rTemporalJitterSampleCount(
+        TEXT("r.TemporalJitter.SampleCount"), 8);
 } // namespace AltinaEngine::Rendering

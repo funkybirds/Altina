@@ -15,6 +15,8 @@
 #include <mutex>
 
 namespace AltinaEngine::Rendering::PostProcess::Builtin {
+    void AddTaa(RenderCore::FFrameGraph& graph, const RenderCore::View::FViewData& view,
+        const FPostProcessNode& node, const FPostProcessBuildContext& ctx, FPostProcessIO& io);
     void AddBloom(RenderCore::FFrameGraph& graph, const RenderCore::View::FViewData& view,
         const FPostProcessNode& node, const FPostProcessBuildContext& ctx, FPostProcessIO& io);
     void AddTonemap(RenderCore::FFrameGraph& graph, const RenderCore::View::FViewData& view,
@@ -53,6 +55,7 @@ namespace AltinaEngine::Rendering {
             }
 
             // Built-ins.
+            s.Effects[FString(TEXT("TAA"))]     = FEffectEntry{ &PostProcess::Builtin::AddTaa };
             s.Effects[FString(TEXT("Bloom"))]   = FEffectEntry{ &PostProcess::Builtin::AddBloom };
             s.Effects[FString(TEXT("Tonemap"))] = FEffectEntry{ &PostProcess::Builtin::AddTonemap };
             s.Effects[FString(TEXT("Fxaa"))]    = FEffectEntry{ &PostProcess::Builtin::AddFxaa };

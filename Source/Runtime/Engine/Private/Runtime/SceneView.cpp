@@ -4,6 +4,7 @@
 #include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/PointLightComponent.h"
+#include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
 #include "Math/LinAlg/Common.h"
@@ -15,6 +16,8 @@ namespace AltinaEngine::Engine {
         outScene.Views.Clear();
         outScene.StaticMeshes.Clear();
         outScene.Lights.Clear();
+        outScene.SkyCubeAsset = {};
+        outScene.bHasSkyCube  = false;
 
         const auto& cameraIds = world.GetActiveCameraComponents();
         outScene.Views.Reserve(cameraIds.Size());
@@ -45,18 +48,6 @@ namespace AltinaEngine::Engine {
             viewData.TemporalSampleIndex = params.TemporalSampleIndex;
             viewData.DeltaTimeSeconds    = params.DeltaTimeSeconds;
             viewData.bReverseZ           = params.bReverseZ;
-
-            viewData.BeginFrame();
-            const auto viewMatrix     = component.BuildViewMatrix(viewData.Camera.Transform);
-            viewData.Matrices.View    = viewMatrix;
-            viewData.Matrices.InvView = Core::Math::LinAlg::Inverse(viewMatrix);
-            viewData.Matrices.ViewProj =
-                Core::Math::MatMul(viewData.Matrices.ProjUnjittered, viewMatrix);
-            viewData.Matrices.ViewProjJittered =
-                Core::Math::MatMul(viewData.Matrices.ProjJittered, viewMatrix);
-            viewData.Matrices.InvViewProj = Core::Math::LinAlg::Inverse(viewData.Matrices.ViewProj);
-            viewData.Matrices.InvViewProjJittered =
-                Core::Math::LinAlg::Inverse(viewData.Matrices.ViewProjJittered);
 
             outScene.Views.PushBack(Move(sceneView));
         }
@@ -167,6 +158,28 @@ namespace AltinaEngine::Engine {
             outScene.Lights.MainDirectionalLight.Color = Core::Math::FVector3f(1.0f, 1.0f, 1.0f);
             outScene.Lights.MainDirectionalLight.Intensity    = 2.0f;
             outScene.Lights.MainDirectionalLight.bCastShadows = false;
+        }
+
+        // Sky cube: first enabled instance with a valid asset handle wins.
+        const auto& skyCubeIds = world.GetActiveSkyCubeComponents();
+        for (const auto& id : skyCubeIds) {
+            if (!world.IsAlive(id)) {
+                continue;
+            }
+
+            const auto& component = world.ResolveComponent<GameScene::FSkyCubeComponent>(id);
+            if (!component.IsEnabled() || !world.IsGameObjectActive(component.GetOwner())) {
+                continue;
+            }
+
+            const auto handle = component.GetCubeMapAsset();
+            if (!handle.IsValid()) {
+                continue;
+            }
+
+            outScene.SkyCubeAsset = handle;
+            outScene.bHasSkyCube  = true;
+            break;
         }
     }
 } // namespace AltinaEngine::Engine

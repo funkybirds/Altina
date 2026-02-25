@@ -19,6 +19,8 @@ namespace AltinaEngine::RenderCore::Render {
 
 namespace AltinaEngine::Rendering {
     struct AE_RENDERING_API FRenderViewContext {
+        // Stable per-view key (e.g. ViewTarget + CameraId), used for persistent temporal state.
+        u64                                          ViewKey      = 0ULL;
         const RenderCore::View::FViewData*           View         = nullptr;
         const RenderCore::Render::FDrawList*         DrawList     = nullptr;
         Rhi::FRhiTexture*                            OutputTarget = nullptr;

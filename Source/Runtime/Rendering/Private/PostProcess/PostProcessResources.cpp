@@ -304,6 +304,54 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 }
             }
 
+            // TAA uses a dedicated layout (multiple textures) to avoid breaking the
+            // legacy single-texture post-process layout used by other effects.
+            if (!res.TaaLayout) {
+                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+                layoutDesc.mDebugName.Assign(TEXT("PostProcess.TAA.Layout"));
+                layoutDesc.mSetIndex = 0U;
+
+                // b0
+                {
+                    Rhi::FRhiBindGroupLayoutEntry entry{};
+                    entry.mBinding          = 0U;
+                    entry.mType             = Rhi::ERhiBindingType::ConstantBuffer;
+                    entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
+                    entry.mArrayCount       = 1U;
+                    entry.mHasDynamicOffset = false;
+                    layoutDesc.mEntries.PushBack(entry);
+                }
+
+                // t0..t2 (Current, History, Depth)
+                for (u32 binding = 0U; binding < 3U; ++binding) {
+                    Rhi::FRhiBindGroupLayoutEntry entry{};
+                    entry.mBinding          = binding;
+                    entry.mType             = Rhi::ERhiBindingType::SampledTexture;
+                    entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
+                    entry.mArrayCount       = 1U;
+                    entry.mHasDynamicOffset = false;
+                    layoutDesc.mEntries.PushBack(entry);
+                }
+
+                // s0 (linear)
+                {
+                    Rhi::FRhiBindGroupLayoutEntry entry{};
+                    entry.mBinding          = 0U;
+                    entry.mType             = Rhi::ERhiBindingType::Sampler;
+                    entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
+                    entry.mArrayCount       = 1U;
+                    entry.mHasDynamicOffset = false;
+                    layoutDesc.mEntries.PushBack(entry);
+                }
+
+                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
+                res.TaaLayout          = device.CreateBindGroupLayout(layoutDesc);
+                if (!res.TaaLayout) {
+                    LogError(TEXT("Failed to create PostProcess TAA bind group layout."));
+                    return false;
+                }
+            }
+
             if (!res.PipelineLayout) {
                 Rhi::FRhiPipelineLayoutDesc layoutDesc{};
                 layoutDesc.mDebugName.Assign(TEXT("PostProcess.PipelineLayout"));
@@ -311,6 +359,17 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 res.PipelineLayout = device.CreatePipelineLayout(layoutDesc);
                 if (!res.PipelineLayout) {
                     LogError(TEXT("Failed to create PostProcess pipeline layout."));
+                    return false;
+                }
+            }
+
+            if (!res.TaaPipelineLayout) {
+                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
+                layoutDesc.mDebugName.Assign(TEXT("PostProcess.TAA.PipelineLayout"));
+                layoutDesc.mBindGroupLayouts.PushBack(res.TaaLayout.Get());
+                res.TaaPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+                if (!res.TaaPipelineLayout) {
+                    LogError(TEXT("Failed to create PostProcess TAA pipeline layout."));
                     return false;
                 }
             }
@@ -350,6 +409,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
             const FTonemapConstants tonemapDefaults{};
             const FFxaaConstants    fxaaDefaults{};
             const FBloomConstants   bloomDefaults{};
+            const FTaaConstants     taaDefaults{};
 
             if (!EnsureCB(res.BlitConstantsBuffer, TEXT("PostProcess.Constants.Blit"),
                     sizeof(FBlitConstants), &blitDefaults)
@@ -358,7 +418,9 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 || !EnsureCB(res.FxaaConstantsBuffer, TEXT("PostProcess.Constants.Fxaa"),
                     sizeof(FFxaaConstants), &fxaaDefaults)
                 || !EnsureCB(res.BloomConstantsBuffer, TEXT("PostProcess.Constants.Bloom"),
-                    sizeof(FBloomConstants), &bloomDefaults)) {
+                    sizeof(FBloomConstants), &bloomDefaults)
+                || !EnsureCB(res.TaaConstantsBuffer, TEXT("PostProcess.Constants.TAA"),
+                    sizeof(FTaaConstants), &taaDefaults)) {
                 return false;
             }
 
@@ -368,7 +430,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         auto EnsurePipelines(Rhi::FRhiDevice& device, FPostProcessSharedResources& res) -> bool {
             if (!res.FullscreenVS || !res.BlitPS || !res.TonemapPS || !res.FxaaPS
                 || !res.BloomPrefilterPS || !res.BloomDownsamplePS || !res.BloomUpsamplePS
-                || !res.BloomApplyPS) {
+                || !res.BloomApplyPS || !res.TaaPS) {
                 const auto shaderDir = FindBuiltinPostProcessShaderDir();
                 if (!shaderDir.IsEmpty()) {
                     const auto vsPath      = shaderDir / TEXT("FullscreenTriangle.hlsl");
@@ -376,6 +438,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                     const auto tonemapPath = shaderDir / TEXT("Tonemap.hlsl");
                     const auto fxaaPath    = shaderDir / TEXT("Fxaa.hlsl");
                     const auto bloomPath   = shaderDir / TEXT("Bloom.hlsl");
+                    const auto taaPath     = shaderDir / TEXT("Taa.hlsl");
 
                     LogInfo(TEXT("PostProcess shader dir: '{}'"), shaderDir.GetString().ToView());
 
@@ -394,7 +457,9 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                         || !CompileShaderFromFile(bloomPath, TEXT("PSBloomUpsample"),
                             Shader::EShaderStage::Pixel, res.BloomUpsamplePS)
                         || !CompileShaderFromFile(bloomPath, TEXT("PSBloomApply"),
-                            Shader::EShaderStage::Pixel, res.BloomApplyPS)) {
+                            Shader::EShaderStage::Pixel, res.BloomApplyPS)
+                        || !CompileShaderFromFile(
+                            taaPath, TEXT("PSTaa"), Shader::EShaderStage::Pixel, res.TaaPS)) {
                         return false;
                     }
                 } else {
@@ -556,6 +621,26 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 res.BloomApplyAddPipeline     = device.CreateGraphicsPipeline(desc);
                 if (!res.BloomApplyAddPipeline) {
                     LogError(TEXT("Failed to create PostProcess bloom apply pipeline."));
+                    return false;
+                }
+            }
+
+            if (!res.TaaPipeline) {
+                Rhi::FRhiGraphicsPipelineDesc desc{};
+                desc.mDebugName.Assign(TEXT("PostProcess.TAAPipeline"));
+                desc.mVertexShader            = res.FullscreenVS.Get();
+                desc.mPixelShader             = res.TaaPS.Get();
+                desc.mPipelineLayout          = res.TaaPipelineLayout.Get();
+                desc.mVertexLayout            = {};
+                desc.mRasterState             = {};
+                desc.mDepthState              = {};
+                desc.mBlendState              = {};
+                desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+                desc.mDepthState.mDepthEnable = false;
+                desc.mDepthState.mDepthWrite  = false;
+                res.TaaPipeline               = device.CreateGraphicsPipeline(desc);
+                if (!res.TaaPipeline) {
+                    LogError(TEXT("Failed to create PostProcess TAA pipeline."));
                     return false;
                 }
             }

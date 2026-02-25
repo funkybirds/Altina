@@ -2,6 +2,7 @@
 
 #include "Container/SmartPtr.h"
 #include "Container/StringView.h"
+#include "Math/Matrix.h"
 #include "Rhi/RhiRefs.h"
 #include "Types/Aliases.h"
 
@@ -45,6 +46,23 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         f32 KawaseOffset = 1.0f;
     };
 
+    // Must match Source/Shader/PostProcess/Taa.hlsl cbuffer layout.
+    struct alignas(16) FTaaConstants {
+        f32                     RenderTargetSize[2]    = { 0.0f, 0.0f };
+        f32                     InvRenderTargetSize[2] = { 0.0f, 0.0f };
+
+        f32                     JitterNdc[2]     = { 0.0f, 0.0f };
+        f32                     PrevJitterNdc[2] = { 0.0f, 0.0f };
+
+        f32                     Alpha       = 0.9f;
+        f32                     ClampK      = 1.0f;
+        u32                     bHasHistory = 0U;
+        u32                     _pad0       = 0U;
+
+        Core::Math::FMatrix4x4f InvViewProjJittered{};
+        Core::Math::FMatrix4x4f PrevViewProjJittered{};
+    };
+
     struct FPostProcessSharedResources {
         Rhi::FRhiShaderRef          FullscreenVS;
         Rhi::FRhiShaderRef          BlitPS;
@@ -54,9 +72,12 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         Rhi::FRhiShaderRef          BloomDownsamplePS;
         Rhi::FRhiShaderRef          BloomUpsamplePS;
         Rhi::FRhiShaderRef          BloomApplyPS;
+        Rhi::FRhiShaderRef          TaaPS;
 
         Rhi::FRhiBindGroupLayoutRef Layout;
+        Rhi::FRhiBindGroupLayoutRef TaaLayout;
         Rhi::FRhiPipelineLayoutRef  PipelineLayout;
+        Rhi::FRhiPipelineLayoutRef  TaaPipelineLayout;
         Rhi::FRhiSamplerRef         LinearSampler;
 
         Rhi::FRhiPipelineRef        BlitPipeline;
@@ -66,11 +87,13 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         Rhi::FRhiPipelineRef        BloomDownsamplePipeline;
         Rhi::FRhiPipelineRef        BloomUpsampleAddPipeline;
         Rhi::FRhiPipelineRef        BloomApplyAddPipeline;
+        Rhi::FRhiPipelineRef        TaaPipeline;
 
         Rhi::FRhiBufferRef          BlitConstantsBuffer;
         Rhi::FRhiBufferRef          TonemapConstantsBuffer;
         Rhi::FRhiBufferRef          FxaaConstantsBuffer;
         Rhi::FRhiBufferRef          BloomConstantsBuffer;
+        Rhi::FRhiBufferRef          TaaConstantsBuffer;
     };
 
     [[nodiscard]] auto GetPostProcessSharedResources() -> FPostProcessSharedResources&;

@@ -73,6 +73,10 @@ namespace AltinaEngine::Engine {
         TVector<FSceneView>                   Views{};
         TVector<FSceneStaticMesh>             StaticMeshes{};
         RenderCore::Lighting::FLightSceneData Lights{};
+
+        // Optional skybox cubemap (asset handle only; GPU resource is render-side).
+        Asset::FAssetHandle                   SkyCubeAsset{};
+        bool                                  bHasSkyCube = false;
     };
 
     struct AE_ENGINE_API FSceneViewBuildParams {

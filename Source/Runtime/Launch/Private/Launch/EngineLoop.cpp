@@ -10,6 +10,8 @@
 #include "Rendering/BasicDeferredRenderer.h"
 #include "Rendering/BasicForwardRenderer.h"
 #include "Rendering/CommonRendererResource.h"
+#include "Rendering/PostProcess/PostProcessSettings.h"
+#include "Rendering/TemporalAA/TemporalAA.h"
 #include "Rendering/RenderingSettings.h"
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
@@ -30,6 +32,8 @@
 #include "Rhi/RhiStructs.h"
 #include "Rhi/Command/RhiCmdContextAdapter.h"
 #include "Reflection/Reflection.h"
+
+#include <cstdint>
 
 #if AE_PLATFORM_WIN
     #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
@@ -165,6 +169,55 @@ namespace AltinaEngine::Launch {
             return nullptr;
         }
 
+        constexpr u64      kViewKeyHashSeed = 0x9e3779b97f4a7c15ULL;
+
+        [[nodiscard]] auto HashCombine(u64 seed, u64 value) noexcept -> u64 {
+            return seed ^ (value + kViewKeyHashSeed + (seed << 6U) + (seed >> 2U));
+        }
+
+        [[nodiscard]] auto HashPointer(const void* ptr) noexcept -> u64 {
+            return static_cast<u64>(reinterpret_cast<uintptr_t>(ptr));
+        }
+
+        [[nodiscard]] auto HashUuid(const FUuid& uuid) noexcept -> u64 {
+            // Simple FNV-1a over 16 bytes.
+            constexpr u64 kOffset = 1469598103934665603ULL;
+            constexpr u64 kPrime  = 1099511628211ULL;
+            u64           h       = kOffset;
+            const u8*     p       = uuid.Data();
+            for (usize i = 0; i < FUuid::kByteCount; ++i) {
+                h ^= static_cast<u64>(p[i]);
+                h *= kPrime;
+            }
+            return h;
+        }
+
+        [[nodiscard]] auto ComputeTemporalViewKey(const Engine::FSceneView& view) noexcept -> u64 {
+            using ETargetType = Engine::FSceneView::ETargetType;
+
+            u64 h = 0ULL;
+            h     = HashCombine(h, static_cast<u64>(view.Target.Type));
+
+            // View target contributes to key.
+            switch (view.Target.Type) {
+                case ETargetType::Viewport:
+                    h = HashCombine(h, HashPointer(view.Target.Viewport));
+                    break;
+                case ETargetType::TextureAsset:
+                    h = HashCombine(h, HashUuid(view.Target.Texture.Uuid));
+                    h = HashCombine(h, static_cast<u64>(view.Target.Texture.Type));
+                    break;
+                default:
+                    break;
+            }
+
+            // Camera id contributes to key.
+            h = HashCombine(h, static_cast<u64>(view.CameraId.Index));
+            h = HashCombine(h, static_cast<u64>(view.CameraId.Generation));
+            h = HashCombine(h, static_cast<u64>(view.CameraId.Type));
+            return h;
+        }
+
         void ExecuteFrameGraph(Rhi::FRhiDevice& device, RenderCore::FFrameGraph& graph) {
             Rhi::FRhiCommandContextDesc ctxDesc{};
             ctxDesc.mQueueType  = Rhi::ERhiQueueType::Graphics;
@@ -201,7 +254,7 @@ namespace AltinaEngine::Launch {
         }
 
         void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
-            const Engine::FRenderScene&                              scene,
+            Engine::FRenderScene&                                    scene,
             const Container::TVector<RenderCore::Render::FDrawList>& drawLists,
             const Container::TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
             Rendering::ERendererType                                 rendererType) {
@@ -219,7 +272,7 @@ namespace AltinaEngine::Launch {
 
             const usize viewCount = scene.Views.Size();
             for (usize i = 0; i < viewCount; ++i) {
-                const auto& view = scene.Views[i];
+                auto& view = scene.Views[i];
                 if (!view.View.IsValid()) {
                     continue;
                 }
@@ -229,7 +282,22 @@ namespace AltinaEngine::Launch {
                     continue;
                 }
 
+                const u64  viewKey    = ComputeTemporalViewKey(view);
+                const bool bEnableTaa = (rendererType == Rendering::ERendererType::Deferred)
+                    && (Rendering::rPostProcessTaa.Get() != 0);
+                const bool bEnableJitter  = bEnableTaa && (Rendering::rTemporalJitter.Get() != 0);
+                i32        sampleCountI32 = Rendering::rTemporalJitterSampleCount.Get();
+                if (sampleCountI32 < 1) {
+                    sampleCountI32 = 1;
+                }
+                const u32 sampleCount = static_cast<u32>(sampleCountI32);
+
+                // Prepare persistent previous-view snapshot + per-frame jitter (render thread).
+                Rendering::TemporalAA::PrepareViewForFrame(
+                    viewKey, view.View, bEnableJitter, sampleCount);
+
                 Rendering::FRenderViewContext viewContext{};
+                viewContext.ViewKey  = viewKey;
                 viewContext.View     = &view.View;
                 viewContext.DrawList = (i < drawLists.Size()) ? &drawLists[i] : nullptr;
                 viewContext.ShadowDrawList =
@@ -242,6 +310,9 @@ namespace AltinaEngine::Launch {
                 renderer->Render(graph);
                 graph.Compile();
                 ExecuteFrameGraph(device, graph);
+
+                Rendering::TemporalAA::FinalizeViewForFrame(
+                    viewKey, view.View, bEnableJitter, sampleCount);
             }
 
             renderer->FinalizeRendering();
@@ -591,17 +662,6 @@ namespace AltinaEngine::Launch {
 
                 Engine::FSceneViewBuilder viewBuilder;
                 viewBuilder.Build(*world, viewParams, renderScene);
-
-                for (auto& view : renderScene.Views) {
-                    if (!world->IsAlive(view.CameraId)) {
-                        continue;
-                    }
-
-                    const auto& camera =
-                        world->ResolveComponent<GameScene::FCameraComponent>(view.CameraId);
-                    view.View.Camera.Transform =
-                        world->Object(camera.GetOwner()).GetWorldTransform();
-                }
 
                 if (!renderScene.Views.IsEmpty()) {
                     Engine::FSceneBatchBuilder     batchBuilder;

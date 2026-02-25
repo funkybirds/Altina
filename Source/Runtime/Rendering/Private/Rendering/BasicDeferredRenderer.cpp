@@ -907,7 +907,7 @@ namespace AltinaEngine::Rendering {
 
         if (mPerFrameBuffer) {
             FPerFrameConstants constants{};
-            constants.ViewProjection = view->Matrices.ViewProj;
+            constants.ViewProjection = view->Matrices.ViewProjJittered;
             UpdateConstantBuffer(mPerFrameBuffer.Get(), &constants, sizeof(constants));
         }
 
@@ -1457,11 +1457,11 @@ namespace AltinaEngine::Rendering {
 
                 // Fill per-frame constants (b0).
                 FPerFrameConstants constants{};
-                constants.ViewProjection = view->Matrices.ViewProj;
+                constants.ViewProjection = view->Matrices.ViewProjJittered;
                 constants.View           = view->Matrices.View;
-                constants.Proj           = view->Matrices.ProjUnjittered;
-                constants.ViewProj       = view->Matrices.ViewProj;
-                constants.InvViewProj    = view->Matrices.InvViewProj;
+                constants.Proj           = view->Matrices.ProjJittered;
+                constants.ViewProj       = view->Matrices.ViewProjJittered;
+                constants.InvViewProj    = view->Matrices.InvViewProjJittered;
 
                 constants.ViewOriginWS[0]  = view->ViewOrigin[0];
                 constants.ViewOriginWS[1]  = view->ViewOrigin[1];
@@ -1619,6 +1619,18 @@ namespace AltinaEngine::Rendering {
             FPostProcessStack pp{};
             pp.bEnable = (rPostProcessEnable.Get() != 0);
 
+            const bool bEnableTaa = (rPostProcessTaa.Get() != 0);
+            if (bEnableTaa) {
+                FPostProcessNode node{};
+                node.EffectId.Assign(TEXT("TAA"));
+                node.bEnabled = true;
+                node.Params[Container::FString(TEXT("Alpha"))] =
+                    FPostProcessParamValue(rPostProcessTaaAlpha.Get());
+                node.Params[Container::FString(TEXT("ClampK"))] =
+                    FPostProcessParamValue(rPostProcessTaaClampK.Get());
+                pp.Stack.PushBack(Move(node));
+            }
+
             if (rPostProcessBloom.Get() != 0) {
                 FPostProcessNode node{};
                 node.EffectId.Assign(TEXT("Bloom"));
@@ -1647,7 +1659,7 @@ namespace AltinaEngine::Rendering {
                 pp.Stack.PushBack(Move(node));
             }
 
-            if (rPostProcessFxaa.Get() != 0) {
+            if (!bEnableTaa && rPostProcessFxaa.Get() != 0) {
                 FPostProcessNode node{};
                 node.EffectId.Assign(TEXT("Fxaa"));
                 node.bEnabled = true;
@@ -1666,6 +1678,7 @@ namespace AltinaEngine::Rendering {
             io.Depth      = sceneDepth;
 
             FPostProcessBuildContext buildCtx{};
+            buildCtx.ViewKey          = mViewContext.ViewKey;
             buildCtx.BackBuffer       = outputTexture;
             buildCtx.BackBufferFormat = outputTarget->GetDesc().mFormat;
 

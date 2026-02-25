@@ -4,8 +4,13 @@
 #ifndef AE_POSTPROCESS_COMMON_HLSLI
 #define AE_POSTPROCESS_COMMON_HLSLI 1
 
+// Most post-process passes use a single source color texture and a linear sampler.
+// Some passes (e.g. TAA) bind different resources and should opt out via:
+//   #define AE_POSTPROCESS_COMMON_NO_DEFAULT_BINDINGS 1
+#ifndef AE_POSTPROCESS_COMMON_NO_DEFAULT_BINDINGS
 Texture2D    SceneColor : register(t0);
 SamplerState LinearSampler : register(s0);
+#endif
 
 struct FSQOutput
 {

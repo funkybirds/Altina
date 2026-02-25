@@ -277,3 +277,80 @@ TEST_CASE("FrameGraph.ImportedTextureRoundTrip") {
 
     REQUIRE(samePointer);
 }
+
+TEST_CASE("FrameGraph.ImportedTextureWriteAsRenderTarget") {
+    FRhiMockContext context;
+    auto            device = CreateMockDevice(context);
+
+    FRhiTextureDesc texDesc;
+    texDesc.mDebugName.Assign(TEXT("ImportedTextureRT"));
+    texDesc.mWidth     = 4U;
+    texDesc.mHeight    = 4U;
+    texDesc.mFormat    = ERhiFormat::R8G8B8A8Unorm;
+    texDesc.mBindFlags = ERhiTextureBindFlags::RenderTarget | ERhiTextureBindFlags::ShaderResource;
+
+    auto externalTexture = device->CreateTexture(texDesc);
+    REQUIRE(externalTexture);
+
+    FFrameGraph graph(*device);
+    graph.BeginFrame(3);
+
+    auto imported = graph.ImportTexture(externalTexture.Get(), ERhiResourceState::Common);
+
+    struct FPassData {
+        FFrameGraphTextureRef Out;
+        FFrameGraphRTVRef     OutRTV;
+    };
+
+    bool                executed    = false;
+    bool                sameTexture = false;
+    bool                hasValidRtv = false;
+
+    FFrameGraphPassDesc passDesc;
+    passDesc.mName  = "FrameGraph.ImportedTextureWriteAsRenderTarget";
+    passDesc.mType  = EFrameGraphPassType::Raster;
+    passDesc.mQueue = EFrameGraphQueue::Graphics;
+
+    graph.AddPass<FPassData>(
+        passDesc,
+        [&](FFrameGraphPassBuilder& builder, FPassData& data) {
+            data.Out = builder.Write(imported, ERhiResourceState::RenderTarget);
+
+            FRhiTextureViewRange range{};
+            range.mMipCount        = 1U;
+            range.mLayerCount      = 1U;
+            range.mDepthSliceCount = 1U;
+
+            FRhiRenderTargetViewDesc rtvDesc{};
+            rtvDesc.mDebugName.Assign(TEXT("ImportedTextureRT.RTV"));
+            rtvDesc.mFormat = texDesc.mFormat;
+            rtvDesc.mRange  = range;
+            data.OutRTV     = builder.CreateRTV(data.Out, rtvDesc);
+
+            FRdgRenderTargetBinding rtv{};
+            rtv.mRTV    = data.OutRTV;
+            rtv.mLoadOp = AltinaEngine::Rhi::ERhiLoadOp::Clear;
+            builder.SetRenderTargets(&rtv, 1U, nullptr);
+
+            // This is an external resource; keep pass alive.
+            builder.SetSideEffect();
+        },
+        [&](AltinaEngine::Rhi::FRhiCmdContext&, const FFrameGraphPassResources& res,
+            const FPassData& data) {
+            executed    = true;
+            sameTexture = (res.GetTexture(data.Out) == externalTexture.Get());
+            hasValidRtv = (res.GetRTV(data.OutRTV) != nullptr);
+        });
+
+    graph.Compile();
+
+    FTestCmdContext cmdContext;
+    cmdContext.Begin();
+    graph.Execute(cmdContext);
+    cmdContext.End();
+    graph.EndFrame();
+
+    REQUIRE(executed);
+    REQUIRE(sameTexture);
+    REQUIRE(hasValidRtv);
+}

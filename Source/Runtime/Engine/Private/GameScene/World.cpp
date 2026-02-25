@@ -4,6 +4,7 @@
 #include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/PointLightComponent.h"
+#include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Reflection/Serializer.h"
@@ -36,11 +37,12 @@ namespace AltinaEngine::GameScene {
             GetComponentTypeHash<FDirectionalLightComponent>();
         const FComponentTypeHash kPointLightComponentType =
             GetComponentTypeHash<FPointLightComponent>();
+        const FComponentTypeHash kSkyCubeComponentType = GetComponentTypeHash<FSkyCubeComponent>();
 
-        constexpr u32 kWorldSerializationVersion = 1U;
+        constexpr u32            kWorldSerializationVersion = 1U;
 
-        auto          WriteTransform(Core::Reflection::ISerializer& serializer,
-                     const Core::Math::LinAlg::FSpatialTransform&   transform) -> void {
+        auto                     WriteTransform(Core::Reflection::ISerializer& serializer,
+                                const Core::Math::LinAlg::FSpatialTransform&   transform) -> void {
             serializer.Write(transform.Rotation.x);
             serializer.Write(transform.Rotation.y);
             serializer.Write(transform.Rotation.z);
@@ -215,6 +217,14 @@ namespace AltinaEngine::GameScene {
             WriteNativeStringJson(serializer, component.GetTypeName());
             serializer.WriteFieldName(TEXT("scriptAsset"));
             WriteAssetHandleJson(serializer, component.GetScriptAsset());
+            serializer.EndObject();
+        }
+
+        auto WriteSkyCubeComponentJson(
+            Core::Reflection::ISerializer& serializer, const FSkyCubeComponent& component) -> void {
+            serializer.BeginObject({});
+            serializer.WriteFieldName(TEXT("cubeMapAsset"));
+            WriteAssetHandleJson(serializer, component.GetCubeMapAsset());
             serializer.EndObject();
         }
 
@@ -496,6 +506,10 @@ namespace AltinaEngine::GameScene {
         return mActivePointLightComponents;
     }
 
+    auto FWorld::GetActiveSkyCubeComponents() const noexcept -> const TVector<FComponentId>& {
+        return mActiveSkyCubeComponents;
+    }
+
     void FWorld::Serialize(Core::Reflection::ISerializer& serializer) const {
         serializer.Write(kWorldSerializationVersion);
         serializer.Write(mWorldId);
@@ -642,6 +656,8 @@ namespace AltinaEngine::GameScene {
                     serializer.WriteString(TEXT("MeshMaterialComponent"));
                 } else if (componentId.Type == kScriptComponentType) {
                     serializer.WriteString(TEXT("ScriptComponent"));
+                } else if (componentId.Type == kSkyCubeComponentType) {
+                    serializer.WriteString(TEXT("SkyCubeComponent"));
                 } else {
                     serializer.WriteString(TEXT("UnknownComponent"));
                 }
@@ -660,6 +676,9 @@ namespace AltinaEngine::GameScene {
                 } else if (componentId.Type == kScriptComponentType) {
                     WriteScriptComponentJson(
                         serializer, ResolveComponent<FScriptComponent>(componentId));
+                } else if (componentId.Type == kSkyCubeComponentType) {
+                    WriteSkyCubeComponentJson(
+                        serializer, ResolveComponent<FSkyCubeComponent>(componentId));
                 } else {
                     serializer.BeginObject({});
                     serializer.EndObject();
@@ -838,6 +857,14 @@ namespace AltinaEngine::GameScene {
             if (component.IsEnabled()) {
                 AddActiveComponent(mActivePointLightComponents, id);
             }
+            return;
+        }
+
+        if (id.Type == kSkyCubeComponentType) {
+            const auto& component = ResolveComponent<FSkyCubeComponent>(id);
+            if (component.IsEnabled()) {
+                AddActiveComponent(mActiveSkyCubeComponents, id);
+            }
         }
     }
 
@@ -864,6 +891,11 @@ namespace AltinaEngine::GameScene {
 
         if (id.Type == kPointLightComponentType) {
             RemoveActiveComponent(mActivePointLightComponents, id);
+            return;
+        }
+
+        if (id.Type == kSkyCubeComponentType) {
+            RemoveActiveComponent(mActiveSkyCubeComponents, id);
         }
     }
 
@@ -909,6 +941,15 @@ namespace AltinaEngine::GameScene {
                 AddActiveComponent(mActivePointLightComponents, id);
             } else {
                 RemoveActiveComponent(mActivePointLightComponents, id);
+            }
+            return;
+        }
+
+        if (id.Type == kSkyCubeComponentType) {
+            if (enabled && IsGameObjectActive(owner)) {
+                AddActiveComponent(mActiveSkyCubeComponents, id);
+            } else {
+                RemoveActiveComponent(mActiveSkyCubeComponents, id);
             }
         }
     }
@@ -966,6 +1007,15 @@ namespace AltinaEngine::GameScene {
                     AddActiveComponent(mActivePointLightComponents, id);
                 } else {
                     RemoveActiveComponent(mActivePointLightComponents, id);
+                }
+                continue;
+            }
+
+            if (id.Type == kSkyCubeComponentType) {
+                if (active && ResolveComponent<FSkyCubeComponent>(id).IsEnabled()) {
+                    AddActiveComponent(mActiveSkyCubeComponents, id);
+                } else {
+                    RemoveActiveComponent(mActiveSkyCubeComponents, id);
                 }
             }
         }

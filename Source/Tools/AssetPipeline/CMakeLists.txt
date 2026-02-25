@@ -96,6 +96,7 @@ set(Target_Private_Sources
     Private/AssetToolIO.cpp
     Private/Importers/Audio/AudioImporter.cpp
     Private/Importers/EnvMap/EnvMapImporter.cpp
+    ${CMAKE_SOURCE_DIR}/ThirdParty/tinyexr/miniz.cpp
     Private/Importers/Material/MaterialImporter.cpp
     Private/Importers/Mesh/MeshImporter.cpp
     Private/Importers/Model/GltfImporter.cpp
@@ -116,6 +117,7 @@ target_include_directories(${TargetName}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/Private
         ${CMAKE_CURRENT_SOURCE_DIR}/Public
+        ${CMAKE_SOURCE_DIR}/ThirdParty/tinyexr
 )
 
 target_link_libraries(${TargetName}

@@ -231,6 +231,8 @@ namespace AltinaEngine::Rendering {
             RenderCore::FShaderRegistry::FShaderKey           OutputPSKey;
             RenderCore::FShaderRegistry::FShaderKey           LightingVSKey;
             RenderCore::FShaderRegistry::FShaderKey           LightingPSKey;
+            RenderCore::FShaderRegistry::FShaderKey           SkyBoxVSKey;
+            RenderCore::FShaderRegistry::FShaderKey           SkyBoxPSKey;
             RenderCore::FMaterialPassDesc                     DefaultPassDesc;
             RenderCore::FMaterialPassDesc                     DefaultShadowPassDesc;
             Container::TShared<RenderCore::FMaterialTemplate> DefaultTemplate;
@@ -246,6 +248,11 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiBindGroupLayoutRef                       LightingLayout;
             Rhi::FRhiPipelineLayoutRef                        LightingPipelineLayout;
             Rhi::FRhiPipelineRef                              LightingPipeline;
+
+            // Skybox (FSQ -> SceneColorHDR).
+            Rhi::FRhiBindGroupLayoutRef                       SkyBoxLayout;
+            Rhi::FRhiPipelineLayoutRef                        SkyBoxPipelineLayout;
+            Rhi::FRhiPipelineRef                              SkyBoxPipeline;
 
             THashMap<u64, Rhi::FRhiPipelineRef>               BasePipelines;
             THashMap<u64, Rhi::FRhiBindGroupLayoutRef>        MaterialLayouts;
@@ -428,6 +435,47 @@ namespace AltinaEngine::Rendering {
             return resources.LightingPipeline.Get() != nullptr;
         }
 
+        auto EnsureSkyBoxPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)
+            -> bool {
+            if (resources.SkyBoxPipeline) {
+                return true;
+            }
+
+            if (!resources.SkyBoxVSKey.IsValid() || !resources.SkyBoxPSKey.IsValid()) {
+                // Skybox is optional; missing shader keys is not an error.
+                return false;
+            }
+
+            auto vs = resources.Registry.FindShader(resources.SkyBoxVSKey);
+            auto ps = resources.Registry.FindShader(resources.SkyBoxPSKey);
+            if (!vs || !ps) {
+                LogError(TEXT("Deferred skybox shaders are not registered."));
+                return false;
+            }
+
+            if (!resources.SkyBoxPipelineLayout) {
+                LogError(TEXT("Deferred skybox pipeline layout is missing."));
+                return false;
+            }
+
+            Rhi::FRhiGraphicsPipelineDesc desc{};
+            desc.mDebugName.Assign(TEXT("BasicDeferred.SkyBoxPipeline"));
+            desc.mVertexShader   = vs.Get();
+            desc.mPixelShader    = ps.Get();
+            desc.mPipelineLayout = resources.SkyBoxPipelineLayout.Get();
+            desc.mVertexLayout   = {};
+            desc.mRasterState    = {};
+            desc.mDepthState     = {};
+            desc.mBlendState     = {};
+            // Full-screen triangle; avoid culling.
+            desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+            desc.mDepthState.mDepthEnable = false;
+            desc.mDepthState.mDepthWrite  = false;
+            resources.SkyBoxPipeline      = device.CreateGraphicsPipeline(desc);
+
+            return resources.SkyBoxPipeline.Get() != nullptr;
+        }
+
         void EnsureLayouts(Rhi::FRhiDevice& device, FDeferredSharedResources& resources) {
             if (!resources.PerFrameLayout) {
                 Rhi::FRhiBindGroupLayoutEntry entry{};
@@ -531,6 +579,50 @@ namespace AltinaEngine::Rendering {
                     layoutDesc.mBindGroupLayouts.PushBack(resources.LightingLayout.Get());
                 }
                 resources.LightingPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+            }
+
+            if (!resources.SkyBoxLayout) {
+                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+                layoutDesc.mSetIndex = 0U;
+
+                // b0
+                Rhi::FRhiBindGroupLayoutEntry cbuffer{};
+                cbuffer.mBinding    = 0U;
+                cbuffer.mType       = Rhi::ERhiBindingType::ConstantBuffer;
+                cbuffer.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(cbuffer);
+
+                // t0: scene depth
+                Rhi::FRhiBindGroupLayoutEntry depth{};
+                depth.mBinding    = 0U;
+                depth.mType       = Rhi::ERhiBindingType::SampledTexture;
+                depth.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(depth);
+
+                // t1: sky cube
+                Rhi::FRhiBindGroupLayoutEntry sky{};
+                sky.mBinding    = 1U;
+                sky.mType       = Rhi::ERhiBindingType::SampledTexture;
+                sky.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(sky);
+
+                // s0
+                Rhi::FRhiBindGroupLayoutEntry sampler{};
+                sampler.mBinding    = 0U;
+                sampler.mType       = Rhi::ERhiBindingType::Sampler;
+                sampler.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(sampler);
+
+                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
+                resources.SkyBoxLayout = device.CreateBindGroupLayout(layoutDesc);
+            }
+
+            if (!resources.SkyBoxPipelineLayout) {
+                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
+                if (resources.SkyBoxLayout) {
+                    layoutDesc.mBindGroupLayouts.PushBack(resources.SkyBoxLayout.Get());
+                }
+                resources.SkyBoxPipelineLayout = device.CreatePipelineLayout(layoutDesc);
             }
         }
 
@@ -770,6 +862,15 @@ namespace AltinaEngine::Rendering {
         resources.LightingVSKey = vs;
         resources.LightingPSKey = ps;
         resources.LightingPipeline.Reset();
+    }
+
+    void FBasicDeferredRenderer::SetSkyBoxShaderKeys(
+        const RenderCore::FShaderRegistry::FShaderKey& vs,
+        const RenderCore::FShaderRegistry::FShaderKey& ps) noexcept {
+        auto& resources       = GetSharedResources();
+        resources.SkyBoxVSKey = vs;
+        resources.SkyBoxPSKey = ps;
+        resources.SkyBoxPipeline.Reset();
     }
 
     auto FBasicDeferredRenderer::RegisterShader(
@@ -1613,6 +1714,134 @@ namespace AltinaEngine::Rendering {
                 ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
                 ctx.RHIDraw(3U, 1U, 0U, 0U);
             });
+
+        // Optional skybox pass: draw cube map into SceneColorHDR as background.
+        if (mViewContext.bHasSkyCube && mViewContext.SkyCubeTexture && sceneColorHDR.IsValid()
+            && sceneDepth.IsValid()) {
+            auto* device = Rhi::RHIGetDevice();
+            if (device != nullptr) {
+                auto& shared = GetSharedResources();
+                EnsureLayouts(*device, shared);
+                if (EnsureSkyBoxPipeline(*device, shared) && shared.SkyBoxLayout
+                    && shared.SkyBoxPipeline) {
+                    struct FSkyBoxPassData {
+                        RenderCore::FFrameGraphTextureRef Depth;
+                        RenderCore::FFrameGraphTextureRef Output;
+                        RenderCore::FFrameGraphRTVRef     OutputRTV;
+                    };
+
+                    RenderCore::FFrameGraphPassDesc passDesc{};
+                    passDesc.mName  = "BasicDeferred.SkyBox";
+                    passDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
+                    passDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
+
+                    Rhi::FRhiTexture* skyCube = mViewContext.SkyCubeTexture;
+                    graph.AddPass<FSkyBoxPassData>(
+                        passDesc,
+                        [&](RenderCore::FFrameGraphPassBuilder& builder, FSkyBoxPassData& data) {
+                            builder.Read(sceneDepth, Rhi::ERhiResourceState::ShaderResource);
+                            data.Depth = sceneDepth;
+
+                            data.Output =
+                                builder.Write(sceneColorHDR, Rhi::ERhiResourceState::RenderTarget);
+
+                            Rhi::FRhiTextureViewRange viewRange{};
+                            viewRange.mMipCount        = 1U;
+                            viewRange.mLayerCount      = 1U;
+                            viewRange.mDepthSliceCount = 1U;
+
+                            Rhi::FRhiRenderTargetViewDesc rtvDesc{};
+                            rtvDesc.mDebugName.Assign(TEXT("SceneColorHDR.SkyBox.RTV"));
+                            rtvDesc.mFormat = Rhi::ERhiFormat::R16G16B16A16Float;
+                            rtvDesc.mRange  = viewRange;
+                            data.OutputRTV  = builder.CreateRTV(data.Output, rtvDesc);
+
+                            RenderCore::FRdgRenderTargetBinding rtvBinding{};
+                            rtvBinding.mRTV     = data.OutputRTV;
+                            rtvBinding.mLoadOp  = Rhi::ERhiLoadOp::Load;
+                            rtvBinding.mStoreOp = Rhi::ERhiStoreOp::Store;
+                            builder.SetRenderTargets(&rtvBinding, 1U, nullptr);
+                        },
+                        [viewRect, perFrameBuffer = mPerFrameBuffer.Get(), skyCube](
+                            Rhi::FRhiCmdContext&                        ctx,
+                            const RenderCore::FFrameGraphPassResources& res,
+                            const FSkyBoxPassData&                      data) {
+                            auto& shared = GetSharedResources();
+                            if (!shared.SkyBoxPipeline || !shared.SkyBoxLayout
+                                || !shared.OutputSampler || perFrameBuffer == nullptr
+                                || skyCube == nullptr) {
+                                return;
+                            }
+
+                            auto* depthTex = res.GetTexture(data.Depth);
+                            if (depthTex == nullptr) {
+                                return;
+                            }
+
+                            auto* device = Rhi::RHIGetDevice();
+                            if (device == nullptr) {
+                                return;
+                            }
+
+                            Rhi::FRhiBindGroupDesc groupDesc{};
+                            groupDesc.mLayout = shared.SkyBoxLayout.Get();
+
+                            Rhi::FRhiBindGroupEntry cb{};
+                            cb.mBinding = 0U;
+                            cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
+                            cb.mBuffer  = perFrameBuffer;
+                            cb.mOffset  = 0ULL;
+                            cb.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
+                            groupDesc.mEntries.PushBack(cb);
+
+                            Rhi::FRhiBindGroupEntry depth{};
+                            depth.mBinding = 0U;
+                            depth.mType    = Rhi::ERhiBindingType::SampledTexture;
+                            depth.mTexture = depthTex;
+                            groupDesc.mEntries.PushBack(depth);
+
+                            Rhi::FRhiBindGroupEntry sky{};
+                            sky.mBinding = 1U;
+                            sky.mType    = Rhi::ERhiBindingType::SampledTexture;
+                            sky.mTexture = skyCube;
+                            groupDesc.mEntries.PushBack(sky);
+
+                            Rhi::FRhiBindGroupEntry sampler{};
+                            sampler.mBinding = 0U;
+                            sampler.mType    = Rhi::ERhiBindingType::Sampler;
+                            sampler.mSampler = shared.OutputSampler.Get();
+                            groupDesc.mEntries.PushBack(sampler);
+
+                            auto bindGroup = device->CreateBindGroup(groupDesc);
+                            if (!bindGroup) {
+                                return;
+                            }
+
+                            ctx.RHISetGraphicsPipeline(shared.SkyBoxPipeline.Get());
+
+                            Rhi::FRhiViewportRect viewport{};
+                            viewport.mX        = static_cast<f32>(viewRect.X);
+                            viewport.mY        = static_cast<f32>(viewRect.Y);
+                            viewport.mWidth    = static_cast<f32>(viewRect.Width);
+                            viewport.mHeight   = static_cast<f32>(viewRect.Height);
+                            viewport.mMinDepth = 0.0f;
+                            viewport.mMaxDepth = 1.0f;
+                            ctx.RHISetViewport(viewport);
+
+                            Rhi::FRhiScissorRect scissor{};
+                            scissor.mX      = viewRect.X;
+                            scissor.mY      = viewRect.Y;
+                            scissor.mWidth  = viewRect.Width;
+                            scissor.mHeight = viewRect.Height;
+                            ctx.RHISetScissor(scissor);
+
+                            ctx.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
+                            ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
+                            ctx.RHIDraw(3U, 1U, 0U, 0U);
+                        });
+                }
+            }
+        }
 
         // Post-process chain (stack + registry) -> Present.
         {

@@ -144,6 +144,22 @@ if(TARGET AltinaEngineAssetTool)
     add_dependencies(AltinaEngineTestsAsset AltinaEngineAssetTool)
 endif()
 
+if(TARGET AltinaEngineProjectGenerator)
+    set(AE_PROJECTGEN_OUT_DIR ${CMAKE_BINARY_DIR}/ProjectGenSandbox)
+    add_test(NAME AltinaEngineProjectGenNewDemo
+        COMMAND $<TARGET_FILE:AltinaEngineProjectGenerator> new-demo
+            --root ${CMAKE_SOURCE_DIR}
+            --name ProjectGenTest
+            --out-root ${AE_PROJECTGEN_OUT_DIR}
+            --update-cmake false
+            --managed false
+            --force true
+    )
+    if(TARGET AltinaEngineTests)
+        add_dependencies(AltinaEngineTests AltinaEngineProjectGenerator)
+    endif()
+endif()
+
 file(GLOB_RECURSE AE_TEST_GAMESCENE_SOURCES
     CONFIGURE_DEPENDS
     ${AE_TESTS_ROOT}/GameScene/*.cpp

@@ -1,5 +1,7 @@
 param(
     [string]$Preset = "windows-msvc-relwithdebinfo",
+    [ValidateSet("Minimal", "SpaceshipGame", "All")]
+    [string]$Demo = "Minimal",
     [switch]$ForceConfigure,
     [ValidateSet("Keep", "On", "Off")]
     [string]$Shipping = "Keep"
@@ -84,11 +86,21 @@ try {
         Invoke-Configure -PresetName $Preset -ExtraArgs $configureArgs
     }
 
-    Write-Host "[CMake] Cleaning Demo/Minimal output folders (Binaries/Shipping)"
-    Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoMinimalPreClean")
+    if ($Demo -eq "Minimal" -or $Demo -eq "All") {
+        Write-Host "[CMake] Cleaning Demo/Minimal output folders (Binaries/Shipping)"
+        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoMinimalPreClean")
 
-    Write-Host "[CMake] Building AltinaEngineDemoMinimal via preset '$Preset'"
-    Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoMinimal")
+        Write-Host "[CMake] Building AltinaEngineDemoMinimal via preset '$Preset'"
+        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoMinimal")
+    }
+
+    if ($Demo -eq "SpaceshipGame" -or $Demo -eq "All") {
+        Write-Host "[CMake] Cleaning Demo/SpaceshipGame output folders (Binaries/Shipping)"
+        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoSpaceshipGamePreClean")
+
+        Write-Host "[CMake] Building AltinaEngineDemoSpaceshipGame via preset '$Preset'"
+        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoSpaceshipGame")
+    }
 }
 finally {
     Set-Location $initialLocation

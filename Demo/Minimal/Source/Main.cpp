@@ -6,6 +6,7 @@
 #include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
+#include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
 #include "Engine/GameSceneAsset/ModelAssetInstantiator.h"
@@ -48,6 +49,8 @@ namespace {
                 TEXT("demo/minimal/models/hoshino/hoshino_battle"));
             const auto scriptHandle =
                 engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/scripts/demoscript"));
+            const auto skyCubeHandle = engineLoop.GetAssetRegistry().FindByPath(
+                TEXT("demo/minimal/skyboxes/churchmeetingroom4k"));
             if (!modelHandle.IsValid() || !scriptHandle.IsValid()) {
                 LogError(TEXT("Demo assets missing (model or script)."));
                 return false;
@@ -93,6 +96,15 @@ namespace {
             }
             if (scriptComponent.IsValid()) {
                 scriptComponent.Get().SetScriptAsset(scriptHandle);
+            }
+
+            // Skybox (asset may be missing until cooked; component still exists for demo wiring).
+            {
+                auto skyObject    = world->CreateGameObject(TEXT("SkyBox"));
+                auto skyComponent = skyObject.AddComponent<GameScene::FSkyCubeComponent>();
+                if (skyComponent.IsValid()) {
+                    skyComponent.Get().SetCubeMapAsset(skyCubeHandle);
+                }
             }
 
             // Floor (static mesh + material) at world Y=0. We author the plane in XY (z=0) so the

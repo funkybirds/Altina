@@ -262,6 +262,31 @@ namespace AltinaEngine::Launch {
                 return;
             }
 
+            // Cache skybox GPU resources on the render thread to avoid re-uploading every frame.
+            static AltinaEngine::Asset::FAssetHandle                                sSkyCubeAsset{};
+            static AltinaEngine::GameScene::FSkyCubeComponent::FSkyCubeRhiResources sSkyCubeRhi{};
+            static bool       sHasSkyCubeRhi = false;
+
+            Rhi::FRhiTexture* skyCubeTexture = nullptr;
+            bool              bHasSkyCube    = false;
+            if (scene.bHasSkyCube && scene.SkyCubeAsset.IsValid()) {
+                bHasSkyCube = true;
+                if (!AltinaEngine::GameScene::FSkyCubeComponent::AssetToSkyCubeConverter) {
+                    bHasSkyCube = false;
+                } else if (!sHasSkyCubeRhi || sSkyCubeAsset != scene.SkyCubeAsset) {
+                    sSkyCubeAsset = scene.SkyCubeAsset;
+                    sSkyCubeRhi =
+                        AltinaEngine::GameScene::FSkyCubeComponent::AssetToSkyCubeConverter(
+                            scene.SkyCubeAsset);
+                    sHasSkyCubeRhi = sSkyCubeRhi.IsValid();
+                }
+                if (sHasSkyCubeRhi) {
+                    skyCubeTexture = sSkyCubeRhi.Texture.Get();
+                } else {
+                    bHasSkyCube = false;
+                }
+            }
+
             Rendering::FBasicDeferredRenderer deferredRenderer;
             Rendering::FBasicForwardRenderer  forwardRenderer;
             Rendering::IRenderer* renderer = (rendererType == Rendering::ERendererType::Deferred)
@@ -302,8 +327,10 @@ namespace AltinaEngine::Launch {
                 viewContext.DrawList = (i < drawLists.Size()) ? &drawLists[i] : nullptr;
                 viewContext.ShadowDrawList =
                     (i < shadowDrawLists.Size()) ? &shadowDrawLists[i] : nullptr;
-                viewContext.OutputTarget = outputTarget;
-                viewContext.Lights       = &scene.Lights;
+                viewContext.OutputTarget   = outputTarget;
+                viewContext.Lights         = &scene.Lights;
+                viewContext.SkyCubeTexture = skyCubeTexture;
+                viewContext.bHasSkyCube    = bHasSkyCube;
                 renderer->SetViewContext(viewContext);
 
                 RenderCore::FFrameGraph graph(device);

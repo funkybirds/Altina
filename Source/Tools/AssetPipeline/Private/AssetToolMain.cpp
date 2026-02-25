@@ -65,6 +65,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::vector<Asset::FAssetHandle> Dependencies;
             Asset::FTexture2DDesc            TextureDesc{};
             bool                             HasTextureDesc = false;
+            Asset::FCubeMapDesc              CubeMapDesc{};
+            bool                             HasCubeMapDesc = false;
             Asset::FMeshDesc                 MeshDesc{};
             bool                             HasMeshDesc = false;
             Asset::FMaterialDesc             MaterialDesc{};
@@ -172,6 +174,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             switch (type) {
                 case Asset::EAssetType::Texture2D:
                     return "Texture2D";
+                case Asset::EAssetType::CubeMap:
+                    return "CubeMap";
                 case Asset::EAssetType::Mesh:
                     return "Mesh";
                 case Asset::EAssetType::MaterialTemplate:
@@ -197,6 +201,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             ToLowerAscii(value);
             if (value == "texture2d") {
                 return Asset::EAssetType::Texture2D;
+            }
+            if (value == "cubemap" || value == "texturecube" || value == "cube") {
+                return Asset::EAssetType::CubeMap;
             }
             if (value == "mesh") {
                 return Asset::EAssetType::Mesh;
@@ -229,6 +236,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             switch (type) {
                 case Asset::EAssetType::Texture2D:
                     return "TextureImporter";
+                case Asset::EAssetType::CubeMap:
+                    return "EnvMapImporter";
                 case Asset::EAssetType::Mesh:
                     return "MeshImporter";
                 case Asset::EAssetType::MaterialTemplate:
@@ -257,13 +266,21 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return "EnvMapImporter";
                 }
             }
+            if (type == Asset::EAssetType::CubeMap) {
+                std::string ext = sourcePath.extension().string();
+                ToLowerAscii(ext);
+                if (ext == ".hdr" || ext == ".exr") {
+                    return "EnvMapImporter";
+                }
+            }
             return GetImporterName(type);
         }
 
         auto IsTextureExtension(const std::filesystem::path& path) -> bool {
             std::string ext = path.extension().string();
             ToLowerAscii(ext);
-            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".hdr";
+            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".hdr"
+                || ext == ".exr";
         }
 
         auto IsMeshExtension(const std::filesystem::path& path) -> bool {
@@ -684,11 +701,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
             Asset::EAssetType metaType = Asset::EAssetType::Unknown;
             std::string       metaVirtualPath;
             if (LoadMeta(asset.MetaPath, asset.Uuid, metaType, metaVirtualPath)) {
-                const auto guessedType = GuessAssetType(asset.SourcePath);
-                if (guessedType != Asset::EAssetType::Unknown && guessedType != metaType) {
-                    asset.Type = guessedType;
-                } else if (metaType != Asset::EAssetType::Unknown) {
+                // Prefer the explicit type from .meta. Some formats (e.g. .exr) can be authored
+                // as either a regular Texture2D or a CubeMap, and the file extension alone is not
+                // sufficient to infer the intended asset type.
+                if (metaType != Asset::EAssetType::Unknown) {
                     asset.Type = metaType;
+                } else {
+                    asset.Type = GuessAssetType(asset.SourcePath);
                 }
                 if (!metaVirtualPath.empty()) {
                     asset.VirtualPath = metaVirtualPath;
@@ -938,6 +957,17 @@ namespace AltinaEngine::Tools::AssetPipeline {
                                 << "\"Width\": 0, \"Height\": 0, \"Format\": 0, \"MipCount\": 0, \"SRGB\": true";
                         }
                         break;
+                    case Asset::EAssetType::CubeMap:
+                        if (entry.HasCubeMapDesc) {
+                            stream << "\"Size\": " << entry.CubeMapDesc.Size
+                                   << ", \"MipCount\": " << entry.CubeMapDesc.MipCount
+                                   << ", \"Format\": " << entry.CubeMapDesc.Format
+                                   << ", \"SRGB\": " << (entry.CubeMapDesc.SRGB ? "true" : "false");
+                        } else {
+                            stream
+                                << "\"Size\": 0, \"MipCount\": 0, \"Format\": 0, \"SRGB\": false";
+                        }
+                        break;
                     case Asset::EAssetType::Mesh:
                         if (entry.HasMeshDesc) {
                             stream << "\"VertexFormat\": " << entry.MeshDesc.VertexFormat
@@ -1109,24 +1139,27 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 std::vector<u8>       cookedBytes;
                 std::vector<u8>       cookKeyExtras;
                 Asset::FTexture2DDesc textureDesc{};
+                Asset::FCubeMapDesc   cubeMapDesc{};
                 Asset::FMeshDesc      meshDesc{};
                 Asset::FMaterialDesc  materialDesc{};
                 Asset::FShaderDesc    shaderDesc{};
                 Asset::FModelDesc     modelDesc{};
                 Asset::FAudioDesc     audioDesc{};
-                const bool            isTexture = asset.Type == Asset::EAssetType::Texture2D;
-                const bool            isMesh    = asset.Type == Asset::EAssetType::Mesh;
-                const bool  isMaterial          = asset.Type == Asset::EAssetType::MaterialTemplate;
-                const bool  isAudio             = asset.Type == Asset::EAssetType::Audio;
-                const bool  isScript            = asset.Type == Asset::EAssetType::Script;
-                const bool  isShader            = asset.Type == Asset::EAssetType::Shader;
-                const bool  isModel             = asset.Type == Asset::EAssetType::Model;
+                const bool            isTexture2D = asset.Type == Asset::EAssetType::Texture2D;
+                const bool            isCubeMap   = asset.Type == Asset::EAssetType::CubeMap;
+                const bool            isMesh      = asset.Type == Asset::EAssetType::Mesh;
+                const bool  isMaterial = asset.Type == Asset::EAssetType::MaterialTemplate;
+                const bool  isAudio    = asset.Type == Asset::EAssetType::Audio;
+                const bool  isScript   = asset.Type == Asset::EAssetType::Script;
+                const bool  isShader   = asset.Type == Asset::EAssetType::Shader;
+                const bool  isModel    = asset.Type == Asset::EAssetType::Model;
                 std::string scriptAssemblyPath;
                 std::string scriptTypeName;
                 bool        hasScriptDesc = false;
                 std::vector<Asset::FAssetHandle> materialDeps;
                 FModelCookResult                 modelResult{};
                 FEnvMapCookResult                envMapResult{};
+                FSkyCubeCookResult               skyCubeResult{};
                 std::vector<FGeneratedAsset>     generatedAssets;
                 if (isScript) {
                     if (!ParseScriptDescriptor(bytes, scriptAssemblyPath, scriptTypeName)) {
@@ -1136,7 +1169,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     }
                     hasScriptDesc = true;
                 }
-                if (isTexture) {
+                if (isTexture2D) {
                     std::string ext = asset.SourcePath.extension().string();
                     ToLowerAscii(ext);
                     if (ext == ".hdr") {
@@ -1159,12 +1192,41 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         cookKeyExtras   = envMapResult.CookKeyExtras;
                         generatedAssets = Move(envMapResult.Generated);
                     } else {
+                        if (ext == ".exr") {
+                            std::cerr << "EXR Texture2D is not supported by the runtime toolchain. "
+                                         "Set asset Type to CubeMap to cook as a skybox: "
+                                      << asset.SourcePath.string() << "\n";
+                            continue;
+                        }
                         constexpr bool kDefaultSrgb = true;
                         if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
                             std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
                                       << "\n";
                             continue;
                         }
+                    }
+                } else if (isCubeMap) {
+                    std::string ext = asset.SourcePath.extension().string();
+                    ToLowerAscii(ext);
+                    if (ext == ".exr") {
+                        std::string cookError;
+                        if (!CookSkyCubeFromExr(
+                                asset.SourcePath, bytes, skyCubeResult, cookError)) {
+                            std::cerr << "Failed to cook sky cubemap EXR: "
+                                      << asset.SourcePath.string();
+                            if (!cookError.empty()) {
+                                std::cerr << " (" << cookError << ")";
+                            }
+                            std::cerr << "\n";
+                            continue;
+                        }
+                        cookedBytes   = skyCubeResult.CookedBytes;
+                        cubeMapDesc   = skyCubeResult.Desc;
+                        cookKeyExtras = skyCubeResult.CookKeyExtras;
+                    } else {
+                        std::cerr << "Unsupported cubemap source: " << asset.SourcePath.string()
+                                  << "\n";
+                        continue;
                     }
                 } else if (isMesh) {
                     if (!CookMesh(asset.SourcePath, cookedBytes, meshDesc, cookKeyExtras)) {
@@ -1253,9 +1315,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 registryEntry.Type        = asset.Type;
                 registryEntry.VirtualPath = asset.VirtualPath;
                 registryEntry.CookedPath  = cookedRel;
-                if (isTexture) {
+                if (isTexture2D) {
                     registryEntry.TextureDesc    = textureDesc;
                     registryEntry.HasTextureDesc = true;
+                } else if (isCubeMap) {
+                    registryEntry.CubeMapDesc    = cubeMapDesc;
+                    registryEntry.HasCubeMapDesc = true;
                 } else if (isMesh) {
                     registryEntry.MeshDesc    = meshDesc;
                     registryEntry.HasMeshDesc = true;

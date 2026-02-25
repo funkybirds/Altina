@@ -6,6 +6,18 @@
 #include "Utility/Json.h"
 #include "Utility/Uuid.h"
 
+#if defined(_MSC_VER)
+    #pragma warning(push)
+    #pragma warning(disable : 4242) // int -> u16 (tinyexr internal tables)
+    #pragma warning(disable : 4245) // signed/unsigned mismatch (size_t returns)
+    #pragma warning(disable : 4702) // unreachable code (tinyexr internal)
+#endif
+#define TINYEXR_IMPLEMENTATION
+#include "tinyexr.h"
+#if defined(_MSC_VER)
+    #pragma warning(pop)
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -73,6 +85,86 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     && Rgb.size() == static_cast<size_t>(Width) * static_cast<size_t>(Height) * 3U;
             }
         };
+
+        [[nodiscard]] auto FloatToHalfBits(float value) -> u16 {
+            // IEEE 754 float -> half conversion. Good enough for HDR environment maps.
+            u32 bits = 0;
+            static_assert(sizeof(bits) == sizeof(value));
+            std::memcpy(&bits, &value, sizeof(bits));
+
+            const u32 sign = (bits >> 16) & 0x8000u;
+            const u32 mant = bits & 0x007FFFFFu;
+            const i32 exp  = static_cast<i32>((bits >> 23) & 0xFFu) - 127;
+
+            if (exp > 15) {
+                // Overflow -> Inf.
+                return static_cast<u16>(sign | 0x7C00u);
+            }
+            if (exp <= -15) {
+                // Subnormal or zero.
+                if (exp < -24) {
+                    return static_cast<u16>(sign);
+                }
+                const u32 shifted = (mant | 0x00800000u) >> static_cast<u32>(-exp - 1);
+                // Round to nearest.
+                const u32 halfMant = (shifted + 0x00001000u) >> 13;
+                return static_cast<u16>(sign | halfMant);
+            }
+
+            const u32 halfExp  = static_cast<u32>(exp + 15);
+            const u32 halfMant = (mant + 0x00001000u) >> 13; // round
+            return static_cast<u16>(sign | (halfExp << 10) | (halfMant & 0x03FFu));
+        }
+
+        auto DecodeOpenExr(const std::vector<u8>& sourceBytes, FHDRImage& outImage,
+            std::string& outError) -> bool {
+            outImage = {};
+            outError.clear();
+
+            if (sourceBytes.empty()) {
+                outError = "Empty EXR bytes.";
+                return false;
+            }
+
+            float*      rgba   = nullptr;
+            int         width  = 0;
+            int         height = 0;
+            const char* err    = nullptr;
+            const int   ret    = LoadEXRFromMemory(
+                &rgba, &width, &height, sourceBytes.data(), sourceBytes.size(), &err);
+            if (ret != TINYEXR_SUCCESS) {
+                if (err != nullptr) {
+                    outError = err;
+                    FreeEXRErrorMessage(err);
+                } else {
+                    outError = "LoadEXRFromMemory failed.";
+                }
+                return false;
+            }
+
+            if (rgba == nullptr || width <= 0 || height <= 0) {
+                if (rgba != nullptr) {
+                    free(rgba); // NOLINT(*-no-malloc)
+                }
+                outError = "Invalid EXR decode output.";
+                return false;
+            }
+
+            outImage.Width  = static_cast<u32>(width);
+            outImage.Height = static_cast<u32>(height);
+            outImage.Rgb.resize(static_cast<size_t>(outImage.Width) * outImage.Height * 3U);
+
+            const size_t pixelCount =
+                static_cast<size_t>(outImage.Width) * static_cast<size_t>(outImage.Height);
+            for (size_t i = 0; i < pixelCount; ++i) {
+                outImage.Rgb[i * 3U + 0U] = rgba[i * 4U + 0U];
+                outImage.Rgb[i * 3U + 1U] = rgba[i * 4U + 1U];
+                outImage.Rgb[i * 3U + 2U] = rgba[i * 4U + 2U];
+            }
+
+            free(rgba); // NOLINT(*-no-malloc)
+            return outImage.IsValid();
+        }
 
         [[nodiscard]] auto GetPixel(const FHDRImage& image, u32 x, u32 y) -> FVector3 {
             const u32    ix = (x >= image.Width) ? (image.Width - 1U) : x;
@@ -774,6 +866,99 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return true;
         }
 
+        auto BuildCubeMapRgba16fBlobFromMipChains(u32             size,
+            const std::array<std::vector<std::vector<float>>, 6>& faceMipChains,
+            std::vector<u8>& outCooked, Asset::FCubeMapDesc& outDesc, std::string& outError)
+            -> bool {
+            outCooked.clear();
+            outDesc = {};
+            outError.clear();
+
+            if (size == 0U) {
+                outError = "Invalid cube map size.";
+                return false;
+            }
+
+            const u32 mipCount = FullMipCount(size);
+            const u32 format   = Asset::kTextureFormatRGBA16F;
+            const u32 bpp      = Asset::GetTextureBytesPerPixel(format);
+            if (bpp == 0U) {
+                outError = "Unsupported cube map format.";
+                return false;
+            }
+
+            u64 totalBytes = 0ULL;
+            u32 mipSize    = size;
+            for (u32 mip = 0U; mip < mipCount; ++mip) {
+                const u64 faceBytes =
+                    static_cast<u64>(mipSize) * static_cast<u64>(mipSize) * static_cast<u64>(bpp);
+                totalBytes += faceBytes * 6ULL;
+                mipSize = (mipSize > 1U) ? (mipSize >> 1U) : 1U;
+            }
+
+            if (totalBytes > static_cast<u64>(std::numeric_limits<u32>::max())) {
+                outError = "Cooked cubemap data too large.";
+                return false;
+            }
+
+            Asset::FCubeMapBlobDesc blobDesc{};
+            blobDesc.Size     = size;
+            blobDesc.Format   = format;
+            blobDesc.MipCount = mipCount;
+            blobDesc.RowPitch = size * bpp;
+
+            Asset::FAssetBlobHeader header{};
+            header.Type     = static_cast<u8>(Asset::EAssetType::CubeMap);
+            header.Flags    = Asset::MakeAssetBlobFlags(false);
+            header.DescSize = static_cast<u32>(sizeof(Asset::FCubeMapBlobDesc));
+            header.DataSize = static_cast<u32>(totalBytes);
+
+            const size_t totalSize =
+                sizeof(header) + sizeof(blobDesc) + static_cast<size_t>(totalBytes);
+            outCooked.resize(totalSize);
+
+            u8* write = outCooked.data();
+            std::memcpy(write, &header, sizeof(header));
+            write += sizeof(header);
+            std::memcpy(write, &blobDesc, sizeof(blobDesc));
+            write += sizeof(blobDesc);
+
+            for (u32 mip = 0U; mip < mipCount; ++mip) {
+                const u32    mipDim = std::max(1U, size >> mip);
+                const size_t expectedFloats =
+                    static_cast<size_t>(mipDim) * static_cast<size_t>(mipDim) * 3U;
+
+                for (u32 face = 0U; face < 6U; ++face) {
+                    if (faceMipChains[face].size() != static_cast<size_t>(mipCount)
+                        || faceMipChains[face][mip].size() != expectedFloats) {
+                        outError = "Cubemap mip chain size mismatch.";
+                        return false;
+                    }
+
+                    const auto&  src = faceMipChains[face][mip];
+                    const size_t pixelCount =
+                        static_cast<size_t>(mipDim) * static_cast<size_t>(mipDim);
+
+                    for (size_t i = 0U; i < pixelCount; ++i) {
+                        const float r = src[i * 3U + 0U];
+                        const float g = src[i * 3U + 1U];
+                        const float b = src[i * 3U + 2U];
+
+                        const u16   half[4] = { FloatToHalfBits(r), FloatToHalfBits(g),
+                              FloatToHalfBits(b), FloatToHalfBits(1.0f) };
+                        std::memcpy(write, half, sizeof(half));
+                        write += sizeof(half);
+                    }
+                }
+            }
+
+            outDesc.Size     = blobDesc.Size;
+            outDesc.MipCount = blobDesc.MipCount;
+            outDesc.Format   = blobDesc.Format;
+            outDesc.SRGB     = false;
+            return true;
+        }
+
         auto ValidateCookedTexture2D(
             const std::vector<u8>& cookedBytes, const Asset::FTexture2DDesc& expectedDesc) -> bool {
             class FMemoryAssetStream final : public Asset::IAssetStream {
@@ -1347,6 +1532,71 @@ namespace AltinaEngine::Tools::AssetPipeline {
         outResult.CookKeyExtras.resize(sizeof(extras));
         std::memcpy(outResult.CookKeyExtras.data(), &extras, sizeof(extras));
 
+        return true;
+    }
+
+    auto CookSkyCubeFromExr(const std::filesystem::path& sourcePath,
+        const std::vector<u8>& sourceBytes, FSkyCubeCookResult& outResult, std::string& outError)
+        -> bool {
+        outResult = {};
+        outError.clear();
+
+        FEnvMapCookOptions options{};
+        std::string        optError;
+        if (!LoadEnvMapCookOptions(sourcePath, options, optError)) {
+            outError = optError;
+            return false;
+        }
+
+        FHDRImage image{};
+        if (!DecodeOpenExr(sourceBytes, image, outError)) {
+            return false;
+        }
+
+        const u32 size = options.SkyboxSize;
+        if (size == 0U) {
+            outError = "EnvMapSkyboxSize must be > 0.";
+            return false;
+        }
+
+        const u32                                      mipCount = FullMipCount(size);
+        std::array<std::vector<std::vector<float>>, 6> faceMipChains;
+        for (u32 f = 0U; f < 6U; ++f) {
+            faceMipChains[f].resize(mipCount);
+
+            if (!GenerateSkyboxFace(image, static_cast<ECubeFace>(f), size, faceMipChains[f][0])) {
+                outError = "Failed to generate skybox face.";
+                return false;
+            }
+
+            u32 w = size;
+            u32 h = size;
+            for (u32 mip = 1U; mip < mipCount; ++mip) {
+                u32 nw = 0U, nh = 0U;
+                if (!DownsampleBox2x(
+                        faceMipChains[f][mip - 1U], w, h, faceMipChains[f][mip], nw, nh)) {
+                    outError = "Failed to downsample skybox mip.";
+                    return false;
+                }
+                w = nw;
+                h = nh;
+            }
+        }
+
+        std::vector<u8>     cooked;
+        Asset::FCubeMapDesc desc{};
+        std::string         cookError;
+        if (!BuildCubeMapRgba16fBlobFromMipChains(size, faceMipChains, cooked, desc, cookError)) {
+            outError = cookError;
+            return false;
+        }
+
+        // Stable cook key extras: options relevant to cube generation.
+        outResult.CookKeyExtras.resize(sizeof(u32));
+        std::memcpy(outResult.CookKeyExtras.data(), &options.SkyboxSize, sizeof(u32));
+
+        outResult.CookedBytes = Move(cooked);
+        outResult.Desc        = desc;
         return true;
     }
 } // namespace AltinaEngine::Tools::AssetPipeline

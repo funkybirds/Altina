@@ -81,7 +81,8 @@ add_custom_command(
     COMMENT "Staging Minimal demo executable"
 )
 
-set(DemoShaderStageStamp ${CMAKE_BINARY_DIR}/Demo/Minimal/StageShaders.stamp)
+# Put the stamp under the demo output tree so the PreClean target removes it, forcing restaging.
+set(DemoShaderStageStamp ${DemoBinaryDir}/Assets/Shader/StageShaders.stamp)
 add_custom_command(
     OUTPUT ${DemoShaderStageStamp}
     COMMAND ${CMAKE_COMMAND} -E rm -rf ${DemoStagedShaderRoot}

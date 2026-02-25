@@ -59,9 +59,9 @@ add_subdirectory(Source/Runtime/Application)
 add_subdirectory(Source/Runtime/Input)
 add_subdirectory(Source/Runtime/Launch)
 add_subdirectory(Source/Tools/AssetPipeline)
+add_subdirectory(Source/Tools/ProjectGenerator)
 add_subdirectory(Demo/Minimal)
+add_subdirectory(Demo/SpaceshipGame)
 add_subdirectory(Source/Tests)
 
 ae_add_reflection_codegen(TARGET AltinaEngineCore FORBID_ANNOTATIONS)
-
-

@@ -29,4 +29,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
         const std::vector<u8>& sourceBytes, const Asset::FAssetHandle& baseHandle,
         const std::string& baseVirtualPath, FEnvMapCookResult& outResult, std::string& outError)
         -> bool;
+
+    struct FSkyCubeCookResult {
+        std::vector<u8>     CookedBytes;
+        Asset::FCubeMapDesc Desc{};
+        std::vector<u8>     CookKeyExtras;
+    };
+
+    // Skybox-only importer (tool-only): reads OpenEXR .exr (equirectangular) and cooks a CubeMap.
+    auto CookSkyCubeFromExr(const std::filesystem::path& sourcePath,
+        const std::vector<u8>& sourceBytes, FSkyCubeCookResult& outResult, std::string& outError)
+        -> bool;
 } // namespace AltinaEngine::Tools::AssetPipeline

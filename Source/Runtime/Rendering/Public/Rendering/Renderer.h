@@ -3,7 +3,7 @@
 #include "Rendering/RenderingAPI.h"
 
 #include "FrameGraph/FrameGraph.h"
-#include "Rhi/RhiFwd.h"
+#include "Rhi/RhiTexture.h"
 
 namespace AltinaEngine::RenderCore::View {
     struct FViewData;
@@ -30,6 +30,10 @@ namespace AltinaEngine::Rendering {
 
         // Optional shadow caster list (e.g., directional CSM).
         const RenderCore::Render::FDrawList*         ShadowDrawList = nullptr;
+
+        // Optional sky cubemap (for skybox rendering).
+        Rhi::FRhiTexture*                            SkyCubeTexture = nullptr;
+        bool                                         bHasSkyCube    = false;
     };
 
     /**

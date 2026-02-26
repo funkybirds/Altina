@@ -92,6 +92,19 @@ namespace AltinaEngine::Core::Math {
 
 // Transpose: (R x C) -> (C x R)
 namespace AltinaEngine::Core::Math {
+
+    template <CScalar T, u32 Rs, u32 Cs, u32 Rt, u32 Ct, u32 R, u32 C>
+    [[nodiscard]] constexpr auto SubMatrix(const TMatrix<T, R, C>& M) noexcept
+        -> TMatrix<T, Rt - Rs + 1, Ct - Cs + 1> {
+        using TMatOut = TMatrix<T, Rt - Rs + 1, Ct - Cs + 1>;
+        TMatOut out(T{});
+        for (u32 r = Rs; r <= Rt; ++r) {
+            for (u32 c = Cs; c <= Ct; ++c) {
+                out(r - Rs, c - Cs) = M.mElements[r][c];
+            }
+        }
+    }
+
     template <CScalar T, u32 R, u32 C>
     [[nodiscard]] constexpr auto Transpose(const TMatrix<T, R, C>& M) noexcept -> TMatrix<T, C, R> {
         TMatrix<T, C, R> out(T{});
@@ -103,10 +116,8 @@ namespace AltinaEngine::Core::Math {
         return out;
     }
 
-} // namespace AltinaEngine::Core::Math
+    // Matrix * Vector multiplication (MxN) * (N) -> (M)
 
-// Matrix * Vector multiplication (MxN) * (N) -> (M)
-namespace AltinaEngine::Core::Math {
     template <CScalar T, u32 R, u32 C>
     [[nodiscard]] constexpr auto MatMul(const TMatrix<T, R, C>& M, const TVector<T, C>& v) noexcept
         -> TVector<T, R> {
@@ -121,10 +132,8 @@ namespace AltinaEngine::Core::Math {
         return out;
     }
 
-} // namespace AltinaEngine::Core::Math
+    // Matrix * Matrix multiplication (R x K) * (K x C) -> (R x C)
 
-// Matrix * Matrix multiplication (R x K) * (K x C) -> (R x C)
-namespace AltinaEngine::Core::Math {
     template <CScalar T, u32 R, u32 K, u32 C>
     [[nodiscard]] constexpr auto MatMul(
         const TMatrix<T, R, K>& A, const TMatrix<T, K, C>& B) noexcept -> TMatrix<T, R, C> {

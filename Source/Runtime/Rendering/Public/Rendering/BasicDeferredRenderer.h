@@ -6,8 +6,9 @@
 #include "Shader/ShaderRegistry.h"
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiRefs.h"
+#include "Container/Array.h"
 
-#include <array>
+using AltinaEngine::Core::Container::TArray;
 
 namespace AltinaEngine::Rendering {
     class AE_RENDERING_API FBasicDeferredRenderer final : public IRenderer {
@@ -33,16 +34,16 @@ namespace AltinaEngine::Rendering {
         void        FinalizeRendering() override;
 
     private:
-        static constexpr u32                               kShadowCascades = 4U;
+        static constexpr u32                           kShadowCascades = 4U;
 
-        Rhi::FRhiBufferRef                                 mPerFrameBuffer;
-        Rhi::FRhiBindGroupRef                              mPerFrameGroup;
-        Rhi::FRhiBufferRef                                 mPerDrawBuffer;
-        Rhi::FRhiBindGroupRef                              mPerDrawGroup;
+        Rhi::FRhiBufferRef                             mPerFrameBuffer;
+        Rhi::FRhiBindGroupRef                          mPerFrameGroup;
+        Rhi::FRhiBufferRef                             mPerDrawBuffer;
+        Rhi::FRhiBindGroupRef                          mPerDrawGroup;
 
         // D3D11 deferred context: updating the same cbuffer multiple times while recording can
         // make all draws see the "last written" data at Execute time. Use per-cascade cbuffers.
-        std::array<Rhi::FRhiBufferRef, kShadowCascades>    mShadowPerFrameBuffers{};
-        std::array<Rhi::FRhiBindGroupRef, kShadowCascades> mShadowPerFrameGroups{};
+        TArray<Rhi::FRhiBufferRef, kShadowCascades>    mShadowPerFrameBuffers{};
+        TArray<Rhi::FRhiBindGroupRef, kShadowCascades> mShadowPerFrameGroups{};
     };
 } // namespace AltinaEngine::Rendering

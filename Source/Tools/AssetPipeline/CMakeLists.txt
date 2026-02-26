@@ -32,10 +32,16 @@ set(_assimp_zlib_byproduct
     "${_assimp_zlib_libdir}/${CMAKE_CFG_INTDIR}/zlibstatic${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
 set(_assimp_cmake_args
+    # Bump this value to force the ExternalProject configure step to re-run when assimp fork
+    # sources change, even if other configure args remain the same.
+    -DAE_ASSIMP_SUPERBUILD_REV=4
     -DBUILD_SHARED_LIBS=OFF
     -DASSIMP_NO_EXPORT=ON
     -DASSIMP_BUILD_TESTS=OFF
     -DASSIMP_BUILD_ASSIMP_TOOLS=OFF
+    # Enable USDZ (*.usdz) import via Assimp's experimental USD importer (tinyusdz backend).
+    # This is required by the SpaceshipGame demo to ingest provided USDZ models.
+    -DASSIMP_BUILD_USD_IMPORTER=ON
     -DASSIMP_BUILD_ZLIB=ON
     -DASSIMP_BUILD_MINIZIP=ON
     -DASSIMP_INSTALL=OFF
@@ -57,6 +63,14 @@ if (MSVC)
         -DCMAKE_CXX_FLAGS_RELEASE=/MD
         -DCMAKE_CXX_FLAGS_MINSIZEREL=/MD
     )
+
+    # ExternalProject_Add configures Assimp in a nested CMake run (Ninja generator).
+    # In some environments the nested run does not populate MSVC_TOOLSET_VERSION, which
+    # affects Assimp's output library naming (assimp-vcXXX-mt.lib). Pass it through so
+    # our BUILD_BYPRODUCTS and imported target path remain consistent.
+    if (MSVC_TOOLSET_VERSION)
+        list(APPEND _assimp_cmake_args -DMSVC_TOOLSET_VERSION=${MSVC_TOOLSET_VERSION})
+    endif()
 endif()
 
 ExternalProject_Add(assimp_ext
@@ -91,6 +105,10 @@ add_executable(${TargetName})
 
 add_dependencies(${TargetName} assimp_ext)
 
+# Avoid MSVC dependency scanner glitches in environments where standard include paths are not
+# available to the scanner (build is still driven by our scripts via VsDevCmd).
+set_property(TARGET ${TargetName} PROPERTY CXX_SCAN_FOR_MODULES OFF)
+
 set(Target_Private_Sources
     Private/AssetToolMain.cpp
     Private/AssetToolIO.cpp
@@ -104,6 +122,7 @@ set(Target_Private_Sources
     Private/Importers/Model/FbxImporter.cpp
     Private/Importers/Model/ModelImporter.cpp
     Private/Importers/Model/PmxImporter.cpp
+    Private/Importers/Model/UsdzImporter.cpp
     Private/Importers/Shader/ShaderImporter.cpp
     Private/Importers/Texture/TextureImporter.cpp
 )

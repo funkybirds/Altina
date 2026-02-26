@@ -265,7 +265,7 @@ namespace AltinaEngine::RenderCore {
                 ++passIndex;
             }
         }
-
+        // Require refactor: Lacking resource state transition
         for (auto& pass : mPasses) {
             const bool hasRenderPass = pass.mDesc.mType == EFrameGraphPassType::Raster
                 && (!pass.mCompiledColorAttachments.IsEmpty() || pass.mHasCompiledDepth);

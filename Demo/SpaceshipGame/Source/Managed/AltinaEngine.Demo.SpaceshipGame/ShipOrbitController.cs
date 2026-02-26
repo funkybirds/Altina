@@ -57,6 +57,12 @@ public sealed class ShipOrbitController : ScriptComponent
 
     private void UpdateMouseOffsets()
     {
+        if (SpaceshipGlobals.ThirdPersonCameraEnabled)
+        {
+            // In third-person mode the mouse is used for orbit camera controls.
+            return;
+        }
+
         if (!Input.HasFocus)
         {
             return;

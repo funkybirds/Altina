@@ -19,22 +19,30 @@
 #include "Platform/Generic/GenericPlatformDecl.h"
 #include "Rhi/Command/RhiCmdContext.h"
 #include "Rhi/RhiBindGroup.h"
-#include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiBuffer.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiPipelineLayout.h"
-#include "Rhi/RhiSampler.h"
 #include "Rhi/RhiTexture.h"
 
 #include "Math/LinAlg/Common.h"
+#include "Algorithm/Sort.h"
+#include "Utility/Assert.h"
 
 #include <algorithm>
-#include <cmath>
 #include <limits>
 
 using AltinaEngine::Move;
+using AltinaEngine::Core::Math::FMatrix4x4f;
+using AltinaEngine::Core::Math::FVector3f;
+using AltinaEngine::Core::Math::FVector4f;
+
+using AltinaEngine::Core::Utility::Assert;
+using AltinaEngine::Core::Utility::DebugAssert;
+
+using AltinaEngine::Core::Container::FString;
+
 namespace AltinaEngine::Rendering {
     namespace {
         namespace Container = Core::Container;
@@ -52,38 +60,38 @@ namespace AltinaEngine::Rendering {
         // IMPORTANT: BasePass (VSBase) and ShadowDepth (VSShadowDepth) only read ViewProjection,
         // so it must remain the first member.
         struct FPerFrameConstants {
-            Core::Math::FMatrix4x4f ViewProjection;
+            FMatrix4x4f ViewProjection;
 
-            Core::Math::FMatrix4x4f View;
-            Core::Math::FMatrix4x4f Proj;
-            Core::Math::FMatrix4x4f ViewProj;
-            Core::Math::FMatrix4x4f InvViewProj;
+            FMatrix4x4f View;
+            FMatrix4x4f Proj;
+            FMatrix4x4f ViewProj;
+            FMatrix4x4f InvViewProj;
 
-            f32                     ViewOriginWS[3] = { 0.0f, 0.0f, 0.0f };
-            u32                     PointLightCount = 0U;
+            f32         ViewOriginWS[3] = { 0.0f, 0.0f, 0.0f };
+            u32         PointLightCount = 0U;
 
-            f32                     DirLightDirectionWS[3] = { 0.0f, -1.0f, 0.0f };
-            f32                     DirLightIntensity      = 0.0f;
-            f32                     DirLightColor[3]       = { 1.0f, 1.0f, 1.0f };
-            u32                     CSMCascadeCount        = 0U;
+            f32         DirLightDirectionWS[3] = { 0.0f, -1.0f, 0.0f };
+            f32         DirLightIntensity      = 0.0f;
+            f32         DirLightColor[3]       = { 1.0f, 1.0f, 1.0f };
+            u32         CSMCascadeCount        = 0U;
 
             // Keep these as explicit members (not an array). See DeferredLighting.hlsl:
             // Slang -> DXBC can mishandle row_major on matrix arrays, causing implicit transposes.
-            Core::Math::FMatrix4x4f CSM_LightViewProj0{};
-            Core::Math::FMatrix4x4f CSM_LightViewProj1{};
-            Core::Math::FMatrix4x4f CSM_LightViewProj2{};
-            Core::Math::FMatrix4x4f CSM_LightViewProj3{};
-            f32                     CSM_SplitsVS[RenderCore::Shadow::kMaxCascades][4] = {};
+            FMatrix4x4f CSM_LightViewProj0{};
+            FMatrix4x4f CSM_LightViewProj1{};
+            FMatrix4x4f CSM_LightViewProj2{};
+            FMatrix4x4f CSM_LightViewProj3{};
+            f32         CSM_SplitsVS[RenderCore::Shadow::kMaxCascades][4] = {};
 
-            f32                     RenderTargetSize[2]    = { 0.0f, 0.0f };
-            f32                     InvRenderTargetSize[2] = { 0.0f, 0.0f };
+            f32         RenderTargetSize[2]    = { 0.0f, 0.0f };
+            f32         InvRenderTargetSize[2] = { 0.0f, 0.0f };
 
-            u32                     bReverseZ           = 1U;
-            u32                     DebugShadingMode    = 0U; // 0=PBR, 1=Lambert(debug)
-            f32                     ShadowBias          = 0.0015f;
-            f32                     _pad0               = 0.0f;
-            f32                     ShadowMapInvSize[2] = { 0.0f, 0.0f };
-            f32                     _pad1[2]            = { 0.0f, 0.0f };
+            u32         bReverseZ           = 1U;
+            u32         DebugShadingMode    = 0U; // 0=PBR, 1=Lambert(debug)
+            f32         ShadowBias          = 0.0015f;
+            f32         _pad0               = 0.0f;
+            f32         ShadowMapInvSize[2] = { 0.0f, 0.0f };
+            f32         _pad1[2]            = { 0.0f, 0.0f };
 
             struct FPointLight {
                 f32 PositionWS[3] = { 0.0f, 0.0f, 0.0f };
@@ -95,14 +103,12 @@ namespace AltinaEngine::Rendering {
         };
 
         struct FPerDrawConstants {
-            Core::Math::FMatrix4x4f World;
-            Core::Math::FMatrix4x4f NormalMatrix;
+            FMatrix4x4f World;
+            FMatrix4x4f NormalMatrix;
         };
 
-        [[nodiscard]] auto ComputeNormalMatrix(const Core::Math::FMatrix4x4f& world) noexcept
-            -> Core::Math::FMatrix4x4f {
+        [[nodiscard]] auto ComputeNormalMatrix(const FMatrix4x4f& world) noexcept -> FMatrix4x4f {
             using Core::Math::FMatrix3x3f;
-            using Core::Math::FMatrix4x4f;
 
             // Normal matrix = transpose(inverse(upper3x3(World))).
             FMatrix3x3f upper{};
@@ -129,22 +135,19 @@ namespace AltinaEngine::Rendering {
         }
 
         struct FWorldBoundsDebug {
-            bool                  bValid        = false;
-            Core::Math::FVector3f MinWS         = Core::Math::FVector3f(0.0f);
-            Core::Math::FVector3f MaxWS         = Core::Math::FVector3f(0.0f);
-            u32                   BatchCount    = 0U;
-            u32                   InstanceCount = 0U;
+            bool      bValid        = false;
+            FVector3f MinWS         = FVector3f(0.0f);
+            FVector3f MaxWS         = FVector3f(0.0f);
+            u32       BatchCount    = 0U;
+            u32       InstanceCount = 0U;
         };
 
-        [[nodiscard]] auto TransformAabbToWorld(const Core::Math::FMatrix4x4f& world,
-            const RenderCore::Geometry::FStaticMeshBounds3f&                   localBounds,
-            Core::Math::FVector3f& outMinWS, Core::Math::FVector3f& outMaxWS) -> bool {
+        [[nodiscard]] auto TransformAabbToWorld(const FMatrix4x4f& world,
+            const RenderCore::Geometry::FStaticMeshBounds3f& localBounds, FVector3f& outMinWS,
+            FVector3f& outMaxWS) -> bool {
             if (!localBounds.IsValid()) {
                 return false;
             }
-
-            using Core::Math::FVector3f;
-            using Core::Math::FVector4f;
 
             const FVector3f& bmin = localBounds.Min;
             const FVector3f& bmax = localBounds.Max;
@@ -185,8 +188,8 @@ namespace AltinaEngine::Rendering {
             FWorldBoundsDebug out{};
             out.BatchCount = static_cast<u32>(list.Batches.Size());
 
-            Core::Math::FVector3f minWS(std::numeric_limits<f32>::max());
-            Core::Math::FVector3f maxWS(-std::numeric_limits<f32>::max());
+            FVector3f minWS(std::numeric_limits<f32>::max());
+            FVector3f maxWS(-std::numeric_limits<f32>::max());
 
             for (const auto& batch : list.Batches) {
                 const auto* mesh = batch.Static.Mesh;
@@ -203,8 +206,8 @@ namespace AltinaEngine::Rendering {
                 }
 
                 for (const auto& inst : batch.Instances) {
-                    Core::Math::FVector3f instMinWS(0.0f);
-                    Core::Math::FVector3f instMaxWS(0.0f);
+                    FVector3f instMinWS(0.0f);
+                    FVector3f instMaxWS(0.0f);
                     if (!TransformAabbToWorld(inst.World, lodBounds, instMinWS, instMaxWS)) {
                         continue;
                     }
@@ -220,8 +223,8 @@ namespace AltinaEngine::Rendering {
             }
 
             out.bValid = (minWS[0] <= maxWS[0]) && (minWS[1] <= maxWS[1]) && (minWS[2] <= maxWS[2]);
-            out.MinWS  = out.bValid ? minWS : Core::Math::FVector3f(0.0f);
-            out.MaxWS  = out.bValid ? maxWS : Core::Math::FVector3f(0.0f);
+            out.MinWS  = out.bValid ? minWS : FVector3f(0.0f);
+            out.MaxWS  = out.bValid ? maxWS : FVector3f(0.0f);
             return out;
         }
 
@@ -324,12 +327,13 @@ namespace AltinaEngine::Rendering {
                 outEntries.PushBack(entry);
             }
 
-            std::sort(outEntries.begin(), outEntries.end(), [](const auto& lhs, const auto& rhs) {
-                if (lhs.mBinding != rhs.mBinding) {
-                    return lhs.mBinding < rhs.mBinding;
-                }
-                return lhs.mType < rhs.mType;
-            });
+            Core::Algorithm::Sort(
+                outEntries.begin(), outEntries.end(), [](const auto& lhs, const auto& rhs) {
+                    if (lhs.mBinding != rhs.mBinding) {
+                        return lhs.mBinding < rhs.mBinding;
+                    }
+                    return lhs.mType < rhs.mType;
+                });
 
             // D3D11 backend does not expose descriptor sets/spaces in reflection in our pipeline;
             // we treat all resources as set 0 and separate them by register index ranges (b0/b4/b8,
@@ -1106,7 +1110,7 @@ namespace AltinaEngine::Rendering {
 
         graph.AddPass<FBasePassData>(
             basePassDesc,
-            [&](RenderCore::FFrameGraphPassBuilder& builder, FBasePassData& data) {
+            [&](RenderCore::FFrameGraphPassBuilder& builder, FBasePassData& data) -> void {
                 RenderCore::FFrameGraphTextureDesc gbufferADesc{};
                 gbufferADesc.mDesc.mDebugName.Assign(TEXT("GBufferA.Albedo"));
                 gbufferADesc.mDesc.mWidth     = width;
@@ -1210,7 +1214,7 @@ namespace AltinaEngine::Rendering {
                 sceneDepth = data.Depth;
             },
             [drawList, drawBindings, pipelineData, bindingData, viewRect](Rhi::FRhiCmdContext& ctx,
-                const RenderCore::FFrameGraphPassResources&, const FBasePassData&) {
+                const RenderCore::FFrameGraphPassResources&, const FBasePassData&) -> void {
                 // LogInfo(TEXT("FG Pass: BasicDeferred.BasePass"));
                 Rhi::FRhiViewportRect viewport{};
                 viewport.mX        = static_cast<f32>(viewRect.X);
@@ -1240,9 +1244,11 @@ namespace AltinaEngine::Rendering {
 
         RenderCore::Shadow::FCSMSettings csmSettings{};
         csmSettings.CascadeCount = RenderCore::Shadow::kMaxCascades;
-        // Keep this reasonably large; too small will clip all casters/receivers out of the
-        // shadow frustum (common in demo scenes).
-        csmSettings.MaxDistance   = 1000.0f;
+        // NOTE: The demo scenes typically have a huge camera far plane (and far-away sky
+        // objects). Keeping the CSM range too large causes visible shimmering/aliasing.
+        // Clamp the shadow range to a smaller distance for more stable results.
+        csmSettings.SplitLambda   = 0.65f;
+        csmSettings.MaxDistance   = 250.0f;
         csmSettings.ShadowMapSize = 2048U;
         csmSettings.ReceiverBias  = 0.0015f;
 
@@ -1262,18 +1268,18 @@ namespace AltinaEngine::Rendering {
 
                 const auto bounds = ComputeDrawListWorldBounds(*shadowDrawList);
                 if (bounds.bValid) {
-                    const Core::Math::FVector3f bmin = bounds.MinWS;
-                    const Core::Math::FVector3f bmax = bounds.MaxWS;
+                    const FVector3f bmin = bounds.MinWS;
+                    const FVector3f bmax = bounds.MaxWS;
 
-                    Core::Math::FVector4f       cornersWS[8] = {
-                        Core::Math::FVector4f(bmin[0], bmin[1], bmin[2], 1.0f),
-                        Core::Math::FVector4f(bmax[0], bmin[1], bmin[2], 1.0f),
-                        Core::Math::FVector4f(bmax[0], bmax[1], bmin[2], 1.0f),
-                        Core::Math::FVector4f(bmin[0], bmax[1], bmin[2], 1.0f),
-                        Core::Math::FVector4f(bmin[0], bmin[1], bmax[2], 1.0f),
-                        Core::Math::FVector4f(bmax[0], bmin[1], bmax[2], 1.0f),
-                        Core::Math::FVector4f(bmax[0], bmax[1], bmax[2], 1.0f),
-                        Core::Math::FVector4f(bmin[0], bmax[1], bmax[2], 1.0f),
+                    FVector4f       cornersWS[8] = {
+                        FVector4f(bmin[0], bmin[1], bmin[2], 1.0f),
+                        FVector4f(bmax[0], bmin[1], bmin[2], 1.0f),
+                        FVector4f(bmax[0], bmax[1], bmin[2], 1.0f),
+                        FVector4f(bmin[0], bmax[1], bmin[2], 1.0f),
+                        FVector4f(bmin[0], bmin[1], bmax[2], 1.0f),
+                        FVector4f(bmax[0], bmin[1], bmax[2], 1.0f),
+                        FVector4f(bmax[0], bmax[1], bmax[2], 1.0f),
+                        FVector4f(bmin[0], bmax[1], bmax[2], 1.0f),
                     };
 
                     for (u32 cascade = 0U; cascade < csmData.CascadeCount; ++cascade) {
@@ -1399,7 +1405,7 @@ namespace AltinaEngine::Rendering {
                              : mPerFrameGroup.Get(),
                         lightViewProj  = csmData.Cascades[cascade].LightViewProj](
                         Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources&,
-                        const FShadowPassData&) {
+                        const FShadowPassData&) -> void {
                         // LogInfo(TEXT("FG Pass: BasicDeferred.ShadowCSM"));
 
                         if (perFrameBuffer) {
@@ -1531,7 +1537,7 @@ namespace AltinaEngine::Rendering {
             },
             [viewRect, view, lights, csmData, csmSettings, perFrameBuffer = mPerFrameBuffer.Get()](
                 Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources& res,
-                const FLightingPassData& data) {
+                const FLightingPassData& data) -> void {
                 // LogInfo(TEXT("FG Pass: BasicDeferred.DeferredLighting"));
                 auto& shared = GetSharedResources();
                 if (!shared.LightingPipeline || !shared.LightingLayout || !shared.OutputSampler) {
@@ -1582,8 +1588,8 @@ namespace AltinaEngine::Rendering {
                 if (lights != nullptr && lights->bHasMainDirectionalLight) {
                     dir = lights->MainDirectionalLight;
                 } else {
-                    dir.DirectionWS  = Core::Math::FVector3f(0.4f, 0.6f, 0.7f);
-                    dir.Color        = Core::Math::FVector3f(1.0f, 1.0f, 1.0f);
+                    dir.DirectionWS  = FVector3f(0.4f, 0.6f, 0.7f);
+                    dir.Color        = FVector3f(1.0f, 1.0f, 1.0f);
                     dir.Intensity    = 2.0f;
                     dir.bCastShadows = false;
                 }
@@ -1688,9 +1694,7 @@ namespace AltinaEngine::Rendering {
                 groupDesc.mEntries.PushBack(sampler);
 
                 auto bindGroup = device->CreateBindGroup(groupDesc);
-                if (!bindGroup) {
-                    return;
-                }
+                Assert(!(!bindGroup), TEXT("BasicDeferredRenderer"), "Failed to create bind group");
 
                 ctx.RHISetGraphicsPipeline(shared.LightingPipeline.Get());
 
@@ -1716,8 +1720,8 @@ namespace AltinaEngine::Rendering {
             });
 
         // Optional skybox pass: draw cube map into SceneColorHDR as background.
-        if (mViewContext.bHasSkyCube && mViewContext.SkyCubeTexture && sceneColorHDR.IsValid()
-            && sceneDepth.IsValid()) {
+        if (mViewContext.bHasSkyCube && (mViewContext.SkyCubeTexture != nullptr)
+            && sceneColorHDR.IsValid() && sceneDepth.IsValid()) {
             auto* device = Rhi::RHIGetDevice();
             if (device != nullptr) {
                 auto& shared = GetSharedResources();
@@ -1765,7 +1769,7 @@ namespace AltinaEngine::Rendering {
                         [viewRect, perFrameBuffer = mPerFrameBuffer.Get(), skyCube](
                             Rhi::FRhiCmdContext&                        ctx,
                             const RenderCore::FFrameGraphPassResources& res,
-                            const FSkyBoxPassData&                      data) {
+                            const FSkyBoxPassData&                      data) -> void {
                             auto& shared = GetSharedResources();
                             if (!shared.SkyBoxPipeline || !shared.SkyBoxLayout
                                 || !shared.OutputSampler || perFrameBuffer == nullptr
@@ -1779,9 +1783,7 @@ namespace AltinaEngine::Rendering {
                             }
 
                             auto* device = Rhi::RHIGetDevice();
-                            if (device == nullptr) {
-                                return;
-                            }
+                            DebugAssert(device, TEXT("BasicDeferredRenderer"), "Device lost");
 
                             Rhi::FRhiBindGroupDesc groupDesc{};
                             groupDesc.mLayout = shared.SkyBoxLayout.Get();
@@ -1853,9 +1855,9 @@ namespace AltinaEngine::Rendering {
                 FPostProcessNode node{};
                 node.EffectId.Assign(TEXT("TAA"));
                 node.bEnabled = true;
-                node.Params[Container::FString(TEXT("Alpha"))] =
+                node.Params[FString(TEXT("Alpha"))] =
                     FPostProcessParamValue(rPostProcessTaaAlpha.Get());
-                node.Params[Container::FString(TEXT("ClampK"))] =
+                node.Params[FString(TEXT("ClampK"))] =
                     FPostProcessParamValue(rPostProcessTaaClampK.Get());
                 pp.Stack.PushBack(Move(node));
             }
@@ -1865,15 +1867,15 @@ namespace AltinaEngine::Rendering {
                 node.EffectId.Assign(TEXT("Bloom"));
                 node.bEnabled = true;
                 // Defaults can be tuned via CVars; can be overridden later via stack params.
-                node.Params[Container::FString(TEXT("Threshold"))] =
+                node.Params[FString(TEXT("Threshold"))] =
                     FPostProcessParamValue(rPostProcessBloomThreshold.Get());
-                node.Params[Container::FString(TEXT("Knee"))] =
+                node.Params[FString(TEXT("Knee"))] =
                     FPostProcessParamValue(rPostProcessBloomKnee.Get());
-                node.Params[Container::FString(TEXT("Intensity"))] =
+                node.Params[FString(TEXT("Intensity"))] =
                     FPostProcessParamValue(rPostProcessBloomIntensity.Get());
-                node.Params[Container::FString(TEXT("KawaseOffset"))] =
+                node.Params[FString(TEXT("KawaseOffset"))] =
                     FPostProcessParamValue(rPostProcessBloomKawaseOffset.Get());
-                node.Params[Container::FString(TEXT("Iterations"))] =
+                node.Params[FString(TEXT("Iterations"))] =
                     FPostProcessParamValue(rPostProcessBloomIterations.Get());
                 pp.Stack.PushBack(Move(node));
             }
@@ -1883,8 +1885,8 @@ namespace AltinaEngine::Rendering {
                 node.EffectId.Assign(TEXT("Tonemap"));
                 node.bEnabled = true;
                 // Defaults; user can override via stack params later.
-                node.Params[Container::FString(TEXT("Exposure"))] = FPostProcessParamValue(1.0f);
-                node.Params[Container::FString(TEXT("Gamma"))]    = FPostProcessParamValue(2.2f);
+                node.Params[FString(TEXT("Exposure"))] = FPostProcessParamValue(1.0f);
+                node.Params[FString(TEXT("Gamma"))]    = FPostProcessParamValue(2.2f);
                 pp.Stack.PushBack(Move(node));
             }
 
@@ -1893,11 +1895,11 @@ namespace AltinaEngine::Rendering {
                 node.EffectId.Assign(TEXT("Fxaa"));
                 node.bEnabled = true;
                 // Defaults can be tuned via CVars; can be overridden later via stack params.
-                node.Params[Container::FString(TEXT("EdgeThreshold"))] =
+                node.Params[FString(TEXT("EdgeThreshold"))] =
                     FPostProcessParamValue(rPostProcessFxaaEdgeThreshold.Get());
-                node.Params[Container::FString(TEXT("EdgeThresholdMin"))] =
+                node.Params[FString(TEXT("EdgeThresholdMin"))] =
                     FPostProcessParamValue(rPostProcessFxaaEdgeThresholdMin.Get());
-                node.Params[Container::FString(TEXT("Subpix"))] =
+                node.Params[FString(TEXT("Subpix"))] =
                     FPostProcessParamValue(rPostProcessFxaaSubpix.Get());
                 pp.Stack.PushBack(Move(node));
             }

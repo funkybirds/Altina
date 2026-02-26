@@ -188,11 +188,14 @@ namespace AltinaEngine::Rendering {
             packedNormals.Reserve(static_cast<usize>(desc.VertexCount));
         }
 
+        // NOTE:
+        // Our base-pass pipeline always expects a TEXCOORD0 stream (input slot 2). If a mesh asset
+        // is missing UV0, the renderer will not bind slot 2 which can make the draw invalid under
+        // D3D11 validation (and effectively "invisible"). To keep rendering robust, synthesize a
+        // zero UV0 buffer when missing.
         const bool                                      hasUv0 = uv0Attr.Valid;
         Core::Container::TVector<Core::Math::FVector2f> uv0;
-        if (hasUv0) {
-            uv0.Reserve(static_cast<usize>(desc.VertexCount));
-        }
+        uv0.Reserve(static_cast<usize>(desc.VertexCount));
 
         const bool                                      hasUv1 = uv1Attr.Valid;
         Core::Container::TVector<Core::Math::FVector2f> uv1;
@@ -230,6 +233,8 @@ namespace AltinaEngine::Rendering {
                     return false;
                 }
                 uv0.PushBack(Core::Math::FVector2f(values[0], values[1]));
+            } else {
+                uv0.PushBack(Core::Math::FVector2f(0.0f, 0.0f));
             }
 
             if (hasUv1) {
@@ -248,9 +253,8 @@ namespace AltinaEngine::Rendering {
         if (!packedNormals.IsEmpty()) {
             lod.SetTangents(packedNormals.Data(), desc.VertexCount);
         }
-        if (!uv0.IsEmpty()) {
-            lod.SetUV0(uv0.Data(), desc.VertexCount);
-        }
+        // Always provide UV0 (see note above).
+        lod.SetUV0(uv0.Data(), desc.VertexCount);
         if (!uv1.IsEmpty()) {
             lod.SetUV1(uv1.Data(), desc.VertexCount);
         }

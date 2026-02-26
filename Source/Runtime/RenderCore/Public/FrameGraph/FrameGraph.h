@@ -56,6 +56,16 @@ namespace AltinaEngine::RenderCore {
     struct FFrameGraphTextureDesc {
         Rhi::FRhiTextureDesc   mDesc;
         Rhi::ERhiResourceState mInitialState = Rhi::ERhiResourceState::Common;
+
+        static auto            Create(TChar* name, u32 width, u32 height, Rhi::ERhiFormat format,
+                       Rhi::ERhiTextureBindFlags bindFlags) -> FFrameGraphTextureDesc {
+            FFrameGraphTextureDesc desc{};
+            desc.mDesc.mFormat    = format;
+            desc.mDesc.mWidth     = width;
+            desc.mDesc.mHeight    = height;
+            desc.mDesc.mBindFlags = bindFlags;
+            desc.mDesc.mDebugName.Assign(name);
+        }
     };
 
     struct FFrameGraphBufferDesc {

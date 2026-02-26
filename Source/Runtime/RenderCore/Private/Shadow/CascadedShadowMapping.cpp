@@ -200,18 +200,37 @@ namespace AltinaEngine::RenderCore::Shadow {
             minLS[2] -= zPad;
             maxLS[2] += zPad;
 
-            const f32       width  = std::max(maxLS[0] - minLS[0], kEps);
-            const f32       height = std::max(maxLS[1] - minLS[1], kEps);
-            const f32       nearZ  = std::min(minLS[2], maxLS[2]);
-            const f32       farZ   = std::max(minLS[2], maxLS[2]);
+            const f32 nearZ = std::min(minLS[2], maxLS[2]);
+            const f32 farZ  = std::max(minLS[2], maxLS[2]);
 
-            // Ortho projection centered on the AABB.
-            const FVector3f boxCenter(
-                (minLS[0] + maxLS[0]) * 0.5f, (minLS[1] + maxLS[1]) * 0.5f, 0.0f);
-            // Translate so the AABB is centered.
+            // Stabilize the cascade (reduce shimmering):
+            // - Fit a square ortho (width == height) around the frustum's light-space AABB.
+            // - Snap the light-space center to shadow-map texel-sized increments.
+            const f32 halfW  = (maxLS[0] - minLS[0]) * 0.5f;
+            const f32 halfH  = (maxLS[1] - minLS[1]) * 0.5f;
+            f32       radius = std::max(std::max(halfW, halfH), kEps);
+            radius *= 1.01f; // small padding for safety
+
+            const f32 width  = radius * 2.0f;
+            const f32 height = width;
+
+            f32       centerX = (minLS[0] + maxLS[0]) * 0.5f;
+            f32       centerY = (minLS[1] + maxLS[1]) * 0.5f;
+
+            const u32 smSize = std::max(settings.ShadowMapSize, 1U);
+            const f32 texelX = width / static_cast<f32>(smSize);
+            const f32 texelY = height / static_cast<f32>(smSize);
+            if (texelX > kEps) {
+                centerX = std::floor(centerX / texelX) * texelX;
+            }
+            if (texelY > kEps) {
+                centerY = std::floor(centerY / texelY) * texelY;
+            }
+
+            // Translate so the cascade box is centered.
             FMatrix4x4f translate = LinAlg::Identity<f32, 4>();
-            translate(0, 3)       = -boxCenter[0];
-            translate(1, 3)       = -boxCenter[1];
+            translate(0, 3)       = -centerX;
+            translate(1, 3)       = -centerY;
 
             const FMatrix4x4f lightViewCentered = Math::MatMul(translate, lightView);
             const FMatrix4x4f lightProj =

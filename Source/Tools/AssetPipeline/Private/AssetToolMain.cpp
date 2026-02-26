@@ -14,6 +14,10 @@
 #include "Utility/Json.h"
 #include "Utility/Uuid.h"
 
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -292,7 +296,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
         auto IsModelExtension(const std::filesystem::path& path) -> bool {
             std::string ext = path.extension().string();
             ToLowerAscii(ext);
-            return ext == ".fbx" || ext == ".gltf" || ext == ".glb" || ext == ".model";
+            return ext == ".fbx" || ext == ".gltf" || ext == ".glb" || ext == ".model"
+                || ext == ".usdz";
         }
 
         auto IsMaterialExtension(const std::filesystem::path& path) -> bool {
@@ -757,6 +762,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::cout << " [--build-root <BuildRoot>] [--cook-root <CookRoot>]\n";
             std::cout << "  validate --registry <PathToAssetRegistry.json>\n";
             std::cout << "  clean    --root <repoRoot> [--build-root <BuildRoot>] --cache\n";
+            std::cout << "  modelinfo --source <PathToModel> [--target-radius <R>]\n";
         }
 
         auto BuildPaths(const FCommandLine& command, const std::string& platform) -> FToolPaths {
@@ -1208,8 +1214,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 } else if (isCubeMap) {
                     std::string ext = asset.SourcePath.extension().string();
                     ToLowerAscii(ext);
+                    std::string cookError;
                     if (ext == ".exr") {
-                        std::string cookError;
                         if (!CookSkyCubeFromExr(
                                 asset.SourcePath, bytes, skyCubeResult, cookError)) {
                             std::cerr << "Failed to cook sky cubemap EXR: "
@@ -1220,14 +1226,26 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             std::cerr << "\n";
                             continue;
                         }
-                        cookedBytes   = skyCubeResult.CookedBytes;
-                        cubeMapDesc   = skyCubeResult.Desc;
-                        cookKeyExtras = skyCubeResult.CookKeyExtras;
+                    } else if (ext == ".hdr") {
+                        if (!CookSkyCubeFromHdr(
+                                asset.SourcePath, bytes, skyCubeResult, cookError)) {
+                            std::cerr << "Failed to cook sky cubemap HDR: "
+                                      << asset.SourcePath.string();
+                            if (!cookError.empty()) {
+                                std::cerr << " (" << cookError << ")";
+                            }
+                            std::cerr << "\n";
+                            continue;
+                        }
                     } else {
                         std::cerr << "Unsupported cubemap source: " << asset.SourcePath.string()
                                   << "\n";
                         continue;
                     }
+
+                    cookedBytes   = skyCubeResult.CookedBytes;
+                    cubeMapDesc   = skyCubeResult.Desc;
+                    cookKeyExtras = skyCubeResult.CookKeyExtras;
                 } else if (isMesh) {
                     if (!CookMesh(asset.SourcePath, cookedBytes, meshDesc, cookKeyExtras)) {
                         std::cerr << "Failed to cook mesh: " << asset.SourcePath.string() << "\n";
@@ -1624,6 +1642,144 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return 0;
         }
 
+        auto ModelInfo(const FCommandLine& command) -> int {
+            auto srcIt = command.Options.find("source");
+            if (srcIt == command.Options.end()) {
+                std::cerr << "Missing --source.\n";
+                return 1;
+            }
+
+            std::filesystem::path sourcePath = std::filesystem::path(srcIt->second);
+            if (!std::filesystem::exists(sourcePath)) {
+                std::cerr << "Source model does not exist: " << sourcePath.string() << "\n";
+                return 1;
+            }
+
+            double targetRadius = 0.0;
+            auto   targetIt     = command.Options.find("target-radius");
+            if (targetIt != command.Options.end()) {
+                try {
+                    targetRadius = std::stod(targetIt->second);
+                } catch (...) {
+                    std::cerr << "Invalid --target-radius.\n";
+                    return 1;
+                }
+            }
+
+            Assimp::Importer importer;
+            const aiScene*   scene = importer.ReadFile(sourcePath.string(),
+                  aiProcess_Triangulate | aiProcess_JoinIdenticalVertices
+                      | aiProcess_ImproveCacheLocality | aiProcess_GenSmoothNormals
+                      | aiProcess_CalcTangentSpace | aiProcess_LimitBoneWeights);
+            if (scene == nullptr || scene->mRootNode == nullptr) {
+                std::cerr << "Assimp failed to load: " << sourcePath.string() << "\n";
+                const char* err = importer.GetErrorString();
+                if (err != nullptr && err[0] != '\0') {
+                    std::cerr << "Assimp error: " << err << "\n";
+                }
+                return 1;
+            }
+
+            auto identity = []() -> aiMatrix4x4 {
+                aiMatrix4x4 m;
+                m.a1 = 1.0f;
+                m.a2 = 0.0f;
+                m.a3 = 0.0f;
+                m.a4 = 0.0f;
+                m.b1 = 0.0f;
+                m.b2 = 1.0f;
+                m.b3 = 0.0f;
+                m.b4 = 0.0f;
+                m.c1 = 0.0f;
+                m.c2 = 0.0f;
+                m.c3 = 1.0f;
+                m.c4 = 0.0f;
+                m.d1 = 0.0f;
+                m.d2 = 0.0f;
+                m.d3 = 0.0f;
+                m.d4 = 1.0f;
+                return m;
+            };
+
+            auto transformPoint = [](const aiMatrix4x4& m, const aiVector3D& p) -> aiVector3D {
+                aiVector3D out;
+                out.x = m.a1 * p.x + m.a2 * p.y + m.a3 * p.z + m.a4;
+                out.y = m.b1 * p.x + m.b2 * p.y + m.b3 * p.z + m.b4;
+                out.z = m.c1 * p.x + m.c2 * p.y + m.c3 * p.z + m.c4;
+                return out;
+            };
+
+            bool                                                   hasAny = false;
+            aiVector3D                                             minV(1e30f, 1e30f, 1e30f);
+            aiVector3D                                             maxV(-1e30f, -1e30f, -1e30f);
+
+            std::function<void(const aiNode*, const aiMatrix4x4&)> visit =
+                [&](const aiNode* node, const aiMatrix4x4& parent) {
+                    const aiMatrix4x4 local = parent * node->mTransformation;
+
+                    for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
+                        const unsigned int meshIndex = node->mMeshes[i];
+                        if (meshIndex >= scene->mNumMeshes) {
+                            continue;
+                        }
+                        const aiMesh* mesh = scene->mMeshes[meshIndex];
+                        if (mesh == nullptr || mesh->mVertices == nullptr) {
+                            continue;
+                        }
+                        for (unsigned int v = 0; v < mesh->mNumVertices; ++v) {
+                            const aiVector3D p = transformPoint(local, mesh->mVertices[v]);
+                            minV.x             = std::min(minV.x, p.x);
+                            minV.y             = std::min(minV.y, p.y);
+                            minV.z             = std::min(minV.z, p.z);
+                            maxV.x             = std::max(maxV.x, p.x);
+                            maxV.y             = std::max(maxV.y, p.y);
+                            maxV.z             = std::max(maxV.z, p.z);
+                            hasAny             = true;
+                        }
+                    }
+
+                    for (unsigned int c = 0; c < node->mNumChildren; ++c) {
+                        visit(node->mChildren[c], local);
+                    }
+                };
+
+            visit(scene->mRootNode, identity());
+
+            if (!hasAny) {
+                std::cerr << "No mesh vertices found.\n";
+                return 1;
+            }
+
+            const aiVector3D size(maxV.x - minV.x, maxV.y - minV.y, maxV.z - minV.z);
+            const aiVector3D center(
+                (minV.x + maxV.x) * 0.5f, (minV.y + maxV.y) * 0.5f, (minV.z + maxV.z) * 0.5f);
+            const double boundsRadius = 0.5
+                * std::sqrt(
+                    static_cast<double>(size.x * size.x + size.y * size.y + size.z * size.z));
+            const double extentRadius =
+                0.5 * static_cast<double>(std::max(size.x, std::max(size.y, size.z)));
+
+            std::cout << "Model: " << sourcePath.string() << "\n";
+            std::cout << "  Min: [" << minV.x << ", " << minV.y << ", " << minV.z << "]\n";
+            std::cout << "  Max: [" << maxV.x << ", " << maxV.y << ", " << maxV.z << "]\n";
+            std::cout << "  Size: [" << size.x << ", " << size.y << ", " << size.z << "]\n";
+            std::cout << "  Center: [" << center.x << ", " << center.y << ", " << center.z << "]\n";
+            std::cout << "  BoundsRadius: " << boundsRadius << "\n";
+            std::cout << "  ExtentRadius: " << extentRadius << "\n";
+            if (targetRadius > 0.0) {
+                std::cout << "  TargetRadius: " << targetRadius << "\n";
+                if (boundsRadius > 1e-12) {
+                    std::cout << "  SuggestedUniformScaleBounds: " << (targetRadius / boundsRadius)
+                              << "\n";
+                }
+                if (extentRadius > 1e-12) {
+                    std::cout << "  SuggestedUniformScaleExtent: " << (targetRadius / extentRadius)
+                              << "\n";
+                }
+            }
+            return 0;
+        }
+
     } // namespace
 
     auto RunTool(int argc, char** argv) -> int {
@@ -1660,6 +1816,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
         if (cmdLower == "clean") {
             return CleanCache(command);
+        }
+        if (cmdLower == "modelinfo") {
+            return ModelInfo(command);
         }
 
         PrintUsage();

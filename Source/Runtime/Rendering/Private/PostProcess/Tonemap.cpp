@@ -200,6 +200,7 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                 cmd.RHISetScissor(scissor);
 
                 cmd.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
+                // Require refactor
                 cmd.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
                 cmd.RHIDraw(3U, 1U, 0U, 0U);
             });

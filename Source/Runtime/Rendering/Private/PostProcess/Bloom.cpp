@@ -451,6 +451,11 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                     data.Height = baseH;
 
                     data.InBloom = builder.Read(down[0], Rhi::ERhiResourceState::ShaderResource);
+                    // IMPORTANT:
+                    // This pass uses LoadOp=Load to additively blend bloom onto the existing
+                    // SceneColor. Declare a read dependency so the frame graph preserves the
+                    // prior contents produced by previous passes (lighting/skybox/etc.).
+                    (void)builder.Read(io.SceneColor, Rhi::ERhiResourceState::RenderTarget);
                     data.OutScene =
                         builder.Write(io.SceneColor, Rhi::ERhiResourceState::RenderTarget);
 

@@ -412,6 +412,76 @@ namespace AltinaEngine::Rhi {
             }
         }
 
+        auto ToD3D11BlendOp(ERhiBlendOp op) noexcept -> D3D11_BLEND_OP {
+            switch (op) {
+                case ERhiBlendOp::Add:
+                    return D3D11_BLEND_OP_ADD;
+                case ERhiBlendOp::Subtract:
+                    return D3D11_BLEND_OP_SUBTRACT;
+                case ERhiBlendOp::ReverseSubtract:
+                    return D3D11_BLEND_OP_REV_SUBTRACT;
+                case ERhiBlendOp::Min:
+                    return D3D11_BLEND_OP_MIN;
+                case ERhiBlendOp::Max:
+                    return D3D11_BLEND_OP_MAX;
+                default:
+                    return D3D11_BLEND_OP_ADD;
+            }
+        }
+
+        auto ToD3D11BlendFactor(ERhiBlendFactor factor) noexcept -> D3D11_BLEND {
+            switch (factor) {
+                case ERhiBlendFactor::Zero:
+                    return D3D11_BLEND_ZERO;
+                case ERhiBlendFactor::One:
+                    return D3D11_BLEND_ONE;
+                case ERhiBlendFactor::SrcColor:
+                    return D3D11_BLEND_SRC_COLOR;
+                case ERhiBlendFactor::InvSrcColor:
+                    return D3D11_BLEND_INV_SRC_COLOR;
+                case ERhiBlendFactor::SrcAlpha:
+                    return D3D11_BLEND_SRC_ALPHA;
+                case ERhiBlendFactor::InvSrcAlpha:
+                    return D3D11_BLEND_INV_SRC_ALPHA;
+                case ERhiBlendFactor::DestAlpha:
+                    return D3D11_BLEND_DEST_ALPHA;
+                case ERhiBlendFactor::InvDestAlpha:
+                    return D3D11_BLEND_INV_DEST_ALPHA;
+                case ERhiBlendFactor::DestColor:
+                    return D3D11_BLEND_DEST_COLOR;
+                case ERhiBlendFactor::InvDestColor:
+                    return D3D11_BLEND_INV_DEST_COLOR;
+                case ERhiBlendFactor::SrcAlphaSaturate:
+                    return D3D11_BLEND_SRC_ALPHA_SAT;
+                case ERhiBlendFactor::ConstantColor:
+                case ERhiBlendFactor::ConstantAlpha:
+                    return D3D11_BLEND_BLEND_FACTOR;
+                case ERhiBlendFactor::InvConstantColor:
+                case ERhiBlendFactor::InvConstantAlpha:
+                    return D3D11_BLEND_INV_BLEND_FACTOR;
+                default:
+                    return D3D11_BLEND_ONE;
+            }
+        }
+
+        auto ToD3D11ColorWriteMask(ERhiColorWriteMask mask) noexcept -> UINT8 {
+            const u8 bits = static_cast<u8>(mask);
+            UINT8    out  = 0U;
+            if ((bits & static_cast<u8>(ERhiColorWriteMask::R)) != 0U) {
+                out |= D3D11_COLOR_WRITE_ENABLE_RED;
+            }
+            if ((bits & static_cast<u8>(ERhiColorWriteMask::G)) != 0U) {
+                out |= D3D11_COLOR_WRITE_ENABLE_GREEN;
+            }
+            if ((bits & static_cast<u8>(ERhiColorWriteMask::B)) != 0U) {
+                out |= D3D11_COLOR_WRITE_ENABLE_BLUE;
+            }
+            if ((bits & static_cast<u8>(ERhiColorWriteMask::A)) != 0U) {
+                out |= D3D11_COLOR_WRITE_ENABLE_ALPHA;
+            }
+            return out;
+        }
+
         auto GetRasterLogPathA() -> const char* {
             static std::string sPath;
             if (!sPath.empty()) {
@@ -935,9 +1005,15 @@ namespace AltinaEngine::Rhi {
         if (graphicsPipeline != nullptr) {
             context->RSSetState(graphicsPipeline->GetRasterizerState());
             context->OMSetDepthStencilState(graphicsPipeline->GetDepthStencilState(), 0U);
+
+            // Bloom upsample/apply rely on additive blending. Bind the pipeline's blend state here.
+            const FLOAT blendFactor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            context->OMSetBlendState(graphicsPipeline->GetBlendState(), blendFactor, 0xFFFFFFFFu);
         } else {
             context->RSSetState(nullptr);
             context->OMSetDepthStencilState(nullptr, 0U);
+            const FLOAT blendFactor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            context->OMSetBlendState(nullptr, blendFactor, 0xFFFFFFFFu);
         }
 
         // LogCurrentRasterizerState(context, TEXT("After RHISetGraphicsPipeline"),
@@ -2178,6 +2254,7 @@ namespace AltinaEngine::Rhi {
         ComPtr<ID3D11InputLayout>       mInputLayout;
         ComPtr<ID3D11RasterizerState>   mRasterizerState;
         ComPtr<ID3D11DepthStencilState> mDepthStencilState;
+        ComPtr<ID3D11BlendState>        mBlendState;
     };
 #else
     struct FRhiD3D11GraphicsPipeline::FState {};
@@ -2225,6 +2302,30 @@ namespace AltinaEngine::Rhi {
                 if (SUCCEEDED(device->CreateDepthStencilState(&ds, &depthStencil))
                     && depthStencil) {
                     mState->mDepthStencilState = Move(depthStencil);
+                }
+
+                D3D11_BLEND_DESC blend{};
+                blend.AlphaToCoverageEnable  = FALSE;
+                blend.IndependentBlendEnable = FALSE;
+
+                D3D11_RENDER_TARGET_BLEND_DESC rt{};
+                rt.BlendEnable           = desc.mBlendState.mBlendEnable ? TRUE : FALSE;
+                rt.SrcBlend              = ToD3D11BlendFactor(desc.mBlendState.mSrcColor);
+                rt.DestBlend             = ToD3D11BlendFactor(desc.mBlendState.mDstColor);
+                rt.BlendOp               = ToD3D11BlendOp(desc.mBlendState.mColorOp);
+                rt.SrcBlendAlpha         = ToD3D11BlendFactor(desc.mBlendState.mSrcAlpha);
+                rt.DestBlendAlpha        = ToD3D11BlendFactor(desc.mBlendState.mDstAlpha);
+                rt.BlendOpAlpha          = ToD3D11BlendOp(desc.mBlendState.mAlphaOp);
+                rt.RenderTargetWriteMask = ToD3D11ColorWriteMask(desc.mBlendState.mColorWriteMask);
+
+                // Even if we currently only use RT0, keep the full array initialized.
+                for (u32 i = 0U; i < 8U; ++i) {
+                    blend.RenderTarget[i] = rt;
+                }
+
+                ComPtr<ID3D11BlendState> blendState;
+                if (SUCCEEDED(device->CreateBlendState(&blend, &blendState)) && blendState) {
+                    mState->mBlendState = Move(blendState);
                 }
             }
         }
@@ -2282,6 +2383,14 @@ namespace AltinaEngine::Rhi {
         -> ID3D11DepthStencilState* {
 #if AE_PLATFORM_WIN
         return mState ? mState->mDepthStencilState.Get() : nullptr;
+#else
+        return nullptr;
+#endif
+    }
+
+    auto FRhiD3D11GraphicsPipeline::GetBlendState() const noexcept -> ID3D11BlendState* {
+#if AE_PLATFORM_WIN
+        return mState ? mState->mBlendState.Get() : nullptr;
 #else
         return nullptr;
 #endif

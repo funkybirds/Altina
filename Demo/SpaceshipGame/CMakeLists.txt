@@ -169,6 +169,9 @@ if(AE_DOTNET_HOST)
     set(AE_DEMO_MANAGED_PROJECT ${AE_DEMO_MANAGED_ROOT}/AltinaEngine.Demo.SpaceshipGame.csproj)
     set(AE_DEMO_MANAGED_OUT_DIR ${CMAKE_BINARY_DIR}/Demo/SpaceshipGame/Managed)
     set(AE_DEMO_MANAGED_STAMP ${AE_DEMO_MANAGED_OUT_DIR}/AltinaEngine.Demo.SpaceshipGame.build.stamp)
+    file(GLOB_RECURSE AE_DEMO_MANAGED_SOURCES CONFIGURE_DEPENDS
+        ${AE_DEMO_MANAGED_ROOT}/*.cs
+    )
 
     add_custom_command(
         OUTPUT ${AE_DEMO_MANAGED_STAMP}
@@ -184,9 +187,7 @@ if(AE_DOTNET_HOST)
         COMMAND ${CMAKE_COMMAND} -E touch ${AE_DEMO_MANAGED_STAMP}
         DEPENDS
             ${AE_DEMO_MANAGED_PROJECT}
-            ${AE_DEMO_MANAGED_ROOT}/FpsCameraController.cs
-            ${AE_DEMO_MANAGED_ROOT}/ShipFreeMove.cs
-            ${AE_DEMO_MANAGED_ROOT}/SpaceshipMath.cs
+            ${AE_DEMO_MANAGED_SOURCES}
             ${CMAKE_SOURCE_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.csproj
             ${CMAKE_SOURCE_DIR}/Source/Managed/AltinaEngine.Managed/ManagedLog.cs
         BYPRODUCTS

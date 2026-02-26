@@ -40,4 +40,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
     auto CookSkyCubeFromExr(const std::filesystem::path& sourcePath,
         const std::vector<u8>& sourceBytes, FSkyCubeCookResult& outResult, std::string& outError)
         -> bool;
+
+    // Skybox-only importer (tool-only): reads Radiance RGBE .hdr (equirectangular) and cooks a
+    // CubeMap.
+    auto CookSkyCubeFromHdr(const std::filesystem::path& sourcePath,
+        const std::vector<u8>& sourceBytes, FSkyCubeCookResult& outResult, std::string& outError)
+        -> bool;
 } // namespace AltinaEngine::Tools::AssetPipeline

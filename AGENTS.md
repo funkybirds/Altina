@@ -2,6 +2,9 @@
 
 ## Specifications and Todo-lists 
 - **DO** reference specifications in `Docs/Spec` folder first.
+- You **CANNOT** do things that are marked with **ESPECIALLY DO NOT**, WHATEVER and WHENEVER it is.
+- You **CANNOT** do things that are marked with **DO NOT**, unless specified **EXPLICITLY** by user specifications and user prompt.
+- You are recommended to do things that are marked with **DO**.
 
 ## Module Layout Rules
 - Each module sits under `Source/<Domain>/<ModuleName>/` with `Public/` and `Private/` subfolders.
@@ -21,6 +24,7 @@ Some core modules:
   - If you want to implement such functionality, switch to `RenderCore` or `Rendering`.
 
 ### Notes on `RenderCore`
+- API-specific and low-level infrastructures should be implemented in `Rhi` layer, not here! (like `WorkGraph Shader` classes,`Cooperative Vector` support)
 - General computing infrastructure is also acceptable in this module (like `WorkGraph` infrastructures). But only provide infrastructure-level utils.
   - Do not introduce operation-specific-implementations here, like neural layers(`Conv2D`,`Linear`,`SelfAttn`,...) and ops(`Scan`,`Reduce`,`Gather`,...)
 - Do not introduce geometry processing utilities (like `Meshlet Generation`, `Mesh Simplification`, `SDF Baking`) here. But new geometry format is allowed (for neural reprenstations like `3DGS`). Also, resource proxy (like `Compute-Shader-Generated Vertices` or `Procedural Mesh`) is also allowed.
@@ -42,6 +46,15 @@ You can use CMake (with reldebinfo preset), if it fails, use following shortcuts
 ## Coding Styles
 - **DO** reference `Docs/CodingStyle.md` for detailed naming, formatting, and tooling guidance.
 - **DO NOT** introduce non-English characters in any source files.
+
+### Assertion And Log
+- **DO** log internal processes with **PROPER CATEGORY**.
+  - **DO NOT** log **FREQUENTLY** on a performance-aware path, like `Tick()`.
+- **DO** use runtime assertions in need.
+  - **DO** use `Assert` for critical checks, and `DebugAssert` for debugging and performance purpose.
+  - **NOT RECOMMENDED TO** use `if(!some_condition){return;}` for workground. Instead, use runtime assertions.
+  - **ESPECIALLY DO NOT** use `try` experssion.
+- **DO NOT** use C++ exceptions
 
 ### Important Coding Rules
 - **DO** use modern C++ features. You can use `C++23` standard if the compiler supports.

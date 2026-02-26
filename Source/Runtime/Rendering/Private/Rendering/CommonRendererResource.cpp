@@ -422,6 +422,7 @@ namespace AltinaEngine::Rendering {
             shaderPath.GetString().ToView(), lightingShaderPath.GetString().ToView(),
             skyBoxShaderPath.GetString().ToView(), shadowShaderPath.GetString().ToView());
 
+        // Require refactor
         RenderCore::FShaderRegistry::FShaderKey vsKey{};
         RenderCore::FShaderRegistry::FShaderKey psKey{};
         RenderCore::FShaderRegistry::FShaderKey fsqVsKey{};

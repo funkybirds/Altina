@@ -69,7 +69,9 @@
 using AltinaEngine::Move;
 using AltinaEngine::Core::Container::MakeUnique;
 using AltinaEngine::Core::Container::MakeUniqueAs;
+using AltinaEngine::Core::Container::TVector;
 using AltinaEngine::Core::Logging::LogWarningCat;
+
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
     namespace {
@@ -426,30 +428,28 @@ namespace AltinaEngine::Launch {
         }
 
         void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
-            Engine::FRenderScene&                                    scene,
-            const Container::TVector<RenderCore::Render::FDrawList>& drawLists,
-            const Container::TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
-            Rendering::ERendererType                                 rendererType) {
+            Engine::FRenderScene& scene, const TVector<RenderCore::Render::FDrawList>& drawLists,
+            const TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
+            Rendering::ERendererType                      rendererType) {
             if (scene.Views.IsEmpty()) {
                 return;
             }
 
             // Cache skybox GPU resources on the render thread to avoid re-uploading every frame.
-            static AltinaEngine::Asset::FAssetHandle                                sSkyCubeAsset{};
-            static AltinaEngine::GameScene::FSkyCubeComponent::FSkyCubeRhiResources sSkyCubeRhi{};
-            static bool       sHasSkyCubeRhi = false;
+            static Asset::FAssetHandle                                sSkyCubeAsset{};
+            static GameScene::FSkyCubeComponent::FSkyCubeRhiResources sSkyCubeRhi{};
+            static bool                                               sHasSkyCubeRhi = false;
 
-            Rhi::FRhiTexture* skyCubeTexture = nullptr;
-            bool              bHasSkyCube    = false;
+            Rhi::FRhiTexture*                                         skyCubeTexture = nullptr;
+            bool                                                      bHasSkyCube    = false;
             if (scene.bHasSkyCube && scene.SkyCubeAsset.IsValid()) {
                 bHasSkyCube = true;
-                if (!AltinaEngine::GameScene::FSkyCubeComponent::AssetToSkyCubeConverter) {
+                if (!GameScene::FSkyCubeComponent::AssetToSkyCubeConverter) {
                     bHasSkyCube = false;
                 } else if (!sHasSkyCubeRhi || sSkyCubeAsset != scene.SkyCubeAsset) {
                     sSkyCubeAsset = scene.SkyCubeAsset;
                     sSkyCubeRhi =
-                        AltinaEngine::GameScene::FSkyCubeComponent::AssetToSkyCubeConverter(
-                            scene.SkyCubeAsset);
+                        GameScene::FSkyCubeComponent::AssetToSkyCubeConverter(scene.SkyCubeAsset);
                     sHasSkyCubeRhi = sSkyCubeRhi.IsValid();
                 }
                 if (sHasSkyCubeRhi) {
@@ -848,9 +848,9 @@ namespace AltinaEngine::Launch {
                 Rendering::FBasicDeferredRenderer::GetDefaultMaterialTemplate());
         }
 
-        Engine::FRenderScene                              renderScene;
-        Container::TVector<RenderCore::Render::FDrawList> drawLists;
-        Container::TVector<RenderCore::Render::FDrawList> shadowDrawLists;
+        Engine::FRenderScene                   renderScene;
+        TVector<RenderCore::Render::FDrawList> drawLists;
+        TVector<RenderCore::Render::FDrawList> shadowDrawLists;
 
         if (width > 0U && height > 0U) {
             if (auto* world = mEngineRuntime.GetWorldManager().GetActiveWorld()) {
@@ -906,10 +906,10 @@ namespace AltinaEngine::Launch {
         for (const auto& drawList : drawLists) {
             totalBatches += static_cast<u32>(drawList.Batches.Size());
         }
-        LogInfo(TEXT("Scene Batches: {} (Views: {})"), totalBatches,
-            static_cast<u32>(renderScene.Views.Size()));
+        // LogInfo(TEXT("Scene Batches: {} (Views: {})"), totalBatches,
+        //     static_cast<u32>(renderScene.Views.Size()));
 
-        LogInfo(TEXT("GameThread Frame {}"), frameIndex);
+        // LogInfo(TEXT("GameThread Frame {}"), frameIndex);
 
         auto handle = RenderCore::EnqueueRenderTask(Container::FString(TEXT("RenderFrame")),
             [device, viewport, callback, frameIndex, width, height, shouldResize,
@@ -945,7 +945,7 @@ namespace AltinaEngine::Launch {
 
                 device->EndFrame();
 
-                LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
+                // LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
             });
         if (handle.IsValid()) {
             mPendingRenderFrames.Push(handle);

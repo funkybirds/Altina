@@ -1599,4 +1599,69 @@ namespace AltinaEngine::Tools::AssetPipeline {
         outResult.Desc        = desc;
         return true;
     }
+
+    auto CookSkyCubeFromHdr(const std::filesystem::path& sourcePath,
+        const std::vector<u8>& sourceBytes, FSkyCubeCookResult& outResult, std::string& outError)
+        -> bool {
+        outResult = {};
+        outError.clear();
+
+        FEnvMapCookOptions options{};
+        std::string        optError;
+        if (!LoadEnvMapCookOptions(sourcePath, options, optError)) {
+            outError = optError;
+            return false;
+        }
+
+        FHDRImage image{};
+        if (!DecodeRadianceHdr(sourceBytes, image, outError)) {
+            return false;
+        }
+
+        const u32 size = options.SkyboxSize;
+        if (size == 0U) {
+            outError = "EnvMapSkyboxSize must be > 0.";
+            return false;
+        }
+
+        const u32                                      mipCount = FullMipCount(size);
+        std::array<std::vector<std::vector<float>>, 6> faceMipChains;
+        for (u32 f = 0U; f < 6U; ++f) {
+            faceMipChains[f].resize(mipCount);
+
+            if (!GenerateSkyboxFace(image, static_cast<ECubeFace>(f), size, faceMipChains[f][0])) {
+                outError = "Failed to generate skybox face.";
+                return false;
+            }
+
+            u32 w = size;
+            u32 h = size;
+            for (u32 mip = 1U; mip < mipCount; ++mip) {
+                u32 nw = 0U, nh = 0U;
+                if (!DownsampleBox2x(
+                        faceMipChains[f][mip - 1U], w, h, faceMipChains[f][mip], nw, nh)) {
+                    outError = "Failed to downsample skybox mip.";
+                    return false;
+                }
+                w = nw;
+                h = nh;
+            }
+        }
+
+        std::vector<u8>     cooked;
+        Asset::FCubeMapDesc desc{};
+        std::string         cookError;
+        if (!BuildCubeMapRgba16fBlobFromMipChains(size, faceMipChains, cooked, desc, cookError)) {
+            outError = cookError;
+            return false;
+        }
+
+        // Stable cook key extras: options relevant to cube generation.
+        outResult.CookKeyExtras.resize(sizeof(u32));
+        std::memcpy(outResult.CookKeyExtras.data(), &options.SkyboxSize, sizeof(u32));
+
+        outResult.CookedBytes = Move(cooked);
+        outResult.Desc        = desc;
+        return true;
+    }
 } // namespace AltinaEngine::Tools::AssetPipeline

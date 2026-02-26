@@ -4,6 +4,7 @@
 #include "Asset/AssetBinary.h"
 #include "Importers/Model/FbxImporter.h"
 #include "Importers/Model/PmxImporter.h"
+#include "Importers/Model/UsdzImporter.h"
 
 #include <cstring>
 #include <limits>
@@ -121,6 +122,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
         if (ext == ".pmx") {
             return CookModelFromPmx(sourcePath, baseHandle, baseVirtualPath, outResult, outError);
+        }
+        if (ext == ".usdz") {
+            return CookModelFromUsdz(sourcePath, baseHandle, baseVirtualPath, outResult, outError);
         }
 
         outError = "Unsupported model format.";

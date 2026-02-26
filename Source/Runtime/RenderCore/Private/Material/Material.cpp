@@ -106,7 +106,7 @@ namespace AltinaEngine::RenderCore {
                 desc.mDebugName.Assign(TEXT("DefaultMaterial.Sampler"));
                 s.Sampler = Rhi::RHICreateSampler(desc);
             }
-
+            // Require refactor
             auto create1x1 = [&](const TChar* debugName, u8 r, u8 g, u8 b,
                                  u8 a) -> Rhi::FRhiTextureRef {
                 Rhi::FRhiTextureDesc desc{};

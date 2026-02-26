@@ -121,7 +121,8 @@ namespace AltinaEngine::Rendering {
                     builder.SetExternalOutput(data.Out, Rhi::ERhiResourceState::Present);
                 },
                 [viewRect = view.ViewRect](Rhi::FRhiCmdContext& cmd,
-                    const RenderCore::FFrameGraphPassResources& res, const FPassData& data) {
+                    const RenderCore::FFrameGraphPassResources& res,
+                    const FPassData&                            data) -> void {
                     if (!data.bHasInput) {
                         return;
                     }

@@ -1,5 +1,5 @@
 // @altina raster_state {
-//     cull = front;
+//     cull = back;
 // }
 
 #include "Shader/Bindings/ShaderBindings.hlsli"

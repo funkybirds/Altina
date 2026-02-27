@@ -35,6 +35,9 @@ namespace AltinaEngine::Scripting::CoreCLR {
         FSetWorldRotationFn setWorldRotationFn, FGetLocalRotationFn getLocalRotationFn,
         FSetLocalRotationFn setLocalRotationFn) noexcept;
 
+    using FSetWindowTitleUtf8Fn = void (*)(const char* titleUtf8);
+    AE_SCRIPTING_CORECLR_API void SetWindowTitleAccess(FSetWindowTitleUtf8Fn fn) noexcept;
+
     class AE_SCRIPTING_CORECLR_API FScriptSystem {
     public:
         FScriptSystem()  = default;

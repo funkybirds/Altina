@@ -154,6 +154,17 @@ namespace AltinaEngine::Application {
         ShowWindow(static_cast<HWND>(mWindowHandle), SW_MAXIMIZE);
     }
 
+    void FWindowsPlatformWindow::SetTitle(const FString& InTitle) {
+        if (!mWindowHandle) {
+            return;
+        }
+
+        const FWindowTitleCStr titleCStr(InTitle);
+        SetWindowText(static_cast<HWND>(mWindowHandle), titleCStr.Get());
+
+        mProperties.mTitle = InTitle;
+    }
+
     void FWindowsPlatformWindow::SetCursorVisible(bool visible) {
         if (mCursorVisible == visible) {
             return;

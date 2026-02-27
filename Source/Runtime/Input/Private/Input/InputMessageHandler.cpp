@@ -30,6 +30,42 @@ namespace {
         }
 
         switch (KeyCode) {
+            case 0x70: // VK_F1
+                OutKey = AltinaEngine::Input::EKey::F1;
+                return true;
+            case 0x71: // VK_F2
+                OutKey = AltinaEngine::Input::EKey::F2;
+                return true;
+            case 0x72: // VK_F3
+                OutKey = AltinaEngine::Input::EKey::F3;
+                return true;
+            case 0x73: // VK_F4
+                OutKey = AltinaEngine::Input::EKey::F4;
+                return true;
+            case 0x74: // VK_F5
+                OutKey = AltinaEngine::Input::EKey::F5;
+                return true;
+            case 0x75: // VK_F6
+                OutKey = AltinaEngine::Input::EKey::F6;
+                return true;
+            case 0x76: // VK_F7
+                OutKey = AltinaEngine::Input::EKey::F7;
+                return true;
+            case 0x77: // VK_F8
+                OutKey = AltinaEngine::Input::EKey::F8;
+                return true;
+            case 0x78: // VK_F9
+                OutKey = AltinaEngine::Input::EKey::F9;
+                return true;
+            case 0x79: // VK_F10
+                OutKey = AltinaEngine::Input::EKey::F10;
+                return true;
+            case 0x7A: // VK_F11
+                OutKey = AltinaEngine::Input::EKey::F11;
+                return true;
+            case 0x7B: // VK_F12
+                OutKey = AltinaEngine::Input::EKey::F12;
+                return true;
             case 0x1B: // VK_ESCAPE
                 OutKey = AltinaEngine::Input::EKey::Escape;
                 return true;

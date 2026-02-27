@@ -27,6 +27,8 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto GetStaticMesh() const noexcept -> const Geometry::FStaticMeshData&;
 
         void               SetStaticMeshAsset(Asset::FAssetHandle handle) noexcept;
+        void               SetStaticMeshData(Geometry::FStaticMeshData&& InMesh) noexcept;
+        void               ClearStaticMeshData() noexcept;
         [[nodiscard]] auto GetStaticMeshAsset() const noexcept -> Asset::FAssetHandle {
             return mMeshAsset;
         }
@@ -46,6 +48,7 @@ namespace AltinaEngine::GameScene {
     private:
         mutable Geometry::FStaticMeshData mStaticMesh{};
         mutable Asset::FAssetHandle       mResolvedAsset{};
-        mutable bool                      mMeshResolved = false;
+        mutable bool                      mMeshResolved       = false;
+        mutable bool                      mProceduralOverride = false;
     };
 } // namespace AltinaEngine::GameScene

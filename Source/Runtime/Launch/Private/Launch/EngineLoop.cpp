@@ -13,6 +13,7 @@
 #include "Rendering/PostProcess/PostProcessSettings.h"
 #include "Rendering/TemporalAA/TemporalAA.h"
 #include "Rendering/RenderingSettings.h"
+#include "DebugGui/DebugGui.h"
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
     #include "Scripting/ScriptSystemCoreCLR.h"
@@ -34,6 +35,8 @@
 #include "Reflection/Reflection.h"
 
 #include <cstdint>
+#include <cstring>
+#include <string>
 
 #if AE_PLATFORM_WIN
     #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
@@ -84,7 +87,50 @@ namespace AltinaEngine::Launch {
         }
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
-        GameScene::FWorldManager* gScriptWorldManager = nullptr;
+        GameScene::FWorldManager*     gScriptWorldManager        = nullptr;
+        Application::FPlatformWindow* gMainWindowForManagedTitle = nullptr;
+
+        auto ToFStringFromUtf8Bytes(const char* data) -> Core::Container::FString {
+            using Core::Container::FString;
+            if (data == nullptr || data[0] == '\0') {
+                return {};
+            }
+            const usize length = std::strlen(data);
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        #if AE_PLATFORM_WIN
+            FString out;
+            int     wideCount =
+                MultiByteToWideChar(CP_UTF8, 0, data, static_cast<int>(length), nullptr, 0);
+            if (wideCount <= 0) {
+                return out;
+            }
+            std::wstring wide(static_cast<size_t>(wideCount), L'\0');
+            MultiByteToWideChar(CP_UTF8, 0, data, static_cast<int>(length), wide.data(), wideCount);
+            out.Append(wide.c_str(), wide.size());
+            return out;
+        #else
+            FString out;
+            for (usize i = 0; i < length; ++i) {
+                out.Append(static_cast<TChar>(static_cast<unsigned char>(data[i])));
+            }
+            return out;
+        #endif
+    #else
+            // Non-unicode builds: treat input as native bytes.
+            return FString(data, length);
+    #endif
+        }
+
+        void SetScriptWindowTitleUtf8(const char* titleUtf8) {
+            if (gMainWindowForManagedTitle == nullptr) {
+                return;
+            }
+            const auto title = ToFStringFromUtf8Bytes(titleUtf8);
+            if (title.IsEmptyString()) {
+                return;
+            }
+            gMainWindowForManagedTitle->SetTitle(title);
+        }
 
         auto GetScriptWorldTranslation(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
             Scripting::FScriptVector3* outValue) -> bool {
@@ -602,6 +648,14 @@ namespace AltinaEngine::Launch {
             mAppMessageHandler = MakeUnique<Input::FInputMessageHandler>(*mInputSystem);
         }
 
+        if (!mDebugGui) {
+            using Core::Container::TPolymorphicDeleter;
+            using DebugGui::IDebugGuiSystem;
+            mDebugGui = TOwner<IDebugGuiSystem, TPolymorphicDeleter<IDebugGuiSystem>>(
+                DebugGui::CreateDebugGuiSystem(),
+                TPolymorphicDeleter<IDebugGuiSystem>(&DebugGui::DestroyDebugGuiSystem));
+        }
+
 #if AE_PLATFORM_WIN
         mApplication = MakeUniqueAs<Application::FApplication, Application::FWindowsApplication>(
             mStartupParameters);
@@ -740,11 +794,13 @@ namespace AltinaEngine::Launch {
             mScriptSystem = MakeUnique<Scripting::CoreCLR::FScriptSystem>();
         }
         if (mScriptSystem) {
-            gScriptWorldManager = &mEngineRuntime.GetWorldManager();
+            gScriptWorldManager        = &mEngineRuntime.GetWorldManager();
+            gMainWindowForManagedTitle = window;
             Scripting::CoreCLR::SetTransformAccess(&GetScriptWorldTranslation,
                 &SetScriptWorldTranslation, &GetScriptLocalTranslation, &SetScriptLocalTranslation,
                 &GetScriptWorldRotation, &SetScriptWorldRotation, &GetScriptLocalRotation,
                 &SetScriptLocalRotation);
+            Scripting::CoreCLR::SetWindowTitleAccess(&SetScriptWindowTitleUtf8);
             Scripting::FScriptRuntimeConfig runtimeConfig{};
             const auto                      exeDir =
                 Core::Utility::Filesystem::FPath(Core::Platform::GetExecutableDir());
@@ -842,6 +898,7 @@ namespace AltinaEngine::Launch {
         auto       device       = mRhiDevice;
         auto       viewport     = mMainViewport;
         auto       callback     = mRenderCallback;
+        auto*      debugGui     = mDebugGui.Get();
         const auto rendererType = Rendering::GetRendererTypeSetting();
         if (rendererType == Rendering::ERendererType::Deferred) {
             mMaterialCache.SetDefaultTemplate(
@@ -906,13 +963,22 @@ namespace AltinaEngine::Launch {
         for (const auto& drawList : drawLists) {
             totalBatches += static_cast<u32>(drawList.Batches.Size());
         }
+
+        if (mDebugGui && mInputSystem) {
+            DebugGui::FDebugGuiExternalStats stats{};
+            stats.FrameIndex      = frameIndex;
+            stats.ViewCount       = static_cast<u32>(renderScene.Views.Size());
+            stats.SceneBatchCount = totalBatches;
+            mDebugGui->SetExternalStats(stats);
+            mDebugGui->TickGameThread(*mInputSystem.Get(), mLastDeltaTimeSeconds, width, height);
+        }
         // LogInfo(TEXT("Scene Batches: {} (Views: {})"), totalBatches,
         //     static_cast<u32>(renderScene.Views.Size()));
 
         // LogInfo(TEXT("GameThread Frame {}"), frameIndex);
 
         auto handle = RenderCore::EnqueueRenderTask(Container::FString(TEXT("RenderFrame")),
-            [device, viewport, callback, frameIndex, width, height, shouldResize,
+            [device, viewport, callback, debugGui, frameIndex, width, height, shouldResize,
                 renderScene = Move(renderScene), drawLists = Move(drawLists),
                 shadowDrawLists = Move(shadowDrawLists), rendererType]() mutable -> void {
                 if (!device)
@@ -932,6 +998,10 @@ namespace AltinaEngine::Launch {
 
                     if (callback) {
                         callback(*device, *viewport, width, height);
+                    }
+
+                    if (debugGui) {
+                        debugGui->RenderRenderThread(*device, *viewport);
                     }
 
                     const auto queue = device->GetQueue(Rhi::ERhiQueueType::Graphics);
@@ -960,6 +1030,10 @@ namespace AltinaEngine::Launch {
         if (mRenderingThread) {
             mRenderingThread->Stop();
             mRenderingThread.Reset();
+        }
+
+        if (mDebugGui) {
+            mDebugGui.Reset();
         }
 
         if (mAssetReady) {
@@ -1012,7 +1086,9 @@ namespace AltinaEngine::Launch {
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
         Scripting::CoreCLR::SetTransformAccess(
             nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
-        gScriptWorldManager = nullptr;
+        Scripting::CoreCLR::SetWindowTitleAccess(nullptr);
+        gScriptWorldManager        = nullptr;
+        gMainWindowForManagedTitle = nullptr;
 #endif
 
         if (mInputSystem) {
@@ -1057,6 +1133,14 @@ namespace AltinaEngine::Launch {
 
     auto FEngineLoop::GetAssetManager() const noexcept -> const Asset::FAssetManager& {
         return mAssetManager;
+    }
+
+    auto FEngineLoop::GetDebugGui() noexcept -> DebugGui::IDebugGuiSystem* {
+        return mDebugGui.Get();
+    }
+
+    auto FEngineLoop::GetDebugGui() const noexcept -> const DebugGui::IDebugGuiSystem* {
+        return mDebugGui.Get();
     }
 
     auto FEngineLoop::LoadDemoAssetRegistry() -> bool {

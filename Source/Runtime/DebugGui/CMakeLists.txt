@@ -1,7 +1,7 @@
-set(TargetName AltinaEngineLaunch)
+set(TargetName AltinaEngineDebugGui)
 
 add_library(${TargetName} SHARED)
-add_library(AltinaEngine::Launch ALIAS ${TargetName})
+add_library(AltinaEngine::DebugGui ALIAS ${TargetName})
 
 file(GLOB_RECURSE Target_Public_Headers
     CONFIGURE_DEPENDS
@@ -40,7 +40,7 @@ target_sources(${TargetName}
 target_include_directories(${TargetName}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Public>
-        $<INSTALL_INTERFACE:include/AltinaEngine/Launch>
+        $<INSTALL_INTERFACE:include/AltinaEngine/DebugGui>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/Private
 )
@@ -48,39 +48,11 @@ target_include_directories(${TargetName}
 target_link_libraries(${TargetName}
     PUBLIC
         AltinaEngine::Core
-        AltinaEngine::Asset
-        AltinaEngine::Application
-        AltinaEngine::Engine
         AltinaEngine::Input
-        AltinaEngine::Rendering
-        AltinaEngine::RenderCore
         AltinaEngine::Rhi::General
     PRIVATE
-        AltinaEngine::DebugGui
+        AltinaEngine::ShaderCompiler
 )
-
-if(AE_ENABLE_SCRIPTING_CORECLR)
-    target_link_libraries(${TargetName}
-        PUBLIC
-            AltinaEngine::Scripting::CoreCLR
-    )
-    target_compile_definitions(${TargetName}
-        PRIVATE
-            AE_ENABLE_SCRIPTING_CORECLR=1
-    )
-endif()
-
-if(WIN32)
-    target_link_libraries(${TargetName}
-        PRIVATE
-            AltinaEngine::Rhi::D3D11
-    )
-else()
-    target_link_libraries(${TargetName}
-        PRIVATE
-            AltinaEngine::Rhi::Mock
-    )
-endif()
 
 target_compile_features(${TargetName}
     PUBLIC
@@ -89,7 +61,7 @@ target_compile_features(${TargetName}
 
 target_compile_definitions(${TargetName}
     PRIVATE
-        AE_LAUNCH_BUILD
+        AE_DEBUGGUI_BUILD
 )
 
 set(Warnings
@@ -118,8 +90,9 @@ add_custom_command(
 
 set_target_properties(${TargetName}
     PROPERTIES
-        OUTPUT_NAME AltinaEngine.Launch
-        FOLDER "Engine/Launch"
+        OUTPUT_NAME AltinaEngine.DebugGui
+        FOLDER "Engine/DebugGui"
 )
 
 ae_add_reflection_codegen(TARGET ${TargetName})
+

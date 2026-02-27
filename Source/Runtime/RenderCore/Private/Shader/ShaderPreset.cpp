@@ -54,6 +54,9 @@ namespace AltinaEngine::RenderCore {
         (void)FShaderPresetRegistry::RegisterPreset(TEXT("Deferred/Lit/PBR.Standard"),
             TEXT("Shader/Deferred/Materials/Lit/PBR.Standard.hlsl"));
 
+        (void)FShaderPresetRegistry::RegisterPreset(TEXT("Deferred/Unlit/OrbitLine.Billboard"),
+            TEXT("Shader/Deferred/OrbitLine.Billboard.hlsl"));
+
         sInitialized = true;
     }
 } // namespace AltinaEngine::RenderCore

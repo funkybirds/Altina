@@ -40,6 +40,7 @@ namespace AltinaEngine::Application {
         void               MoveTo(i32 InPositionX, i32 InPositionY) override;
         void               Minimalize() override;
         void               Maximalize() override;
+        void               SetTitle(const FString& InTitle) override;
 
         [[nodiscard]] auto GetSize() const noexcept -> FWindowExtent override;
         [[nodiscard]] auto GetProperties() const -> FPlatformWindowProperty override;

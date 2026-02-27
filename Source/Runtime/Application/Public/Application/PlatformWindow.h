@@ -38,6 +38,7 @@ namespace AltinaEngine::Application {
         virtual void MoveTo(i32 InPositionX, i32 InPositionY)                        = 0;
         virtual void Minimalize()                                                    = 0;
         virtual void Maximalize()                                                    = 0;
+        virtual void SetTitle(const FString& InTitle)                                = 0;
 
         [[nodiscard]] virtual auto GetSize() const noexcept -> FWindowExtent        = 0;
         [[nodiscard]] virtual auto GetProperties() const -> FPlatformWindowProperty = 0;

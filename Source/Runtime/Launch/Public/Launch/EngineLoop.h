@@ -56,6 +56,10 @@ namespace AltinaEngine::Scripting::CoreCLR {
     class FScriptSystem;
 } // namespace AltinaEngine::Scripting::CoreCLR
 
+namespace AltinaEngine::DebugGui {
+    class IDebugGuiSystem;
+} // namespace AltinaEngine::DebugGui
+
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
 
@@ -82,6 +86,8 @@ namespace AltinaEngine::Launch {
         [[nodiscard]] auto GetAssetRegistry() const noexcept -> const Asset::FAssetRegistry&;
         [[nodiscard]] auto GetAssetManager() noexcept -> Asset::FAssetManager&;
         [[nodiscard]] auto GetAssetManager() const noexcept -> const Asset::FAssetManager&;
+        [[nodiscard]] auto GetDebugGui() noexcept -> DebugGui::IDebugGuiSystem*;
+        [[nodiscard]] auto GetDebugGui() const noexcept -> const DebugGui::IDebugGuiSystem*;
         auto               LoadDemoAssetRegistry() -> bool;
 
     private:
@@ -277,7 +283,8 @@ namespace AltinaEngine::Launch {
         Asset::FCubeMapLoader                mCubeMapLoader;
         Engine::FMaterialCache               mMaterialCache;
         TOwner<RenderCore::FRenderingThread> mRenderingThread;
-        TQueue<Core::Jobs::FJobHandle>       mPendingRenderFrames;
-        Engine::FEngineRuntime               mEngineRuntime{};
+        TOwner<DebugGui::IDebugGuiSystem, TPolymorphicDeleter<DebugGui::IDebugGuiSystem>> mDebugGui;
+        TQueue<Core::Jobs::FJobHandle> mPendingRenderFrames;
+        Engine::FEngineRuntime         mEngineRuntime{};
     };
 } // namespace AltinaEngine::Launch

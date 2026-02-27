@@ -1,0 +1,2 @@
+# Intentionally empty.
+# This prototype uses only Python standard library (tkinter) so it works out-of-box.

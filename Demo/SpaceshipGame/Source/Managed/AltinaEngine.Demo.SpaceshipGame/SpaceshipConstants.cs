@@ -22,5 +22,8 @@ internal static class SpaceshipConstants
     // Transfer orbit window/gating.
     public const float TransferWindowHalfAngleRad = 15.0f * (3.14159265f / 180.0f);
     public const float TransferMoonCaptureDistance = 1.6f;
+
+    // Orbit switch gating: allowed only near orbit join points.
+    public const float OrbitSwitchEpsilon = 0.15f;
 }
 

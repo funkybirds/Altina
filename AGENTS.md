@@ -1,11 +1,14 @@
 # AltinaEngine Guide for Agents
 
+## Rules
+- You **CANNOT** do things that are marked with **MUST NOT**, WHATEVER and WHENEVER it is. They are **RULES**.
+- You **CANNOT** do things that are marked with **DO NOT**, unless specified **EXPLICITLY** by user specifications and user prompt. These are **GUIDELINES**.
+- You are recommended to do things that are marked with **DO**. These are **GUIDELINES**.
+- You must follow the rules marked with **MUST**. They are **RULES**.
+
 ## Specifications and Todo-lists 
 - **DO** reference specifications in `Docs/Spec` folder first.
-- You **CANNOT** do things that are marked with **ESPECIALLY DO NOT**, WHATEVER and WHENEVER it is.
-- You **CANNOT** do things that are marked with **DO NOT**, unless specified **EXPLICITLY** by user specifications and user prompt.
-- You are recommended to do things that are marked with **DO**.
-
+  
 ## Module Layout Rules
 - Each module sits under `Source/<Domain>/<ModuleName>/` with `Public/` and `Private/` subfolders.
 - `Public/` contains the module's exported headers organized by feature (e.g. `Public/Rendering/Pipeline.h`).
@@ -53,7 +56,7 @@ You can use CMake (with reldebinfo preset), if it fails, use following shortcuts
 - **DO** use runtime assertions in need.
   - **DO** use `Assert` for critical checks, and `DebugAssert` for debugging and performance purpose.
   - **NOT RECOMMENDED TO** use `if(!some_condition){return;}` for workground. Instead, use runtime assertions.
-  - **ESPECIALLY DO NOT** use `try` experssion.
+  - **MUST NOT** use `try` experssion.
 - **DO NOT** use C++ exceptions
 
 ### Important Coding Rules
@@ -72,9 +75,9 @@ You can use CMake (with reldebinfo preset), if it fails, use following shortcuts
   - If possible, **DO NOT** use `static_assert` and `enable_if`
 
 ### Functionality Implementation Rules
-- **DO** implement commonly-used utilities in `Core` module. **DO NOT** implement them in module-specific domain. **ESPECIALLY DO NOT** place them in module-specific headers.
+- **DO** implement commonly-used utilities in `Core` module. **DO NOT** implement them in module-specific domain. **MUST NOT** place them in module-specific headers.
   - Such utilities like filesystem operations(place them under `Core/Platform`); string and codecvt utilities(in `Core/Utility`); algorithms like sorting, prefix sum, graph theory,...(place them under `Core/Algorithm`); Geometric and linear algebra utilities, spherical harmonics, integrals,... (place them under `Core/Math`)
-- **DO NOT** use platform-specific headers in engine header files, like `<windows.h>`, `<unistd.h>`.
+- **MUST NOT** use platform-specific headers in engine header files, like `<windows.h>`, `<unistd.h>`.
   - You can **ONLY** use these functions in `Core/Platform`, `Rhi.D3D11`, `Rhi.D3D12`(if presents) and `Rhi.Metal`(if presents). Otherwise, lookup `Core/Platform` first!
 
 ## Libraries and Dependencies
@@ -91,3 +94,6 @@ You can use CMake (with reldebinfo preset), if it fails, use following shortcuts
 ## Testing & Samples
 - **ALWAYS** add tests after you introduce a new feature.
   - Keep engine self-tests under `Source/Tests/` with CTest integrated as a module.
+
+## Miscellaneous
+- This repository inherits my previous toy project `https://github.com/aeroraven/ifrit-v2`. 

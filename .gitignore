@@ -82,6 +82,10 @@ Testing/
 Source/Tests/Scripting/Managed/**/bin/
 Source/Tests/Scripting/Managed/**/obj/
 
+# Demo managed build outputs
+Demo/*/Source/Managed/**/bin/
+Demo/*/Source/Managed/**/obj/
+
 # Test result artifacts
 Source/Tests/**/TestResults/
 
@@ -91,12 +95,23 @@ Demo/*/Binaries/
 # PowerShell temp/persist files
 *.ps1xml
 
+# Python caches
+__pycache__/
+*.pyc
+
 # Allow mesh assets (OBJ) under asset folders
 !Assets/**/*.obj
 !Demo/*/Assets/**/*.obj
 
 
 Misc
+# Allow checked-in orbit prototype under demo Misc (keep other Misc content ignored).
+!Demo/SpaceshipGame/Misc/
+Demo/SpaceshipGame/Misc/*
+!Demo/SpaceshipGame/Misc/OrbitPrototype/
+!Demo/SpaceshipGame/Misc/OrbitPrototype/**
+Demo/SpaceshipGame/Misc/OrbitPrototype/__pycache__/
+Demo/SpaceshipGame/Misc/OrbitPrototype/**/*.pyc
 TODO_RhiVulkan.md
 .vs
 

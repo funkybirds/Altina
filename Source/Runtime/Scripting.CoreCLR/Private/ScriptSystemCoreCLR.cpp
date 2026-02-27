@@ -47,6 +47,7 @@ namespace AltinaEngine::Scripting::CoreCLR {
         FSetWorldRotationFn        gSetWorldRotation    = nullptr;
         FGetLocalRotationFn        gGetLocalRotation    = nullptr;
         FSetLocalRotationFn        gSetLocalRotation    = nullptr;
+        FSetWindowTitleUtf8Fn      gSetWindowTitleUtf8  = nullptr;
 
         auto ToFStringFromUtf8(const char* message) -> Core::Container::FString {
             using Core::Container::FNativeStringView;
@@ -237,6 +238,13 @@ namespace AltinaEngine::Scripting::CoreCLR {
             }
             return gSetLocalRotation(worldId, ownerIndex, ownerGeneration, value);
         }
+
+        void SetWindowTitle(const char* titleUtf8) {
+            if (!gSetWindowTitleUtf8 || titleUtf8 == nullptr) {
+                return;
+            }
+            gSetWindowTitleUtf8(titleUtf8);
+        }
     } // namespace
 
     void SetTransformAccess(FGetWorldTranslationFn getWorldTranslationFn,
@@ -253,6 +261,8 @@ namespace AltinaEngine::Scripting::CoreCLR {
         gGetLocalRotation    = getLocalRotationFn;
         gSetLocalRotation    = setLocalRotationFn;
     }
+
+    void SetWindowTitleAccess(FSetWindowTitleUtf8Fn fn) noexcept { gSetWindowTitleUtf8 = fn; }
 
     auto FScriptSystem::Initialize(const FScriptRuntimeConfig& runtimeConfig,
         const FManagedRuntimeConfig& managedConfig, const Input::FInputSystem* inputSystem)
@@ -291,6 +301,7 @@ namespace AltinaEngine::Scripting::CoreCLR {
         mNativeApi.SetWorldRotation       = &SetWorldRotation;
         mNativeApi.GetLocalRotation       = &GetLocalRotation;
         mNativeApi.SetLocalRotation       = &SetLocalRotation;
+        mNativeApi.SetWindowTitle         = &SetWindowTitle;
 
         if (!mRuntime.Initialize(runtimeConfig, managedConfig, mNativeApi)) {
             gInputSystem = nullptr;

@@ -112,6 +112,7 @@ if(AE_DOTNET_HOST)
             ${AE_MANAGED_ROOT}/ManagedLog.cs
             ${AE_MANAGED_ROOT}/ScriptComponent.cs
             ${AE_MANAGED_ROOT}/Input.cs
+            ${AE_MANAGED_ROOT}/Window.cs
             ${AE_MANAGED_ROOT}/Vector3.cs
             ${AE_MANAGED_ROOT}/Quaternion.cs
         BYPRODUCTS

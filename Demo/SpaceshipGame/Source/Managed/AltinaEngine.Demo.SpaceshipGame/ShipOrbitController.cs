@@ -7,11 +7,9 @@ public sealed class ShipOrbitController : ScriptComponent
 {
     private enum EShipState
     {
-        LandedEarth = 0,
-        EarthOrbit,
+        EarthOrbit = 0,
         Transfer,
         MoonOrbit,
-        LandedMoon,
     }
 
     private EShipState _state = EShipState.EarthOrbit;
@@ -21,12 +19,25 @@ public sealed class ShipOrbitController : ScriptComponent
 
     private float _orbitPhaseRad;
     private float _transferThetaRad;
+    private float _transferS01; // normalized arc-length progress on transfer [0,1)
+
+    private bool _transferLutBuilt;
+    private float[] _transferLutTheta = Array.Empty<float>();
+    private float[] _transferLutS01 = Array.Empty<float>();
+    private float _transferSAtTheta0;
+    private float _transferSAtThetaPi;
 
     // Mouse-controlled offsets applied on top of the state-dependent base orientation (usually
     // aligned with the current movement direction). This keeps "look at X" stable while orbiting
     // without overriding user input each tick.
     private float _yawOffsetRad;
     private float _pitchOffsetRad;
+
+    private bool _titleInitialized;
+    private EShipState _lastTitleState;
+    private bool _lastTitleCanSwitchEarth;
+    private bool _lastTitleCanSwitchMoon;
+    private string _lastWindowTitle = string.Empty;
 
     private const float MouseSensitivity = 0.0025f;
     private const float PitchLimit = 1.35f; // ~77 deg
@@ -36,9 +47,20 @@ public sealed class ShipOrbitController : ScriptComponent
         _state = EShipState.EarthOrbit;
         _timeScale = 1.0f;
         _orbitPhaseRad = 0.0f;
-        _transferThetaRad = 0.0f;
+        _transferThetaRad = 0.0f; // theta=0 => JoinEarth.
+        _transferS01 = 0.0f;
         _yawOffsetRad = 0.0f;
         _pitchOffsetRad = 0.0f;
+
+        _titleInitialized = false;
+        _lastTitleState = _state;
+        _lastTitleCanSwitchEarth = false;
+        _lastTitleCanSwitchMoon = false;
+        _lastWindowTitle = string.Empty;
+
+        // Bodies are static in this iteration; build the LUT once.
+        BuildTransferLut(CelestialMotion.EarthPosition(0.0f), CelestialMotion.MoonPosition(0.0f));
+        _transferS01 = _transferSAtTheta0;
     }
 
     public override void Tick(float dt)
@@ -46,13 +68,84 @@ public sealed class ShipOrbitController : ScriptComponent
         _t += dt;
 
         UpdateTimeScale(dt);
-        HandleStateSwitchInput();
+        float scaledDt = dt * _timeScale;
 
-        Vector3 shipPos = ComputeShipPosition(dt);
+        Vector3 earthPos = CelestialMotion.EarthPosition(_t);
+        Vector3 moonPos = CelestialMotion.MoonPosition(_t);
+
+        if (!_transferLutBuilt)
+        {
+            BuildTransferLut(earthPos, moonPos);
+        }
+
+        // Gate switches at the current position (before advancing this frame), then advance the
+        // active orbit so switching feels responsive near join points.
+        Vector3 shipPosBeforeAdvance = EvalShipPosition(earthPos, moonPos);
+
+        bool canSwitchEarth = CanSwitchAtJoinEarth(earthPos, moonPos, shipPosBeforeAdvance);
+        bool canSwitchMoon = CanSwitchAtJoinMoon(earthPos, moonPos, shipPosBeforeAdvance);
+        UpdateWindowTitle(canSwitchEarth, canSwitchMoon);
+
+        if (HandleStateSwitchInput(earthPos, moonPos, shipPosBeforeAdvance, canSwitchEarth, canSwitchMoon))
+        {
+            shipPosBeforeAdvance = EvalShipPosition(earthPos, moonPos);
+        }
+
+        AdvanceOrbit(scaledDt);
+        Vector3 shipPos = EvalShipPosition(earthPos, moonPos);
+
         TrySetWorldPosition(shipPos);
 
         UpdateMouseOffsets();
-        ApplyOrientation(dt);
+        ApplyOrientation(dt, earthPos, moonPos);
+    }
+
+    private void UpdateWindowTitle(bool canSwitchEarth, bool canSwitchMoon)
+    {
+        bool changed = !_titleInitialized
+            || _lastTitleState != _state
+            || _lastTitleCanSwitchEarth != canSwitchEarth
+            || _lastTitleCanSwitchMoon != canSwitchMoon;
+
+        if (!changed)
+        {
+            return;
+        }
+
+        _titleInitialized = true;
+        _lastTitleState = _state;
+        _lastTitleCanSwitchEarth = canSwitchEarth;
+        _lastTitleCanSwitchMoon = canSwitchMoon;
+
+        // Keep ASCII-only to avoid encoding edge cases in early engine UI-less builds.
+        // Primary UX: show when Space is usable for transfers.
+        string switchText = string.Empty;
+        switch (_state)
+        {
+            case EShipState.EarthOrbit:
+                if (canSwitchEarth) switchText = "Hint: Space->Transfer";
+                break;
+            case EShipState.Transfer:
+                if (canSwitchEarth && canSwitchMoon) switchText = "Hint: Space->EarthOrbit / MoonOrbit";
+                else if (canSwitchEarth) switchText = "Hint: Space->EarthOrbit";
+                else if (canSwitchMoon) switchText = "Hint: Space->MoonOrbit";
+                break;
+            case EShipState.MoonOrbit:
+                if (canSwitchMoon) switchText = "Hint: Space->Transfer";
+                break;
+        }
+
+        string title = string.IsNullOrEmpty(switchText)
+            ? $"SpaceshipGame | {_state}"
+            : $"SpaceshipGame | {_state} | {switchText}";
+
+        if (title == _lastWindowTitle)
+        {
+            return;
+        }
+
+        _lastWindowTitle = title;
+        Window.SetTitle(title);
     }
 
     private void UpdateMouseOffsets()
@@ -92,91 +185,189 @@ public sealed class ShipOrbitController : ScriptComponent
         _timeScale = SpaceshipMath.Clamp(_timeScale, 0.1f, 6.0f);
     }
 
-    private void HandleStateSwitchInput()
+    private bool HandleStateSwitchInput(in Vector3 earthPos, in Vector3 moonPos, in Vector3 shipPos,
+        bool canSwitchEarth, bool canSwitchMoon)
     {
-        if (Input.WasKeyPressed(EKey.Num1)) _state = EShipState.LandedEarth;
-        if (Input.WasKeyPressed(EKey.Num5)) _state = EShipState.LandedMoon;
+        bool changed = false;
 
-        if (Input.WasKeyPressed(EKey.Num3) && _state != EShipState.Transfer)
+        // Primary UX: press Space to switch when near a join point.
+        if (Input.WasKeyPressed(EKey.Space))
         {
-            _state = EShipState.Transfer;
-            _transferThetaRad = 0.0f; // periapsis
+            switch (_state)
+            {
+                case EShipState.EarthOrbit:
+                    if (canSwitchEarth)
+                    {
+                        _state = EShipState.Transfer;
+                        _transferS01 = _transferSAtTheta0;
+                        _transferThetaRad = 0.0f; // JoinEarth.
+                        changed = true;
+                    }
+                    break;
+                case EShipState.Transfer:
+                    if (canSwitchEarth)
+                    {
+                        _state = EShipState.EarthOrbit;
+                        _orbitPhaseRad = MathF.PI; // JoinEarth.
+                        changed = true;
+                    }
+                    else if (canSwitchMoon)
+                    {
+                        _state = EShipState.MoonOrbit;
+                        _orbitPhaseRad = MathF.PI; // JoinMoon.
+                        changed = true;
+                    }
+                    break;
+                case EShipState.MoonOrbit:
+                    if (canSwitchMoon)
+                    {
+                        _state = EShipState.Transfer;
+                        _transferS01 = _transferSAtThetaPi;
+                        _transferThetaRad = MathF.PI; // JoinMoon.
+                        changed = true;
+                    }
+                    break;
+            }
         }
 
+        // Orbit-only state machine:
+        // - 2: EarthOrbit (only from Transfer at JoinEarth)
+        // - 3: Transfer (only from EarthOrbit at JoinEarth, or from MoonOrbit at JoinMoon)
+        // - 4: MoonOrbit (only from Transfer at JoinMoon)
         if (Input.WasKeyPressed(EKey.Num2))
         {
-            if (_state == EShipState.Transfer) TrySwitchFromTransferToEarthOrbit();
-            else _state = EShipState.EarthOrbit;
+            if (_state == EShipState.Transfer && canSwitchEarth)
+            {
+                _state = EShipState.EarthOrbit;
+                _orbitPhaseRad = MathF.PI; // JoinEarth.
+                changed = true;
+            }
+        }
+
+        if (Input.WasKeyPressed(EKey.Num3))
+        {
+            if (_state == EShipState.EarthOrbit && canSwitchEarth)
+            {
+                _state = EShipState.Transfer;
+                _transferS01 = _transferSAtTheta0;
+                _transferThetaRad = 0.0f; // JoinEarth.
+                changed = true;
+            }
+            else if (_state == EShipState.MoonOrbit && canSwitchMoon)
+            {
+                _state = EShipState.Transfer;
+                _transferS01 = _transferSAtThetaPi;
+                _transferThetaRad = MathF.PI; // JoinMoon.
+                changed = true;
+            }
         }
 
         if (Input.WasKeyPressed(EKey.Num4))
         {
-            if (_state == EShipState.Transfer) TrySwitchFromTransferToMoonOrbit();
-            else _state = EShipState.MoonOrbit;
+            if (_state == EShipState.Transfer && canSwitchMoon)
+            {
+                _state = EShipState.MoonOrbit;
+                _orbitPhaseRad = MathF.PI; // JoinMoon (moon near-side point).
+                changed = true;
+            }
         }
+
+        return changed;
     }
 
-    private Vector3 ComputeShipPosition(float dt)
+    private void AdvanceOrbit(float scaledDt)
     {
-        // Keep orbits readable regardless of delta time.
-        float scaledDt = dt * _timeScale;
-
-        Vector3 earthPos = CelestialMotion.EarthPosition(_t);
-        Vector3 moonPos = CelestialMotion.MoonPosition(_t);
-
         switch (_state)
         {
-            case EShipState.LandedEarth:
-                // Land at "north pole" direction.
-                return SpaceshipMath.Add(earthPos,
-                    new Vector3(0.0f, SpaceshipConstants.EarthRadius + SpaceshipConstants.ShipRadius, 0.0f));
-
             case EShipState.EarthOrbit:
             {
                 _orbitPhaseRad += scaledDt * 0.9f;
-                Vector3 offset = new(SpaceshipConstants.EarthOrbitRadius, 0.0f, 0.0f);
-                Vector3 local = SpaceshipMath.RotateY(offset, _orbitPhaseRad);
-                return SpaceshipMath.Add(earthPos, local);
+                _orbitPhaseRad = SpaceshipMath.WrapAngleRad(_orbitPhaseRad);
+                break;
             }
 
             case EShipState.MoonOrbit:
             {
-                _orbitPhaseRad += scaledDt * 1.8f;
-                Vector3 offset = new(SpaceshipConstants.MoonOrbitRadius, 0.0f, 0.0f);
-                Vector3 local = SpaceshipMath.RotateY(offset, _orbitPhaseRad);
-                return SpaceshipMath.Add(moonPos, local);
+                // Reverse direction so transfer capture at JoinMoon is tangent-continuous.
+                _orbitPhaseRad -= scaledDt * 1.8f;
+                _orbitPhaseRad = SpaceshipMath.WrapAngleRad(_orbitPhaseRad);
+                break;
             }
-
-            case EShipState.LandedMoon:
-                return SpaceshipMath.Add(moonPos,
-                    new Vector3(0.0f, SpaceshipConstants.MoonRadius + SpaceshipConstants.ShipRadius, 0.0f));
 
             case EShipState.Transfer:
             default:
-                return ComputeTransferPosition(earthPos, moonPos, scaledDt);
+                // Advance at (approx) constant speed along the transfer curve by using an
+                // arc-length LUT (instead of theta stepping, which is non-uniform).
+                const float thetaDot = 0.35f;
+                const float twoPi = 6.2831853f;
+                float fracPerSec = thetaDot / twoPi;
+                _transferS01 = Wrap01(_transferS01 + scaledDt * fracPerSec);
+                _transferThetaRad = SpaceshipMath.WrapAngleRad(ThetaFromS01(_transferS01));
+                break;
+        }
+
+        return;
+    }
+
+    private Vector3 EvalShipPosition(in Vector3 earthPos, in Vector3 moonPos)
+    {
+        Vector3 earthToMoon = SpaceshipMath.Sub(moonPos, earthPos);
+        Vector3 axisX = SpaceshipMath.NormalizeXZ(earthToMoon);
+        Vector3 axisZ = SpaceshipMath.PerpLeftXZ(axisX);
+
+        switch (_state)
+        {
+            case EShipState.EarthOrbit:
+            {
+                float c = MathF.Cos(_orbitPhaseRad);
+                float s = MathF.Sin(_orbitPhaseRad);
+                Vector3 local = SpaceshipMath.Add(SpaceshipMath.Mul(axisX, SpaceshipConstants.EarthOrbitRadius * c),
+                    SpaceshipMath.Mul(axisZ, SpaceshipConstants.EarthOrbitRadius * s));
+                return SpaceshipMath.Add(earthPos, local);
+            }
+            case EShipState.MoonOrbit:
+            {
+                float c = MathF.Cos(_orbitPhaseRad);
+                float s = MathF.Sin(_orbitPhaseRad);
+                Vector3 local = SpaceshipMath.Add(SpaceshipMath.Mul(axisX, SpaceshipConstants.MoonOrbitRadius * c),
+                    SpaceshipMath.Mul(axisZ, SpaceshipConstants.MoonOrbitRadius * s));
+                return SpaceshipMath.Add(moonPos, local);
+            }
+            case EShipState.Transfer:
+            {
+                const float r1 = SpaceshipConstants.EarthOrbitRadius;
+                float r2 = SpaceshipConstants.EarthMoonDistance - SpaceshipConstants.MoonOrbitRadius;
+                float a = 0.5f * (r1 + r2);
+                float e = (r2 - r1) / (r2 + r1);
+                return EvalTransferPosition(earthPos, axisX, axisZ, _transferThetaRad, a, e);
+            }
+            default:
+                return earthPos;
         }
     }
 
-    private void ApplyOrientation(float dt)
+    private void ApplyOrientation(float dt, in Vector3 earthPos, in Vector3 moonPos)
     {
         // Base yaw aims along the current movement direction (tangent).
         float baseYawRad = 0.0f;
 
+        Vector3 earthToMoon = SpaceshipMath.Sub(moonPos, earthPos);
+        Vector3 axisX = SpaceshipMath.NormalizeXZ(earthToMoon);
+        Vector3 axisZ = SpaceshipMath.PerpLeftXZ(axisX);
+
         switch (_state)
         {
             case EShipState.EarthOrbit:
             {
-                // Derivative of RotateY((R,0,0), phase): (-sin, 0, -cos) (up to scale).
-                float s = MathF.Sin(_orbitPhaseRad);
-                float c = MathF.Cos(_orbitPhaseRad);
-                baseYawRad = MathF.Atan2(-s, -c);
+                Vector3 t = EvalCircleTangent(axisX, axisZ, _orbitPhaseRad, +1.0f);
+                baseYawRad = MathF.Atan2(t.X, t.Z);
                 break;
             }
             case EShipState.MoonOrbit:
             {
-                float s = MathF.Sin(_orbitPhaseRad);
-                float c = MathF.Cos(_orbitPhaseRad);
-                baseYawRad = MathF.Atan2(-s, -c);
+                // Moon orbit runs phase in reverse (see AdvanceOrbit).
+                Vector3 t = EvalCircleTangent(axisX, axisZ, _orbitPhaseRad, -1.0f);
+                baseYawRad = MathF.Atan2(t.X, t.Z);
                 break;
             }
             case EShipState.Transfer:
@@ -184,18 +375,11 @@ public sealed class ShipOrbitController : ScriptComponent
                 // Finite difference on the transfer orbit for tangent direction.
                 float scaledDt = dt * _timeScale;
 
-                Vector3 earthPos = CelestialMotion.EarthPosition(_t);
-                Vector3 moonPos = CelestialMotion.MoonPosition(_t);
-                Vector3 earthToMoon = SpaceshipMath.Sub(moonPos, earthPos);
-                Vector3 axisX = SpaceshipMath.NormalizeXZ(earthToMoon);
-                Vector3 axisZ = SpaceshipMath.PerpLeftXZ(axisX);
-
                 const float r1 = SpaceshipConstants.EarthOrbitRadius;
-                const float r2 = SpaceshipConstants.EarthMoonDistance;
+                float r2 = SpaceshipConstants.EarthMoonDistance - SpaceshipConstants.MoonOrbitRadius;
                 float a = 0.5f * (r1 + r2);
                 float e = (r2 - r1) / (r2 + r1);
 
-                // Use a small delta theta based on time step.
                 float dTheta = MathF.Max(0.001f, MathF.Abs(scaledDt) * 0.02f);
                 Vector3 p0 = EvalTransferPosition(earthPos, axisX, axisZ, _transferThetaRad, a, e);
                 Vector3 p1 = EvalTransferPosition(earthPos, axisX, axisZ, _transferThetaRad + dTheta, a, e);
@@ -216,25 +400,6 @@ public sealed class ShipOrbitController : ScriptComponent
         TrySetWorldRotation(q);
     }
 
-    private Vector3 ComputeTransferPosition(in Vector3 earthPos, in Vector3 moonPos, float scaledDt)
-    {
-        // Rotate the ellipse basis with the current Earth->Moon direction.
-        Vector3 earthToMoon = SpaceshipMath.Sub(moonPos, earthPos);
-        Vector3 axisX = SpaceshipMath.NormalizeXZ(earthToMoon);
-        Vector3 axisZ = SpaceshipMath.PerpLeftXZ(axisX);
-
-        const float r1 = SpaceshipConstants.EarthOrbitRadius;
-        const float r2 = SpaceshipConstants.EarthMoonDistance;
-        float a = 0.5f * (r1 + r2);
-        float e = (r2 - r1) / (r2 + r1);
-
-        // Advance along the parametric ellipse.
-        _transferThetaRad += scaledDt * 0.35f;
-        _transferThetaRad = SpaceshipMath.WrapAngleRad(_transferThetaRad);
-
-        return EvalTransferPosition(earthPos, axisX, axisZ, _transferThetaRad, a, e);
-    }
-
     private static Vector3 EvalTransferPosition(in Vector3 earthPos, in Vector3 axisX,
         in Vector3 axisZ, float theta, float a, float e)
     {
@@ -250,44 +415,135 @@ public sealed class ShipOrbitController : ScriptComponent
             SpaceshipMath.Add(SpaceshipMath.Mul(axisX, r * c), SpaceshipMath.Mul(axisZ, r * s)));
     }
 
-    private void TrySwitchFromTransferToEarthOrbit()
+    private static Vector3 EvalCircleTangent(in Vector3 axisX, in Vector3 axisZ, float phase, float dirSign)
     {
-        // Allow capture near periapsis: theta ~ 0.
-        float d = MathF.Abs(SpaceshipMath.WrapAngleRad(_transferThetaRad));
-        if (d <= SpaceshipConstants.TransferWindowHalfAngleRad)
-        {
-            _state = EShipState.EarthOrbit;
-        }
+        // d/dphase of (axisX*cos + axisZ*sin) = (-axisX*sin + axisZ*cos).
+        float s = MathF.Sin(phase);
+        float c = MathF.Cos(phase);
+        Vector3 t = SpaceshipMath.Add(SpaceshipMath.Mul(axisX, -s), SpaceshipMath.Mul(axisZ, c));
+        return SpaceshipMath.Mul(t, dirSign);
     }
 
-    private void TrySwitchFromTransferToMoonOrbit()
+    private static float DistXZ(in Vector3 a, in Vector3 b)
     {
-        // Allow capture near apoapsis: theta ~ PI and ship close to the Moon.
-        float d = MathF.Abs(SpaceshipMath.WrapAngleRad(_transferThetaRad - MathF.PI));
-        if (d > SpaceshipConstants.TransferWindowHalfAngleRad)
-        {
-            return;
-        }
+        Vector3 d = SpaceshipMath.Sub(a, b);
+        return MathF.Sqrt(d.X * d.X + d.Z * d.Z);
+    }
 
-        Vector3 earthPos = CelestialMotion.EarthPosition(_t);
-        Vector3 moonPos = CelestialMotion.MoonPosition(_t);
+    private static float Wrap01(float x)
+    {
+        x %= 1.0f;
+        if (x < 0.0f) x += 1.0f;
+        return x;
+    }
 
-        Vector3 earthToMoon = SpaceshipMath.Sub(moonPos, earthPos);
-        Vector3 axisX = SpaceshipMath.NormalizeXZ(earthToMoon);
+    private void BuildTransferLut(in Vector3 earthPos, in Vector3 moonPos)
+    {
+        // LUT over theta in [0, 2PI], mapping normalized arc-length fraction -> theta.
+        // This makes motion along the ellipse look close to constant-speed.
+        Vector3 axisX = AxisX(earthPos, moonPos);
         Vector3 axisZ = SpaceshipMath.PerpLeftXZ(axisX);
 
         const float r1 = SpaceshipConstants.EarthOrbitRadius;
-        const float r2 = SpaceshipConstants.EarthMoonDistance;
+        float r2 = SpaceshipConstants.EarthMoonDistance - SpaceshipConstants.MoonOrbitRadius;
         float a = 0.5f * (r1 + r2);
         float e = (r2 - r1) / (r2 + r1);
 
-        Vector3 shipPos = EvalTransferPosition(earthPos, axisX, axisZ, _transferThetaRad, a, e);
+        const int n = 4096;
+        const float twoPi = 6.2831853f;
 
-        Vector3 toMoon = SpaceshipMath.Sub(shipPos, moonPos);
-        float dist = MathF.Sqrt(toMoon.X * toMoon.X + toMoon.Y * toMoon.Y + toMoon.Z * toMoon.Z);
-        if (dist <= SpaceshipConstants.TransferMoonCaptureDistance)
+        _transferLutTheta = new float[n + 1];
+        _transferLutS01 = new float[n + 1];
+
+        Vector3 prev = EvalTransferPosition(earthPos, axisX, axisZ, 0.0f, a, e);
+        _transferLutTheta[0] = 0.0f;
+        _transferLutS01[0] = 0.0f;
+
+        float total = 0.0f;
+        for (int i = 1; i <= n; ++i)
         {
-            _state = EShipState.MoonOrbit;
+            float theta = twoPi * (i / (float)n);
+            Vector3 p = EvalTransferPosition(earthPos, axisX, axisZ, theta, a, e);
+            total += DistXZ(p, prev);
+            _transferLutTheta[i] = theta;
+            _transferLutS01[i] = total;
+            prev = p;
         }
+
+        if (total > 1e-6f)
+        {
+            for (int i = 1; i <= n; ++i)
+            {
+                _transferLutS01[i] /= total;
+            }
+        }
+
+        _transferSAtTheta0 = 0.0f;
+        _transferSAtThetaPi = _transferLutS01[n / 2];
+        _transferLutBuilt = true;
+    }
+
+    private float ThetaFromS01(float s01)
+    {
+        if (_transferLutS01.Length == 0)
+        {
+            return 0.0f;
+        }
+
+        s01 = Wrap01(s01);
+
+        // Binary search for first i with s[i] >= s01.
+        int lo = 0;
+        int hi = _transferLutS01.Length - 1;
+        while (lo < hi)
+        {
+            int mid = (lo + hi) / 2;
+            if (_transferLutS01[mid] < s01) lo = mid + 1;
+            else hi = mid;
+        }
+
+        int i1 = lo;
+        if (i1 <= 0) return _transferLutTheta[0];
+        if (i1 >= _transferLutS01.Length) return _transferLutTheta[_transferLutTheta.Length - 1];
+
+        int i0 = i1 - 1;
+        float s0 = _transferLutS01[i0];
+        float s1 = _transferLutS01[i1];
+        float t0 = _transferLutTheta[i0];
+        float t1 = _transferLutTheta[i1];
+        float denom = s1 - s0;
+        if (denom <= 1e-8f) return t1;
+
+        float a = (s01 - s0) / denom;
+        return t0 + (t1 - t0) * a;
+    }
+
+    private static Vector3 AxisX(in Vector3 earthPos, in Vector3 moonPos)
+    {
+        return SpaceshipMath.NormalizeXZ(SpaceshipMath.Sub(moonPos, earthPos));
+    }
+
+    private static Vector3 JoinEarth(in Vector3 earthPos, in Vector3 axisX)
+    {
+        return SpaceshipMath.Add(earthPos, SpaceshipMath.Mul(axisX, -SpaceshipConstants.EarthOrbitRadius));
+    }
+
+    private static Vector3 JoinMoon(in Vector3 moonPos, in Vector3 axisX)
+    {
+        return SpaceshipMath.Add(moonPos, SpaceshipMath.Mul(axisX, -SpaceshipConstants.MoonOrbitRadius));
+    }
+
+    private static bool CanSwitchAtJoinEarth(in Vector3 earthPos, in Vector3 moonPos, in Vector3 shipPos)
+    {
+        Vector3 axisX = AxisX(earthPos, moonPos);
+        Vector3 join = JoinEarth(earthPos, axisX);
+        return DistXZ(shipPos, join) <= SpaceshipConstants.OrbitSwitchEpsilon;
+    }
+
+    private static bool CanSwitchAtJoinMoon(in Vector3 earthPos, in Vector3 moonPos, in Vector3 shipPos)
+    {
+        Vector3 axisX = AxisX(earthPos, moonPos);
+        Vector3 join = JoinMoon(moonPos, axisX);
+        return DistXZ(shipPos, join) <= SpaceshipConstants.OrbitSwitchEpsilon;
     }
 }

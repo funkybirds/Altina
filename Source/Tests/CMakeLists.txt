@@ -46,6 +46,21 @@ ae_add_test_target(AltinaEngineTestsCore
     LIBS AltinaEngine::Core
 )
 
+file(GLOB_RECURSE AE_TEST_DEBUGGUI_SOURCES
+    CONFIGURE_DEPENDS
+    ${AE_TESTS_ROOT}/DebugGui/*.cpp
+)
+
+if(AE_TEST_DEBUGGUI_SOURCES)
+    ae_add_test_target(AltinaEngineTestsDebugGui
+        FOLDER "DebugGui"
+        SOURCES ${AE_TEST_DEBUGGUI_SOURCES}
+        LIBS
+            AltinaEngine::DebugGui
+            AltinaEngine::Rhi::Mock
+    )
+endif()
+
 file(GLOB_RECURSE AE_TEST_RENDERCORE_SOURCES
     CONFIGURE_DEPENDS
     ${AE_TESTS_ROOT}/RenderCore/*.cpp
@@ -231,5 +246,4 @@ if(AE_ENABLE_SCRIPTING_CORECLR)
         message(STATUS "dotnet not found; skipping CoreCLR scripting interop tests.")
     endif()
 endif()
-
 

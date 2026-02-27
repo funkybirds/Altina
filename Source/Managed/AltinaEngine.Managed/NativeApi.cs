@@ -42,6 +42,8 @@ public unsafe struct NativeApi
 
     public delegate* unmanaged[Cdecl]<uint, uint, uint, Quaternion*, bool> GetLocalRotation;
     public delegate* unmanaged[Cdecl]<uint, uint, uint, Quaternion*, bool> SetLocalRotation;
+
+    public delegate* unmanaged[Cdecl]<byte*, void> SetWindowTitle;
 }
 
 internal static unsafe class Native
@@ -54,7 +56,14 @@ internal static unsafe class Native
 
     internal static void LogError(string message) => CallLog(Api.LogError, message);
 
+    internal static void SetWindowTitle(string title) => CallUtf8(Api.SetWindowTitle, title);
+
     private static void CallLog(delegate* unmanaged[Cdecl]<byte*, void> fn, string message)
+    {
+        CallUtf8(fn, message);
+    }
+
+    private static void CallUtf8(delegate* unmanaged[Cdecl]<byte*, void> fn, string message)
     {
         if (fn == null || string.IsNullOrEmpty(message))
         {

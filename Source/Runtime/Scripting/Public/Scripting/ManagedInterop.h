@@ -61,6 +61,8 @@ namespace AltinaEngine::Scripting {
             FScriptQuaternion* outValue)    = nullptr;
         bool (*SetLocalRotation)(u32 worldId, u32 ownerIndex, u32 ownerGeneration,
             const FScriptQuaternion* value) = nullptr;
+
+        void (*SetWindowTitle)(const char* titleUtf8) = nullptr;
     };
 
     struct AE_SCRIPTING_API FManagedCreateArgs {

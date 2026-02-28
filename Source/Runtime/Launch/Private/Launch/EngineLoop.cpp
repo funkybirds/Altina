@@ -14,6 +14,7 @@
 #include "Rendering/TemporalAA/TemporalAA.h"
 #include "Rendering/RenderingSettings.h"
 #include "DebugGui/DebugGui.h"
+#include "Asset/Texture2DAsset.h"
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
     #include "Scripting/ScriptSystemCoreCLR.h"
@@ -476,7 +477,8 @@ namespace AltinaEngine::Launch {
         void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
             Engine::FRenderScene& scene, const TVector<RenderCore::Render::FDrawList>& drawLists,
             const TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
-            Rendering::ERendererType                      rendererType) {
+            Rendering::ERendererType rendererType, const Asset::FAssetRegistry* assetRegistry,
+            Asset::FAssetManager* assetManager) {
             if (scene.Views.IsEmpty()) {
                 return;
             }
@@ -485,6 +487,19 @@ namespace AltinaEngine::Launch {
             static Asset::FAssetHandle                                sSkyCubeAsset{};
             static GameScene::FSkyCubeComponent::FSkyCubeRhiResources sSkyCubeRhi{};
             static bool                                               sHasSkyCubeRhi = false;
+
+            // Cache IBL GPU resources (derived from the active sky cubemap).
+            static Asset::FAssetHandle                                sSkyIrradianceAsset{};
+            static GameScene::FSkyCubeComponent::FSkyCubeRhiResources sSkyIrradianceRhi{};
+            static bool                                               sHasSkyIrradianceRhi = false;
+
+            static Asset::FAssetHandle                                sSkySpecularAsset{};
+            static GameScene::FSkyCubeComponent::FSkyCubeRhiResources sSkySpecularRhi{};
+            static bool                                               sHasSkySpecularRhi = false;
+
+            static Asset::FAssetHandle                                sBrdfLutAsset{};
+            static Rhi::FRhiTextureRef                                sBrdfLutTexture{};
+            static bool                                               sHasBrdfLutTexture = false;
 
             Rhi::FRhiTexture*                                         skyCubeTexture = nullptr;
             bool                                                      bHasSkyCube    = false;
@@ -497,11 +512,179 @@ namespace AltinaEngine::Launch {
                     sSkyCubeRhi =
                         GameScene::FSkyCubeComponent::AssetToSkyCubeConverter(scene.SkyCubeAsset);
                     sHasSkyCubeRhi = sSkyCubeRhi.IsValid();
+
+                    // Sky asset changed; derived IBL assets are tied to its virtual path.
+                    sSkyIrradianceAsset  = {};
+                    sHasSkyIrradianceRhi = false;
+                    sSkySpecularAsset    = {};
+                    sHasSkySpecularRhi   = false;
+                    sBrdfLutAsset        = {};
+                    sHasBrdfLutTexture   = false;
+                    sBrdfLutTexture.Reset();
                 }
                 if (sHasSkyCubeRhi) {
                     skyCubeTexture = sSkyCubeRhi.Texture.Get();
                 } else {
                     bHasSkyCube = false;
+                }
+            }
+
+            // Optional environment IBL (diffuse irradiance + specular prefilter + BRDF LUT).
+            Rhi::FRhiTexture* skyIrradiance  = nullptr;
+            Rhi::FRhiTexture* skySpecular    = nullptr;
+            Rhi::FRhiTexture* brdfLut        = nullptr;
+            float             specularMaxLod = 0.0f;
+            bool              bHasSkyIbl     = false;
+
+            if (bHasSkyCube && assetRegistry != nullptr && assetManager != nullptr) {
+                const auto* baseDesc = assetRegistry->GetDesc(scene.SkyCubeAsset);
+                if (baseDesc != nullptr && !baseDesc->VirtualPath.IsEmpty()) {
+                    auto MakeDerivedPath = [&](const TChar* suffix) -> Container::FString {
+                        Container::FString out = baseDesc->VirtualPath;
+                        out.Append(TEXT("/"));
+                        out.Append(suffix);
+                        return out;
+                    };
+
+                    const auto irradiancePath = MakeDerivedPath(TEXT("irradiance"));
+                    const auto specularPath   = MakeDerivedPath(TEXT("specular"));
+                    const auto brdfPath       = MakeDerivedPath(TEXT("brdf_lut"));
+
+                    const auto irradianceHandle =
+                        assetRegistry->FindByPath(irradiancePath.ToView());
+                    const auto specularHandle = assetRegistry->FindByPath(specularPath.ToView());
+                    const auto brdfHandle     = assetRegistry->FindByPath(brdfPath.ToView());
+
+                    if (irradianceHandle.IsValid()
+                        && GameScene::FSkyCubeComponent::AssetToSkyCubeConverter) {
+                        if (!sHasSkyIrradianceRhi || sSkyIrradianceAsset != irradianceHandle) {
+                            sSkyIrradianceAsset = irradianceHandle;
+                            sSkyIrradianceRhi =
+                                GameScene::FSkyCubeComponent::AssetToSkyCubeConverter(
+                                    irradianceHandle);
+                            sHasSkyIrradianceRhi = sSkyIrradianceRhi.IsValid();
+                        }
+                        if (sHasSkyIrradianceRhi) {
+                            skyIrradiance = sSkyIrradianceRhi.Texture.Get();
+                        }
+                    }
+
+                    if (specularHandle.IsValid()
+                        && GameScene::FSkyCubeComponent::AssetToSkyCubeConverter) {
+                        if (!sHasSkySpecularRhi || sSkySpecularAsset != specularHandle) {
+                            sSkySpecularAsset = specularHandle;
+                            sSkySpecularRhi = GameScene::FSkyCubeComponent::AssetToSkyCubeConverter(
+                                specularHandle);
+                            sHasSkySpecularRhi = sSkySpecularRhi.IsValid();
+                        }
+                        if (sHasSkySpecularRhi) {
+                            skySpecular = sSkySpecularRhi.Texture.Get();
+                        }
+
+                        const auto* specDesc = assetRegistry->GetDesc(specularHandle);
+                        if (specDesc != nullptr
+                            && specDesc->Handle.Type == Asset::EAssetType::CubeMap
+                            && specDesc->CubeMap.MipCount > 0U) {
+                            specularMaxLod = static_cast<float>(specDesc->CubeMap.MipCount - 1U);
+                        }
+                    }
+
+                    if (brdfHandle.IsValid()) {
+                        const auto* brdfDesc = assetRegistry->GetDesc(brdfHandle);
+                        if (brdfDesc == nullptr
+                            || brdfDesc->Handle.Type != Asset::EAssetType::Texture2D) {
+                            // Ignore invalid derived assets.
+                        } else if (!sHasBrdfLutTexture || sBrdfLutAsset != brdfHandle) {
+                            sBrdfLutAsset      = brdfHandle;
+                            sHasBrdfLutTexture = false;
+                            sBrdfLutTexture.Reset();
+
+                            auto* rhiDevice = Rhi::RHIGetDevice();
+                            if (rhiDevice != nullptr) {
+                                const auto  assetRef = assetManager->Load(brdfHandle);
+                                const auto* texAsset = assetRef
+                                    ? static_cast<const Asset::FTexture2DAsset*>(assetRef.Get())
+                                    : nullptr;
+                                if (texAsset != nullptr) {
+                                    const auto& assetDesc = texAsset->GetDesc();
+                                    const u32   bytesPerPixel =
+                                        Asset::GetTextureBytesPerPixel(assetDesc.Format);
+                                    if (bytesPerPixel > 0U && assetDesc.Width > 0U
+                                        && assetDesc.Height > 0U) {
+                                        Rhi::ERhiFormat format = Rhi::ERhiFormat::Unknown;
+                                        switch (assetDesc.Format) {
+                                            case Asset::kTextureFormatRGBA8:
+                                                format = assetDesc.SRGB
+                                                    ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
+                                                    : Rhi::ERhiFormat::R8G8B8A8Unorm;
+                                                break;
+                                            case Asset::kTextureFormatRGBA16F:
+                                                format = Rhi::ERhiFormat::R16G16B16A16Float;
+                                                break;
+                                            case Asset::kTextureFormatR8:
+                                            case Asset::kTextureFormatRGB8:
+                                            default:
+                                                format = assetDesc.SRGB
+                                                    ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
+                                                    : Rhi::ERhiFormat::R8G8B8A8Unorm;
+                                                break;
+                                        }
+
+                                        Rhi::FRhiTextureDesc texDesc{};
+                                        texDesc.mDebugName.Assign(TEXT("IBL.BrdfLut"));
+                                        texDesc.mDimension = Rhi::ERhiTextureDimension::Tex2D;
+                                        texDesc.mWidth     = assetDesc.Width;
+                                        texDesc.mHeight    = assetDesc.Height;
+                                        texDesc.mMipLevels =
+                                            (assetDesc.MipCount > 0U) ? assetDesc.MipCount : 1U;
+                                        texDesc.mFormat = format;
+                                        texDesc.mBindFlags =
+                                            Rhi::ERhiTextureBindFlags::ShaderResource;
+
+                                        sBrdfLutTexture = Rhi::RHICreateTexture(texDesc);
+                                        if (sBrdfLutTexture) {
+                                            const auto& pixels = texAsset->GetPixels();
+                                            if (!pixels.IsEmpty()) {
+                                                u32   width  = assetDesc.Width;
+                                                u32   height = assetDesc.Height;
+                                                usize offset = 0U;
+                                                for (u32 mip = 0U; mip < texDesc.mMipLevels;
+                                                    ++mip) {
+                                                    const usize rowPitch =
+                                                        static_cast<usize>(width) * bytesPerPixel;
+                                                    const usize slicePitch =
+                                                        rowPitch * static_cast<usize>(height);
+                                                    if (rowPitch == 0U || slicePitch == 0U) {
+                                                        break;
+                                                    }
+                                                    if (offset + slicePitch > pixels.Size()) {
+                                                        break;
+                                                    }
+                                                    Rhi::FRhiTextureSubresource subresource{};
+                                                    subresource.mMipLevel = mip;
+                                                    rhiDevice->UpdateTextureSubresource(
+                                                        sBrdfLutTexture.Get(), subresource,
+                                                        pixels.Data() + offset,
+                                                        static_cast<u32>(rowPitch),
+                                                        static_cast<u32>(slicePitch));
+                                                    offset += slicePitch;
+                                                    width  = (width > 1U) ? (width >> 1U) : 1U;
+                                                    height = (height > 1U) ? (height >> 1U) : 1U;
+                                                }
+                                            }
+                                            sHasBrdfLutTexture = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (sHasBrdfLutTexture) {
+                            brdfLut = sBrdfLutTexture.Get();
+                        }
+                    }
+
+                    bHasSkyIbl = (skyIrradiance != nullptr) && (skySpecular != nullptr)
+                        && (brdfLut != nullptr);
                 }
             }
 
@@ -545,10 +728,15 @@ namespace AltinaEngine::Launch {
                 viewContext.DrawList = (i < drawLists.Size()) ? &drawLists[i] : nullptr;
                 viewContext.ShadowDrawList =
                     (i < shadowDrawLists.Size()) ? &shadowDrawLists[i] : nullptr;
-                viewContext.OutputTarget   = outputTarget;
-                viewContext.Lights         = &scene.Lights;
-                viewContext.SkyCubeTexture = skyCubeTexture;
-                viewContext.bHasSkyCube    = bHasSkyCube;
+                viewContext.OutputTarget      = outputTarget;
+                viewContext.Lights            = &scene.Lights;
+                viewContext.SkyCubeTexture    = skyCubeTexture;
+                viewContext.bHasSkyCube       = bHasSkyCube;
+                viewContext.SkyIrradianceCube = skyIrradiance;
+                viewContext.SkySpecularCube   = skySpecular;
+                viewContext.BrdfLutTexture    = brdfLut;
+                viewContext.SkySpecularMaxLod = specularMaxLod;
+                viewContext.bHasSkyIbl        = bHasSkyIbl;
                 renderer->SetViewContext(viewContext);
 
                 RenderCore::FFrameGraph graph(device);
@@ -977,10 +1165,14 @@ namespace AltinaEngine::Launch {
 
         // LogInfo(TEXT("GameThread Frame {}"), frameIndex);
 
-        auto handle = RenderCore::EnqueueRenderTask(Container::FString(TEXT("RenderFrame")),
-            [device, viewport, callback, debugGui, frameIndex, width, height, shouldResize,
+        auto* assetRegistry = &mAssetRegistry;
+        auto* assetManager  = &mAssetManager;
+
+        auto  handle = RenderCore::EnqueueRenderTask(Container::FString(TEXT("RenderFrame")),
+             [device, viewport, callback, debugGui, frameIndex, width, height, shouldResize,
                 renderScene = Move(renderScene), drawLists = Move(drawLists),
-                shadowDrawLists = Move(shadowDrawLists), rendererType]() mutable -> void {
+                shadowDrawLists = Move(shadowDrawLists), rendererType, assetRegistry,
+                assetManager]() mutable -> void {
                 if (!device)
                     return;
 
@@ -993,7 +1185,7 @@ namespace AltinaEngine::Launch {
 
                     if (!renderScene.Views.IsEmpty()) {
                         SendSceneRenderingRequest(*device, viewport.Get(), renderScene, drawLists,
-                            shadowDrawLists, rendererType);
+                             shadowDrawLists, rendererType, assetRegistry, assetManager);
                     }
 
                     if (callback) {

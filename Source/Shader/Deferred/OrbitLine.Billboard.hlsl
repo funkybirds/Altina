@@ -60,7 +60,7 @@ AE_PER_FRAME_CBUFFER(ViewConstants)
 AE_PER_DRAW_CBUFFER(ObjectConstants)
 {
     row_major float4x4 World;
-    row_major float4x4 NormalMatrix; // Unused here, but kept for layout compatibility.
+    row_major float4x4 NormalMatrix;
 };
 
 AE_PER_MATERIAL_CBUFFER(MaterialConstants)
@@ -99,38 +99,38 @@ VSOutput VSBase(VSInput input)
     const float4 pClip = mul(ViewProjection, pWS);
     const float4 qClip = mul(ViewProjection, qWS);
 
-    // Convert to NDC for computing a screen-space perpendicular.
     const float2 pNdc = pClip.xy / max(pClip.w, 1e-6f);
     const float2 qNdc = qClip.xy / max(qClip.w, 1e-6f);
 
-    float2 dir = qNdc - pNdc;
+    // input.Position is either segment endpoint p0 or p1, and input.OtherPos is the opposite.
+    // Build a consistent segment direction (p0->p1) for all four vertices; otherwise the quad
+    // twists per-vertex and can show small discontinuities at distance.
+    const float endFlag = saturate(input.Params.y); // 0 at p0, 1 at p1
+    const float2 p0Ndc  = (endFlag < 0.5f) ? pNdc : qNdc;
+    const float2 p1Ndc  = (endFlag < 0.5f) ? qNdc : pNdc;
+
+    float2 dir = p1Ndc - p0Ndc;
     const float dirLen2 = dot(dir, dir);
     dir = (dirLen2 > 1e-12f) ? (dir * rsqrt(dirLen2)) : float2(1.0f, 0.0f);
 
     const float2 perp = float2(-dir.y, dir.x);
 
-    // Pixel -> NDC conversion ([-1,1] range).
     float2 invRt = InvRenderTargetSize;
-    // Defensive fallback: if the per-frame constants layout ever diverges, keep the debug orbit
-    // lines visible rather than silently collapsing to zero width.
     if (invRt.x <= 0.0f || invRt.y <= 0.0f) {
         invRt = float2(1.0f / 1920.0f, 1.0f / 1080.0f);
     }
 
     const float2 pixelToNdc  = float2(2.0f, 2.0f) * invRt;
     const float  halfWidthPx = max(LineWidthPx, 2.0f) * 0.5f;
+    // Slight overlap (in pixels) to avoid sub-pixel cracks between segments after projection.
+    const float  padPx = 0.75f;
 
     const float  side = input.Params.x; // -1 / +1
-    float2 offsetNdc = perp * (side * halfWidthPx) * pixelToNdc;
+    float2 offsetNdc = perp * (side * (halfWidthPx + padPx)) * pixelToNdc;
 
-    // Extend each segment slightly beyond its endpoints (in screen space) so adjacent segments
-    // overlap. This reduces small cracks/"dashed" artifacts on curved polylines where each segment
-    // computes its own screen-space perpendicular.
-    const float endFlag = saturate(input.Params.y); // 0 at p0, 1 at p1
     const float endSign = (endFlag * 2.0f - 1.0f);  // -1 at p0, +1 at p1
-    offsetNdc += dir * (endSign * halfWidthPx) * pixelToNdc;
+    offsetNdc += dir * (endSign * (halfWidthPx + padPx)) * pixelToNdc;
 
-    // Apply offset in clip space: clip.xy = (ndc.xy + offsetNdc) * w
     float4 clip = pClip;
     clip.xy += offsetNdc * pClip.w;
 
@@ -148,8 +148,6 @@ struct PSOutput
 PSOutput PSBase(VSOutput input)
 {
     PSOutput output;
-
-    // Unlit-ish: rely on emissive so the orbit line stays readable.
     const float3 normalWorld = float3(0.0f, 1.0f, 0.0f);
 
     output.GBufferA = float4(BaseColor.rgb, saturate(Metallic));

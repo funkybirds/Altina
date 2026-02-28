@@ -1,4 +1,4 @@
-// Deferred lighting + optional directional CSM shadows (Phase1).
+// Deferred lighting + shadowing
 
 #include "Shader/Bindings/ShaderBindings.hlsli"
 
@@ -65,13 +65,33 @@ Texture2D      GBufferB   : register(t1);
 Texture2D      GBufferC   : register(t2);
 Texture2D      SceneDepth : register(t3);
 Texture2DArray ShadowMap  : register(t4);
+TextureCube    SkyIrradianceCube : register(t5);
+TextureCube    SkySpecularCube   : register(t6);
+Texture2D      BrdfLut            : register(t7);
+Texture2D      SsaoTex            : register(t8);
 SamplerState   LinearSampler : register(s0);
+
+cbuffer IblConstants : register(b1)
+{
+    float EnvDiffuseIntensity;
+    float EnvSpecularIntensity;
+    float SpecularMaxLod;
+    float EnvSaturation;
+};
 
 struct FSQOutput
 {
     float4 Position : SV_POSITION;
     float2 UV       : TEXCOORD0;
 };
+
+static const float3 kEnvLumaWeights = float3(0.2126f, 0.7152f, 0.0722f);
+
+float3 ApplySaturation(float3 c, float sat)
+{
+    const float l = dot(c, kEnvLumaWeights);
+    return lerp(l.xxx, c, sat);
+}
 
 FSQOutput VSFullScreenTriangle(uint vertexId : SV_VertexID)
 {
@@ -108,7 +128,6 @@ float CompareShadowDepth(float receiverDepth, float storedDepth)
     // Returns 1 if lit, 0 if shadowed.
     if (bReverseZ != 0)
     {
-        // Reverse-Z: larger depth is closer.
         return (receiverDepth >= storedDepth) ? 1.0f : 0.0f;
     }
     return (receiverDepth <= storedDepth) ? 1.0f : 0.0f;
@@ -165,7 +184,6 @@ uint SelectCascade(float viewDepthVS)
         return 0;
     }
 
-    // Avoid `break` inside `[unroll]` loops: fxc can fail to unroll such loops.
     uint cascade = 0;
     //[unroll(4)]
     for (uint i = 0; i < 4; ++i)
@@ -175,7 +193,6 @@ uint SelectCascade(float viewDepthVS)
             continue;
         }
 
-        // If we're beyond the cascade far plane, advance the cascade index.
         if (viewDepthVS > CSM_SplitsVS[i].y)
         {
             cascade = min(i + 1, CSMCascadeCount - 1);
@@ -189,6 +206,7 @@ float4 PSDeferredLighting(FSQOutput input) : SV_Target0
     const float2 uv = input.UV;
 
     const float depth = SceneDepth.Sample(LinearSampler, uv).r;
+    // Require refactor (manual): shader perm for revz
     // Reverse-Z clears depth to 0 (far). Treat that as background.
     if (depth <= 1e-6f)
     {
@@ -204,27 +222,39 @@ float4 PSDeferredLighting(FSQOutput input) : SV_Target0
     const float3 positionWS = ReconstructWorldPosition(uv, depth);
     const float4 positionVS4 = mul(View, float4(positionWS, 1.0f));
 
-    // View vector in world space.
     float3 V = ViewOriginWS - positionWS;
     const float vLen2 = dot(V, V);
     V = (vLen2 > 1e-8f) ? (V * rsqrt(vLen2)) : float3(0.0f, 0.0f, 1.0f);
     const float3 N = normalize(data.Normal);
 
-    // Cascade selection uses view-space depth (positive forward).
     const float viewDepthVS = positionVS4.z;
     const uint cascadeIndex = SelectCascade(viewDepthVS);
     const float shadow = SampleShadowPCF(cascadeIndex, positionWS);
 
-    float3 color = data.Emissive;
-    // Simple ambient term.
-    color += data.BaseColor * 0.02f;
+    // Ambient/indirect terms. Keep separate so AO only affects indirect lighting (not direct).
+    float3 color          = data.Emissive;
+    float3 ambientDiffuse = data.BaseColor * 0.02f;
+    float3 ambientSpec    = 0.0f;
+
+    // if(cascadeIndex==0)
+    // {
+    //     color=float3(1.0,0.0,0.0);
+    // }else if(cascadeIndex==1)
+    // {
+    //     color=float3(0.0,1.0,0.0);
+    // }else if(cascadeIndex==2)
+    // {
+    //     color=float3(0.0,0.0,1.0);
+    // }else if(cascadeIndex==3)
+    // {
+    //     color=float3(1.0,1.0,0.0);
+    // }
 
     // Main directional.
     const float3 Ld = normalize(-DirLightDirectionWS);
     float3 dirLight = 0.0f;
     if (DebugShadingMode != 0)
     {
-        // Lambert diffuse for debugging material/lighting correctness without PBR inputs.
         const float NdotL = saturate(dot(N, Ld));
         dirLight = data.BaseColor * (DirLightColor * DirLightIntensity) * NdotL;
     }
@@ -260,8 +290,49 @@ float4 PSDeferredLighting(FSQOutput input) : SV_Target0
         }
     }
 
-    // AO (very simple: darken everything a bit).
-    color *= lerp(0.35f, 1.0f, data.Occlusion);
+    // AO: combine material occlusion (baked) with screen-space AO factor.
+    const float ssao = SsaoTex.Sample(LinearSampler, uv).r;
+    const float ao   = saturate(data.Occlusion) * saturate(ssao);
+
+    // IBL
+    {
+        const float envSat   = max(EnvSaturation, 0.0f);
+        const float envDiffK = max(EnvDiffuseIntensity, 0.0f);
+        const float envSpecK = max(EnvSpecularIntensity, 0.0f);
+        if (envDiffK > 1e-6f || envSpecK > 1e-6f)
+        {
+            const float NdotV = saturate(dot(N, V));
+            const float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), data.BaseColor, data.Metallic);
+
+            if (envDiffK > 1e-6f)
+            {
+                float3 irradiance = SkyIrradianceCube.SampleLevel(LinearSampler, N, 0.0f).rgb;
+                irradiance = ApplySaturation(irradiance, envSat);
+                const float3 diffuse = irradiance * data.BaseColor * (1.0f - data.Metallic);
+                ambientDiffuse += diffuse * envDiffK;
+            }
+
+            if (envSpecK > 1e-6f)
+            {
+                const float3 R = reflect(-V, N);
+                const float lod = saturate(data.Roughness) * max(SpecularMaxLod, 0.0f);
+                float3 prefiltered = SkySpecularCube.SampleLevel(LinearSampler, R, lod).rgb;
+                prefiltered = ApplySaturation(prefiltered, envSat);
+
+                const float2 brdf =
+                    BrdfLut.Sample(LinearSampler, float2(NdotV, saturate(data.Roughness))).rg;
+                const float3 spec = prefiltered * (F0 * brdf.x + brdf.y);
+                ambientSpec += spec * envSpecK;
+            }
+        }
+    }
+
+    // Apply AO to indirect only. This makes AO show up primarily in shadowed regions, and avoids
+    // darkening direct lighting which is not physically correct for SSAO.
+    // Specular IBL is usually less occluded than diffuse; keep a softer curve here.
+    const float aoSpec = lerp(1.0f, ao, 0.5f);
+    color += ambientDiffuse * ao;
+    color += ambientSpec * aoSpec;
 
     return float4(color, 1.0f);
 }

@@ -429,7 +429,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
 
         auto EnsurePipelines(Rhi::FRhiDevice& device, FPostProcessSharedResources& res) -> bool {
             if (!res.FullscreenVS || !res.BlitPS || !res.TonemapPS || !res.FxaaPS
-                || !res.BloomPrefilterPS || !res.BloomDownsamplePS || !res.BloomUpsamplePS
+                || !res.BloomPrefilterPS || !res.BloomDownsamplePS || !res.BloomDownsampleWeightedPS
+                || !res.BloomBlurHPS || !res.BloomBlurVPS || !res.BloomUpsamplePS
                 || !res.BloomApplyPS || !res.TaaPS) {
                 const auto shaderDir = FindBuiltinPostProcessShaderDir();
                 if (!shaderDir.IsEmpty()) {
@@ -454,6 +455,12 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                             Shader::EShaderStage::Pixel, res.BloomPrefilterPS)
                         || !CompileShaderFromFile(bloomPath, TEXT("PSBloomDownsample"),
                             Shader::EShaderStage::Pixel, res.BloomDownsamplePS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomDownsampleWeighted"),
+                            Shader::EShaderStage::Pixel, res.BloomDownsampleWeightedPS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomBlurH"),
+                            Shader::EShaderStage::Pixel, res.BloomBlurHPS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomBlurV"),
+                            Shader::EShaderStage::Pixel, res.BloomBlurVPS)
                         || !CompileShaderFromFile(bloomPath, TEXT("PSBloomUpsample"),
                             Shader::EShaderStage::Pixel, res.BloomUpsamplePS)
                         || !CompileShaderFromFile(bloomPath, TEXT("PSBloomApply"),
@@ -571,6 +578,67 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 }
             }
 
+            if (!res.BloomDownsampleWeightedPipeline) {
+                Rhi::FRhiGraphicsPipelineDesc desc{};
+                desc.mDebugName.Assign(TEXT("PostProcess.BloomDownsampleWeightedPipeline"));
+                desc.mVertexShader                  = res.FullscreenVS.Get();
+                desc.mPixelShader                   = res.BloomDownsampleWeightedPS.Get();
+                desc.mPipelineLayout                = res.PipelineLayout.Get();
+                desc.mVertexLayout                  = {};
+                desc.mRasterState                   = {};
+                desc.mDepthState                    = {};
+                desc.mBlendState                    = {};
+                desc.mRasterState.mCullMode         = Rhi::ERhiRasterCullMode::None;
+                desc.mDepthState.mDepthEnable       = false;
+                desc.mDepthState.mDepthWrite        = false;
+                res.BloomDownsampleWeightedPipeline = device.CreateGraphicsPipeline(desc);
+                if (!res.BloomDownsampleWeightedPipeline) {
+                    LogError(
+                        TEXT("Failed to create PostProcess bloom downsample-weighted pipeline."));
+                    return false;
+                }
+            }
+
+            if (!res.BloomBlurHPipeline) {
+                Rhi::FRhiGraphicsPipelineDesc desc{};
+                desc.mDebugName.Assign(TEXT("PostProcess.BloomBlurHPipeline"));
+                desc.mVertexShader            = res.FullscreenVS.Get();
+                desc.mPixelShader             = res.BloomBlurHPS.Get();
+                desc.mPipelineLayout          = res.PipelineLayout.Get();
+                desc.mVertexLayout            = {};
+                desc.mRasterState             = {};
+                desc.mDepthState              = {};
+                desc.mBlendState              = {};
+                desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+                desc.mDepthState.mDepthEnable = false;
+                desc.mDepthState.mDepthWrite  = false;
+                res.BloomBlurHPipeline        = device.CreateGraphicsPipeline(desc);
+                if (!res.BloomBlurHPipeline) {
+                    LogError(TEXT("Failed to create PostProcess bloom blur-h pipeline."));
+                    return false;
+                }
+            }
+
+            if (!res.BloomBlurVPipeline) {
+                Rhi::FRhiGraphicsPipelineDesc desc{};
+                desc.mDebugName.Assign(TEXT("PostProcess.BloomBlurVPipeline"));
+                desc.mVertexShader            = res.FullscreenVS.Get();
+                desc.mPixelShader             = res.BloomBlurVPS.Get();
+                desc.mPipelineLayout          = res.PipelineLayout.Get();
+                desc.mVertexLayout            = {};
+                desc.mRasterState             = {};
+                desc.mDepthState              = {};
+                desc.mBlendState              = {};
+                desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+                desc.mDepthState.mDepthEnable = false;
+                desc.mDepthState.mDepthWrite  = false;
+                res.BloomBlurVPipeline        = device.CreateGraphicsPipeline(desc);
+                if (!res.BloomBlurVPipeline) {
+                    LogError(TEXT("Failed to create PostProcess bloom blur-v pipeline."));
+                    return false;
+                }
+            }
+
             if (!res.BloomUpsampleAddPipeline) {
                 Rhi::FRhiGraphicsPipelineDesc desc{};
                 desc.mDebugName.Assign(TEXT("PostProcess.BloomUpsampleAddPipeline"));
@@ -593,7 +661,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mBlendState.mAlphaOp     = Rhi::ERhiBlendOp::Add;
                 res.BloomUpsampleAddPipeline  = device.CreateGraphicsPipeline(desc);
                 if (!res.BloomUpsampleAddPipeline) {
-                    LogError(TEXT("Failed to create PostProcess bloom upsample pipeline."));
+                    LogError(TEXT("Failed to create PostProcess bloom upsample-add pipeline."));
                     return false;
                 }
             }

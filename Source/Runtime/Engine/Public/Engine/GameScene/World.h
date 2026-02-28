@@ -14,6 +14,7 @@
 #include "Types/Traits.h"
 
 using AltinaEngine::CClassBaseOf;
+using AltinaEngine::Forward;
 using AltinaEngine::Move;
 using AltinaEngine::Core::Container::FStringView;
 using AltinaEngine::Core::Container::MakeUniqueAs;
@@ -50,6 +51,9 @@ namespace AltinaEngine::GameScene {
 
         template <typename T>
         [[nodiscard]] auto CreateComponent(FGameObjectId owner) -> FComponentId;
+        template <typename T, typename InitFn>
+            requires requires(InitFn&& fn, T& component) { fn(component); }
+        [[nodiscard]] auto CreateComponent(FGameObjectId owner, InitFn&& init) -> FComponentId;
         [[nodiscard]] auto CreateComponent(FGameObjectId owner, FComponentTypeHash type)
             -> FComponentId;
         void                                     DestroyComponent(FComponentId id);
@@ -141,6 +145,42 @@ namespace AltinaEngine::GameScene {
 
                 auto* component = slot.Handle.Get();
                 world.InitializeComponent(*component, id, owner);
+                component->OnCreate();
+                if (component->IsEnabled()) {
+                    component->OnEnable();
+                }
+
+                world.LinkComponentToOwner(owner, id);
+                world.OnComponentCreated(id, owner);
+                return id;
+            }
+
+            template <typename InitFn>
+                requires requires(InitFn&& fn, T& component) { fn(component); }
+            auto Create(FWorld& world, FGameObjectId owner, InitFn&& init) -> FComponentId {
+                auto handle = mPool.Allocate();
+                if (!handle) {
+                    return {};
+                }
+
+                const u32 index = AcquireSlot();
+                auto&     slot  = mSlots[index];
+                slot.Handle     = Move(handle);
+                slot.Alive      = true;
+                if (slot.Generation == 0) {
+                    slot.Generation = 1;
+                }
+                slot.Owner = owner;
+
+                FComponentId id{};
+                id.Index      = index;
+                id.Generation = slot.Generation;
+                id.Type       = mTypeHash;
+
+                auto* component = slot.Handle.Get();
+                world.InitializeComponent(*component, id, owner);
+                init(*component);
+
                 component->OnCreate();
                 if (component->IsEnabled()) {
                     component->OnEnable();
@@ -352,6 +392,20 @@ namespace AltinaEngine::GameScene {
         return storage.Create(*this, owner);
     }
 
+    template <typename T, typename InitFn>
+        requires requires(InitFn&& fn, T& component) { fn(component); }
+    inline auto FWorld::CreateComponent(FGameObjectId owner, InitFn&& init) -> FComponentId {
+        static_assert(CClassBaseOf<FComponent, T>, "Component types must derive from FComponent.");
+
+        if (!IsAlive(owner)) {
+            return {};
+        }
+
+        EnsureComponentRegistration<T>();
+        auto& storage = GetOrCreateComponentStorage<T>();
+        return storage.Create(*this, owner, Forward<InitFn>(init));
+    }
+
     template <typename T> inline auto FWorld::HasComponent(FGameObjectId owner) const -> bool {
         return GetComponent<T>(owner).IsValid();
     }
@@ -441,6 +495,15 @@ namespace AltinaEngine::GameScene {
             return {};
         }
         const auto id = mWorld->CreateComponent<T>(mId);
+        return TComponentRef<T>(mWorld, id);
+    }
+
+    template <typename T, typename InitFn>
+    inline auto FGameObjectView::AddComponent(InitFn&& init) -> TComponentRef<T> {
+        if (mWorld == nullptr) {
+            return {};
+        }
+        const auto id = mWorld->CreateComponent<T>(mId, Forward<InitFn>(init));
         return TComponentRef<T>(mWorld, id);
     }
 

@@ -1,14 +1,21 @@
 #pragma once
 
-#include <functional>
-#include <initializer_list>
-#include <string>
 #include "../Algorithm/CStringUtils.h"
 
 #include "StringView.h"
 #include "Vector.h"
 #include "../Types/Aliases.h"
 #include "../Types/Traits.h"
+
+namespace std {
+    template <typename T> struct hash;
+} // namespace std
+
+namespace AltinaEngine::Core::Container::Detail {
+    extern "C" int snprintf(char* buffer, AltinaEngine::usize bufferSize, const char* format, ...);
+    extern "C" int swprintf(
+        wchar_t* buffer, AltinaEngine::usize bufferSize, const wchar_t* format, ...);
+} // namespace AltinaEngine::Core::Container::Detail
 
 namespace AltinaEngine::Core::Container {
 
@@ -28,13 +35,6 @@ namespace AltinaEngine::Core::Container {
         explicit TBasicString(const TValueType* Text) { Append(Text); }
 
         TBasicString(const TValueType* Text, usize Length) { Append(Text, Length); }
-
-        TBasicString(std::initializer_list<TValueType> Init) {
-            Reserve(Init.size());
-            for (const auto& character : Init) {
-                this->PushBack(character);
-            }
-        }
 
         TBasicString(TBasicStringView<T> strView) { Append(strView.Data(), strView.Length()); }
 
@@ -84,9 +84,9 @@ namespace AltinaEngine::Core::Container {
             if (Text.Length() == 0) {
                 return;
             }
-            const auto* data = Text.Data();
+            const auto* data   = Text.Data();
             const auto  length = Text.Length();
-            const auto* base = this->GetData();
+            const auto* base   = this->GetData();
             if (base != nullptr && data >= base && data < (base + this->Length())) {
                 TBasicString temp(Text);
                 Append(temp.GetData(), temp.Length());
@@ -95,16 +95,15 @@ namespace AltinaEngine::Core::Container {
             Append(data, length);
         }
 
-        void Append(const TBasicString& Text) { Append(Text.ToView()); }
+        void                             Append(const TBasicString& Text) { Append(Text.ToView()); }
 
-        template <typename NumberT>
-        void AppendNumber(NumberT value) {
+        template <typename NumberT> void AppendNumber(NumberT value) {
             if constexpr (AltinaEngine::TTypeIsIntegral<NumberT>::Value
                 || AltinaEngine::TTypeIsFloatingPoint<NumberT>::Value) {
                 AppendNumberImpl(value);
             } else {
                 static_assert(AltinaEngine::TTypeIsIntegral<NumberT>::Value
-                    || AltinaEngine::TTypeIsFloatingPoint<NumberT>::Value,
+                        || AltinaEngine::TTypeIsFloatingPoint<NumberT>::Value,
                     "AppendNumber only supports scalar numeric types.");
             }
         }
@@ -127,7 +126,7 @@ namespace AltinaEngine::Core::Container {
             return { this->GetData(), this->Length() };
         }
 
-        [[nodiscard]] operator TView() const noexcept { return ToView(); }
+        [[nodiscard]]      operator TView() const noexcept { return ToView(); }
 
         [[nodiscard]] auto CStr() const noexcept -> const TValueType* {
             if (this->IsEmpty()) {
@@ -259,7 +258,7 @@ namespace AltinaEngine::Core::Container {
             return lhs;
         }
 
-        void          ToLower() {
+        void ToLower() {
             TransformCharacters(
                 [](TValueType Character) -> TValueType { return LowerChar(Character); });
         }
@@ -310,17 +309,61 @@ namespace AltinaEngine::Core::Container {
         }
 
         template <typename NumberT> void AppendNumberImpl(NumberT value) {
-            if constexpr (AltinaEngine::CSameAs<TValueType, char>) {
-                const auto text = std::to_string(value);
-                Append(text.c_str(), static_cast<usize>(text.size()));
-            } else if constexpr (AltinaEngine::CSameAs<TValueType, wchar_t>) {
-                const auto text = std::to_wstring(value);
-                Append(text.c_str(), static_cast<usize>(text.size()));
+            // Format number into a stack buffer without pulling in any STL headers.
+            if constexpr (AltinaEngine::CSameAs<TValueType, wchar_t>) {
+                wchar_t buffer[128] = {};
+
+                int     written = 0;
+                if constexpr (AltinaEngine::TTypeIsFloatingPoint<NumberT>::Value) {
+                    if constexpr (AltinaEngine::CSameAs<NumberT, long double>) {
+                        written = Detail::swprintf(buffer, 128, L"%Lg", value);
+                    } else {
+                        written = Detail::swprintf(buffer, 128, L"%g", static_cast<double>(value));
+                    }
+                } else if constexpr (AltinaEngine::TTypeIsIntegral<NumberT>::Value) {
+                    if constexpr (AltinaEngine::TTypeIsSigned<NumberT>::Value) {
+                        written =
+                            Detail::swprintf(buffer, 128, L"%lld", static_cast<long long>(value));
+                    } else {
+                        written = Detail::swprintf(
+                            buffer, 128, L"%llu", static_cast<unsigned long long>(value));
+                    }
+                }
+
+                if (written > 0) {
+                    Append(buffer, static_cast<usize>(written));
+                }
             } else {
-                const auto text = std::to_string(value);
-                this->Reserve(this->Size() + text.size());
-                for (char c : text) {
-                    this->PushBack(static_cast<TValueType>(c));
+                char buffer[128] = {};
+
+                int  written = 0;
+                if constexpr (AltinaEngine::TTypeIsFloatingPoint<NumberT>::Value) {
+                    if constexpr (AltinaEngine::CSameAs<NumberT, long double>) {
+                        written = Detail::snprintf(buffer, 128, "%Lg", value);
+                    } else {
+                        written = Detail::snprintf(buffer, 128, "%g", static_cast<double>(value));
+                    }
+                } else if constexpr (AltinaEngine::TTypeIsIntegral<NumberT>::Value) {
+                    if constexpr (AltinaEngine::TTypeIsSigned<NumberT>::Value) {
+                        written =
+                            Detail::snprintf(buffer, 128, "%lld", static_cast<long long>(value));
+                    } else {
+                        written = Detail::snprintf(
+                            buffer, 128, "%llu", static_cast<unsigned long long>(value));
+                    }
+                }
+
+                if (written <= 0) {
+                    return;
+                }
+
+                if constexpr (AltinaEngine::CSameAs<TValueType, char>) {
+                    Append(buffer, static_cast<usize>(written));
+                } else {
+                    this->Reserve(this->Size() + static_cast<usize>(written));
+                    for (int i = 0; i < written; ++i) {
+                        this->PushBack(static_cast<TValueType>(buffer[i]));
+                    }
                 }
             }
         }
@@ -330,34 +373,32 @@ namespace AltinaEngine::Core::Container {
 } // namespace AltinaEngine::Core::Container
 
 namespace std {
-    template <typename CharT>
-    struct hash<AltinaEngine::Core::Container::TBasicStringView<CharT>> {
+    template <typename CharT> struct hash<AltinaEngine::Core::Container::TBasicStringView<CharT>> {
         auto operator()(
             const AltinaEngine::Core::Container::TBasicStringView<CharT>& value) const noexcept
-            -> size_t {
-            constexpr size_t kOffset =
-                (sizeof(size_t) == 8) ? 14695981039346656037ull : 2166136261u;
-            constexpr size_t kPrime =
-                (sizeof(size_t) == 8) ? 1099511628211ull : 16777619u;
+            -> AltinaEngine::usize {
+            constexpr AltinaEngine::usize kOffset =
+                (sizeof(AltinaEngine::usize) == 8) ? 14695981039346656037ull : 2166136261u;
+            constexpr AltinaEngine::usize kPrime =
+                (sizeof(AltinaEngine::usize) == 8) ? 1099511628211ull : 16777619u;
 
-            size_t hash = kOffset;
-            const auto* data = value.Data();
-            const auto  length = value.Length();
-            for (size_t i = 0; i < static_cast<size_t>(length); ++i) {
-                hash ^= static_cast<size_t>(
-                    static_cast<typename AltinaEngine::Core::Container::TBasicStringView<
-                        CharT>::TUnsigned>(data[i]));
+            AltinaEngine::usize hash   = kOffset;
+            const auto*         data   = value.Data();
+            const auto          length = value.Length();
+            for (AltinaEngine::usize i = 0; i < static_cast<AltinaEngine::usize>(length); ++i) {
+                hash ^= static_cast<AltinaEngine::usize>(static_cast<
+                    typename AltinaEngine::Core::Container::TBasicStringView<CharT>::TUnsigned>(
+                    data[i]));
                 hash *= kPrime;
             }
             return hash;
         }
     };
 
-    template <typename CharT>
-    struct hash<AltinaEngine::Core::Container::TBasicString<CharT>> {
+    template <typename CharT> struct hash<AltinaEngine::Core::Container::TBasicString<CharT>> {
         auto operator()(
             const AltinaEngine::Core::Container::TBasicString<CharT>& value) const noexcept
-            -> size_t {
+            -> AltinaEngine::usize {
             const auto view = AltinaEngine::Core::Container::TBasicStringView<CharT>(
                 value.GetData(), value.Length());
             return std::hash<AltinaEngine::Core::Container::TBasicStringView<CharT>>{}(view);

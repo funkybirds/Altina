@@ -15,8 +15,6 @@ namespace AltinaEngine::Core::Utility {
     template <typename... Args>
     void DebugAssert(
         bool condition, FStringView category, TFormatString<Args...> format, Args&&... args) {
-        // Debug-only assertion hook. In non-debug builds this is intentionally a no-op, but we
-        // still need to consume parameters to avoid /WX warnings.
         (void)condition;
         (void)category;
         (void)format;

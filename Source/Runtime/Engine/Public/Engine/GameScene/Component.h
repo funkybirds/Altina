@@ -30,6 +30,9 @@ namespace AltinaEngine::GameScene {
     protected:
         FComponent() = default;
 
+        [[nodiscard]] auto GetWorld() noexcept -> FWorld* { return mWorld; }
+        [[nodiscard]] auto GetWorld() const noexcept -> const FWorld* { return mWorld; }
+
     private:
         friend class FWorld;
         template <auto Member>

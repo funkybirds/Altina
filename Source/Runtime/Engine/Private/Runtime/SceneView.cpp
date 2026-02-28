@@ -119,10 +119,15 @@ namespace AltinaEngine::Engine {
                 transform.Rotation.RotateVector(Core::Math::FVector3f(0.0f, 0.0f, 1.0f));
 
             RenderCore::Lighting::FDirectionalLight light{};
-            light.DirectionWS  = forward;
-            light.Color        = component.mColor;
-            light.Intensity    = component.mIntensity;
-            light.bCastShadows = component.mCastShadows;
+            light.DirectionWS        = forward;
+            light.Color              = component.mColor;
+            light.Intensity          = component.mIntensity;
+            light.bCastShadows       = component.mCastShadows;
+            light.ShadowCascadeCount = component.mShadowCascadeCount;
+            light.ShadowSplitLambda  = component.mShadowSplitLambda;
+            light.ShadowMaxDistance  = component.mShadowMaxDistance;
+            light.ShadowMapSize      = component.mShadowMapSize;
+            light.ShadowReceiverBias = component.mShadowReceiverBias;
 
             outScene.Lights.bHasMainDirectionalLight = true;
             outScene.Lights.MainDirectionalLight     = light;
@@ -156,8 +161,13 @@ namespace AltinaEngine::Engine {
             outScene.Lights.MainDirectionalLight.DirectionWS =
                 Core::Math::FVector3f(0.4f, 0.6f, 0.7f);
             outScene.Lights.MainDirectionalLight.Color = Core::Math::FVector3f(1.0f, 1.0f, 1.0f);
-            outScene.Lights.MainDirectionalLight.Intensity    = 2.0f;
-            outScene.Lights.MainDirectionalLight.bCastShadows = false;
+            outScene.Lights.MainDirectionalLight.Intensity          = 2.0f;
+            outScene.Lights.MainDirectionalLight.bCastShadows       = false;
+            outScene.Lights.MainDirectionalLight.ShadowCascadeCount = 4U;
+            outScene.Lights.MainDirectionalLight.ShadowSplitLambda  = 0.65f;
+            outScene.Lights.MainDirectionalLight.ShadowMaxDistance  = 250.0f;
+            outScene.Lights.MainDirectionalLight.ShadowMapSize      = 2048U;
+            outScene.Lights.MainDirectionalLight.ShadowReceiverBias = 0.0015f;
         }
 
         // Sky cube: first enabled instance with a valid asset handle wins.

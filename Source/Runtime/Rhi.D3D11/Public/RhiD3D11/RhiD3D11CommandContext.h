@@ -48,8 +48,11 @@ namespace AltinaEngine::Rhi {
 
         [[nodiscard]] auto GetDeferredContext() const noexcept -> ID3D11DeviceContext*;
 
-    private:
+        // Implementation state (defined in the .cpp). Exposed as an incomplete type so translation
+        // units in this module can reference it without violating access control.
         struct FState;
+
+    private:
         FState*            mState = nullptr;
         FRhiCommandListRef mCommandList;
     };

@@ -19,6 +19,10 @@ namespace AltinaEngine::Rendering {
     AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rPostProcessBloomIntensity;
     AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rPostProcessBloomKawaseOffset;
     AE_RENDERING_API extern Core::Console::TConsoleVariable<i32> rPostProcessBloomIterations;
+    // If enabled, the first Bloom downsample pass (level 0 -> level 1) uses per-tap luma weighting
+    // (1 / (1 + luma)) to reduce the influence of very bright samples.
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<i32>
+        rPostProcessBloomFirstDownsampleLumaWeight;
 
     // FXAA tuning (used as defaults for the built-in FXAA node).
     AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rPostProcessFxaaEdgeThreshold;

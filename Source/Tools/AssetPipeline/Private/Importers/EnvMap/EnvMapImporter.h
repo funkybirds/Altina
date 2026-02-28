@@ -31,19 +31,25 @@ namespace AltinaEngine::Tools::AssetPipeline {
         -> bool;
 
     struct FSkyCubeCookResult {
-        std::vector<u8>     CookedBytes;
-        Asset::FCubeMapDesc Desc{};
-        std::vector<u8>     CookKeyExtras;
+        std::vector<u8>              CookedBytes;
+        Asset::FCubeMapDesc          Desc{};
+        std::vector<FGeneratedAsset> Generated;
+        std::vector<u8>              CookKeyExtras;
     };
 
     // Skybox-only importer (tool-only): reads OpenEXR .exr (equirectangular) and cooks a CubeMap.
     auto CookSkyCubeFromExr(const std::filesystem::path& sourcePath,
-        const std::vector<u8>& sourceBytes, FSkyCubeCookResult& outResult, std::string& outError)
+        const std::vector<u8>& sourceBytes, const Asset::FAssetHandle& baseHandle,
+        const std::string& baseVirtualPath, FSkyCubeCookResult& outResult, std::string& outError)
         -> bool;
 
     // Skybox-only importer (tool-only): reads Radiance RGBE .hdr (equirectangular) and cooks a
     // CubeMap.
     auto CookSkyCubeFromHdr(const std::filesystem::path& sourcePath,
-        const std::vector<u8>& sourceBytes, FSkyCubeCookResult& outResult, std::string& outError)
+        const std::vector<u8>& sourceBytes, const Asset::FAssetHandle& baseHandle,
+        const std::string& baseVirtualPath, FSkyCubeCookResult& outResult, std::string& outError)
         -> bool;
+
+    // Tool-only self test used by CTest to validate EnvMap cooking determinism.
+    auto RunEnvMapSelfTest(std::string& outError) -> bool;
 } // namespace AltinaEngine::Tools::AssetPipeline

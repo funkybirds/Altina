@@ -21,6 +21,9 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto GetId() const noexcept -> FGameObjectId { return mId; }
 
         template <typename T> [[nodiscard]] auto AddComponent() -> TComponentRef<T>;
+        // Optional init hook that runs after Initialize(...) but before OnCreate/OnEnable.
+        template <typename T, typename InitFn>
+        [[nodiscard]] auto                       AddComponent(InitFn&& init) -> TComponentRef<T>;
         template <typename T> [[nodiscard]] auto HasComponent() const -> bool;
         template <typename T> [[nodiscard]] auto GetComponent() const -> TComponentRef<T>;
         template <typename T> void               RemoveComponent();

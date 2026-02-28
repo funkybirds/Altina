@@ -3,6 +3,9 @@
 #include "Asset/AssetBinary.h"
 #include "Asset/Texture2DLoader.h"
 #include "AssetToolIO.h"
+#include "Jobs/JobSystem.h"
+#include "Threading/Atomic.h"
+#include "Threading/Event.h"
 #include "Utility/Json.h"
 #include "Utility/Uuid.h"
 
@@ -20,18 +23,27 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <iostream>
 #include <limits>
 #include <sstream>
 #include <string_view>
+#include <thread>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Tools::AssetPipeline {
     namespace {
         using Core::Container::FNativeString;
         using Core::Container::FNativeStringView;
+        using Core::Container::TFunction;
+        using Core::Jobs::FWorkerPool;
+        using Core::Jobs::FWorkerPoolConfig;
+        using Core::Threading::EEventResetMode;
+        using Core::Threading::FEvent;
+        using Core::Threading::TAtomic;
         using Core::Utility::Json::EJsonType;
         using Core::Utility::Json::FindObjectValueInsensitive;
         using Core::Utility::Json::FJsonDocument;
@@ -74,6 +86,58 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return (len > 0.0f) ? Div(v, len) : FVector3{};
         }
         [[nodiscard]] auto Clamp01(float v) -> float { return std::min(1.0f, std::max(0.0f, v)); }
+
+        struct FEnvMapThreadContext {
+            FWorkerPool* Pool        = nullptr;
+            u32          ThreadCount = 1U;
+            u32          GrainRows   = 1U;
+        };
+
+        template <typename Fn>
+        auto ParallelForRows(const FEnvMapThreadContext& ctx, u32 rowCount, Fn&& fn) -> void {
+            if (rowCount == 0U) {
+                return;
+            }
+
+            // ThreadCount==1 or no pool: run sequentially (also avoids job system overhead).
+            if (ctx.Pool == nullptr || ctx.ThreadCount <= 1U) {
+                for (u32 y = 0; y < rowCount; ++y) {
+                    fn(y);
+                }
+                return;
+            }
+
+            const u32    grain = std::max(1U, ctx.GrainRows);
+
+            // Dynamic scheduling: each worker grabs a chunk of rows. Deterministic because each row
+            // writes a disjoint output region and per-pixel accumulation order is unchanged.
+            TAtomic<i32> nextRow{ 0 };
+            TAtomic<i32> remaining{ static_cast<i32>(ctx.ThreadCount) };
+            FEvent       done{ false, EEventResetMode::Manual };
+
+            for (u32 t = 0; t < ctx.ThreadCount; ++t) {
+                ctx.Pool->Submit(TFunction<void()>([&]() -> void {
+                    for (;;) {
+                        const i32 start = nextRow.FetchAdd(static_cast<i32>(grain));
+                        if (start >= static_cast<i32>(rowCount)) {
+                            break;
+                        }
+                        const i32 end =
+                            std::min(start + static_cast<i32>(grain), static_cast<i32>(rowCount));
+                        for (i32 y = start; y < end; ++y) {
+                            fn(static_cast<u32>(y));
+                        }
+                    }
+
+                    const i32 prev = remaining.FetchSub(1);
+                    if (prev == 1) {
+                        done.Set();
+                    }
+                }));
+            }
+
+            done.Wait();
+        }
 
         struct FHDRImage {
             u32                Width  = 0;
@@ -174,6 +238,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return MakeVec3(image.Rgb[index + 0], image.Rgb[index + 1], image.Rgb[index + 2]);
         }
 
+        [[nodiscard]] auto GetPixelUnchecked(const FHDRImage& image, u32 x, u32 y) -> FVector3 {
+            const size_t index =
+                (static_cast<size_t>(y) * static_cast<size_t>(image.Width) + x) * 3U;
+            return MakeVec3(image.Rgb[index + 0], image.Rgb[index + 1], image.Rgb[index + 2]);
+        }
+
         [[nodiscard]] auto Lerp(const FVector3& a, const FVector3& b, float t) -> FVector3 {
             return Add(Mul(a, 1.0f - t), Mul(b, t));
         }
@@ -190,17 +260,34 @@ namespace AltinaEngine::Tools::AssetPipeline {
             const float x = uu * static_cast<float>(image.Width);
             const float y = vv * static_cast<float>(image.Height);
 
-            const int   x0 = static_cast<int>(std::floor(x)) % static_cast<int>(image.Width);
-            const int   y0 = static_cast<int>(std::floor(y));
-            const int   x1 = (x0 + 1) % static_cast<int>(image.Width);
-            const int   y1 = std::min(static_cast<int>(image.Height) - 1, y0 + 1);
-            const float tx = x - std::floor(x);
-            const float ty = y - std::floor(y);
+            const float xf = std::floor(x);
+            const float yf = std::floor(y);
 
-            const auto  c00 = GetPixel(image, static_cast<u32>(x0), static_cast<u32>(y0));
-            const auto  c10 = GetPixel(image, static_cast<u32>(x1), static_cast<u32>(y0));
-            const auto  c01 = GetPixel(image, static_cast<u32>(x0), static_cast<u32>(y1));
-            const auto  c11 = GetPixel(image, static_cast<u32>(x1), static_cast<u32>(y1));
+            int         x0 = static_cast<int>(xf);
+            int         y0 = static_cast<int>(yf);
+            if (x0 >= static_cast<int>(image.Width)) {
+                // Preserve modulo wrap behavior when uu ends up exactly 1.0 due to float rounding.
+                x0 -= static_cast<int>(image.Width);
+            }
+
+            int x1 = x0 + 1;
+            if (x1 >= static_cast<int>(image.Width)) {
+                x1 = 0;
+            }
+
+            const int yMax = static_cast<int>(image.Height) - 1;
+            const int y1   = std::min(yMax, y0 + 1);
+            if (y0 > yMax) {
+                y0 = yMax;
+            }
+
+            const float tx = x - xf;
+            const float ty = y - yf;
+
+            const auto  c00 = GetPixelUnchecked(image, static_cast<u32>(x0), static_cast<u32>(y0));
+            const auto  c10 = GetPixelUnchecked(image, static_cast<u32>(x1), static_cast<u32>(y0));
+            const auto  c01 = GetPixelUnchecked(image, static_cast<u32>(x0), static_cast<u32>(y1));
+            const auto  c11 = GetPixelUnchecked(image, static_cast<u32>(x1), static_cast<u32>(y1));
 
             const auto  cx0 = Lerp(c00, c10, tx);
             const auto  cx1 = Lerp(c01, c11, tx);
@@ -1014,6 +1101,16 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return { x, y };
         }
 
+        [[nodiscard]] auto BuildHammersleySequence(u32 sampleCount)
+            -> std::vector<std::pair<float, float>> {
+            std::vector<std::pair<float, float>> seq;
+            seq.reserve(sampleCount);
+            for (u32 i = 0; i < sampleCount; ++i) {
+                seq.push_back(Hammersley(i, sampleCount));
+            }
+            return seq;
+        }
+
         [[nodiscard]] auto BuildTangentBasis(const FVector3& n, FVector3& outT, FVector3& outB)
             -> void {
             const FVector3 up =
@@ -1050,6 +1147,23 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return Normalize(hWorld);
         }
 
+        [[nodiscard]] auto ImportanceSampleGGX(float u1, float u2, const FVector3& n,
+            const FVector3& t, const FVector3& b, float roughness) -> FVector3 {
+            const float    a  = std::max(roughness * roughness, 0.001f);
+            const float    a2 = a * a;
+
+            const float    phi      = kTwoPi * u1;
+            const float    cosTheta = std::sqrt((1.0f - u2) / (1.0f + (a2 - 1.0f) * u2));
+            const float    sinTheta = std::sqrt(std::max(0.0f, 1.0f - cosTheta * cosTheta));
+
+            const FVector3 hTangent =
+                MakeVec3(std::cos(phi) * sinTheta, std::sin(phi) * sinTheta, cosTheta);
+
+            const FVector3 hWorld =
+                Add(Add(Mul(t, hTangent.x), Mul(b, hTangent.y)), Mul(n, hTangent.z));
+            return Normalize(hWorld);
+        }
+
         [[nodiscard]] auto D_GGX(float nDotH, float roughness) -> float {
             const float a     = std::max(roughness * roughness, 0.001f);
             const float a2    = a * a;
@@ -1069,10 +1183,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return ggx1 * ggx2;
         }
 
-        auto GenerateSkyboxFace(
-            const FHDRImage& src, ECubeFace face, u32 size, std::vector<float>& outRgb) -> bool {
+        auto GenerateSkyboxFace(const FHDRImage& src, ECubeFace face, u32 size,
+            std::vector<float>& outRgb, const FEnvMapThreadContext& threads) -> bool {
             outRgb.assign(static_cast<size_t>(size) * static_cast<size_t>(size) * 3U, 0.0f);
-            for (u32 y = 0; y < size; ++y) {
+            ParallelForRows(threads, size, [&](u32 y) -> void {
                 for (u32 x = 0; x < size; ++x) {
                     const FVector3 dir = FaceTexelToDir(face, x, y, size);
                     const auto [u, v]  = DirToEquirectUv(dir);
@@ -1084,14 +1198,16 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     outRgb[idx + 1] = c.y;
                     outRgb[idx + 2] = c.z;
                 }
-            }
+            });
             return true;
         }
 
-        auto GenerateIrradianceFace(const FHDRImage& src, ECubeFace face, u32 size, u32 sampleCount,
-            std::vector<float>& outRgb) -> bool {
+        auto GenerateIrradianceFace(const FHDRImage& src, ECubeFace face, u32 size,
+            const std::vector<std::pair<float, float>>& hammersley, std::vector<float>& outRgb,
+            const FEnvMapThreadContext& threads) -> bool {
             outRgb.assign(static_cast<size_t>(size) * static_cast<size_t>(size) * 3U, 0.0f);
-            for (u32 y = 0; y < size; ++y) {
+            const u32 sampleCount = static_cast<u32>(hammersley.size());
+            ParallelForRows(threads, size, [&](u32 y) -> void {
                 for (u32 x = 0; x < size; ++x) {
                     const FVector3 n = FaceTexelToDir(face, x, y, size);
                     FVector3       t, b;
@@ -1099,7 +1215,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
                     FVector3 accum{};
                     for (u32 i = 0; i < sampleCount; ++i) {
-                        const auto [u1, u2] = Hammersley(i, sampleCount);
+                        const auto [u1, u2] = hammersley[i];
                         const FVector3 h    = CosineSampleHemisphere(u1, u2); // local
                         const FVector3 l =
                             Normalize(Add(Add(Mul(t, h.x), Mul(b, h.y)), Mul(n, h.z)));
@@ -1107,7 +1223,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         accum               = Add(accum, SampleEquirectBilinear(src, eu, ev));
                     }
 
-                    const FVector3 irradiance = Div(accum, static_cast<float>(sampleCount));
+                    const FVector3 irradiance = (sampleCount > 0U)
+                        ? Div(accum, static_cast<float>(sampleCount))
+                        : FVector3{};
                     const size_t   idx        = (static_cast<size_t>(y) * static_cast<size_t>(size)
                                            + static_cast<size_t>(x))
                         * 3U;
@@ -1115,23 +1233,27 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     outRgb[idx + 1] = irradiance.y;
                     outRgb[idx + 2] = irradiance.z;
                 }
-            }
+            });
             return true;
         }
 
         auto GenerateSpecularPrefilterMip(const FHDRImage& src, ECubeFace face, u32 size,
-            u32 sampleCount, float roughness, std::vector<float>& outRgb) -> bool {
+            const std::vector<std::pair<float, float>>& hammersley, float roughness,
+            std::vector<float>& outRgb, const FEnvMapThreadContext& threads) -> bool {
             outRgb.assign(static_cast<size_t>(size) * static_cast<size_t>(size) * 3U, 0.0f);
-            for (u32 y = 0; y < size; ++y) {
+            const u32 sampleCount = static_cast<u32>(hammersley.size());
+            ParallelForRows(threads, size, [&](u32 y) -> void {
                 for (u32 x = 0; x < size; ++x) {
                     const FVector3 n = FaceTexelToDir(face, x, y, size);
                     const FVector3 v = n;
+                    FVector3       t, b;
+                    BuildTangentBasis(n, t, b);
 
-                    FVector3       prefiltered{};
-                    float          totalWeight = 0.0f;
+                    FVector3 prefiltered{};
+                    float    totalWeight = 0.0f;
                     for (u32 i = 0; i < sampleCount; ++i) {
-                        const auto [u1, u2]  = Hammersley(i, sampleCount);
-                        const FVector3 h     = ImportanceSampleGGX(u1, u2, n, roughness);
+                        const auto [u1, u2]  = hammersley[i];
+                        const FVector3 h     = ImportanceSampleGGX(u1, u2, n, t, b, roughness);
                         const float    vDotH = std::max(0.0f, Dot(v, h));
                         const FVector3 l     = Normalize(Sub(Mul(h, 2.0f * vDotH), v));
 
@@ -1160,20 +1282,21 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     outRgb[idx + 1] = color.y;
                     outRgb[idx + 2] = color.z;
                 }
-            }
+            });
             return true;
         }
 
-        [[nodiscard]] auto IntegrateBrdf(float nDotV, float roughness, u32 sampleCount)
-            -> std::pair<float, float> {
+        [[nodiscard]] auto IntegrateBrdf(float nDotV, float roughness,
+            const std::vector<std::pair<float, float>>& hammersley) -> std::pair<float, float> {
             const float    ndv = std::max(0.0f, std::min(1.0f, nDotV));
             const FVector3 v   = MakeVec3(std::sqrt(std::max(0.0f, 1.0f - ndv * ndv)), 0.0f, ndv);
             const FVector3 n   = MakeVec3(0.0f, 0.0f, 1.0f);
 
-            float          a = 0.0f;
-            float          b = 0.0f;
+            float          a           = 0.0f;
+            float          b           = 0.0f;
+            const u32      sampleCount = static_cast<u32>(hammersley.size());
             for (u32 i = 0; i < sampleCount; ++i) {
-                const auto [u1, u2]  = Hammersley(i, sampleCount);
+                const auto [u1, u2]  = hammersley[i];
                 const FVector3 h     = ImportanceSampleGGX(u1, u2, n, roughness);
                 const float    vDotH = std::max(0.0f, Dot(v, h));
                 const FVector3 l     = Normalize(Sub(Mul(h, 2.0f * vDotH), v));
@@ -1195,16 +1318,17 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return { Clamp01(a * inv), Clamp01(b * inv) };
         }
 
-        auto BuildBrdfLutRgba8(u32 size, u32 sampleCount, std::vector<u8>& outRgba) -> bool {
+        auto BuildBrdfLutRgba8(u32 size, const std::vector<std::pair<float, float>>& hammersley,
+            std::vector<u8>& outRgba, const FEnvMapThreadContext& threads) -> bool {
             outRgba.assign(static_cast<size_t>(size) * static_cast<size_t>(size) * 4U, 0U);
-            for (u32 y = 0; y < size; ++y) {
+            ParallelForRows(threads, size, [&](u32 y) -> void {
                 const float roughness =
                     (size > 1U) ? (static_cast<float>(y) / static_cast<float>(size - 1U)) : 0.0f;
                 for (u32 x = 0; x < size; ++x) {
                     const float nDotV = (size > 1U)
                         ? (static_cast<float>(x) / static_cast<float>(size - 1U))
                         : 0.0f;
-                    const auto [a, b] = IntegrateBrdf(nDotV, roughness, sampleCount);
+                    const auto [a, b] = IntegrateBrdf(nDotV, roughness, hammersley);
                     const size_t idx  = (static_cast<size_t>(y) * static_cast<size_t>(size)
                                            + static_cast<size_t>(x))
                         * 4U;
@@ -1215,7 +1339,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     outRgba[idx + 2] = 0U;
                     outRgba[idx + 3] = 255U;
                 }
-            }
+            });
             return true;
         }
 
@@ -1235,7 +1359,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             const std::string& derivedVirtualPath, const std::vector<u8>& cookedBytes,
             const Asset::FTexture2DDesc& desc, std::vector<FGeneratedAsset>& outGenerated,
             std::string& outError) -> bool {
-            if (!baseHandle.IsValid() || baseHandle.Type != Asset::EAssetType::Texture2D) {
+            if (!baseHandle.IsValid() || baseHandle.Type == Asset::EAssetType::Unknown) {
                 outError = "Invalid base handle.";
                 return false;
             }
@@ -1259,6 +1383,34 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return true;
         }
 
+        auto AddGeneratedCubeMap(const Asset::FAssetHandle& baseHandle,
+            const std::string& derivedVirtualPath, const std::vector<u8>& cookedBytes,
+            const Asset::FCubeMapDesc& desc, std::vector<FGeneratedAsset>& outGenerated,
+            std::string& outError) -> bool {
+            if (!baseHandle.IsValid() || baseHandle.Type == Asset::EAssetType::Unknown) {
+                outError = "Invalid base handle.";
+                return false;
+            }
+            if (derivedVirtualPath.empty()) {
+                outError = "Derived virtual path is empty.";
+                return false;
+            }
+
+            const FUuid         derivedUuid = MakeDerivedUuid(baseHandle.Uuid, derivedVirtualPath);
+            Asset::FAssetHandle handle{};
+            handle.Uuid = derivedUuid;
+            handle.Type = Asset::EAssetType::CubeMap;
+
+            FGeneratedAsset gen{};
+            gen.Handle      = handle;
+            gen.Type        = Asset::EAssetType::CubeMap;
+            gen.VirtualPath = derivedVirtualPath;
+            gen.CookedBytes = cookedBytes;
+            gen.CubeMapDesc = desc;
+            outGenerated.push_back(Move(gen));
+            return true;
+        }
+
         struct FCookExtrasV1 {
             u32 Magic           = 0x50414D45U; // "EMAP"
             u32 Version         = 1U;
@@ -1272,11 +1424,39 @@ namespace AltinaEngine::Tools::AssetPipeline {
             u32 Flags = 0; // bit0 base, bit1 skybox, bit2 irradiance, bit3 specular, bit4 brdf
         };
 
-        constexpr u32 kFlagBase = 1u << 0;
-        constexpr u32 kFlagSky  = 1u << 1;
-        constexpr u32 kFlagDiff = 1u << 2;
-        constexpr u32 kFlagSpec = 1u << 3;
-        constexpr u32 kFlagBrdf = 1u << 4;
+        constexpr u32      kFlagBase = 1u << 0;
+        constexpr u32      kFlagSky  = 1u << 1;
+        constexpr u32      kFlagDiff = 1u << 2;
+        constexpr u32      kFlagSpec = 1u << 3;
+        constexpr u32      kFlagBrdf = 1u << 4;
+
+        [[nodiscard]] auto ClampU32(u32 v, u32 lo, u32 hi) noexcept -> u32 {
+            return std::min(hi, std::max(lo, v));
+        }
+
+        [[nodiscard]] auto DefaultCookThreadCount() noexcept -> u32 {
+            const unsigned hc = std::thread::hardware_concurrency();
+            const u32      t  = (hc > 0U) ? static_cast<u32>(hc) : 1U;
+            return ClampU32(t, 1U, 16U);
+        }
+
+        [[nodiscard]] auto DefaultGrainRowsForSize(u32 size) noexcept -> u32 {
+            // Favor slightly larger grains to reduce job scheduling overhead for larger targets.
+            return (size >= 64U) ? 4U : 1U;
+        }
+
+        [[nodiscard]] auto NowMs() noexcept -> u64 {
+            const auto now = std::chrono::steady_clock::now().time_since_epoch();
+            return static_cast<u64>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(now).count());
+        }
+
+        auto PrintEnvMapTiming(const char* stage, u64 timeMs, u32 threads, u32 size, u32 samples)
+            -> void {
+            std::cout << "[AssetTool][EnvMapTiming]"
+                      << " stage=" << stage << " size=" << size << " samples=" << samples
+                      << " threads=" << threads << " timeMs=" << timeMs << "\n";
+        }
     } // namespace
 
     auto CookEnvMapFromHdr(const std::filesystem::path& sourcePath,
@@ -1306,6 +1486,22 @@ namespace AltinaEngine::Tools::AssetPipeline {
         if (!DecodeRadianceHdr(sourceBytes, image, outError)) {
             return false;
         }
+
+        const u32         threadCount = DefaultCookThreadCount();
+        FWorkerPoolConfig poolCfg{};
+        poolCfg.mMinThreads = threadCount;
+        poolCfg.mMaxThreads = threadCount;
+        FWorkerPool pool(poolCfg);
+        if (threadCount > 1U) {
+            pool.Start();
+        }
+        const auto MakeThreads = [&](u32 size) -> FEnvMapThreadContext {
+            FEnvMapThreadContext ctx{};
+            ctx.Pool        = (threadCount > 1U) ? &pool : nullptr;
+            ctx.ThreadCount = threadCount;
+            ctx.GrainRows   = DefaultGrainRowsForSize(size);
+            return ctx;
+        };
 
         // Base cooked asset: RGBE-encoded equirectangular. Stored as a regular Texture2D (RGBA8,
         // SRGB=false).
@@ -1363,11 +1559,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
         if (options.GenerateSkybox) {
             const u32 size     = options.SkyboxSize;
             const u32 mipCount = FullMipCount(size);
+            const u64 skyT0    = NowMs();
             for (u32 f = 0; f < 6U; ++f) {
                 std::vector<std::vector<float>> mipChain;
                 mipChain.resize(mipCount);
 
-                if (!GenerateSkyboxFace(image, static_cast<ECubeFace>(f), size, mipChain[0])) {
+                if (!GenerateSkyboxFace(
+                        image, static_cast<ECubeFace>(f), size, mipChain[0], MakeThreads(size))) {
                     outError = "Failed to generate skybox face.";
                     return false;
                 }
@@ -1404,16 +1602,19 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return false;
                 }
             }
+            PrintEnvMapTiming("SkyboxFaces", NowMs() - skyT0, threadCount, size, 0U);
         }
 
         if (options.GenerateIrradiance) {
-            const u32 size = options.IrradianceSize;
+            const u32  size       = options.IrradianceSize;
+            const auto diffuseSeq = BuildHammersleySequence(options.DiffuseSamples);
+            const u64  irrT0      = NowMs();
             for (u32 f = 0; f < 6U; ++f) {
                 std::vector<std::vector<float>> mipChain;
                 mipChain.resize(1);
 
-                if (!GenerateIrradianceFace(image, static_cast<ECubeFace>(f), size,
-                        options.DiffuseSamples, mipChain[0])) {
+                if (!GenerateIrradianceFace(image, static_cast<ECubeFace>(f), size, diffuseSeq,
+                        mipChain[0], MakeThreads(size))) {
                     outError = "Failed to generate irradiance face.";
                     return false;
                 }
@@ -1438,11 +1639,15 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return false;
                 }
             }
+            PrintEnvMapTiming(
+                "IrradianceFaces", NowMs() - irrT0, threadCount, size, options.DiffuseSamples);
         }
 
         if (options.GenerateSpecular) {
-            const u32 baseSize = options.SpecularSize;
-            const u32 mipCount = FullMipCount(baseSize);
+            const u32  baseSize = options.SpecularSize;
+            const u32  mipCount = FullMipCount(baseSize);
+            const auto specSeq  = BuildHammersleySequence(options.SpecularSamples);
+            const u64  specT0   = NowMs();
             for (u32 f = 0; f < 6U; ++f) {
                 std::vector<std::vector<float>> mipChain;
                 mipChain.resize(mipCount);
@@ -1455,7 +1660,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     const float r         = std::max(roughness, 0.001f);
 
                     if (!GenerateSpecularPrefilterMip(image, static_cast<ECubeFace>(f), mipSize,
-                            options.SpecularSamples, r, mipChain[mip])) {
+                            specSeq, r, mipChain[mip], MakeThreads(mipSize))) {
                         outError = "Failed to generate specular prefilter mip.";
                         return false;
                     }
@@ -1481,14 +1686,21 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return false;
                 }
             }
+            PrintEnvMapTiming(
+                "SpecularFaces", NowMs() - specT0, threadCount, baseSize, options.SpecularSamples);
         }
 
         if (options.GenerateBrdfLut) {
+            const auto      brdfSeq = BuildHammersleySequence(options.BrdfSamples);
             std::vector<u8> rgba;
-            if (!BuildBrdfLutRgba8(options.BrdfLutSize, options.BrdfSamples, rgba)) {
+            const u64       brdfT0 = NowMs();
+            if (!BuildBrdfLutRgba8(
+                    options.BrdfLutSize, brdfSeq, rgba, MakeThreads(options.BrdfLutSize))) {
                 outError = "Failed to build BRDF LUT.";
                 return false;
             }
+            PrintEnvMapTiming(
+                "BrdfLut", NowMs() - brdfT0, threadCount, options.BrdfLutSize, options.BrdfSamples);
 
             std::vector<u8>       cooked;
             Asset::FTexture2DDesc desc{};
@@ -1536,10 +1748,20 @@ namespace AltinaEngine::Tools::AssetPipeline {
     }
 
     auto CookSkyCubeFromExr(const std::filesystem::path& sourcePath,
-        const std::vector<u8>& sourceBytes, FSkyCubeCookResult& outResult, std::string& outError)
+        const std::vector<u8>& sourceBytes, const Asset::FAssetHandle& baseHandle,
+        const std::string& baseVirtualPath, FSkyCubeCookResult& outResult, std::string& outError)
         -> bool {
         outResult = {};
         outError.clear();
+
+        if (!baseHandle.IsValid() || baseHandle.Type != Asset::EAssetType::CubeMap) {
+            outError = "Base handle must be a valid CubeMap handle.";
+            return false;
+        }
+        if (baseVirtualPath.empty()) {
+            outError = "Base virtual path is empty.";
+            return false;
+        }
 
         FEnvMapCookOptions options{};
         std::string        optError;
@@ -1553,24 +1775,42 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return false;
         }
 
-        const u32 size = options.SkyboxSize;
-        if (size == 0U) {
+        const u32         threadCount = DefaultCookThreadCount();
+        FWorkerPoolConfig poolCfg{};
+        poolCfg.mMinThreads = threadCount;
+        poolCfg.mMaxThreads = threadCount;
+        FWorkerPool pool(poolCfg);
+        if (threadCount > 1U) {
+            pool.Start();
+        }
+        const auto MakeThreads = [&](u32 size) -> FEnvMapThreadContext {
+            FEnvMapThreadContext ctx{};
+            ctx.Pool        = (threadCount > 1U) ? &pool : nullptr;
+            ctx.ThreadCount = threadCount;
+            ctx.GrainRows   = DefaultGrainRowsForSize(size);
+            return ctx;
+        };
+
+        const u32 skySize = options.SkyboxSize;
+        if (skySize == 0U) {
             outError = "EnvMapSkyboxSize must be > 0.";
             return false;
         }
 
-        const u32                                      mipCount = FullMipCount(size);
+        const u32                                      mipCount = FullMipCount(skySize);
         std::array<std::vector<std::vector<float>>, 6> faceMipChains;
+        const u64                                      skyT0 = NowMs();
         for (u32 f = 0U; f < 6U; ++f) {
             faceMipChains[f].resize(mipCount);
 
-            if (!GenerateSkyboxFace(image, static_cast<ECubeFace>(f), size, faceMipChains[f][0])) {
+            if (!GenerateSkyboxFace(image, static_cast<ECubeFace>(f), skySize, faceMipChains[f][0],
+                    MakeThreads(skySize))) {
                 outError = "Failed to generate skybox face.";
                 return false;
             }
 
-            u32 w = size;
-            u32 h = size;
+            u32 w = skySize;
+            u32 h = skySize;
             for (u32 mip = 1U; mip < mipCount; ++mip) {
                 u32 nw = 0U, nh = 0U;
                 if (!DownsampleBox2x(
@@ -1582,29 +1822,191 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 h = nh;
             }
         }
+        PrintEnvMapTiming("Skybox", NowMs() - skyT0, threadCount, skySize, 0U);
 
         std::vector<u8>     cooked;
         Asset::FCubeMapDesc desc{};
         std::string         cookError;
-        if (!BuildCubeMapRgba16fBlobFromMipChains(size, faceMipChains, cooked, desc, cookError)) {
+        if (!BuildCubeMapRgba16fBlobFromMipChains(
+                skySize, faceMipChains, cooked, desc, cookError)) {
             outError = cookError;
             return false;
         }
 
-        // Stable cook key extras: options relevant to cube generation.
-        outResult.CookKeyExtras.resize(sizeof(u32));
-        std::memcpy(outResult.CookKeyExtras.data(), &options.SkyboxSize, sizeof(u32));
-
         outResult.CookedBytes = Move(cooked);
         outResult.Desc        = desc;
+
+        auto MakeDerivedPath = [&](const char* leaf) -> std::string {
+            std::string vpath = baseVirtualPath;
+            if (!vpath.empty() && vpath.back() != '/') {
+                vpath.push_back('/');
+            }
+            vpath.append(leaf);
+            return vpath;
+        };
+
+        // Optional derived IBL products (CubeMap + Texture2D).
+        if (options.GenerateIrradiance) {
+            const u32 irrSize = options.IrradianceSize;
+            if (irrSize == 0U) {
+                outError = "EnvMapIrradianceSize must be > 0.";
+                return false;
+            }
+
+            const auto diffuseSeq  = BuildHammersleySequence(options.DiffuseSamples);
+            const u32  irrMipCount = FullMipCount(irrSize);
+            std::array<std::vector<std::vector<float>>, 6> irrMipChains;
+            const u64                                      irrT0 = NowMs();
+            for (u32 f = 0U; f < 6U; ++f) {
+                irrMipChains[f].resize(irrMipCount);
+                if (!GenerateIrradianceFace(image, static_cast<ECubeFace>(f), irrSize, diffuseSeq,
+                        irrMipChains[f][0], MakeThreads(irrSize))) {
+                    outError = "Failed to generate irradiance face.";
+                    return false;
+                }
+
+                u32 w = irrSize;
+                u32 h = irrSize;
+                for (u32 mip = 1U; mip < irrMipCount; ++mip) {
+                    u32 nw = 0U, nh = 0U;
+                    if (!DownsampleBox2x(
+                            irrMipChains[f][mip - 1U], w, h, irrMipChains[f][mip], nw, nh)) {
+                        outError = "Failed to downsample irradiance mip.";
+                        return false;
+                    }
+                    w = nw;
+                    h = nh;
+                }
+            }
+            PrintEnvMapTiming(
+                "Irradiance", NowMs() - irrT0, threadCount, irrSize, options.DiffuseSamples);
+
+            std::vector<u8>     irrCooked;
+            Asset::FCubeMapDesc irrDesc{};
+            std::string         irrErr;
+            if (!BuildCubeMapRgba16fBlobFromMipChains(
+                    irrSize, irrMipChains, irrCooked, irrDesc, irrErr)) {
+                outError = irrErr;
+                return false;
+            }
+
+            const std::string vpath = MakeDerivedPath("irradiance");
+            if (!AddGeneratedCubeMap(
+                    baseHandle, vpath, irrCooked, irrDesc, outResult.Generated, outError)) {
+                return false;
+            }
+        }
+
+        if (options.GenerateSpecular) {
+            const u32 specSize = options.SpecularSize;
+            if (specSize == 0U) {
+                outError = "EnvMapSpecularSize must be > 0.";
+                return false;
+            }
+
+            const auto specSeq      = BuildHammersleySequence(options.SpecularSamples);
+            const u32  specMipCount = FullMipCount(specSize);
+            std::array<std::vector<std::vector<float>>, 6> specMipChains;
+            const u64                                      specT0 = NowMs();
+            for (u32 f = 0U; f < 6U; ++f) {
+                specMipChains[f].resize(specMipCount);
+                for (u32 mip = 0U; mip < specMipCount; ++mip) {
+                    const u32   dim       = std::max(1U, specSize >> mip);
+                    const float roughness = (specMipCount > 1U)
+                        ? (static_cast<float>(mip) / static_cast<float>(specMipCount - 1U))
+                        : 0.0f;
+                    if (!GenerateSpecularPrefilterMip(image, static_cast<ECubeFace>(f), dim,
+                            specSeq, roughness, specMipChains[f][mip], MakeThreads(dim))) {
+                        outError = "Failed to generate specular prefilter mip.";
+                        return false;
+                    }
+                }
+            }
+            PrintEnvMapTiming(
+                "Specular", NowMs() - specT0, threadCount, specSize, options.SpecularSamples);
+
+            std::vector<u8>     specCooked;
+            Asset::FCubeMapDesc specDesc{};
+            std::string         specErr;
+            if (!BuildCubeMapRgba16fBlobFromMipChains(
+                    specSize, specMipChains, specCooked, specDesc, specErr)) {
+                outError = specErr;
+                return false;
+            }
+
+            const std::string vpath = MakeDerivedPath("specular");
+            if (!AddGeneratedCubeMap(
+                    baseHandle, vpath, specCooked, specDesc, outResult.Generated, outError)) {
+                return false;
+            }
+        }
+
+        if (options.GenerateBrdfLut) {
+            const auto      brdfSeq = BuildHammersleySequence(options.BrdfSamples);
+            std::vector<u8> rgba;
+            const u64       brdfT0 = NowMs();
+            if (!BuildBrdfLutRgba8(
+                    options.BrdfLutSize, brdfSeq, rgba, MakeThreads(options.BrdfLutSize))) {
+                outError = "Failed to build BRDF LUT.";
+                return false;
+            }
+            PrintEnvMapTiming(
+                "BrdfLut", NowMs() - brdfT0, threadCount, options.BrdfLutSize, options.BrdfSamples);
+
+            std::vector<u8>       lutCooked;
+            Asset::FTexture2DDesc lutDesc{};
+            std::string           blobError;
+            if (!BuildTexture2DBlobFromRgba8(options.BrdfLutSize, options.BrdfLutSize, rgba, false,
+                    lutCooked, lutDesc, blobError)) {
+                outError = blobError;
+                return false;
+            }
+            if (!ValidateCookedTexture2D(lutCooked, lutDesc)) {
+                outError = "BRDF LUT Texture2D failed to validate.";
+                return false;
+            }
+
+            const std::string vpath = MakeDerivedPath("brdf_lut");
+            if (!AddGeneratedTexture(
+                    baseHandle, vpath, lutCooked, lutDesc, outResult.Generated, outError)) {
+                return false;
+            }
+        }
+
+        // Stable cook key extras: include generation settings so the cook cache invalidates.
+        FCookExtrasV1 extras{};
+        extras.SkyboxSize      = options.SkyboxSize;
+        extras.IrradianceSize  = options.IrradianceSize;
+        extras.SpecularSize    = options.SpecularSize;
+        extras.BrdfLutSize     = options.BrdfLutSize;
+        extras.DiffuseSamples  = options.DiffuseSamples;
+        extras.SpecularSamples = options.SpecularSamples;
+        extras.BrdfSamples     = options.BrdfSamples;
+        extras.Flags |= kFlagSky;
+        extras.Flags |= options.GenerateIrradiance ? kFlagDiff : 0U;
+        extras.Flags |= options.GenerateSpecular ? kFlagSpec : 0U;
+        extras.Flags |= options.GenerateBrdfLut ? kFlagBrdf : 0U;
+
+        outResult.CookKeyExtras.resize(sizeof(extras));
+        std::memcpy(outResult.CookKeyExtras.data(), &extras, sizeof(extras));
         return true;
     }
 
     auto CookSkyCubeFromHdr(const std::filesystem::path& sourcePath,
-        const std::vector<u8>& sourceBytes, FSkyCubeCookResult& outResult, std::string& outError)
+        const std::vector<u8>& sourceBytes, const Asset::FAssetHandle& baseHandle,
+        const std::string& baseVirtualPath, FSkyCubeCookResult& outResult, std::string& outError)
         -> bool {
         outResult = {};
         outError.clear();
+
+        if (!baseHandle.IsValid() || baseHandle.Type != Asset::EAssetType::CubeMap) {
+            outError = "Base handle must be a valid CubeMap handle.";
+            return false;
+        }
+        if (baseVirtualPath.empty()) {
+            outError = "Base virtual path is empty.";
+            return false;
+        }
 
         FEnvMapCookOptions options{};
         std::string        optError;
@@ -1618,24 +2020,42 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return false;
         }
 
-        const u32 size = options.SkyboxSize;
-        if (size == 0U) {
+        const u32         threadCount = DefaultCookThreadCount();
+        FWorkerPoolConfig poolCfg{};
+        poolCfg.mMinThreads = threadCount;
+        poolCfg.mMaxThreads = threadCount;
+        FWorkerPool pool(poolCfg);
+        if (threadCount > 1U) {
+            pool.Start();
+        }
+        const auto MakeThreads = [&](u32 size) -> FEnvMapThreadContext {
+            FEnvMapThreadContext ctx{};
+            ctx.Pool        = (threadCount > 1U) ? &pool : nullptr;
+            ctx.ThreadCount = threadCount;
+            ctx.GrainRows   = DefaultGrainRowsForSize(size);
+            return ctx;
+        };
+
+        const u32 skySize = options.SkyboxSize;
+        if (skySize == 0U) {
             outError = "EnvMapSkyboxSize must be > 0.";
             return false;
         }
 
-        const u32                                      mipCount = FullMipCount(size);
+        const u32                                      mipCount = FullMipCount(skySize);
         std::array<std::vector<std::vector<float>>, 6> faceMipChains;
+        const u64                                      skyT0 = NowMs();
         for (u32 f = 0U; f < 6U; ++f) {
             faceMipChains[f].resize(mipCount);
 
-            if (!GenerateSkyboxFace(image, static_cast<ECubeFace>(f), size, faceMipChains[f][0])) {
+            if (!GenerateSkyboxFace(image, static_cast<ECubeFace>(f), skySize, faceMipChains[f][0],
+                    MakeThreads(skySize))) {
                 outError = "Failed to generate skybox face.";
                 return false;
             }
 
-            u32 w = size;
-            u32 h = size;
+            u32 w = skySize;
+            u32 h = skySize;
             for (u32 mip = 1U; mip < mipCount; ++mip) {
                 u32 nw = 0U, nh = 0U;
                 if (!DownsampleBox2x(
@@ -1647,21 +2067,307 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 h = nh;
             }
         }
+        PrintEnvMapTiming("Skybox", NowMs() - skyT0, threadCount, skySize, 0U);
 
         std::vector<u8>     cooked;
         Asset::FCubeMapDesc desc{};
         std::string         cookError;
-        if (!BuildCubeMapRgba16fBlobFromMipChains(size, faceMipChains, cooked, desc, cookError)) {
+        if (!BuildCubeMapRgba16fBlobFromMipChains(
+                skySize, faceMipChains, cooked, desc, cookError)) {
             outError = cookError;
             return false;
         }
 
-        // Stable cook key extras: options relevant to cube generation.
-        outResult.CookKeyExtras.resize(sizeof(u32));
-        std::memcpy(outResult.CookKeyExtras.data(), &options.SkyboxSize, sizeof(u32));
-
         outResult.CookedBytes = Move(cooked);
         outResult.Desc        = desc;
+
+        auto MakeDerivedPath = [&](const char* leaf) -> std::string {
+            std::string vpath = baseVirtualPath;
+            if (!vpath.empty() && vpath.back() != '/') {
+                vpath.push_back('/');
+            }
+            vpath.append(leaf);
+            return vpath;
+        };
+
+        if (options.GenerateIrradiance) {
+            const u32 irrSize = options.IrradianceSize;
+            if (irrSize == 0U) {
+                outError = "EnvMapIrradianceSize must be > 0.";
+                return false;
+            }
+
+            const auto diffuseSeq  = BuildHammersleySequence(options.DiffuseSamples);
+            const u32  irrMipCount = FullMipCount(irrSize);
+            std::array<std::vector<std::vector<float>>, 6> irrMipChains;
+            const u64                                      irrT0 = NowMs();
+            for (u32 f = 0U; f < 6U; ++f) {
+                irrMipChains[f].resize(irrMipCount);
+                if (!GenerateIrradianceFace(image, static_cast<ECubeFace>(f), irrSize, diffuseSeq,
+                        irrMipChains[f][0], MakeThreads(irrSize))) {
+                    outError = "Failed to generate irradiance face.";
+                    return false;
+                }
+
+                u32 w = irrSize;
+                u32 h = irrSize;
+                for (u32 mip = 1U; mip < irrMipCount; ++mip) {
+                    u32 nw = 0U, nh = 0U;
+                    if (!DownsampleBox2x(
+                            irrMipChains[f][mip - 1U], w, h, irrMipChains[f][mip], nw, nh)) {
+                        outError = "Failed to downsample irradiance mip.";
+                        return false;
+                    }
+                    w = nw;
+                    h = nh;
+                }
+            }
+            PrintEnvMapTiming(
+                "Irradiance", NowMs() - irrT0, threadCount, irrSize, options.DiffuseSamples);
+
+            std::vector<u8>     irrCooked;
+            Asset::FCubeMapDesc irrDesc{};
+            std::string         irrErr;
+            if (!BuildCubeMapRgba16fBlobFromMipChains(
+                    irrSize, irrMipChains, irrCooked, irrDesc, irrErr)) {
+                outError = irrErr;
+                return false;
+            }
+
+            const std::string vpath = MakeDerivedPath("irradiance");
+            if (!AddGeneratedCubeMap(
+                    baseHandle, vpath, irrCooked, irrDesc, outResult.Generated, outError)) {
+                return false;
+            }
+        }
+
+        if (options.GenerateSpecular) {
+            const u32 specSize = options.SpecularSize;
+            if (specSize == 0U) {
+                outError = "EnvMapSpecularSize must be > 0.";
+                return false;
+            }
+
+            const auto specSeq      = BuildHammersleySequence(options.SpecularSamples);
+            const u32  specMipCount = FullMipCount(specSize);
+            std::array<std::vector<std::vector<float>>, 6> specMipChains;
+            const u64                                      specT0 = NowMs();
+            for (u32 f = 0U; f < 6U; ++f) {
+                specMipChains[f].resize(specMipCount);
+                for (u32 mip = 0U; mip < specMipCount; ++mip) {
+                    const u32   dim       = std::max(1U, specSize >> mip);
+                    const float roughness = (specMipCount > 1U)
+                        ? (static_cast<float>(mip) / static_cast<float>(specMipCount - 1U))
+                        : 0.0f;
+                    if (!GenerateSpecularPrefilterMip(image, static_cast<ECubeFace>(f), dim,
+                            specSeq, roughness, specMipChains[f][mip], MakeThreads(dim))) {
+                        outError = "Failed to generate specular prefilter mip.";
+                        return false;
+                    }
+                }
+            }
+            PrintEnvMapTiming(
+                "Specular", NowMs() - specT0, threadCount, specSize, options.SpecularSamples);
+
+            std::vector<u8>     specCooked;
+            Asset::FCubeMapDesc specDesc{};
+            std::string         specErr;
+            if (!BuildCubeMapRgba16fBlobFromMipChains(
+                    specSize, specMipChains, specCooked, specDesc, specErr)) {
+                outError = specErr;
+                return false;
+            }
+
+            const std::string vpath = MakeDerivedPath("specular");
+            if (!AddGeneratedCubeMap(
+                    baseHandle, vpath, specCooked, specDesc, outResult.Generated, outError)) {
+                return false;
+            }
+        }
+
+        if (options.GenerateBrdfLut) {
+            const auto      brdfSeq = BuildHammersleySequence(options.BrdfSamples);
+            std::vector<u8> rgba;
+            const u64       brdfT0 = NowMs();
+            if (!BuildBrdfLutRgba8(
+                    options.BrdfLutSize, brdfSeq, rgba, MakeThreads(options.BrdfLutSize))) {
+                outError = "Failed to build BRDF LUT.";
+                return false;
+            }
+            PrintEnvMapTiming(
+                "BrdfLut", NowMs() - brdfT0, threadCount, options.BrdfLutSize, options.BrdfSamples);
+
+            std::vector<u8>       lutCooked;
+            Asset::FTexture2DDesc lutDesc{};
+            std::string           blobError;
+            if (!BuildTexture2DBlobFromRgba8(options.BrdfLutSize, options.BrdfLutSize, rgba, false,
+                    lutCooked, lutDesc, blobError)) {
+                outError = blobError;
+                return false;
+            }
+            if (!ValidateCookedTexture2D(lutCooked, lutDesc)) {
+                outError = "BRDF LUT Texture2D failed to validate.";
+                return false;
+            }
+
+            const std::string vpath = MakeDerivedPath("brdf_lut");
+            if (!AddGeneratedTexture(
+                    baseHandle, vpath, lutCooked, lutDesc, outResult.Generated, outError)) {
+                return false;
+            }
+        }
+
+        FCookExtrasV1 extras{};
+        extras.SkyboxSize      = options.SkyboxSize;
+        extras.IrradianceSize  = options.IrradianceSize;
+        extras.SpecularSize    = options.SpecularSize;
+        extras.BrdfLutSize     = options.BrdfLutSize;
+        extras.DiffuseSamples  = options.DiffuseSamples;
+        extras.SpecularSamples = options.SpecularSamples;
+        extras.BrdfSamples     = options.BrdfSamples;
+        extras.Flags |= kFlagSky;
+        extras.Flags |= options.GenerateIrradiance ? kFlagDiff : 0U;
+        extras.Flags |= options.GenerateSpecular ? kFlagSpec : 0U;
+        extras.Flags |= options.GenerateBrdfLut ? kFlagBrdf : 0U;
+
+        outResult.CookKeyExtras.resize(sizeof(extras));
+        std::memcpy(outResult.CookKeyExtras.data(), &extras, sizeof(extras));
+        return true;
+    }
+
+    auto RunEnvMapSelfTest(std::string& outError) -> bool {
+        outError.clear();
+
+        // Small deterministic procedural equirect image.
+        FHDRImage image{};
+        image.Width  = 64U;
+        image.Height = 32U;
+        image.Rgb.resize(static_cast<size_t>(image.Width) * static_cast<size_t>(image.Height) * 3U);
+        for (u32 y = 0; y < image.Height; ++y) {
+            for (u32 x = 0; x < image.Width; ++x) {
+                const float  fx = (image.Width > 1U)
+                     ? (static_cast<float>(x) / static_cast<float>(image.Width - 1U))
+                     : 0.0f;
+                const float  fy = (image.Height > 1U)
+                     ? (static_cast<float>(y) / static_cast<float>(image.Height - 1U))
+                     : 0.0f;
+
+                const float  r = fx;
+                const float  g = fy;
+                const float  b = 0.25f + 0.5f * fx * fy;
+
+                const size_t idx =
+                    (static_cast<size_t>(y) * static_cast<size_t>(image.Width) + x) * 3U;
+                image.Rgb[idx + 0] = r;
+                image.Rgb[idx + 1] = g;
+                image.Rgb[idx + 2] = b;
+            }
+        }
+
+        const auto RunOnce = [&](u64& outHash) -> bool {
+            outHash = kFnvOffset;
+
+            const u32         threadCount = DefaultCookThreadCount();
+            FWorkerPoolConfig poolCfg{};
+            poolCfg.mMinThreads = threadCount;
+            poolCfg.mMaxThreads = threadCount;
+            FWorkerPool pool(poolCfg);
+            if (threadCount > 1U) {
+                pool.Start();
+            }
+            const auto MakeThreads = [&](u32 size) -> FEnvMapThreadContext {
+                FEnvMapThreadContext ctx{};
+                ctx.Pool        = (threadCount > 1U) ? &pool : nullptr;
+                ctx.ThreadCount = threadCount;
+                ctx.GrainRows   = DefaultGrainRowsForSize(size);
+                return ctx;
+            };
+
+            // Skybox faces (single mip).
+            {
+                const u32 size = 32U;
+                for (u32 f = 0U; f < 6U; ++f) {
+                    std::vector<float> rgb;
+                    if (!GenerateSkyboxFace(
+                            image, static_cast<ECubeFace>(f), size, rgb, MakeThreads(size))) {
+                        outError = "SelfTest: GenerateSkyboxFace failed.";
+                        return false;
+                    }
+                    outHash = HashBytes(outHash, rgb.data(), rgb.size() * sizeof(float));
+                }
+            }
+
+            // Irradiance faces.
+            {
+                const u32  size       = 16U;
+                const u32  samples    = 64U;
+                const auto diffuseSeq = BuildHammersleySequence(samples);
+                for (u32 f = 0U; f < 6U; ++f) {
+                    std::vector<float> rgb;
+                    if (!GenerateIrradianceFace(image, static_cast<ECubeFace>(f), size, diffuseSeq,
+                            rgb, MakeThreads(size))) {
+                        outError = "SelfTest: GenerateIrradianceFace failed.";
+                        return false;
+                    }
+                    outHash = HashBytes(outHash, rgb.data(), rgb.size() * sizeof(float));
+                }
+            }
+
+            // Specular prefilter (multiple mips).
+            {
+                const u32  baseSize = 32U;
+                const u32  samples  = 64U;
+                const auto specSeq  = BuildHammersleySequence(samples);
+                const u32  mipCount = FullMipCount(baseSize);
+                for (u32 f = 0U; f < 6U; ++f) {
+                    for (u32 mip = 0U; mip < mipCount; ++mip) {
+                        const u32          dim       = std::max(1U, baseSize >> mip);
+                        const float        roughness = (mipCount > 1U)
+                                   ? (static_cast<float>(mip) / static_cast<float>(mipCount - 1U))
+                                   : 0.0f;
+                        std::vector<float> rgb;
+                        if (!GenerateSpecularPrefilterMip(image, static_cast<ECubeFace>(f), dim,
+                                specSeq, roughness, rgb, MakeThreads(dim))) {
+                            outError = "SelfTest: GenerateSpecularPrefilterMip failed.";
+                            return false;
+                        }
+                        outHash = HashBytes(outHash, rgb.data(), rgb.size() * sizeof(float));
+                    }
+                }
+            }
+
+            // BRDF LUT.
+            {
+                const u32       size    = 64U;
+                const u32       samples = 64U;
+                const auto      brdfSeq = BuildHammersleySequence(samples);
+                std::vector<u8> rgba;
+                if (!BuildBrdfLutRgba8(size, brdfSeq, rgba, MakeThreads(size))) {
+                    outError = "SelfTest: BuildBrdfLutRgba8 failed.";
+                    return false;
+                }
+                outHash = HashBytes(outHash, rgba.data(), rgba.size());
+            }
+
+            return true;
+        };
+
+        u64 h0 = 0;
+        u64 h1 = 0;
+        if (!RunOnce(h0)) {
+            return false;
+        }
+        if (!RunOnce(h1)) {
+            return false;
+        }
+
+        std::cout << "[AssetTool][SelfTest] EnvMapHash=" << h0 << "\n";
+        if (h0 != h1) {
+            outError = "EnvMap self test failed: non-deterministic output.";
+            return false;
+        }
+
+        std::cout << "[AssetTool][SelfTest] EnvMapSelfTest ok\n";
         return true;
     }
 } // namespace AltinaEngine::Tools::AssetPipeline

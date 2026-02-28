@@ -12,6 +12,20 @@ namespace AltinaEngine::Rendering {
 
     AE_RENDERING_API extern Core::Console::TConsoleVariable<i32> gRendererType;
 
+    // Image-based lighting (IBL) for deferred lighting (diffuse irradiance + specular prefilter).
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<i32> rIblEnable;
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rIblDiffuseIntensity;
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rIblSpecularIntensity;
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rIblSaturation;
+
+    // SSAO (screen-space ambient occlusion) for the deferred renderer.
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<i32> rSsaoEnable;
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<i32> rSsaoSampleCount;
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rSsaoRadiusVS;
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rSsaoBiasNdc;
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rSsaoPower;
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rSsaoIntensity;
+
     [[nodiscard]] inline auto GetRendererTypeSetting() noexcept -> ERendererType {
         const i32 value = gRendererType.Get();
         if (value <= 0) {

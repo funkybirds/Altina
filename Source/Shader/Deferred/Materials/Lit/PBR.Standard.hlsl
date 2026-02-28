@@ -1,5 +1,5 @@
 // @altina raster_state {
-//     cull = back;
+//     cull = none;
 // }
 
 #include "Shader/Bindings/ShaderBindings.hlsli"
@@ -88,7 +88,6 @@ AE_PER_FRAME_CBUFFER(ViewConstants)
 AE_PER_DRAW_CBUFFER(ObjectConstants)
 {
     row_major float4x4 World;
-    // Inverse-transpose(World) for correct normal transforms under non-uniform scale.
     row_major float4x4 NormalMatrix;
 };
 
@@ -165,9 +164,6 @@ PSOutput PSBase(VSOutput input)
     float3 normalWorld = normalize(input.Normal);
     if (NormalMapStrength > 1e-3f)
     {
-        // Normal mapping (tangent space) without requiring per-vertex tangents:
-        // build a TBN basis from screen-space derivatives. For a flat normal map (0,0,1), this
-        // produces the original geometric normal.
         const float3 normalTS = normalize(NormalTex.Sample(NormalTexSampler, input.TexCoord).xyz
             * 2.0f - 1.0f);
 
@@ -177,9 +173,7 @@ PSOutput PSBase(VSOutput input)
         const float2 duv2 = ddy(input.TexCoord);
 
         float3 T = dp1 * duv2.y - dp2 * duv1.y;
-        // Avoid NaNs if UVs are degenerate.
         T = (dot(T, T) > 1e-8f) ? normalize(T) : float3(1.0f, 0.0f, 0.0f);
-        // Orthonormalize tangent to the normal.
         T = normalize(T - normalWorld * dot(normalWorld, T));
         float3 B = cross(normalWorld, T);
 

@@ -39,6 +39,11 @@ public sealed class ShipOrbitController : ScriptComponent
     private bool _lastTitleCanSwitchMoon;
     private string _lastWindowTitle = string.Empty;
 
+    // Workaround: some GUI / focus integrations can cause "WasKeyPressed" to miss Space in
+    // particular, while "IsKeyDown" still works. Keep a local edge detector so Space transfers
+    // remain reliable.
+    private bool _spaceWasDown;
+
     private const float MouseSensitivity = 0.0025f;
     private const float PitchLimit = 1.35f; // ~77 deg
 
@@ -46,7 +51,9 @@ public sealed class ShipOrbitController : ScriptComponent
     {
         _state = EShipState.EarthOrbit;
         _timeScale = 1.0f;
-        _orbitPhaseRad = 0.0f;
+        // Start at a phase where the ship's tangent (+forward) roughly faces the Moon direction.
+        // This makes the Moon immediately visible in first-person mode without requiring mouse look.
+        _orbitPhaseRad = -0.5f * MathF.PI;
         _transferThetaRad = 0.0f; // theta=0 => JoinEarth.
         _transferS01 = 0.0f;
         _yawOffsetRad = 0.0f;
@@ -57,6 +64,7 @@ public sealed class ShipOrbitController : ScriptComponent
         _lastTitleCanSwitchEarth = false;
         _lastTitleCanSwitchMoon = false;
         _lastWindowTitle = string.Empty;
+        _spaceWasDown = false;
 
         // Bodies are static in this iteration; build the LUT once.
         BuildTransferLut(CelestialMotion.EarthPosition(0.0f), CelestialMotion.MoonPosition(0.0f));
@@ -191,7 +199,15 @@ public sealed class ShipOrbitController : ScriptComponent
         bool changed = false;
 
         // Primary UX: press Space to switch when near a join point.
-        if (Input.WasKeyPressed(EKey.Space))
+        if (!Input.HasFocus)
+        {
+            _spaceWasDown = false;
+        }
+        bool spaceDown = Input.IsKeyDown(EKey.Space);
+        bool spacePressed = spaceDown && !_spaceWasDown;
+        _spaceWasDown = spaceDown;
+
+        if (spacePressed)
         {
             switch (_state)
             {

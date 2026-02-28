@@ -1,4 +1,4 @@
-// Temporal Anti-Aliasing (phase 1): matrix + depth reprojection, no velocity buffer.
+// TAA, incomplete
 
 #define AE_POSTPROCESS_COMMON_NO_DEFAULT_BINDINGS 1
 #include "Shader/PostProcess/Common.hlsli"
@@ -108,7 +108,6 @@ float4 PSTaa(FSQOutput input) : SV_Target0
         const float3 worldPos = ReconstructWorld(uv, depth);
         const float2 prevUv   = ProjectPrevUv(worldPos);
 
-        // Outside history: fallback to current.
         const bool bInside = all(prevUv >= 0.0f) && all(prevUv <= 1.0f);
         if (bInside)
         {
@@ -116,8 +115,6 @@ float4 PSTaa(FSQOutput input) : SV_Target0
 
             float3 nMin, nMax;
             NeighborhoodMinMax(pixel, nMin, nMax);
-
-            // Clamp history into current neighborhood (optionally tightened by ClampK).
             const float3 lo = lerp(curr, nMin, saturate(ClampK));
             const float3 hi = lerp(curr, nMax, saturate(ClampK));
             hist = clamp(hist, lo, hi);

@@ -10,7 +10,7 @@ using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Container::TFunction;
 namespace AltinaEngine::RenderCore {
     Core::Console::TConsoleVariable<i32> gRenderingThreadLagFrames(
-        TEXT("gRenderingThreadLagFrames"), 1);
+        TEXT("rc.RenderingThread.LagFrames"), 1);
 
     auto EnqueueRenderTask(FString TaskName, TFunction<void()> task) noexcept
         -> Core::Jobs::FJobHandle {

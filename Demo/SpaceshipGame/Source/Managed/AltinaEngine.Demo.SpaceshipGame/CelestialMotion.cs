@@ -7,7 +7,8 @@ internal static class CelestialMotion
     public static Vector3 SunPosition(float t)
     {
         _ = t;
-        return Vector3.Zero;
+        // Keep consistent with the native demo scene setup (see Demo/SpaceshipGame/Source/Main.cpp).
+        return new Vector3(400.0f, 0.0f, -400.0f);
     }
 
     public static Vector3 EarthPosition(float t)

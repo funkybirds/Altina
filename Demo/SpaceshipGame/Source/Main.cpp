@@ -50,10 +50,6 @@ namespace {
         return FVector3f(-axisX.Z(), 0.0f, axisX.X());
     }
 
-    [[nodiscard]] auto DotXZ(const FVector3f& a, const FVector3f& b) -> f32 {
-        return a.X() * b.X() + a.Z() * b.Z();
-    }
-
     [[nodiscard]] auto OrbitPointCircle(const FVector3f& center, const FVector3f& axisX,
         const FVector3f& axisZ, f32 radius, f32 phaseRad) -> FVector3f {
         const f32 c = std::cos(phaseRad);
@@ -193,9 +189,6 @@ namespace {
         auto OnInit(Launch::FEngineLoop& engineLoop) -> bool override {
             auto&      assetManager = engineLoop.GetAssetManager();
 
-            const auto sphereMeshHandle =
-                engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/spaceshipgame/models/sphere"));
-
             const auto sunMaterialHandle =
                 engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/spaceshipgame/materials/sun"));
             const auto earthMaterialHandle = engineLoop.GetAssetRegistry().FindByPath(
@@ -224,13 +217,12 @@ namespace {
             const auto cameraScriptHandle = engineLoop.GetAssetRegistry().FindByPath(
                 TEXT("demo/spaceshipgame/scripts/shipcameramodes"));
 
-            if (!sphereMeshHandle.IsValid() || !sunMaterialHandle.IsValid()
-                || !earthMaterialHandle.IsValid() || !moonMaterialHandle.IsValid()
-                || !shipMaterialHandle.IsValid() || !orbitLineMaterialHandle.IsValid()
-                || !skyCubeHandle.IsValid() || !sunModelHandle.IsValid()
-                || !earthModelHandle.IsValid() || !moonModelHandle.IsValid()
-                || !shipModelHandle.IsValid() || !shipScriptHandle.IsValid()
-                || !cameraScriptHandle.IsValid()) {
+            if (!sunMaterialHandle.IsValid() || !earthMaterialHandle.IsValid()
+                || !moonMaterialHandle.IsValid() || !shipMaterialHandle.IsValid()
+                || !orbitLineMaterialHandle.IsValid() || !skyCubeHandle.IsValid()
+                || !sunModelHandle.IsValid() || !earthModelHandle.IsValid()
+                || !moonModelHandle.IsValid() || !shipModelHandle.IsValid()
+                || !shipScriptHandle.IsValid() || !cameraScriptHandle.IsValid()) {
                 return false;
             }
 
@@ -239,11 +231,11 @@ namespace {
             // Enable bloom post-process for the demo (defaults are defined in
             // PostProcessSettings.cpp).
             Rendering::rPostProcessBloom.Set(1);
-            Rendering::rPostProcessBloomThreshold.Set(1.0f);
-            Rendering::rPostProcessBloomKnee.Set(0.5f);
-            Rendering::rPostProcessBloomIntensity.Set(0.20f);
-            Rendering::rPostProcessBloomIterations.Set(5);
-            Rendering::rPostProcessBloomKawaseOffset.Set(1.0f);
+            Rendering::rPostProcessBloomThreshold.Set(1.4f);
+            Rendering::rPostProcessBloomKnee.Set(0.8f);
+            Rendering::rPostProcessBloomIntensity.Set(0.16f);
+            Rendering::rPostProcessBloomIterations.Set(6);
+            Rendering::rPostProcessBloomKawaseOffset.Set(1.2f);
             LogInfo(TEXT("[SpaceshipGame] PostProcess: Bloom=ON (press B to toggle)."));
 
             // Thin world-space ribbons alias heavily at distance without AA. Enable FXAA so orbit
@@ -279,10 +271,8 @@ namespace {
                 t.Scale        = Core::Math::FVector3f(1.0f);
                 shipRootObject.SetWorldTransform(t);
 
-                auto scriptComp = shipRootObject.AddComponent<GameScene::FScriptComponent>();
-                if (scriptComp.IsValid()) {
-                    scriptComp.Get().SetScriptAsset(shipScriptHandle);
-                }
+                (void)shipRootObject.AddComponent<GameScene::FScriptComponent>(
+                    [&](auto& comp) { comp.SetScriptAsset(shipScriptHandle); });
             }
 
             // Ship visual (model).
@@ -335,10 +325,8 @@ namespace {
                     cameraComp.Get().SetFarPlane(5000.0f);
                 }
 
-                auto scriptComp = cameraObject.AddComponent<GameScene::FScriptComponent>();
-                if (scriptComp.IsValid()) {
-                    scriptComp.Get().SetScriptAsset(cameraScriptHandle);
-                }
+                (void)cameraObject.AddComponent<GameScene::FScriptComponent>(
+                    [&](auto& comp) { comp.SetScriptAsset(cameraScriptHandle); });
             }
 
             auto CreateBodyFromModel =
@@ -391,8 +379,12 @@ namespace {
 
             // Suggested scales are computed by AssetTool modelinfo so imported USDZ extents match
             // Milestone 3 radii (world unit: 1 = 10,000 km).
-            auto sunObject   = CreateBodyFromModel(TEXT("Sun"), sunModelHandle, sunMaterialHandle,
-                  Core::Math::FVector3f(0.0f, 0.0f, 0.0f), 0.0464227f * 1.0f);
+            // NOTE: Keep Sun off the Earth->Moon line so the three bodies are not colinear in the
+            // initial static scene (helps lighting/readability).
+            const FVector3f kSunPos(400.0f, 0.0f, -400.0f);
+            auto            sunObject = CreateBodyFromModel(
+                TEXT("Sun"), sunModelHandle, sunMaterialHandle, kSunPos, 0.0464227f * 1.0f);
+
             auto earthObject = CreateBodyFromModel(TEXT("Earth"), earthModelHandle,
                 earthMaterialHandle, Core::Math::FVector3f(400.0f, 0.0f, 0.0f), 0.00515107f * 1.0f);
             auto moonObject = CreateBodyFromModel(TEXT("Moon"), moonModelHandle, moonMaterialHandle,
@@ -489,7 +481,7 @@ namespace {
                 if (lightComp.IsValid()) {
                     auto& light        = lightComp.Get();
                     light.mColor       = Core::Math::FVector3f(1.0f, 1.0f, 1.0f);
-                    light.mIntensity   = 2.0f;
+                    light.mIntensity   = 5.0f;
                     light.mCastShadows = true;
                 }
 

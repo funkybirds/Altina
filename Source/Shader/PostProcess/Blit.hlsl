@@ -1,4 +1,4 @@
-// Simple passthrough blit pixel shader.
+// blit shader.
 
 #include "Shader/PostProcess/Common.hlsli"
 

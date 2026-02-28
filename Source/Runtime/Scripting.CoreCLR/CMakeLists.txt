@@ -91,6 +91,11 @@ if(AE_DOTNET_HOST)
     set(AE_MANAGED_OUT_DIR ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed)
     set(AE_MANAGED_DLL ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.dll)
     set(AE_MANAGED_STAMP ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.build.stamp)
+    # Shared location for self-contained publish output (used by demos for Shipping).
+    set(AE_MANAGED_PUBLISH_SELFCONTAINED_DIR
+        ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/publish-selfcontained
+        CACHE PATH "AltinaEngine.Managed self-contained publish output directory"
+    )
 
     add_custom_command(
         OUTPUT ${AE_MANAGED_STAMP}
@@ -130,6 +135,51 @@ if(AE_DOTNET_HOST)
     set_property(TARGET AltinaEngineManagedBuild PROPERTY BUILD_ALWAYS TRUE)
 
     add_dependencies(${TargetName} AltinaEngineManagedBuild)
+
+    if(WIN32)
+        # Produce a self-contained .NET runtime folder that can be staged next to the demo executable.
+        # This enables running Shipping builds on machines without .NET installed.
+        set(AE_MANAGED_PUBLISH_SELFCONTAINED_STAMP
+            ${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}/AltinaEngine.Managed.publish-selfcontained.stamp
+        )
+
+        add_custom_command(
+            OUTPUT ${AE_MANAGED_PUBLISH_SELFCONTAINED_STAMP}
+            COMMAND ${CMAKE_COMMAND} -E rm -rf ${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}
+            COMMAND ${AE_DOTNET_HOST} publish ${AE_MANAGED_PROJECT}
+                -o ${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}
+                -c $<IF:$<CONFIG:Debug>,Debug,Release>
+                -r win-x64
+                --self-contained true
+                /t:Publish
+                /p:NoIncremental=true
+                /p:PublishTrimmed=false
+                /p:PublishReadyToRun=false
+                /p:MSBuildProjectExtensionsPath=${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}/obj/
+                /p:BaseIntermediateOutputPath=${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}/obj/
+                /p:IntermediateOutputPath=${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}/obj/$<IF:$<CONFIG:Debug>,Debug,Release>/
+            COMMAND ${CMAKE_COMMAND} -E touch ${AE_MANAGED_PUBLISH_SELFCONTAINED_STAMP}
+            DEPENDS
+                ${AE_MANAGED_PROJECT}
+                ${AE_MANAGED_ROOT}/ManagedBootstrap.cs
+                ${AE_MANAGED_ROOT}/ManagedApi.cs
+                ${AE_MANAGED_ROOT}/NativeApi.cs
+                ${AE_MANAGED_ROOT}/ManagedLog.cs
+                ${AE_MANAGED_ROOT}/ScriptComponent.cs
+                ${AE_MANAGED_ROOT}/Input.cs
+                ${AE_MANAGED_ROOT}/Window.cs
+                ${AE_MANAGED_ROOT}/Vector3.cs
+                ${AE_MANAGED_ROOT}/Quaternion.cs
+            COMMENT "Publishing self-contained managed runtime (AltinaEngine.Managed)"
+            VERBATIM
+        )
+
+        add_custom_target(AltinaEngineManagedPublishSelfContained
+            DEPENDS ${AE_MANAGED_PUBLISH_SELFCONTAINED_STAMP}
+        )
+        set_property(TARGET AltinaEngineManagedPublishSelfContained PROPERTY BUILD_ALWAYS TRUE)
+    endif()
 else()
     message(STATUS "dotnet not found; skipping managed scripting runtime build.")
 endif()

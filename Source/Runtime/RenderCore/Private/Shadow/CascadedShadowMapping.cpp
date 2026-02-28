@@ -240,16 +240,18 @@ namespace AltinaEngine::RenderCore::Shadow {
                 Math::MatMul(lightProj, lightViewCentered);
 
             if (sLoggedOnce) {
-                LogInfo(
-                    TEXT(
-                        "CSM Cascade{}: splitVS=({}, {}) centerWS=({}, {}, {}) eyeWS=({}, {}, {})"),
-                    cascadeIndex, splitNear, splitFar, centerWS[0], centerWS[1], centerWS[2],
-                    eyeWS[0], eyeWS[1], eyeWS[2]);
-                LogInfo(
-                    TEXT(
-                        "CSM Cascade{}: minLS=({}, {}, {}) maxLS=({}, {}, {}) ortho(w={}, h={}, near={}, far={})"),
-                    cascadeIndex, minLS[0], minLS[1], minLS[2], maxLS[0], maxLS[1], maxLS[2], width,
-                    height, nearZ, farZ);
+                // LogInfo(
+                //     TEXT(
+                //         "CSM Cascade{}: splitVS=({}, {}) centerWS=({}, {}, {}) eyeWS=({}, {},
+                //         {})"),
+                //     cascadeIndex, splitNear, splitFar, centerWS[0], centerWS[1], centerWS[2],
+                //     eyeWS[0], eyeWS[1], eyeWS[2]);
+                // LogInfo(
+                //     TEXT(
+                //         "CSM Cascade{}: minLS=({}, {}, {}) maxLS=({}, {}, {}) ortho(w={}, h={},
+                //         near={}, far={})"),
+                //     cascadeIndex, minLS[0], minLS[1], minLS[2], maxLS[0], maxLS[1], maxLS[2],
+                //     width, height, nearZ, farZ);
             }
         }
     }

@@ -151,6 +151,16 @@ if(TARGET AltinaEngineAssetTool)
 
     set_tests_properties(AltinaEngineAssetCook PROPERTIES
         FIXTURES_SETUP AssetCook
+        # Match the tool tag in stdout. Use a single escape for '[' and ']' in regex.
+        PASS_REGULAR_EXPRESSION "\\[AssetTool\\]\\[CookTiming\\]"
+    )
+
+    add_test(NAME AltinaEngineAssetToolSelfTestEnvMap
+        COMMAND $<TARGET_FILE:AltinaEngineAssetTool> selftest --envmap
+    )
+
+    set_tests_properties(AltinaEngineAssetToolSelfTestEnvMap PROPERTIES
+        PASS_REGULAR_EXPRESSION "EnvMapSelfTest ok"
     )
     set_tests_properties(AltinaEngineTestsAsset PROPERTIES
         FIXTURES_REQUIRED AssetCook
@@ -246,4 +256,3 @@ if(AE_ENABLE_SCRIPTING_CORECLR)
         message(STATUS "dotnet not found; skipping CoreCLR scripting interop tests.")
     endif()
 endif()
-

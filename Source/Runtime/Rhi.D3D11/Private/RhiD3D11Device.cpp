@@ -155,6 +155,14 @@ namespace AltinaEngine::Rhi {
         ID3D11RenderTargetView*      mCurrentRtvs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
         UINT                         mCurrentRtvCount                                     = 0U;
         ID3D11DepthStencilView*      mCurrentDsv                                          = nullptr;
+
+        // Track shader SRV bindings so we can proactively unbind outputs (RTV/DSV) from inputs and
+        // avoid D3D11 debug-layer warnings / hazards.
+        static constexpr u32         kTrackedSrvStageCount = 6U; // VS, PS, GS, HS, DS, CS
+        static constexpr UINT        kSrvSlotCount = D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT;
+        ID3D11ShaderResourceView*    mBoundSrvs[kTrackedSrvStageCount][kSrvSlotCount]         = {};
+        ID3D11Resource*              mBoundSrvResources[kTrackedSrvStageCount][kSrvSlotCount] = {};
+
         // Transient per-pass view objects (needed to support subresource ranges).
         TVector<ComPtr<ID3D11RenderTargetView>> mTransientRtvs;
         TVector<ComPtr<ID3D11DepthStencilView>> mTransientDsvs;
@@ -768,6 +776,128 @@ namespace AltinaEngine::Rhi {
             }
         }
 
+        auto ToTrackedSrvStageIndex(EShaderStage stage) noexcept -> i32 {
+            switch (stage) {
+                case EShaderStage::Vertex:
+                    return 0;
+                case EShaderStage::Pixel:
+                    return 1;
+                case EShaderStage::Geometry:
+                    return 2;
+                case EShaderStage::Hull:
+                    return 3;
+                case EShaderStage::Domain:
+                    return 4;
+                case EShaderStage::Compute:
+                    return 5;
+                default:
+                    return -1;
+            }
+        }
+
+        auto FromTrackedSrvStageIndex(u32 stageIndex) noexcept -> EShaderStage {
+            switch (stageIndex) {
+                case 0U:
+                    return EShaderStage::Vertex;
+                case 1U:
+                    return EShaderStage::Pixel;
+                case 2U:
+                    return EShaderStage::Geometry;
+                case 3U:
+                    return EShaderStage::Hull;
+                case 4U:
+                    return EShaderStage::Domain;
+                case 5U:
+                    return EShaderStage::Compute;
+                default:
+                    return EShaderStage::Pixel;
+            }
+        }
+
+        void BindShaderResourceTracked(FRhiD3D11CommandContext::FState* state,
+            ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
+            ID3D11ShaderResourceView* view) {
+            BindShaderResource(context, stage, slot, view);
+
+            if (state == nullptr) {
+                return;
+            }
+            const i32 stageIndex = ToTrackedSrvStageIndex(stage);
+            if (stageIndex < 0) {
+                return;
+            }
+            if (slot >= FRhiD3D11CommandContext::FState::kSrvSlotCount) {
+                return;
+            }
+
+            state->mBoundSrvs[stageIndex][slot]         = view;
+            state->mBoundSrvResources[stageIndex][slot] = nullptr;
+            if (view != nullptr) {
+                ComPtr<ID3D11Resource> resource;
+                view->GetResource(&resource);
+                state->mBoundSrvResources[stageIndex][slot] = resource.Get();
+            }
+        }
+
+        void UnbindSrvsConflictingWithOutputs(ID3D11DeviceContext* context,
+            FRhiD3D11CommandContext::FState* state, ID3D11RenderTargetView* const* rtvs,
+            UINT rtvCount, ID3D11DepthStencilView* dsv) {
+            if (context == nullptr || state == nullptr) {
+                return;
+            }
+
+            ID3D11Resource* outputResources[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT + 1] = {};
+            u32             outputResourceCount                                         = 0U;
+
+            for (UINT i = 0; i < rtvCount; ++i) {
+                if (rtvs == nullptr || rtvs[i] == nullptr) {
+                    continue;
+                }
+                ComPtr<ID3D11Resource> resource;
+                rtvs[i]->GetResource(&resource);
+                if (resource != nullptr) {
+                    outputResources[outputResourceCount++] = resource.Get();
+                }
+            }
+
+            if (dsv != nullptr) {
+                ComPtr<ID3D11Resource> resource;
+                dsv->GetResource(&resource);
+                if (resource != nullptr) {
+                    outputResources[outputResourceCount++] = resource.Get();
+                }
+            }
+
+            if (outputResourceCount == 0U) {
+                return;
+            }
+
+            for (u32 stageIndex = 0; stageIndex < state->kTrackedSrvStageCount; ++stageIndex) {
+                for (UINT slot = 0; slot < state->kSrvSlotCount; ++slot) {
+                    ID3D11Resource* boundResource = state->mBoundSrvResources[stageIndex][slot];
+                    if (boundResource == nullptr) {
+                        continue;
+                    }
+
+                    bool conflict = false;
+                    for (u32 outIndex = 0; outIndex < outputResourceCount; ++outIndex) {
+                        if (boundResource == outputResources[outIndex]) {
+                            conflict = true;
+                            break;
+                        }
+                    }
+                    if (!conflict) {
+                        continue;
+                    }
+
+                    const EShaderStage stage = FromTrackedSrvStageIndex(stageIndex);
+                    BindShaderResource(context, stage, slot, nullptr);
+                    state->mBoundSrvs[stageIndex][slot]         = nullptr;
+                    state->mBoundSrvResources[stageIndex][slot] = nullptr;
+                }
+            }
+        }
+
         void BindSampler(ID3D11DeviceContext* context, EShaderStage stage, UINT slot,
             ID3D11SamplerState* sampler) {
             if (context == nullptr) {
@@ -1179,6 +1309,8 @@ namespace AltinaEngine::Rhi {
             dsv                = depthTexture ? depthTexture->GetDepthStencilView() : nullptr;
         }
 
+        UnbindSrvsConflictingWithOutputs(context, mState, rtvs, rtvCount, dsv);
+        UnbindSrvsConflictingWithOutputs(context, mState, rtvs, rtvCount, dsv);
         context->OMSetRenderTargets(rtvCount, rtvCount ? rtvs : nullptr, dsv);
 
         mState->mCurrentRtvCount = rtvCount;
@@ -1579,7 +1711,7 @@ namespace AltinaEngine::Rhi {
                             auto* texture = static_cast<FRhiD3D11Texture*>(entry.mTexture);
                             ID3D11ShaderResourceView* view =
                                 texture ? texture->GetShaderResourceView() : nullptr;
-                            BindShaderResource(context, mapping.mStage, slot, view);
+                            BindShaderResourceTracked(mState, context, mapping.mStage, slot, view);
                             break;
                         }
                         case ERhiBindingType::SampledBuffer:
@@ -1587,7 +1719,7 @@ namespace AltinaEngine::Rhi {
                             auto* buffer = static_cast<FRhiD3D11Buffer*>(entry.mBuffer);
                             ID3D11ShaderResourceView* view =
                                 buffer ? buffer->GetShaderResourceView() : nullptr;
-                            BindShaderResource(context, mapping.mStage, slot, view);
+                            BindShaderResourceTracked(mState, context, mapping.mStage, slot, view);
                             break;
                         }
                         case ERhiBindingType::StorageTexture:
@@ -1695,7 +1827,7 @@ namespace AltinaEngine::Rhi {
                                 //     TEXT("BindGroupFallback SampledTexture binding={} slot={}"),
                                 //     entry.mBinding, slot);
                                 forEachStage([&](EShaderStage stage) {
-                                    BindShaderResource(context, stage, slot, view);
+                                    BindShaderResourceTracked(mState, context, stage, slot, view);
                                 });
                                 break;
                             }
@@ -1893,11 +2025,11 @@ namespace AltinaEngine::Rhi {
             message.Append(TEXT("] "));
             message.Append(messageText);
 
-            const auto messageView = message.ToView();
-            FLogger::Log(level, kD3D11DebugCategory, messageView);
-            if (FLogger::HasCustomLogSink()) {
-                FLogger::LogToDefaultSink(level, kD3D11DebugCategory, messageView);
-            }
+            // const auto messageView = message.ToView();
+            // FLogger::Log(level, kD3D11DebugCategory, messageView);
+            // if (FLogger::HasCustomLogSink()) {
+            //     FLogger::LogToDefaultSink(level, kD3D11DebugCategory, messageView);
+            // }
         }
 
         void ConfigureInfoQueue(ID3D11InfoQueue* infoQueue) {
@@ -2591,19 +2723,31 @@ namespace AltinaEngine::Rhi {
         }
 
         D3D11_SAMPLER_DESC samplerDesc = {};
-        samplerDesc.Filter             = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-        samplerDesc.AddressU           = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.AddressV           = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.AddressW           = D3D11_TEXTURE_ADDRESS_WRAP;
-        samplerDesc.MipLODBias         = 0.0f;
-        samplerDesc.MaxAnisotropy      = 1;
-        samplerDesc.ComparisonFunc     = D3D11_COMPARISON_ALWAYS;
-        samplerDesc.BorderColor[0]     = 0.0f;
-        samplerDesc.BorderColor[1]     = 0.0f;
-        samplerDesc.BorderColor[2]     = 0.0f;
-        samplerDesc.BorderColor[3]     = 0.0f;
-        samplerDesc.MinLOD             = 0.0f;
-        samplerDesc.MaxLOD             = D3D11_FLOAT32_MAX;
+        samplerDesc.Filter             = (desc.mFilter == ERhiSamplerFilter::Nearest)
+                        ? D3D11_FILTER_MIN_MAG_MIP_POINT
+                        : D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+
+        auto ToD3DAddress = [](ERhiSamplerAddressMode mode) noexcept -> D3D11_TEXTURE_ADDRESS_MODE {
+            switch (mode) {
+                case ERhiSamplerAddressMode::Clamp:
+                    return D3D11_TEXTURE_ADDRESS_CLAMP;
+                case ERhiSamplerAddressMode::Wrap:
+                default:
+                    return D3D11_TEXTURE_ADDRESS_WRAP;
+            }
+        };
+        samplerDesc.AddressU       = ToD3DAddress(desc.mAddressU);
+        samplerDesc.AddressV       = ToD3DAddress(desc.mAddressV);
+        samplerDesc.AddressW       = ToD3DAddress(desc.mAddressW);
+        samplerDesc.MipLODBias     = 0.0f;
+        samplerDesc.MaxAnisotropy  = 1;
+        samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+        samplerDesc.BorderColor[0] = 0.0f;
+        samplerDesc.BorderColor[1] = 0.0f;
+        samplerDesc.BorderColor[2] = 0.0f;
+        samplerDesc.BorderColor[3] = 0.0f;
+        samplerDesc.MinLOD         = 0.0f;
+        samplerDesc.MaxLOD         = D3D11_FLOAT32_MAX;
 
         FD3D11SamplerCacheKey cacheKey{};
         cacheKey.mDesc = samplerDesc;

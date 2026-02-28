@@ -29,5 +29,21 @@ namespace AltinaEngine::GameScene {
 
         APROPERTY()
         bool mCastShadows = true;
+
+        // Per-light CSM settings (when mCastShadows=true).
+        APROPERTY()
+        u32 mShadowCascadeCount = 4U;
+
+        APROPERTY()
+        f32 mShadowSplitLambda = 0.65f;
+
+        APROPERTY()
+        f32 mShadowMaxDistance = 30.0f;
+
+        APROPERTY()
+        u32 mShadowMapSize = 2048U;
+
+        APROPERTY()
+        f32 mShadowReceiverBias = 0.0015f;
     };
 } // namespace AltinaEngine::GameScene

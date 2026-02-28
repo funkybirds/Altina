@@ -70,6 +70,9 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         Rhi::FRhiShaderRef          FxaaPS;
         Rhi::FRhiShaderRef          BloomPrefilterPS;
         Rhi::FRhiShaderRef          BloomDownsamplePS;
+        Rhi::FRhiShaderRef          BloomDownsampleWeightedPS;
+        Rhi::FRhiShaderRef          BloomBlurHPS;
+        Rhi::FRhiShaderRef          BloomBlurVPS;
         Rhi::FRhiShaderRef          BloomUpsamplePS;
         Rhi::FRhiShaderRef          BloomApplyPS;
         Rhi::FRhiShaderRef          TaaPS;
@@ -85,6 +88,9 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         Rhi::FRhiPipelineRef        FxaaPipeline;
         Rhi::FRhiPipelineRef        BloomPrefilterPipeline;
         Rhi::FRhiPipelineRef        BloomDownsamplePipeline;
+        Rhi::FRhiPipelineRef        BloomDownsampleWeightedPipeline;
+        Rhi::FRhiPipelineRef        BloomBlurHPipeline;
+        Rhi::FRhiPipelineRef        BloomBlurVPipeline;
         Rhi::FRhiPipelineRef        BloomUpsampleAddPipeline;
         Rhi::FRhiPipelineRef        BloomApplyAddPipeline;
         Rhi::FRhiPipelineRef        TaaPipeline;

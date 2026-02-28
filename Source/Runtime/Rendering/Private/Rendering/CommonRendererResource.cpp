@@ -54,6 +54,12 @@ namespace AltinaEngine::Rendering {
         constexpr FStringView kDeferredLightingShaderSourcePath =
             TEXT("Source/Shader/Deferred/DeferredLighting.hlsl");
 
+        constexpr FStringView kDeferredSsaoShaderAssetsRelPath =
+            TEXT("Assets/Shader/Deferred/SSAO.hlsl");
+        constexpr FStringView kDeferredSsaoShaderRelPath = TEXT("Shader/Deferred/SSAO.hlsl");
+        constexpr FStringView kDeferredSsaoShaderSourcePath =
+            TEXT("Source/Shader/Deferred/SSAO.hlsl");
+
         constexpr FStringView kDeferredSkyBoxShaderAssetsRelPath =
             TEXT("Assets/Shader/Deferred/SkyBox.hlsl");
         constexpr FStringView kDeferredSkyBoxShaderRelPath = TEXT("Shader/Deferred/SkyBox.hlsl");
@@ -402,6 +408,14 @@ namespace AltinaEngine::Rendering {
             return;
         }
 
+        const auto ssaoShaderPath = FindBuiltinShaderPath(kDeferredSsaoShaderAssetsRelPath,
+            kDeferredSsaoShaderRelPath, kDeferredSsaoShaderSourcePath);
+        if (ssaoShaderPath.IsEmpty() || !ssaoShaderPath.Exists()) {
+            LogError(TEXT("Builtin deferred SSAO shader not found. Expected {}."),
+                kDeferredSsaoShaderRelPath);
+            return;
+        }
+
         const auto skyBoxShaderPath = FindBuiltinShaderPath(kDeferredSkyBoxShaderAssetsRelPath,
             kDeferredSkyBoxShaderRelPath, kDeferredSkyBoxShaderSourcePath);
         if (skyBoxShaderPath.IsEmpty() || !skyBoxShaderPath.Exists()) {
@@ -418,9 +432,12 @@ namespace AltinaEngine::Rendering {
             return;
         }
 
-        LogInfo(TEXT("Deferred shader paths: base='{}' lighting='{}' skybox='{}' shadow='{}'"),
+        LogInfo(
+            TEXT(
+                "Deferred shader paths: base='{}' lighting='{}' ssao='{}' skybox='{}' shadow='{}'"),
             shaderPath.GetString().ToView(), lightingShaderPath.GetString().ToView(),
-            skyBoxShaderPath.GetString().ToView(), shadowShaderPath.GetString().ToView());
+            ssaoShaderPath.GetString().ToView(), skyBoxShaderPath.GetString().ToView(),
+            shadowShaderPath.GetString().ToView());
 
         // Require refactor
         RenderCore::FShaderRegistry::FShaderKey vsKey{};
@@ -428,6 +445,8 @@ namespace AltinaEngine::Rendering {
         RenderCore::FShaderRegistry::FShaderKey fsqVsKey{};
         RenderCore::FShaderRegistry::FShaderKey lightingVsKey{};
         RenderCore::FShaderRegistry::FShaderKey lightingPsKey{};
+        RenderCore::FShaderRegistry::FShaderKey ssaoVsKey{};
+        RenderCore::FShaderRegistry::FShaderKey ssaoPsKey{};
         RenderCore::FShaderRegistry::FShaderKey skyBoxVsKey{};
         RenderCore::FShaderRegistry::FShaderKey skyBoxPsKey{};
         RenderCore::FShaderRegistry::FShaderKey shadowVsKey{};
@@ -437,6 +456,8 @@ namespace AltinaEngine::Rendering {
         FShaderCompileResult                    fsqVsResult{};
         FShaderCompileResult                    lightingVsResult{};
         FShaderCompileResult                    lightingPsResult{};
+        FShaderCompileResult                    ssaoVsResult{};
+        FShaderCompileResult                    ssaoPsResult{};
         FShaderCompileResult                    skyBoxVsResult{};
         FShaderCompileResult                    skyBoxPsResult{};
         FShaderCompileResult                    shadowVsResult{};
@@ -455,6 +476,11 @@ namespace AltinaEngine::Rendering {
             || !CompileShaderFromFile(lightingShaderPath, TEXT("PSDeferredLighting"),
                 Shader::EShaderStage::Pixel, TEXT("Builtin/Deferred/DeferredLighting"),
                 lightingPsKey, lightingPsResult)
+            || !CompileShaderFromFile(ssaoShaderPath, TEXT("VSFullScreenTriangle"),
+                Shader::EShaderStage::Vertex, TEXT("Builtin/Deferred/SSAO"), ssaoVsKey,
+                ssaoVsResult)
+            || !CompileShaderFromFile(ssaoShaderPath, TEXT("PSSsao"), Shader::EShaderStage::Pixel,
+                TEXT("Builtin/Deferred/SSAO"), ssaoPsKey, ssaoPsResult)
             || !CompileShaderFromFile(skyBoxShaderPath, TEXT("VSFullScreenTriangle"),
                 Shader::EShaderStage::Vertex, TEXT("Builtin/Deferred/SkyBox"), skyBoxVsKey,
                 skyBoxVsResult)
@@ -508,6 +534,7 @@ namespace AltinaEngine::Rendering {
 
         FBasicDeferredRenderer::SetDefaultMaterialTemplate(templ);
         FBasicDeferredRenderer::SetLightingShaderKeys(lightingVsKey, lightingPsKey);
+        FBasicDeferredRenderer::SetSsaoShaderKeys(ssaoVsKey, ssaoPsKey);
         FBasicDeferredRenderer::SetSkyBoxShaderKeys(skyBoxVsKey, skyBoxPsKey);
         LogInfo(TEXT("Deferred lighting shader keys configured: vs='{}' ps='{}'"),
             lightingVsKey.Name.ToView(), lightingPsKey.Name.ToView());

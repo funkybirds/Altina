@@ -34,6 +34,15 @@ namespace AltinaEngine::Rendering {
         // Optional sky cubemap (for skybox rendering).
         Rhi::FRhiTexture*                            SkyCubeTexture = nullptr;
         bool                                         bHasSkyCube    = false;
+
+        // Optional environment IBL (diffuse irradiance + specular prefilter + BRDF LUT).
+        // These are GPU resources (not asset handles) and are expected to be persistent across
+        // frames, typically cached by the engine loop.
+        Rhi::FRhiTexture*                            SkyIrradianceCube = nullptr; // TextureCube
+        Rhi::FRhiTexture*                            SkySpecularCube   = nullptr; // TextureCube
+        Rhi::FRhiTexture*                            BrdfLutTexture    = nullptr; // Texture2D
+        float                                        SkySpecularMaxLod = 0.0f;
+        bool                                         bHasSkyIbl        = false;
     };
 
     /**

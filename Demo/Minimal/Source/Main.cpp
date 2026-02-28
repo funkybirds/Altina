@@ -164,6 +164,15 @@ namespace {
                     light.mIntensity   = 2.0f;
                     light.mCastShadows = true;
 
+                    // CSM tuning for this demo: the camera is intentionally placed far back
+                    // (kBackDistance=250) to populate multiple cascades. Keep a larger shadow
+                    // range so objects in view don't get clamped to the last cascade too early.
+                    light.mShadowCascadeCount = 4U;
+                    light.mShadowSplitLambda  = 0.75f;
+                    light.mShadowMaxDistance  = 100.0f;
+                    light.mShadowMapSize      = 2048U;
+                    light.mShadowReceiverBias = 0.0015f;
+
                     // +Z is treated as light propagation direction (see component comment).
                     // Aim to the camera's right-front direction (relative to camera forward), using
                     // world +Y as up.

@@ -16,7 +16,6 @@ AE_PER_FRAME_CBUFFER(ViewConstants)
 AE_PER_DRAW_CBUFFER(ObjectConstants)
 {
     row_major float4x4 World;
-    // Inverse-transpose(World) for correct normal transforms under non-uniform scale.
     row_major float4x4 NormalMatrix;
 };
 

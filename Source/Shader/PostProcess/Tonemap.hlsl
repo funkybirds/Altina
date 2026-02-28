@@ -16,7 +16,6 @@ float3 TonemapReinhard(float3 x)
 }
 
 // ACES filmic tonemap approximation (Narkowicz 2015 fit).
-// Note: This is not a full ACES pipeline (no RRT/ODT matrices), but provides the common "ACES look".
 float3 TonemapACESFitted(float3 x)
 {
     const float a = 2.51f;
@@ -33,6 +32,7 @@ float4 PSTonemap(FSQOutput input) : SV_Target0
     hdr *= max(Exposure, 0.0f);
     float3 ldr = TonemapACESFitted(hdr);
 
+    // Require refactor: shader perm for sRGB swapchain
     // BackBuffer is Unorm (not SRGB) by default in D3D11 viewport, so do gamma here.
     ldr = LinearToGamma(ldr, max(Gamma, 1e-6f));
     return float4(ldr, 1.0f);

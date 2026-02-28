@@ -87,6 +87,10 @@ namespace AltinaEngine::GameScene {
     }
 
     template <typename T> inline void RegisterComponentType() {
-        GetComponentRegistry().Register(BuildComponentTypeEntry<T>());
+        const FComponentTypeHash typeHash = GetComponentTypeHash<T>();
+        auto&                    registry = GetComponentRegistry();
+        if (!registry.Has(typeHash)) {
+            registry.Register(BuildComponentTypeEntry<T>());
+        }
     }
 } // namespace AltinaEngine::GameScene

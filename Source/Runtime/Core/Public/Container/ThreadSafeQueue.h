@@ -36,6 +36,16 @@ namespace AltinaEngine::Core::Container {
             mQueue.Pop();
         }
 
+        auto TryPop(TValueType& outValue) noexcept -> bool {
+            Threading::FScopedLock lock(mMutex);
+            if (mQueue.IsEmpty()) {
+                return false;
+            }
+            outValue = Move(mQueue.Front());
+            mQueue.Pop();
+            return true;
+        }
+
         auto Front() -> TValueType {
             Threading::FScopedLock lock(mMutex);
             return mQueue.Front();

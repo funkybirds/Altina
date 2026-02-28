@@ -24,7 +24,6 @@ struct VSOutput
 VSOutput VSMain(VSInput input)
 {
     VSOutput o;
-    // Pixel space -> NDC
     float2 ndc = input.Pos * gScale + gTranslate;
     o.Pos = float4(ndc.x, -ndc.y, 0.0, 1.0); // flip Y (top-left origin)
     o.UV = input.UV;
@@ -35,7 +34,6 @@ VSOutput VSMain(VSInput input)
 float4 PSMain(VSOutput input) : SV_Target0
 {
     float4 tex = gFontAtlas.Sample(gSampler, input.UV);
-    // Atlas stores coverage in alpha; RGB is white.
     float a = tex.a;
     float4 outColor = input.Color;
     outColor.a *= a;

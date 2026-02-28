@@ -1,5 +1,4 @@
 // Common definitions for post-process shaders.
-// Keep this file small and reusable across effects (Blit / Tonemap / FXAA / ...).
 
 #ifndef AE_POSTPROCESS_COMMON_HLSLI
 #define AE_POSTPROCESS_COMMON_HLSLI 1
@@ -20,7 +19,6 @@ struct FSQOutput
 
 float3 LinearToGamma(float3 x, float gamma)
 {
-    // gamma should be > 0
     float invGamma = (gamma > 1e-6f) ? (1.0f / gamma) : 1.0f;
     return pow(saturate(x), invGamma);
 }

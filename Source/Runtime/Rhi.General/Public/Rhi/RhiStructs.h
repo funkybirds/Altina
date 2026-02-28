@@ -259,8 +259,22 @@ namespace AltinaEngine::Rhi {
         u32 mStencil = 0U;
     };
 
+    enum class ERhiSamplerFilter : u8 {
+        Nearest = 0,
+        Linear  = 1,
+    };
+
+    enum class ERhiSamplerAddressMode : u8 {
+        Wrap  = 0,
+        Clamp = 1,
+    };
+
     struct FRhiSamplerDesc {
-        FString mDebugName;
+        FString                mDebugName;
+        ERhiSamplerFilter      mFilter   = ERhiSamplerFilter::Linear;
+        ERhiSamplerAddressMode mAddressU = ERhiSamplerAddressMode::Wrap;
+        ERhiSamplerAddressMode mAddressV = ERhiSamplerAddressMode::Wrap;
+        ERhiSamplerAddressMode mAddressW = ERhiSamplerAddressMode::Wrap;
     };
 
     struct FRhiShaderDesc {

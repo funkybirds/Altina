@@ -6,6 +6,8 @@
 #include "Types/Aliases.h"
 #include "Utility/Filesystem/Path.h"
 
+#include <string>
+
 namespace AltinaEngine::Scripting::CoreCLR::Host {
     namespace Container = ::AltinaEngine::Core::Container;
 #if AE_PLATFORM_WIN

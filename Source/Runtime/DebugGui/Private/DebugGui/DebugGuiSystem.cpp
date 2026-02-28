@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 
 #include "Container/String.h"
+#include "Container/HashMap.h"
 #include "Container/Vector.h"
 #include "Logging/Log.h"
 #include "Console/ConsoleVariable.h"
@@ -124,7 +125,7 @@ namespace AltinaEngine::DebugGui {
             return { FVector2f(minX, minY), FVector2f(maxX, maxY) };
         }
 
-#include "FontAtlas8x8.inl"
+#include "FontAtlas32x32.inl"
 
         struct FGuiInput {
             const Input::FInputSystem* Input                = nullptr;
@@ -137,16 +138,32 @@ namespace AltinaEngine::DebugGui {
             bool                       bKeyBackspacePressed = false;
         };
 
+        struct FWindowState {
+            bool      bInitialized = false;
+            bool      bCollapsed   = false;
+            FVector2f Pos          = FVector2f(10.0f, 10.0f);
+            FVector2f Size         = FVector2f(460.0f, 260.0f);
+        };
+
         struct FFontAtlas {
-            static constexpr u32 kGlyphW     = 8U;
-            static constexpr u32 kGlyphH     = 8U;
+            // Atlas glyph size (texture resolution per glyph).
+            static constexpr u32 kAtlasGlyphW = 32U;
+            static constexpr u32 kAtlasGlyphH = 32U;
+            // Draw glyph size (screen-space size per glyph). Keep the DebugGui layout stable.
+            static constexpr u32 kDrawGlyphW = 7U;
+            static constexpr u32 kDrawGlyphH = 11U;
             static constexpr u32 kFirstChar  = 32U;
             static constexpr u32 kLastChar   = 126U;
             static constexpr u32 kGlyphCount = (kLastChar - kFirstChar + 1U);
             static constexpr u32 kCols       = 16U;
             static constexpr u32 kRows       = (kGlyphCount + kCols - 1U) / kCols;
-            static constexpr u32 kAtlasW     = kCols * kGlyphW;
-            static constexpr u32 kAtlasH     = kRows * kGlyphH;
+            static constexpr u32 kAtlasW     = kCols * kAtlasGlyphW;
+            static constexpr u32 kAtlasH     = kRows * kAtlasGlyphH;
+            // Use the unused last cell (index 95) as a reserved solid texel for non-text
+            // primitives. Glyphs occupy indices [0..kGlyphCount-1] => [0..94]. With 16 cols, we
+            // have 96 cells total.
+            static constexpr u32 kSolidTexelX = (kCols - 1U) * kAtlasGlyphW;
+            static constexpr u32 kSolidTexelY = (kRows - 1U) * kAtlasGlyphH;
 
             TVector<u8>          Pixels; // RGBA8
 
@@ -155,34 +172,43 @@ namespace AltinaEngine::DebugGui {
                 for (usize i = 0; i < Pixels.Size(); ++i) {
                     Pixels[i] = 0U;
                 }
-                // Reserve a solid white texel at (0,0) with alpha=1 for non-text primitives.
-                if (!Pixels.IsEmpty()) {
-                    Pixels[0] = 255U;
-                    Pixels[1] = 255U;
-                    Pixels[2] = 255U;
-                    Pixels[3] = 255U;
-                }
 
                 for (u32 ch = kFirstChar; ch <= kLastChar; ++ch) {
                     const u32 glyphIndex = ch - kFirstChar;
                     const u32 col        = glyphIndex % kCols;
                     const u32 row        = glyphIndex / kCols;
-                    const u32 baseX      = col * kGlyphW;
-                    const u32 baseY      = row * kGlyphH;
+                    const u32 baseX      = col * kAtlasGlyphW;
+                    const u32 baseY      = row * kAtlasGlyphH;
 
-                    const u8* glyphRows = GetFont8x8Glyph(static_cast<u8>(ch));
-                    for (u32 y = 0U; y < kGlyphH; ++y) {
-                        const u8 bits = glyphRows ? glyphRows[y] : 0U;
-                        for (u32 x = 0U; x < kGlyphW; ++x) {
-                            const bool  on = (bits & static_cast<u8>(1U << (7U - x))) != 0U;
+                    const u8* glyph = GetFont32x32Glyph(static_cast<u8>(ch));
+                    for (u32 y = 0U; y < kAtlasGlyphH; ++y) {
+                        for (u32 x = 0U; x < kAtlasGlyphW; ++x) {
+                            const u8    a = glyph ? glyph[y * kAtlasGlyphW + x] : 0U;
                             const u32   px = baseX + x;
                             const u32   py = baseY + y;
                             const usize idx = (static_cast<usize>(py) * kAtlasW + px) * 4U;
                             Pixels[idx + 0U] = 255U;
                             Pixels[idx + 1U] = 255U;
                             Pixels[idx + 2U] = 255U;
-                            Pixels[idx + 3U] = on ? 255U : 0U;
+                            Pixels[idx + 3U] = a;
                         }
+                    }
+                }
+
+                // Reserve a solid white cell (RGBA=1) for non-text primitives.
+                // Fill the entire cell so it is robust under linear filtering.
+                for (u32 y = 0U; y < kAtlasGlyphH; ++y) {
+                    for (u32 x = 0U; x < kAtlasGlyphW; ++x) {
+                        const u32   px = kSolidTexelX + x;
+                        const u32   py = kSolidTexelY + y;
+                        const usize idx = (static_cast<usize>(py) * kAtlasW + px) * 4U;
+                        if (idx + 3U >= Pixels.Size()) {
+                            continue;
+                        }
+                        Pixels[idx + 0U] = 255U;
+                        Pixels[idx + 1U] = 255U;
+                        Pixels[idx + 2U] = 255U;
+                        Pixels[idx + 3U] = 255U;
                     }
                 }
             }
@@ -196,14 +222,15 @@ namespace AltinaEngine::DebugGui {
                 const u32 row        = glyphIndex / kCols;
                 const f32 invW       = 1.0f / static_cast<f32>(kAtlasW);
                 const f32 invH       = 1.0f / static_cast<f32>(kAtlasH);
-                const f32 x0         = static_cast<f32>(col * kGlyphW);
-                const f32 y0         = static_cast<f32>(row * kGlyphH);
-                const f32 x1         = x0 + static_cast<f32>(kGlyphW);
-                const f32 y1         = y0 + static_cast<f32>(kGlyphH);
-                outU0                = x0 * invW;
-                outV0                = y0 * invH;
-                outU1                = x1 * invW;
-                outV1                = y1 * invH;
+                const f32 x0         = static_cast<f32>(col * kAtlasGlyphW);
+                const f32 y0         = static_cast<f32>(row * kAtlasGlyphH);
+                const f32 x1         = x0 + static_cast<f32>(kAtlasGlyphW);
+                const f32 y1         = y0 + static_cast<f32>(kAtlasGlyphH);
+                // Inset by half a texel to avoid linear-filtering bleed from adjacent cells.
+                outU0 = (x0 + 0.5f) * invW;
+                outV0 = (y0 + 0.5f) * invH;
+                outU1 = (x1 - 0.5f) * invW;
+                outV1 = (y1 - 0.5f) * invH;
             }
         };
 
@@ -211,20 +238,38 @@ namespace AltinaEngine::DebugGui {
         public:
             explicit FDebugGuiContext(FDrawData& drawData, FClipRectStack& clip,
                 const FGuiInput& input, FUIState& ui, const FVector2f& displaySize,
-                const FFontAtlas& atlas, TVector<FString>& windowOrder)
+                const FFontAtlas& atlas, const FDebugGuiTheme& theme, TVector<FString>& windowOrder,
+                Container::THashMap<u64, FWindowState>& windows, u64& draggingWindowKey,
+                FVector2f& dragOffset)
                 : mDrawData(&drawData)
                 , mClip(&clip)
                 , mInput(input)
                 , mUi(&ui)
                 , mDisplaySize(displaySize)
                 , mAtlas(&atlas)
-                , mSolidU(0.5f / static_cast<f32>(FFontAtlas::kAtlasW))
-                , mSolidV(0.5f / static_cast<f32>(FFontAtlas::kAtlasH))
-                , mWindowOrder(&windowOrder) {}
+                , mTheme(&theme)
+                // Inset by half a texel to avoid sampling bleed (linear sampler).
+                , mSolidU0((static_cast<f32>(FFontAtlas::kSolidTexelX) + 0.5f)
+                      / static_cast<f32>(FFontAtlas::kAtlasW))
+                , mSolidV0((static_cast<f32>(FFontAtlas::kSolidTexelY) + 0.5f)
+                      / static_cast<f32>(FFontAtlas::kAtlasH))
+                , mSolidU1(
+                      (static_cast<f32>(FFontAtlas::kSolidTexelX + FFontAtlas::kAtlasGlyphW) - 0.5f)
+                      / static_cast<f32>(FFontAtlas::kAtlasW))
+                , mSolidV1(
+                      (static_cast<f32>(FFontAtlas::kSolidTexelY + FFontAtlas::kAtlasGlyphH) - 0.5f)
+                      / static_cast<f32>(FFontAtlas::kAtlasH))
+                , mWindowOrder(&windowOrder)
+                , mWindows(&windows)
+                , mDraggingWindowKey(&draggingWindowKey)
+                , mDragOffset(&dragOffset) {}
 
             [[nodiscard]] auto GetWindowRect() const noexcept -> FRect { return mWindowRect; }
             [[nodiscard]] auto GetContentRect() const noexcept -> FRect {
                 return { mContentMin, mContentMax };
+            }
+            [[nodiscard]] auto GetTheme() const noexcept -> const FDebugGuiTheme& {
+                return *mTheme;
             }
             [[nodiscard]] auto IsMouseHoveringRect(const FRect& rect) const noexcept -> bool {
                 return PointInRect(mInput.MousePos, rect);
@@ -232,8 +277,10 @@ namespace AltinaEngine::DebugGui {
             [[nodiscard]] auto DebugHashId(FStringView label) const noexcept -> u64 {
                 return HashId(label);
             }
+            [[nodiscard]] auto GetCursorPos() const noexcept -> FVector2f { return mCursor; }
+            void               SetCursorPos(const FVector2f& p) noexcept { mCursor = p; }
 
-            void PushClipRect(const FRect& rect) override {
+            void               PushClipRect(const FRect& rect) override {
                 const FRect cur = mClip->Current(mDisplaySize);
                 mClip->Push(IntersectRect(cur, rect));
             }
@@ -245,9 +292,28 @@ namespace AltinaEngine::DebugGui {
             void DrawRect(const FRect& rect, FColor32 color, f32 thickness) override {
                 AddRect(rect, color, thickness);
             }
+            void DrawRoundedRectFilled(const FRect& rect, FColor32 color, f32 rounding) override {
+                AddRoundedRectFilled(rect, color, rounding);
+            }
+            void DrawRoundedRect(
+                const FRect& rect, FColor32 color, f32 rounding, f32 thickness) override {
+                AddRoundedRect(rect, color, rounding, thickness);
+            }
+            void DrawCapsuleFilled(
+                const FVector2f& a, const FVector2f& b, f32 radius, FColor32 color) override {
+                AddCapsuleFilled(a, b, radius, color);
+            }
+            void DrawCapsule(const FVector2f& a, const FVector2f& b, f32 radius, FColor32 color,
+                f32 thickness) override {
+                AddCapsule(a, b, radius, color, thickness);
+            }
             void DrawLine(
                 const FVector2f& p0, const FVector2f& p1, FColor32 color, f32 thickness) override {
                 AddLine(p0, p1, color, thickness);
+            }
+            void DrawTriangleFilled(const FVector2f& p0, const FVector2f& p1, const FVector2f& p2,
+                FColor32 color) override {
+                AddTriangleFilled(p0, p1, p2, color);
             }
             void DrawText(const FVector2f& pos, FColor32 color, FStringView text) override {
                 AddText(pos, color, text);
@@ -268,8 +334,14 @@ namespace AltinaEngine::DebugGui {
                     return false;
                 }
 
+                if (mWindows == nullptr) {
+                    return false;
+                }
+
+                const auto& th = *mTheme;
+
                 // Track order for default placement.
-                usize windowIndex = 0U;
+                usize       windowIndex = 0U;
                 if (mWindowOrder != nullptr) {
                     bool found = false;
                     for (const auto& s : *mWindowOrder) {
@@ -286,39 +358,143 @@ namespace AltinaEngine::DebugGui {
                 }
 
                 mCurrentWindowTitle.Assign(title);
-                mWindowPos  = FVector2f(10.0f, 10.0f);
-                mWindowSize = FVector2f(460.0f, 260.0f);
-                if (mWindowOrder != nullptr) {
-                    // Place windows in columns if the display height is too small for pure vertical
-                    // stacking.
-                    const f32 cellW = mWindowSize.X() + 10.0f;
-                    const f32 cellH = mWindowSize.Y() + 10.0f;
-                    const f32 usableH =
-                        (mDisplaySize.Y() > 10.0f) ? (mDisplaySize.Y() - 10.0f) : 0.0f;
-                    const u32 perCol = (usableH > cellH) ? static_cast<u32>(usableH / cellH) : 1U;
+                const u64 windowKey = HashWindowKey(title);
+                auto&     state     = (*mWindows)[windowKey];
+                if (!state.bInitialized) {
+                    state.bInitialized = true;
+                    state.Size         = th.WindowDefaultSize;
+                    state.Pos          = th.WindowDefaultPos;
 
-                    const u32 col = static_cast<u32>(windowIndex) / perCol;
-                    const u32 row = static_cast<u32>(windowIndex) % perCol;
-                    mWindowPos    = FVector2f(10.0f + static_cast<f32>(col) * cellW,
-                           10.0f + static_cast<f32>(row) * cellH);
+                    if (mWindowOrder != nullptr) {
+                        // Place windows in columns if the display height is too small for pure
+                        // vertical stacking.
+                        const f32 cellW   = state.Size.X() + th.WindowSpacing;
+                        const f32 cellH   = state.Size.Y() + th.WindowSpacing;
+                        const f32 usableH = (mDisplaySize.Y() > th.WindowDefaultPos.Y())
+                            ? (mDisplaySize.Y() - th.WindowDefaultPos.Y())
+                            : 0.0f;
+                        const u32 perCol =
+                            (usableH > cellH) ? static_cast<u32>(usableH / cellH) : 1U;
+
+                        const u32 col = static_cast<u32>(windowIndex) / perCol;
+                        const u32 row = static_cast<u32>(windowIndex) % perCol;
+                        state.Pos =
+                            FVector2f(th.WindowDefaultPos.X() + static_cast<f32>(col) * cellW,
+                                th.WindowDefaultPos.Y() + static_cast<f32>(row) * cellH);
+                    }
                 }
 
-                const FRect windowRect{ mWindowPos,
-                    FVector2f(mWindowPos.X() + mWindowSize.X(), mWindowPos.Y() + mWindowSize.Y()) };
+                mWindowPos  = state.Pos;
+                mWindowSize = state.Size;
 
-                const f32   titleBarH = 18.0f;
-                const FRect titleRect{ mWindowPos,
-                    FVector2f(mWindowPos.X() + mWindowSize.X(), mWindowPos.Y() + titleBarH) };
+                const f32 titleBarH = th.TitleBarHeight;
 
-                mWindowRect = windowRect;
+                // Title bar collapse button (right side).
+                const f32 kTitlePadX = th.CollapseButtonPadX;
+                const f32 kBtnSize   = th.CollapseButtonSize;
 
-                DrawRectFilled(windowRect, MakeColor32(15, 15, 15, 200));
-                DrawRect(windowRect, MakeColor32(255, 255, 255, 140), 1.0f);
-                DrawRectFilled(titleRect, MakeColor32(25, 25, 25, 220));
-                DrawText(FVector2f(mWindowPos.X() + 8.0f, mWindowPos.Y() + 4.0f),
-                    MakeColor32(255, 255, 255, 255), title);
+                f32       drawH = 0.0f;
+                FRect     windowRect{};
+                FRect     titleRect{};
+                FVector2f btnMin(0.0f, 0.0f);
+                FRect     btnRect{};
 
-                const f32       pad = 8.0f;
+                auto      BuildRects = [&]() {
+                    drawH      = state.bCollapsed ? (titleBarH + 2.0f) : mWindowSize.Y();
+                    windowRect = { mWindowPos,
+                        FVector2f(mWindowPos.X() + mWindowSize.X(), mWindowPos.Y() + drawH) };
+                    titleRect  = { mWindowPos,
+                         FVector2f(mWindowPos.X() + mWindowSize.X(), mWindowPos.Y() + titleBarH) };
+                    btnMin = FVector2f(mWindowPos.X() + mWindowSize.X() - kTitlePadX - kBtnSize,
+                             mWindowPos.Y() + th.CollapseButtonOffsetY);
+                    btnRect = { btnMin, FVector2f(btnMin.X() + kBtnSize, btnMin.Y() + kBtnSize) };
+                    mWindowRect = windowRect;
+                };
+
+                BuildRects();
+
+                // Collapse toggle interaction.
+                const u64  collapseId = HashId(TEXT("##WindowCollapse"));
+                const bool btnHovered = PointInRect(mInput.MousePos, btnRect);
+                if (btnHovered) {
+                    mUi->HotId              = collapseId;
+                    mUi->bWantsCaptureMouse = true;
+                }
+                if (btnHovered && mInput.bMousePressed) {
+                    mUi->ActiveId = collapseId;
+                    mUi->FocusId  = collapseId;
+                }
+                if (mUi->ActiveId == collapseId && mInput.bMouseReleased) {
+                    if (btnHovered) {
+                        state.bCollapsed = !state.bCollapsed;
+                    }
+                    mUi->ActiveId = 0ULL;
+                }
+
+                // Drag interaction (on title bar excluding collapse button).
+                const u64  dragId       = HashId(TEXT("##WindowDrag"));
+                const bool titleHovered = PointInRect(mInput.MousePos, titleRect)
+                    && !PointInRect(mInput.MousePos, btnRect);
+                if (titleHovered && mInput.bMousePressed) {
+                    mUi->ActiveId           = dragId;
+                    mUi->FocusId            = dragId;
+                    mUi->bWantsCaptureMouse = true;
+                    if (mDraggingWindowKey != nullptr) {
+                        *mDraggingWindowKey = windowKey;
+                    }
+                    if (mDragOffset != nullptr) {
+                        *mDragOffset = mInput.MousePos - state.Pos;
+                    }
+                }
+                if (mUi->ActiveId == dragId && mInput.bMouseDown && mDraggingWindowKey != nullptr
+                    && *mDraggingWindowKey == windowKey && mDragOffset != nullptr) {
+                    state.Pos  = mInput.MousePos - *mDragOffset;
+                    mWindowPos = state.Pos;
+                }
+                if (mUi->ActiveId == dragId && mInput.bMouseReleased) {
+                    mUi->ActiveId = 0ULL;
+                    if (mDraggingWindowKey != nullptr) {
+                        *mDraggingWindowKey = 0ULL;
+                    }
+                }
+
+                // Update rects after drag/collapse changes for correct visuals this frame.
+                BuildRects();
+
+                const bool btnHoveredDraw = PointInRect(mInput.MousePos, btnRect);
+
+                DrawRectFilled(windowRect, th.WindowBg);
+                DrawRect(windowRect, th.WindowBorder, 1.0f);
+                DrawRectFilled(titleRect, th.TitleBarBg);
+                DrawText(FVector2f(mWindowPos.X() + th.WindowPadding,
+                             mWindowPos.Y() + th.TitleTextOffsetY),
+                    th.TitleText, title);
+
+                // Collapse button visuals.
+                const bool     btnActive = (mUi->ActiveId == collapseId);
+                const FColor32 btnBg     = btnActive
+                        ? th.CollapseButtonActiveBg
+                        : (btnHoveredDraw ? th.CollapseButtonHoverBg : th.CollapseButtonBg);
+                DrawRectFilled(btnRect, btnBg);
+                DrawRect(btnRect, th.CollapseButtonBorder, 1.0f);
+                // Triangle icon (no font dependency).
+                const FVector2f c((btnRect.Min.X() + btnRect.Max.X()) * 0.5f,
+                    (btnRect.Min.Y() + btnRect.Max.Y()) * 0.5f);
+                const f32       hw = th.CollapseIconHalfWidth;
+                const f32       hh = th.CollapseIconHalfHeight;
+                if (state.bCollapsed) {
+                    // Down triangle.
+                    DrawTriangleFilled(FVector2f(c.X() - hw, c.Y() - hh),
+                        FVector2f(c.X() + hw, c.Y() - hh), FVector2f(c.X(), c.Y() + hh),
+                        th.CollapseIcon);
+                } else {
+                    // Up triangle.
+                    DrawTriangleFilled(FVector2f(c.X() - hw, c.Y() + hh),
+                        FVector2f(c.X() + hw, c.Y() + hh), FVector2f(c.X(), c.Y() - hh),
+                        th.CollapseIcon);
+                }
+
+                const f32       pad = th.WindowPadding;
                 const FVector2f contentMin(mWindowPos.X() + pad, mWindowPos.Y() + titleBarH + pad);
                 const FVector2f contentMax(
                     mWindowPos.X() + mWindowSize.X() - pad, mWindowPos.Y() + mWindowSize.Y() - pad);
@@ -332,6 +508,10 @@ namespace AltinaEngine::DebugGui {
                     && (mInput.bMouseDown || mInput.bMousePressed
                         || mInput.MouseWheelDelta != 0.0f)) {
                     mUi->bWantsCaptureMouse = true;
+                }
+
+                if (state.bCollapsed) {
+                    return false;
                 }
 
                 PushClipRect({ contentMin, contentMax });
@@ -348,16 +528,16 @@ namespace AltinaEngine::DebugGui {
                     AdvanceLine();
                     return;
                 }
-                DrawText(mCursor, MakeColor32(220, 220, 220, 255), text);
+                DrawText(mCursor, mTheme->Text, text);
                 AdvanceLine();
             }
 
             void Separator() override {
-                const f32       y = mCursor.Y() + 4.0f;
+                const f32       y = mCursor.Y() + mTheme->SeparatorPaddingY;
                 const FVector2f a(mContentMin.X(), y);
                 const FVector2f b(mContentMax.X(), y);
-                DrawLine(a, b, MakeColor32(255, 255, 255, 80), 1.0f);
-                mCursor = FVector2f(mCursor.X(), y + 6.0f);
+                DrawLine(a, b, mTheme->Separator, 1.0f);
+                mCursor = FVector2f(mCursor.X(), y + mTheme->SeparatorPaddingY + 2.0f);
             }
 
             [[nodiscard]] bool Button(FStringView label) override {
@@ -385,15 +565,16 @@ namespace AltinaEngine::DebugGui {
                     }
                 }
 
-                FColor32 bg = hovered ? MakeColor32(80, 80, 80, 220) : MakeColor32(60, 60, 60, 220);
+                FColor32 bg = hovered ? mTheme->ButtonHoveredBg : mTheme->ButtonBg;
                 if (mUi->ActiveId == id) {
-                    bg = MakeColor32(100, 100, 100, 240);
+                    bg = mTheme->ButtonActiveBg;
                 }
                 DrawRectFilled(r, bg);
-                DrawRect(r, MakeColor32(255, 255, 255, 100), 1.0f);
+                DrawRect(r, mTheme->ButtonBorder, 1.0f);
 
-                const FVector2f textPos(r.Min.X() + 6.0f, r.Min.Y() + 3.0f);
-                DrawText(textPos, MakeColor32(255, 255, 255, 255), label);
+                const FVector2f textPos(
+                    r.Min.X() + mTheme->ButtonPaddingX, r.Min.Y() + mTheme->ButtonPaddingY);
+                DrawText(textPos, mTheme->ButtonText, label);
 
                 AdvanceItem(size);
                 return pressed;
@@ -401,10 +582,11 @@ namespace AltinaEngine::DebugGui {
 
             [[nodiscard]] bool Checkbox(FStringView label, bool& value) override {
                 const u64       id  = HashId(label);
-                const f32       box = 14.0f;
+                const f32       box = mTheme->CheckboxBoxSize;
                 const FRect     boxRect{ mCursor, FVector2f(mCursor.X() + box, mCursor.Y() + box) };
-                const FVector2f textPos(mCursor.X() + box + 8.0f, mCursor.Y() + 3.0f);
-                const f32       w = box + 8.0f + CalcTextWidth(label);
+                const FVector2f textPos(mCursor.X() + box + mTheme->CheckboxTextOffsetX,
+                    mCursor.Y() + mTheme->ButtonPaddingY);
+                const f32       w = box + mTheme->CheckboxTextOffsetX + CalcTextWidth(label);
                 const f32       h = box;
                 const FRect     fullRect{ mCursor, FVector2f(mCursor.X() + w, mCursor.Y() + h) };
 
@@ -427,14 +609,15 @@ namespace AltinaEngine::DebugGui {
                     mUi->ActiveId = 0ULL;
                 }
 
-                DrawRectFilled(boxRect, MakeColor32(30, 30, 30, 255));
-                DrawRect(boxRect, MakeColor32(255, 255, 255, 120), 1.0f);
+                DrawRectFilled(boxRect, mTheme->CheckboxBoxBg);
+                DrawRect(boxRect, mTheme->CheckboxBoxBorder, 1.0f);
                 if (value) {
-                    const FRect mark{ FVector2f(boxRect.Min.X() + 3.0f, boxRect.Min.Y() + 3.0f),
-                        FVector2f(boxRect.Max.X() - 3.0f, boxRect.Max.Y() - 3.0f) };
-                    DrawRectFilled(mark, MakeColor32(140, 200, 140, 255));
+                    const f32   inset = mTheme->CheckboxMarkInset;
+                    const FRect mark{ FVector2f(boxRect.Min.X() + inset, boxRect.Min.Y() + inset),
+                        FVector2f(boxRect.Max.X() - inset, boxRect.Max.Y() - inset) };
+                    DrawRectFilled(mark, mTheme->CheckboxMark);
                 }
-                DrawText(textPos, MakeColor32(220, 220, 220, 255), label);
+                DrawText(textPos, mTheme->Text, label);
 
                 AdvanceItem(FVector2f(w, h));
                 return changed;
@@ -449,7 +632,7 @@ namespace AltinaEngine::DebugGui {
                 Text(label);
                 const u64   id = HashId(label);
                 const f32   w  = mContentMax.X() - mContentMin.X();
-                const f32   h  = 16.0f;
+                const f32   h  = mTheme->SliderHeight;
                 const FRect r{ mCursor, FVector2f(mCursor.X() + w, mCursor.Y() + h) };
 
                 const bool  hovered = PointInRect(mInput.MousePos, r);
@@ -477,14 +660,14 @@ namespace AltinaEngine::DebugGui {
                     mUi->ActiveId = 0ULL;
                 }
 
-                DrawRectFilled(r, MakeColor32(40, 40, 40, 255));
-                DrawRect(r, MakeColor32(255, 255, 255, 90), 1.0f);
+                DrawRectFilled(r, mTheme->SliderBg);
+                DrawRect(r, mTheme->SliderBorder, 1.0f);
                 const f32   norm  = (value - minValue) / (maxValue - minValue);
                 const f32   fillW = (norm < 0.0f) ? 0.0f : ((norm > 1.0f) ? 1.0f : norm);
                 const FRect fill{ r.Min, FVector2f(r.Min.X() + w * fillW, r.Max.Y()) };
-                DrawRectFilled(fill, MakeColor32(120, 160, 220, 255));
+                DrawRectFilled(fill, mTheme->SliderFill);
 
-                AdvanceItem(FVector2f(w, h + 4.0f));
+                AdvanceItem(FVector2f(w, h + mTheme->SliderBottomSpacingY));
                 return changed;
             }
 
@@ -492,7 +675,7 @@ namespace AltinaEngine::DebugGui {
                 Text(label);
                 const u64   id = HashId(label);
                 const f32   w  = mContentMax.X() - mContentMin.X();
-                const f32   h  = 18.0f;
+                const f32   h  = mTheme->InputHeight;
                 const FRect r{ mCursor, FVector2f(mCursor.X() + w, mCursor.Y() + h) };
 
                 const bool  hovered = PointInRect(mInput.MousePos, r);
@@ -522,6 +705,74 @@ namespace AltinaEngine::DebugGui {
                             value.Append(static_cast<TChar>(code));
                             changed = true;
                         }
+
+                        // Fallback: synthesize basic ASCII from key presses when WM_CHAR is not
+                        // available.
+                        if (chars.IsEmpty()) {
+                            const bool shift = mInput.Input->IsKeyDown(Input::EKey::LeftShift)
+                                || mInput.Input->IsKeyDown(Input::EKey::RightShift);
+
+                            auto TryAppendAlpha = [&](Input::EKey key, char lower) {
+                                if (!mInput.Input->WasKeyPressed(key)) {
+                                    return;
+                                }
+                                const char c =
+                                    shift ? static_cast<char>(lower - ('a' - 'A')) : lower;
+                                value.Append(static_cast<TChar>(c));
+                                changed = true;
+                            };
+
+                            TryAppendAlpha(Input::EKey::A, 'a');
+                            TryAppendAlpha(Input::EKey::B, 'b');
+                            TryAppendAlpha(Input::EKey::C, 'c');
+                            TryAppendAlpha(Input::EKey::D, 'd');
+                            TryAppendAlpha(Input::EKey::E, 'e');
+                            TryAppendAlpha(Input::EKey::F, 'f');
+                            TryAppendAlpha(Input::EKey::G, 'g');
+                            TryAppendAlpha(Input::EKey::H, 'h');
+                            TryAppendAlpha(Input::EKey::I, 'i');
+                            TryAppendAlpha(Input::EKey::J, 'j');
+                            TryAppendAlpha(Input::EKey::K, 'k');
+                            TryAppendAlpha(Input::EKey::L, 'l');
+                            TryAppendAlpha(Input::EKey::M, 'm');
+                            TryAppendAlpha(Input::EKey::N, 'n');
+                            TryAppendAlpha(Input::EKey::O, 'o');
+                            TryAppendAlpha(Input::EKey::P, 'p');
+                            TryAppendAlpha(Input::EKey::Q, 'q');
+                            TryAppendAlpha(Input::EKey::R, 'r');
+                            TryAppendAlpha(Input::EKey::S, 's');
+                            TryAppendAlpha(Input::EKey::T, 't');
+                            TryAppendAlpha(Input::EKey::U, 'u');
+                            TryAppendAlpha(Input::EKey::V, 'v');
+                            TryAppendAlpha(Input::EKey::W, 'w');
+                            TryAppendAlpha(Input::EKey::X, 'x');
+                            TryAppendAlpha(Input::EKey::Y, 'y');
+                            TryAppendAlpha(Input::EKey::Z, 'z');
+
+                            auto TryAppendDigit = [&](Input::EKey key, char digit) {
+                                if (!mInput.Input->WasKeyPressed(key)) {
+                                    return;
+                                }
+                                value.Append(static_cast<TChar>(digit));
+                                changed = true;
+                            };
+
+                            TryAppendDigit(Input::EKey::Num0, '0');
+                            TryAppendDigit(Input::EKey::Num1, '1');
+                            TryAppendDigit(Input::EKey::Num2, '2');
+                            TryAppendDigit(Input::EKey::Num3, '3');
+                            TryAppendDigit(Input::EKey::Num4, '4');
+                            TryAppendDigit(Input::EKey::Num5, '5');
+                            TryAppendDigit(Input::EKey::Num6, '6');
+                            TryAppendDigit(Input::EKey::Num7, '7');
+                            TryAppendDigit(Input::EKey::Num8, '8');
+                            TryAppendDigit(Input::EKey::Num9, '9');
+
+                            if (mInput.Input->WasKeyPressed(Input::EKey::Space)) {
+                                value.Append(static_cast<TChar>(' '));
+                                changed = true;
+                            }
+                        }
                     }
 
                     if (mInput.bKeyBackspacePressed && !value.IsEmptyString()) {
@@ -536,33 +787,35 @@ namespace AltinaEngine::DebugGui {
                 }
 
                 const bool active = (mUi->ActiveId == id);
-                DrawRectFilled(
-                    r, active ? MakeColor32(30, 30, 30, 255) : MakeColor32(25, 25, 25, 255));
-                DrawRect(r, MakeColor32(255, 255, 255, active ? 160 : 90), 1.0f);
-                DrawText(FVector2f(r.Min.X() + 6.0f, r.Min.Y() + 4.0f),
-                    MakeColor32(220, 220, 220, 255), value.ToView());
+                DrawRectFilled(r, active ? mTheme->InputActiveBg : mTheme->InputBg);
+                DrawRect(r, active ? mTheme->InputActiveBorder : mTheme->InputBorder, 1.0f);
+                DrawText(FVector2f(r.Min.X() + mTheme->InputTextOffsetX,
+                             r.Min.Y() + mTheme->InputTextOffsetY),
+                    mTheme->InputText, value.ToView());
 
-                AdvanceItem(FVector2f(w, h + 6.0f));
+                AdvanceItem(FVector2f(w, h));
                 return changed;
             }
 
         private:
             void AdvanceLine() {
-                mCursor = FVector2f(
-                    mContentMin.X(), mCursor.Y() + static_cast<f32>(FFontAtlas::kGlyphH) + 4.0f);
+                mCursor = FVector2f(mContentMin.X(),
+                    mCursor.Y() + static_cast<f32>(FFontAtlas::kDrawGlyphH) + mTheme->ItemSpacingY);
             }
 
             void AdvanceItem(const FVector2f& itemSize) {
-                mCursor = FVector2f(mContentMin.X(), mCursor.Y() + itemSize.Y() + 4.0f);
+                mCursor =
+                    FVector2f(mContentMin.X(), mCursor.Y() + itemSize.Y() + mTheme->ItemSpacingY);
             }
 
             [[nodiscard]] auto CalcTextWidth(FStringView s) const noexcept -> f32 {
-                return static_cast<f32>(s.Length()) * static_cast<f32>(FFontAtlas::kGlyphW);
+                return static_cast<f32>(s.Length()) * static_cast<f32>(FFontAtlas::kDrawGlyphW);
             }
 
             [[nodiscard]] auto CalcButtonSize(FStringView label) const noexcept -> FVector2f {
-                const f32 w = CalcTextWidth(label) + 12.0f;
-                const f32 h = static_cast<f32>(FFontAtlas::kGlyphH) + 6.0f;
+                const f32 w = CalcTextWidth(label) + mTheme->ButtonPaddingX * 2.0f;
+                const f32 h =
+                    static_cast<f32>(FFontAtlas::kDrawGlyphH) + mTheme->ButtonPaddingY * 2.0f;
                 return FVector2f(w, h);
             }
 
@@ -579,6 +832,17 @@ namespace AltinaEngine::DebugGui {
                 };
                 MixView(mCurrentWindowTitle.ToView());
                 MixView(label);
+                return h;
+            }
+
+            [[nodiscard]] static auto HashWindowKey(FStringView title) noexcept -> u64 {
+                constexpr u64 kOffset = 1469598103934665603ULL;
+                constexpr u64 kPrime  = 1099511628211ULL;
+                u64           h       = kOffset;
+                for (usize i = 0; i < title.Length(); ++i) {
+                    h ^= static_cast<u64>(static_cast<u32>(title[i]));
+                    h *= kPrime;
+                }
                 return h;
             }
 
@@ -624,9 +888,26 @@ namespace AltinaEngine::DebugGui {
                 mDrawData->Cmds.Back().IndexCount += 6U;
             }
 
+            void AddTriangleFilled(
+                const FVector2f& p0, const FVector2f& p1, const FVector2f& p2, FColor32 color) {
+                BeginCmdIfNeeded();
+                const u32 base = static_cast<u32>(mDrawData->Vertices.Size());
+                const f32 u    = (mSolidU0 + mSolidU1) * 0.5f;
+                const f32 v    = (mSolidV0 + mSolidV1) * 0.5f;
+                mDrawData->Vertices.PushBack({ p0.X(), p0.Y(), u, v, color });
+                mDrawData->Vertices.PushBack({ p1.X(), p1.Y(), u, v, color });
+                mDrawData->Vertices.PushBack({ p2.X(), p2.Y(), u, v, color });
+
+                mDrawData->Indices.PushBack(base + 0U);
+                mDrawData->Indices.PushBack(base + 1U);
+                mDrawData->Indices.PushBack(base + 2U);
+
+                mDrawData->Cmds.Back().IndexCount += 3U;
+            }
+
             void AddRectFilled(const FRect& rect, FColor32 color) {
                 AddQuad(rect.Min, FVector2f(rect.Max.X(), rect.Min.Y()), rect.Max,
-                    FVector2f(rect.Min.X(), rect.Max.Y()), mSolidU, mSolidV, mSolidU, mSolidV,
+                    FVector2f(rect.Min.X(), rect.Max.Y()), mSolidU0, mSolidV0, mSolidU1, mSolidV1,
                     color);
             }
 
@@ -642,6 +923,212 @@ namespace AltinaEngine::DebugGui {
                     color);
             }
 
+            [[nodiscard]] static auto ClampNonNegative(f32 v) noexcept -> f32 {
+                return (v > 0.0f) ? v : 0.0f;
+            }
+
+            [[nodiscard]] static auto Min2(f32 a, f32 b) noexcept -> f32 { return (a < b) ? a : b; }
+
+            [[nodiscard]] static auto CalcArcSegments90(f32 radius) noexcept -> u32 {
+                // 90-degree arc segments. Keep small and deterministic for stable tests.
+                // radius in pixels, typical GUI values: 2..16.
+                const f32 r   = ClampNonNegative(radius);
+                u32       seg = static_cast<u32>(r * 0.25f) + 4U;
+                if (seg < 4U) {
+                    seg = 4U;
+                }
+                if (seg > 16U) {
+                    seg = 16U;
+                }
+                return seg;
+            }
+
+            void AddArcFilled(const FVector2f& center, f32 radius, f32 startAngleRad,
+                f32 endAngleRad, u32 segments, FColor32 color) {
+                if (radius <= 0.0f || segments == 0U) {
+                    return;
+                }
+
+                const f32 step = (endAngleRad - startAngleRad) / static_cast<f32>(segments);
+                f32       a0   = startAngleRad;
+                FVector2f p0(
+                    center.X() + std::cos(a0) * radius, center.Y() + std::sin(a0) * radius);
+                for (u32 i = 0U; i < segments; ++i) {
+                    const f32       a1 = startAngleRad + step * static_cast<f32>(i + 1U);
+                    const FVector2f p1(
+                        center.X() + std::cos(a1) * radius, center.Y() + std::sin(a1) * radius);
+                    AddTriangleFilled(center, p0, p1, color);
+                    p0 = p1;
+                }
+            }
+
+            void AddArcStroke(const FVector2f& center, f32 radius, f32 startAngleRad,
+                f32 endAngleRad, u32 segments, FColor32 color, f32 thickness) {
+                if (radius <= 0.0f || segments == 0U) {
+                    return;
+                }
+
+                const f32 step = (endAngleRad - startAngleRad) / static_cast<f32>(segments);
+                f32       a0   = startAngleRad;
+                FVector2f p0(
+                    center.X() + std::cos(a0) * radius, center.Y() + std::sin(a0) * radius);
+                for (u32 i = 0U; i < segments; ++i) {
+                    const f32       a1 = startAngleRad + step * static_cast<f32>(i + 1U);
+                    const FVector2f p1(
+                        center.X() + std::cos(a1) * radius, center.Y() + std::sin(a1) * radius);
+                    AddLine(p0, p1, color, thickness);
+                    p0 = p1;
+                }
+            }
+
+            void AddRoundedRectFilled(const FRect& rect, FColor32 color, f32 rounding) {
+                const f32 w = rect.Max.X() - rect.Min.X();
+                const f32 h = rect.Max.Y() - rect.Min.Y();
+                if (w <= 0.0f || h <= 0.0f) {
+                    return;
+                }
+
+                f32 r = ClampNonNegative(rounding);
+                r     = Min2(r, Min2(w * 0.5f, h * 0.5f));
+                if (r <= 0.0f) {
+                    AddRectFilled(rect, color);
+                    return;
+                }
+
+                const f32 minX = rect.Min.X();
+                const f32 minY = rect.Min.Y();
+                const f32 maxX = rect.Max.X();
+                const f32 maxY = rect.Max.Y();
+
+                // 5 non-overlapping quads + 4 corner sectors.
+                AddRectFilled(
+                    { FVector2f(minX + r, minY + r), FVector2f(maxX - r, maxY - r) }, color);
+                AddRectFilled({ FVector2f(minX + r, minY), FVector2f(maxX - r, minY + r) }, color);
+                AddRectFilled({ FVector2f(minX + r, maxY - r), FVector2f(maxX - r, maxY) }, color);
+                AddRectFilled({ FVector2f(minX, minY + r), FVector2f(minX + r, maxY - r) }, color);
+                AddRectFilled({ FVector2f(maxX - r, minY + r), FVector2f(maxX, maxY - r) }, color);
+
+                constexpr f32 kPi   = 3.14159265358979323846f;
+                const u32     seg90 = CalcArcSegments90(r);
+
+                // Top-left (pi .. 3pi/2).
+                AddArcFilled(FVector2f(minX + r, minY + r), r, kPi, 1.5f * kPi, seg90, color);
+                // Top-right (-pi/2 .. 0).
+                AddArcFilled(FVector2f(maxX - r, minY + r), r, -0.5f * kPi, 0.0f, seg90, color);
+                // Bottom-right (0 .. pi/2).
+                AddArcFilled(FVector2f(maxX - r, maxY - r), r, 0.0f, 0.5f * kPi, seg90, color);
+                // Bottom-left (pi/2 .. pi).
+                AddArcFilled(FVector2f(minX + r, maxY - r), r, 0.5f * kPi, kPi, seg90, color);
+            }
+
+            void AddRoundedRect(const FRect& rect, FColor32 color, f32 rounding, f32 thickness) {
+                const f32 w = rect.Max.X() - rect.Min.X();
+                const f32 h = rect.Max.Y() - rect.Min.Y();
+                if (w <= 0.0f || h <= 0.0f) {
+                    return;
+                }
+
+                f32 r = ClampNonNegative(rounding);
+                r     = Min2(r, Min2(w * 0.5f, h * 0.5f));
+                if (r <= 0.0f) {
+                    AddRect(rect, color, thickness);
+                    return;
+                }
+
+                constexpr f32 kPi   = 3.14159265358979323846f;
+                const u32     seg90 = CalcArcSegments90(r);
+
+                const f32     minX = rect.Min.X();
+                const f32     minY = rect.Min.Y();
+                const f32     maxX = rect.Max.X();
+                const f32     maxY = rect.Max.Y();
+
+                // Edges.
+                AddLine(FVector2f(minX + r, minY), FVector2f(maxX - r, minY), color, thickness);
+                AddLine(FVector2f(maxX, minY + r), FVector2f(maxX, maxY - r), color, thickness);
+                AddLine(FVector2f(maxX - r, maxY), FVector2f(minX + r, maxY), color, thickness);
+                AddLine(FVector2f(minX, maxY - r), FVector2f(minX, minY + r), color, thickness);
+
+                // Corners.
+                AddArcStroke(
+                    FVector2f(maxX - r, minY + r), r, -0.5f * kPi, 0.0f, seg90, color, thickness);
+                AddArcStroke(
+                    FVector2f(maxX - r, maxY - r), r, 0.0f, 0.5f * kPi, seg90, color, thickness);
+                AddArcStroke(
+                    FVector2f(minX + r, maxY - r), r, 0.5f * kPi, kPi, seg90, color, thickness);
+                AddArcStroke(
+                    FVector2f(minX + r, minY + r), r, kPi, 1.5f * kPi, seg90, color, thickness);
+            }
+
+            void AddCapsuleFilled(
+                const FVector2f& a, const FVector2f& b, f32 radius, FColor32 color) {
+                const f32 r = ClampNonNegative(radius);
+                if (r <= 0.0f) {
+                    return;
+                }
+
+                const FVector2f d    = b - a;
+                const f32       len2 = d.X() * d.X() + d.Y() * d.Y();
+                if (len2 <= 0.0001f) {
+                    // Degenerates to a circle.
+                    constexpr f32 kPi = 3.14159265358979323846f;
+                    const u32     seg = CalcArcSegments90(r) * 4U;
+                    AddArcFilled(a, r, 0.0f, 2.0f * kPi, seg, color);
+                    return;
+                }
+
+                const f32       invLen = 1.0f / std::sqrt(len2);
+                const FVector2f u(d.X() * invLen, d.Y() * invLen);
+                const FVector2f p(-u.Y(), u.X());
+                const FVector2f off(p.X() * r, p.Y() * r);
+
+                // Middle quad (non-overlapping with end caps).
+                AddQuad(a + off, b + off, b - off, a - off, mSolidU0, mSolidV0, mSolidU1, mSolidV1,
+                    color);
+
+                constexpr f32 kPi    = 3.14159265358979323846f;
+                const f32     ang    = std::atan2(u.Y(), u.X());
+                const u32     seg180 = CalcArcSegments90(r) * 2U;
+
+                // End caps: semicircles meeting the quad edges at dot(u)==0.
+                AddArcFilled(a, r, ang + 0.5f * kPi, ang + 1.5f * kPi, seg180, color);
+                AddArcFilled(b, r, ang - 0.5f * kPi, ang + 0.5f * kPi, seg180, color);
+            }
+
+            void AddCapsule(
+                const FVector2f& a, const FVector2f& b, f32 radius, FColor32 color, f32 thickness) {
+                const f32 r = ClampNonNegative(radius);
+                if (r <= 0.0f) {
+                    return;
+                }
+
+                const FVector2f d    = b - a;
+                const f32       len2 = d.X() * d.X() + d.Y() * d.Y();
+                if (len2 <= 0.0001f) {
+                    // Degenerates to a circle stroke.
+                    constexpr f32 kPi = 3.14159265358979323846f;
+                    const u32     seg = CalcArcSegments90(r) * 4U;
+                    AddArcStroke(a, r, 0.0f, 2.0f * kPi, seg, color, thickness);
+                    return;
+                }
+
+                const f32       invLen = 1.0f / std::sqrt(len2);
+                const FVector2f u(d.X() * invLen, d.Y() * invLen);
+                const FVector2f p(-u.Y(), u.X());
+                const FVector2f off(p.X() * r, p.Y() * r);
+
+                // Side edges.
+                AddLine(a + off, b + off, color, thickness);
+                AddLine(b - off, a - off, color, thickness);
+
+                constexpr f32 kPi    = 3.14159265358979323846f;
+                const f32     ang    = std::atan2(u.Y(), u.X());
+                const u32     seg180 = CalcArcSegments90(r) * 2U;
+
+                AddArcStroke(a, r, ang + 0.5f * kPi, ang + 1.5f * kPi, seg180, color, thickness);
+                AddArcStroke(b, r, ang - 0.5f * kPi, ang + 0.5f * kPi, seg180, color, thickness);
+            }
+
             void AddLine(const FVector2f& p0, const FVector2f& p1, FColor32 color, f32 thickness) {
                 const f32       t    = (thickness > 0.0f) ? thickness : 1.0f;
                 const FVector2f d    = p1 - p0;
@@ -653,8 +1140,8 @@ namespace AltinaEngine::DebugGui {
                 const FVector2f n(-d.Y() * invLen, d.X() * invLen);
                 const f32       s = t * 0.5f;
                 const FVector2f off(n.X() * s, n.Y() * s);
-                AddQuad(p0 + off, p1 + off, p1 - off, p0 - off, mSolidU, mSolidV, mSolidU, mSolidV,
-                    color);
+                AddQuad(p0 + off, p1 + off, p1 - off, p0 - off, mSolidU0, mSolidV0, mSolidU1,
+                    mSolidV1, color);
             }
 
             void AddText(const FVector2f& pos, FColor32 color, FStringView text) {
@@ -665,8 +1152,7 @@ namespace AltinaEngine::DebugGui {
                 for (usize i = 0; i < text.Length(); ++i) {
                     const TChar c = text[i];
                     if (c == static_cast<TChar>('\n')) {
-                        cursor =
-                            FVector2f(pos.X(), cursor.Y() + static_cast<f32>(FFontAtlas::kGlyphH));
+                        cursor = FVector2f(pos.X(), cursor.Y() + FFontAtlas::kDrawGlyphH);
                         continue;
                     }
                     if (c == static_cast<TChar>('\r')) {
@@ -678,34 +1164,40 @@ namespace AltinaEngine::DebugGui {
 
                     const FVector2f p0 = cursor;
                     const FVector2f p1(
-                        cursor.X() + static_cast<f32>(FFontAtlas::kGlyphW), cursor.Y());
-                    const FVector2f p2(cursor.X() + static_cast<f32>(FFontAtlas::kGlyphW),
-                        cursor.Y() + static_cast<f32>(FFontAtlas::kGlyphH));
+                        cursor.X() + static_cast<f32>(FFontAtlas::kDrawGlyphW), cursor.Y());
+                    const FVector2f p2(cursor.X() + static_cast<f32>(FFontAtlas::kDrawGlyphW),
+                        cursor.Y() + static_cast<f32>(FFontAtlas::kDrawGlyphH));
                     const FVector2f p3(
-                        cursor.X(), cursor.Y() + static_cast<f32>(FFontAtlas::kGlyphH));
+                        cursor.X(), cursor.Y() + static_cast<f32>(FFontAtlas::kDrawGlyphH));
                     AddQuad(p0, p1, p2, p3, u0, v0, u1, v1, color);
-                    cursor =
-                        FVector2f(cursor.X() + static_cast<f32>(FFontAtlas::kGlyphW), cursor.Y());
+                    cursor = FVector2f(
+                        cursor.X() + static_cast<f32>(FFontAtlas::kDrawGlyphW), cursor.Y());
                 }
             }
 
-            FDrawData*        mDrawData = nullptr;
-            FClipRectStack*   mClip     = nullptr;
-            FGuiInput         mInput{};
-            FUIState*         mUi          = nullptr;
-            FVector2f         mDisplaySize = FVector2f(0.0f, 0.0f);
-            const FFontAtlas* mAtlas       = nullptr;
-            f32               mSolidU      = 0.0f;
-            f32               mSolidV      = 0.0f;
+            FDrawData*                              mDrawData = nullptr;
+            FClipRectStack*                         mClip     = nullptr;
+            FGuiInput                               mInput{};
+            FUIState*                               mUi          = nullptr;
+            FVector2f                               mDisplaySize = FVector2f(0.0f, 0.0f);
+            const FFontAtlas*                       mAtlas       = nullptr;
+            const FDebugGuiTheme*                   mTheme       = nullptr;
+            f32                                     mSolidU0     = 0.0f;
+            f32                                     mSolidV0     = 0.0f;
+            f32                                     mSolidU1     = 0.0f;
+            f32                                     mSolidV1     = 0.0f;
 
-            FVector2f         mWindowPos  = FVector2f(0.0f, 0.0f);
-            FVector2f         mWindowSize = FVector2f(0.0f, 0.0f);
-            FVector2f         mContentMin = FVector2f(0.0f, 0.0f);
-            FVector2f         mContentMax = FVector2f(0.0f, 0.0f);
-            FVector2f         mCursor     = FVector2f(0.0f, 0.0f);
-            FRect             mWindowRect{};
-            FString           mCurrentWindowTitle;
-            TVector<FString>* mWindowOrder = nullptr;
+            FVector2f                               mWindowPos  = FVector2f(0.0f, 0.0f);
+            FVector2f                               mWindowSize = FVector2f(0.0f, 0.0f);
+            FVector2f                               mContentMin = FVector2f(0.0f, 0.0f);
+            FVector2f                               mContentMax = FVector2f(0.0f, 0.0f);
+            FVector2f                               mCursor     = FVector2f(0.0f, 0.0f);
+            FRect                                   mWindowRect{};
+            FString                                 mCurrentWindowTitle;
+            TVector<FString>*                       mWindowOrder       = nullptr;
+            Container::THashMap<u64, FWindowState>* mWindows           = nullptr;
+            u64*                                    mDraggingWindowKey = nullptr;
+            FVector2f*                              mDragOffset        = nullptr;
         };
 
         [[nodiscard]] auto BuildLayoutHash(
@@ -1004,7 +1496,10 @@ namespace AltinaEngine::DebugGui {
             if (!mSampler) {
                 Rhi::FRhiSamplerDesc s{};
                 s.mDebugName.Assign(TEXT("DebugGui.Sampler"));
-                mSampler = device.CreateSampler(s);
+                // Debug text is frequently rendered at small sizes; use point sampling to avoid
+                // blur.
+                s.mFilter = Rhi::ERhiSamplerFilter::Nearest;
+                mSampler  = device.CreateSampler(s);
                 if (!mSampler) {
                     LogError(TEXT("DebugGui: Failed to create sampler."));
                     return false;
@@ -1319,6 +1814,16 @@ namespace AltinaEngine::DebugGui {
                 mExternalStats = stats;
             }
 
+            void SetTheme(const FDebugGuiTheme& theme) noexcept override {
+                FScopedLock lock(mMutex);
+                mTheme = theme;
+            }
+
+            [[nodiscard]] auto GetTheme() const noexcept -> FDebugGuiTheme override {
+                FScopedLock lock(mMutex);
+                return mTheme;
+            }
+
             void TickGameThread(const Input::FInputSystem& input, f32 dtSeconds, u32 displayWidth,
                 u32 displayHeight) override {
                 const FVector2f displaySize(
@@ -1329,6 +1834,7 @@ namespace AltinaEngine::DebugGui {
 
                 bool                   enabled = false;
                 FDebugGuiExternalStats ext{};
+                FDebugGuiTheme         theme{};
                 {
                     FScopedLock lock(mMutex);
                     if (toggle) {
@@ -1336,6 +1842,7 @@ namespace AltinaEngine::DebugGui {
                     }
                     enabled = mEnabledGameThread;
                     ext     = mExternalStats;
+                    theme   = mTheme;
                 }
 
                 mUi.ClearTransient();
@@ -1361,8 +1868,8 @@ namespace AltinaEngine::DebugGui {
                 guiInput.bKeyEnterPressed     = input.WasKeyPressed(Input::EKey::Enter);
                 guiInput.bKeyBackspacePressed = input.WasKeyPressed(Input::EKey::Backspace);
 
-                FDebugGuiContext ctx(
-                    mPending, mClip, guiInput, mUi, displaySize, mFont, mWindowOrder);
+                FDebugGuiContext ctx(mPending, mClip, guiInput, mUi, displaySize, mFont, theme,
+                    mWindowOrder, mWindows, mDraggingWindowKey, mWindowDragOffset);
                 ctx.PushClipRect({ FVector2f(0.0f, 0.0f), displaySize });
 
                 // Built-in panels.
@@ -1373,7 +1880,7 @@ namespace AltinaEngine::DebugGui {
                     DrawConsoleWindow(ctx, guiInput);
                 }
                 if (mShowCVars) {
-                    DrawCVarsWindow(ctx);
+                    DrawCVarsWindow(ctx, guiInput);
                 }
 
                 // Custom panels (can use widgets).
@@ -1661,32 +2168,13 @@ namespace AltinaEngine::DebugGui {
                     ELogLevel::Warning, TEXT("DebugGui"), TEXT("Unknown command. Type 'help'."));
             }
 
-            void DrawCVarsWindow(IDebugGui& gui) {
+            void DrawCVarsWindow(FDebugGuiContext& gui, const FGuiInput& input) {
                 if (!gui.BeginWindow(TEXT("DebugGui CVars"), nullptr)) {
                     return;
                 }
+                const auto& th = gui.GetTheme();
 
-                gui.Text(TEXT("Click a CVar to edit:"));
-                gui.Separator();
-
-                TVector<FString> names;
-                Core::Console::FConsoleVariable::ForEach(
-                    [&](const Core::Console::FConsoleVariable& v) { names.PushBack(v.GetName()); });
-
-                // List (limited).
-                const usize maxShow = (names.Size() > 40U) ? 40U : names.Size();
-                for (usize i = 0; i < maxShow; ++i) {
-                    if (gui.Button(names[i].ToView())) {
-                        mSelectedCVarName = names[i];
-                        if (auto* cvar = Core::Console::FConsoleVariable::Find(mSelectedCVarName)) {
-                            mSelectedCVarValue = cvar->GetString();
-                        } else {
-                            mSelectedCVarValue.Clear();
-                        }
-                    }
-                }
-
-                gui.Separator();
+                // Editor (keep it at the top so it won't scroll away).
                 if (!mSelectedCVarName.IsEmptyString()) {
                     FString title(TEXT("Selected: "));
                     title.Append(mSelectedCVarName);
@@ -1697,7 +2185,194 @@ namespace AltinaEngine::DebugGui {
                             cvar->SetFromString(mSelectedCVarValue);
                         }
                     }
+                    gui.Separator();
                 }
+
+                gui.Text(TEXT("Click a CVar to edit:"));
+                (void)gui.InputText(TEXT("Filter"), mCVarsFilter);
+                gui.Separator();
+
+                TVector<FString> names;
+                Core::Console::FConsoleVariable::ForEach(
+                    [&](const Core::Console::FConsoleVariable& v) { names.PushBack(v.GetName()); });
+
+                // Filtered index list.
+                TVector<usize> filtered;
+                filtered.Reserve(names.Size());
+                for (usize i = 0; i < names.Size(); ++i) {
+                    if (mCVarsFilter.IsEmptyString()
+                        || names[i].Find(mCVarsFilter.ToView(), 0) != FString::npos) {
+                        filtered.PushBack(i);
+                    }
+                }
+
+                const FRect     content = gui.GetContentRect();
+                const FVector2f listMin = gui.GetCursorPos();
+                const FVector2f listMax = content.Max;
+                const FRect     listRect{ listMin, listMax };
+                const bool      listHovered = gui.IsMouseHoveringRect(listRect);
+
+                // Mouse wheel scroll (only when no widget is active).
+                if (listHovered && input.MouseWheelDelta != 0.0f && mUi.ActiveId == 0ULL) {
+                    const i32 step = 3;
+                    if (input.MouseWheelDelta > 0.0f) {
+                        mCVarsScrollIndex -= step;
+                    } else {
+                        mCVarsScrollIndex += step;
+                    }
+                }
+
+                const f32 itemHf       = th.InputHeight;
+                const f32 listHf       = listRect.Max.Y() - listRect.Min.Y();
+                const u32 visibleCount = (listHf > itemHf) ? static_cast<u32>(listHf / itemHf) : 1U;
+                const u32 totalCount   = static_cast<u32>(filtered.Size());
+                const i32 maxStart =
+                    (totalCount > visibleCount) ? static_cast<i32>(totalCount - visibleCount) : 0;
+                if (mCVarsScrollIndex < 0) {
+                    mCVarsScrollIndex = 0;
+                }
+                if (mCVarsScrollIndex > maxStart) {
+                    mCVarsScrollIndex = maxStart;
+                }
+
+                // Scroll bar (optional).
+                const f32  kScrollBarW    = th.ScrollBarWidth;
+                const f32  kScrollBarPad  = th.ScrollBarPadding;
+                const bool needsScrollBar = (totalCount > visibleCount);
+
+                FVector2f  textMax = listRect.Max;
+                if (needsScrollBar
+                    && (listRect.Max.X() - listRect.Min.X())
+                        > (kScrollBarW + kScrollBarPad + 16.0f)) {
+                    textMax =
+                        FVector2f(listRect.Max.X() - kScrollBarW - kScrollBarPad, listRect.Max.Y());
+                }
+
+                const FRect listTextRect{ listRect.Min, textMax };
+                const FRect scrollTrackRect{
+                    FVector2f(textMax.X() + kScrollBarPad, listRect.Min.Y()), listRect.Max
+                };
+
+                if (needsScrollBar) {
+                    const f32 trackH    = scrollTrackRect.Max.Y() - scrollTrackRect.Min.Y();
+                    const f32 thumbMinH = th.ScrollBarThumbMinHeight;
+                    f32       thumbH =
+                        trackH * (static_cast<f32>(visibleCount) / static_cast<f32>(totalCount));
+                    if (thumbH < thumbMinH) {
+                        thumbH = thumbMinH;
+                    }
+                    if (thumbH > trackH) {
+                        thumbH = trackH;
+                    }
+
+                    const f32 maxStartF = static_cast<f32>(maxStart > 0 ? maxStart : 1);
+                    const f32 t =
+                        (maxStart > 0) ? (static_cast<f32>(mCVarsScrollIndex) / maxStartF) : 0.0f;
+                    const f32   thumbY = scrollTrackRect.Min.Y() + (trackH - thumbH) * t;
+                    const FRect thumbRect{ FVector2f(scrollTrackRect.Min.X(), thumbY),
+                        FVector2f(scrollTrackRect.Max.X(), thumbY + thumbH) };
+
+                    const u64   sbId         = gui.DebugHashId(TEXT("##CVarsScrollBar"));
+                    const bool  trackHovered = gui.IsMouseHoveringRect(scrollTrackRect);
+                    const bool  thumbHovered = gui.IsMouseHoveringRect(thumbRect);
+                    const bool  sbActive     = (mUi.ActiveId == sbId);
+
+                    if ((trackHovered || thumbHovered) && input.bMousePressed) {
+                        mUi.ActiveId           = sbId;
+                        mUi.FocusId            = sbId;
+                        mUi.bWantsCaptureMouse = true;
+                        if (thumbHovered) {
+                            mCVarsScrollDragOffsetY = input.MousePos.Y() - thumbRect.Min.Y();
+                        } else {
+                            mCVarsScrollDragOffsetY = thumbH * 0.5f;
+                        }
+                    }
+
+                    if (sbActive && input.bMouseDown) {
+                        mUi.bWantsCaptureMouse  = true;
+                        const f32 desiredThumbY = input.MousePos.Y() - mCVarsScrollDragOffsetY;
+                        const f32 minY          = scrollTrackRect.Min.Y();
+                        const f32 maxY          = scrollTrackRect.Max.Y() - thumbH;
+                        const f32 clampedY      = (desiredThumbY < minY)
+                                 ? minY
+                                 : ((desiredThumbY > maxY) ? maxY : desiredThumbY);
+                        const f32 denom         = (trackH - thumbH);
+                        const f32 tt = (denom > 0.0f) ? ((clampedY - minY) / denom) : 0.0f;
+                        const i32 newStart =
+                            static_cast<i32>(tt * static_cast<f32>(maxStart) + 0.5f);
+                        mCVarsScrollIndex =
+                            (newStart < 0) ? 0 : ((newStart > maxStart) ? maxStart : newStart);
+                    }
+                    if (sbActive && input.bMouseReleased) {
+                        mUi.ActiveId = 0ULL;
+                    }
+
+                    // Draw track + thumb.
+                    gui.DrawRectFilled(scrollTrackRect, th.ScrollBarTrackBg);
+                    gui.DrawRect(scrollTrackRect, th.ScrollBarTrackBorder, 1.0f);
+                    const FColor32 thumbCol = sbActive
+                        ? th.ScrollBarThumbActiveBg
+                        : (thumbHovered ? th.ScrollBarThumbHoverBg : th.ScrollBarThumbBg);
+                    gui.DrawRectFilled(thumbRect, thumbCol);
+                    gui.DrawRect(thumbRect, th.ScrollBarThumbBorder, 1.0f);
+                }
+
+                // List drawing + hit-test.
+                gui.PushClipRect(listTextRect);
+                const u32 start = static_cast<u32>(mCVarsScrollIndex);
+                const u32 end =
+                    (start + visibleCount < totalCount) ? (start + visibleCount) : totalCount;
+                for (u32 order = start; order < end; ++order) {
+                    const usize nameIndex = filtered[order];
+                    const auto& name      = names[nameIndex];
+
+                    const f32 y0 = listTextRect.Min.Y() + static_cast<f32>(order - start) * itemHf;
+                    const FRect r{ FVector2f(listRect.Min.X(), y0),
+                        FVector2f(listTextRect.Max.X(), y0 + itemHf) };
+
+                    const u64   id      = gui.DebugHashId(name.ToView());
+                    const bool  hovered = gui.IsMouseHoveringRect(r);
+                    if (hovered) {
+                        mUi.HotId              = id;
+                        mUi.bWantsCaptureMouse = true;
+                    }
+                    if (hovered && input.bMousePressed) {
+                        mUi.ActiveId = id;
+                        mUi.FocusId  = id;
+                    }
+
+                    bool clicked = false;
+                    if (mUi.ActiveId == id && input.bMouseReleased) {
+                        if (hovered) {
+                            clicked = true;
+                        }
+                        mUi.ActiveId = 0ULL;
+                    }
+
+                    const bool     selected = (!mSelectedCVarName.IsEmptyString()
+                        && mSelectedCVarName.ToView() == name.ToView());
+                    const FColor32 bg =
+                        selected ? th.SelectedRowBg : (hovered ? th.HoveredRowBg : 0U);
+                    if ((bg >> 24U) != 0U) {
+                        gui.DrawRectFilled(r, bg);
+                    }
+                    gui.DrawText(
+                        FVector2f(r.Min.X() + th.InputTextOffsetX, r.Min.Y() + th.InputTextOffsetY),
+                        th.Text, name.ToView());
+
+                    if (clicked) {
+                        mSelectedCVarName = name;
+                        if (auto* cvar = Core::Console::FConsoleVariable::Find(mSelectedCVarName)) {
+                            mSelectedCVarValue = cvar->GetString();
+                        } else {
+                            mSelectedCVarValue.Clear();
+                        }
+                    }
+                }
+                gui.PopClipRect();
+
+                // Consume remaining space (avoid stacking).
+                gui.SetCursorPos(listRect.Max);
 
                 gui.EndWindow();
             }
@@ -1711,44 +2386,51 @@ namespace AltinaEngine::DebugGui {
                 mEnabledRenderThread   = enabled;
             }
 
-            mutable FMutex         mMutex;
-            bool                   mEnabledGameThread   = true;
-            bool                   mEnabledRenderThread = true;
-            TVector<FPanelEntry>   mPanels;
-            FDebugGuiExternalStats mExternalStats{};
+            mutable FMutex                         mMutex;
+            bool                                   mEnabledGameThread   = true;
+            bool                                   mEnabledRenderThread = true;
+            TVector<FPanelEntry>                   mPanels;
+            FDebugGuiExternalStats                 mExternalStats{};
+            FDebugGuiTheme                         mTheme{};
 
-            FUIState               mUi{};
-            FFontAtlas             mFont{};
-            FClipRectStack         mClip{};
-            FDrawData              mPending{};
-            FDrawData              mRender{};
-            FDebugGuiRendererD3D11 mRenderer{};
-            FDebugGuiFrameStats    mLastStats{};
+            FUIState                               mUi{};
+            FFontAtlas                             mFont{};
+            FClipRectStack                         mClip{};
+            FDrawData                              mPending{};
+            FDrawData                              mRender{};
+            FDebugGuiRendererD3D11                 mRenderer{};
+            FDebugGuiFrameStats                    mLastStats{};
 
             // Window order used for deterministic stacking.
-            TVector<FString>       mWindowOrder;
+            TVector<FString>                       mWindowOrder;
+            Container::THashMap<u64, FWindowState> mWindows;
+            u64                                    mDraggingWindowKey = 0ULL;
+            FVector2f                              mWindowDragOffset  = FVector2f(0.0f, 0.0f);
 
             // Console/log capture.
-            static constexpr u32   kMaxLogLines = 2000U;
-            mutable FMutex         mLogMutex;
-            TVector<FLogLine>      mLogLines;
-            u32                    mLogStart            = 0U; // Oldest entry index in ring buffer.
-            u32                    mLogCount            = 0U;
-            bool                   mHasAttachedSink     = false;
-            bool                   mForwardLogToDefault = true;
-            FString                mConsoleInput;
-            FString                mConsoleFilter;
-            i32                    mConsoleScrollOffset = 0; // 0: bottom/newest
-            TVector<u32>           mConsoleFilteredOrderIndices;
+            static constexpr u32                   kMaxLogLines = 2000U;
+            mutable FMutex                         mLogMutex;
+            TVector<FLogLine>                      mLogLines;
+            u32          mLogStart            = 0U; // Oldest entry index in ring buffer.
+            u32          mLogCount            = 0U;
+            bool         mHasAttachedSink     = false;
+            bool         mForwardLogToDefault = true;
+            FString      mConsoleInput;
+            FString      mConsoleFilter;
+            i32          mConsoleScrollOffset = 0; // 0: bottom/newest
+            TVector<u32> mConsoleFilteredOrderIndices;
 
             // CVars panel state.
-            FString                mSelectedCVarName;
-            FString                mSelectedCVarValue;
+            FString      mSelectedCVarName;
+            FString      mSelectedCVarValue;
+            FString      mCVarsFilter;
+            i32          mCVarsScrollIndex       = 0;
+            f32          mCVarsScrollDragOffsetY = 0.0f;
 
             // Panel toggles.
-            bool                   mShowStats   = true;
-            bool                   mShowConsole = true;
-            bool                   mShowCVars   = true;
+            bool         mShowStats   = true;
+            bool         mShowConsole = true;
+            bool         mShowCVars   = true;
         };
     } // namespace
 

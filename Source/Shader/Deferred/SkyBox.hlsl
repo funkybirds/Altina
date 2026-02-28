@@ -91,8 +91,6 @@ float4 PSSkyBox(FSQOutput input) : SV_Target0
 {
     const float depth = SceneDepth.Sample(LinearSampler, input.UV).r;
 
-    // Render sky only on background pixels (depth equals clear value).
-    // Reverse-Z clears depth to 0.0f, non-reversed clears to 1.0f.
     if (bReverseZ != 0)
     {
         if (depth > 1e-6f)

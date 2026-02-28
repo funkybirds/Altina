@@ -169,6 +169,62 @@ namespace {
         return result.mSucceeded;
     }
 
+    auto CompileShaderFromRepoFile(const std::filesystem::path& shaderPath,
+        const AltinaEngine::TChar* entryPoint, EShaderStage stage, EShaderSourceLanguage language,
+        ERhiBackend backend, const char* label) -> bool {
+        FShaderCompileRequest request;
+        request.mSource.mPath           = ToFString(shaderPath);
+        request.mSource.mEntryPoint     = FString(entryPoint);
+        request.mSource.mStage          = stage;
+        request.mSource.mLanguage       = language;
+        request.mOptions.mTargetBackend = backend;
+        AddShaderIncludeDir(request);
+
+        const auto result = GetShaderCompiler().Compile(request);
+
+        if (!result.mSucceeded && IsCompilerUnavailable(result)) {
+            std::cout << "[ SKIP ] " << label << " compiler unavailable\n";
+            return false;
+        }
+
+        if (!result.mSucceeded) {
+            std::cerr << "[FAIL] " << label << " compile diagnostics:\n"
+                      << ToAsciiString(result.mDiagnostics) << "\n";
+        }
+
+        REQUIRE(result.mSucceeded);
+        REQUIRE(!result.mBytecode.IsEmpty());
+        return result.mSucceeded;
+    }
+
+    auto CompileShaderFromPath(const std::filesystem::path& shaderPath,
+        const AltinaEngine::TChar* entryPoint, EShaderStage stage, EShaderSourceLanguage language,
+        ERhiBackend backend, const char* label) -> bool {
+        FShaderCompileRequest request;
+        request.mSource.mPath           = ToFString(shaderPath);
+        request.mSource.mEntryPoint     = FString(entryPoint);
+        request.mSource.mStage          = stage;
+        request.mSource.mLanguage       = language;
+        request.mOptions.mTargetBackend = backend;
+        AddShaderIncludeDir(request);
+
+        const auto result = GetShaderCompiler().Compile(request);
+
+        if (!result.mSucceeded && IsCompilerUnavailable(result)) {
+            std::cout << "[ SKIP ] " << label << " compiler unavailable\n";
+            return false;
+        }
+
+        if (!result.mSucceeded) {
+            std::cerr << "[FAIL] " << label << " compile diagnostics:\n"
+                      << ToAsciiString(result.mDiagnostics) << "\n";
+        }
+
+        REQUIRE(result.mSucceeded);
+        REQUIRE(!result.mBytecode.IsEmpty());
+        return result.mSucceeded;
+    }
+
     constexpr const char* kVsShader = R"(struct VSIn {
     float3 pos : POSITION;
     float2 uv : TEXCOORD0;
@@ -282,6 +338,40 @@ TEST_CASE("ShaderCompiler.DXC.VS_PS_CS") {
         EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-PS"));
     REQUIRE(CompileShader(kCsShader, TEXT("CSMain"), EShaderStage::Compute,
         EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-CS"));
+}
+
+TEST_CASE("ShaderCompiler.DXC.BuiltinBloom") {
+    const auto bloomPath = GetShaderIncludeDir() / "Shader" / "PostProcess" / "Bloom.hlsl";
+
+    const bool prefilterOk =
+        CompileShaderFromPath(bloomPath, TEXT("PSBloomPrefilter"), EShaderStage::Pixel,
+            EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-Bloom-Prefilter");
+    if (!prefilterOk) {
+        return;
+    }
+
+    REQUIRE(CompileShaderFromPath(bloomPath, TEXT("PSBloomDownsample"), EShaderStage::Pixel,
+        EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-Bloom-Downsample"));
+    REQUIRE(CompileShaderFromPath(bloomPath, TEXT("PSBloomDownsampleWeighted"), EShaderStage::Pixel,
+        EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-Bloom-DownsampleWeighted"));
+    REQUIRE(CompileShaderFromPath(bloomPath, TEXT("PSBloomBlurH"), EShaderStage::Pixel,
+        EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-Bloom-BlurH"));
+    REQUIRE(CompileShaderFromPath(bloomPath, TEXT("PSBloomBlurV"), EShaderStage::Pixel,
+        EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-Bloom-BlurV"));
+    REQUIRE(CompileShaderFromPath(bloomPath, TEXT("PSBloomUpsample"), EShaderStage::Pixel,
+        EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-Bloom-Upsample"));
+    REQUIRE(CompileShaderFromPath(bloomPath, TEXT("PSBloomApply"), EShaderStage::Pixel,
+        EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-Bloom-Apply"));
+}
+
+TEST_CASE("ShaderCompiler.DXC.BuiltinFxaa") {
+    const auto fxaaPath = GetShaderIncludeDir() / "Shader" / "PostProcess" / "Fxaa.hlsl";
+
+    const bool ok = CompileShaderFromPath(fxaaPath, TEXT("PSFxaa"), EShaderStage::Pixel,
+        EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-FXAA");
+    if (!ok) {
+        return;
+    }
 }
 
 TEST_CASE("ShaderCompiler.Slang.VS_PS_CS") {
@@ -646,4 +736,27 @@ TEST_CASE("ShaderCompiler.DXC.ConstantBufferMembers") {
     REQUIRE_EQ(innerBRead, innerBValue);
     REQUIRE_EQ(uvBiasRead[0], uvBiasValue[0]);
     REQUIRE_EQ(uvBiasRead[1], uvBiasValue[1]);
+}
+
+TEST_CASE("ShaderCompiler.DXC.BuiltinDeferredShaders") {
+    const auto includeDir   = GetShaderIncludeDir();
+    const auto lightingPath = includeDir / "Shader" / "Deferred" / "DeferredLighting.hlsl";
+    const auto ssaoPath     = includeDir / "Shader" / "Deferred" / "SSAO.hlsl";
+
+    const bool lightingVsOk =
+        CompileShaderFromRepoFile(lightingPath, TEXT("VSFullScreenTriangle"), EShaderStage::Vertex,
+            EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-DeferredLighting-VS");
+    if (!lightingVsOk) {
+        return;
+    }
+    REQUIRE(CompileShaderFromRepoFile(lightingPath, TEXT("PSDeferredLighting"), EShaderStage::Pixel,
+        EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-DeferredLighting-PS"));
+
+    const bool ssaoVsOk = CompileShaderFromRepoFile(ssaoPath, TEXT("VSFullScreenTriangle"),
+        EShaderStage::Vertex, EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-SSAO-VS");
+    if (!ssaoVsOk) {
+        return;
+    }
+    REQUIRE(CompileShaderFromRepoFile(ssaoPath, TEXT("PSSsao"), EShaderStage::Pixel,
+        EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-SSAO-PS"));
 }

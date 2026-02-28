@@ -25,6 +25,14 @@ namespace AltinaEngine::RenderCore::Lighting {
         f32             Intensity = 1.0f;
 
         bool            bCastShadows = false;
+
+        // Cascaded shadow map (CSM) settings for this light (used when bCastShadows=true).
+        // Kept on the light to allow per-scene tuning without global renderer hacks.
+        u32             ShadowCascadeCount = 4U;     // [1,4]
+        f32             ShadowSplitLambda  = 0.65f;  // [0,1]
+        f32             ShadowMaxDistance  = 250.0f; // clamp view far (view-space Z)
+        u32             ShadowMapSize      = 2048U;
+        f32             ShadowReceiverBias = 0.0015f;
     };
 
     struct AE_RENDER_CORE_API FPointLight {

@@ -117,10 +117,11 @@ namespace AltinaEngine::Core::Jobs {
 
             // Drain jobs into local vector to allow priority sorting
             TVector<FJobEntry> batch;
-            while (!mJobQueue.IsEmpty()) {
-                auto item = mJobQueue.Front();
-                mJobQueue.Pop();
-                batch.PushBack(Move(item));
+            {
+                FJobEntry item{};
+                while (mJobQueue.TryPop(item)) {
+                    batch.PushBack(Move(item));
+                }
             }
 
             if (!batch.IsEmpty()) {
@@ -388,9 +389,8 @@ namespace AltinaEngine::Core::Jobs {
         if (!state)
             return;
 
-        while (!state->mQueue.IsEmpty()) {
-            auto job = state->mQueue.Front();
-            state->mQueue.Pop();
+        TFunction<void()> job;
+        while (state->mQueue.TryPop(job)) {
             try {
                 if (job && static_cast<bool>(job))
                     job();

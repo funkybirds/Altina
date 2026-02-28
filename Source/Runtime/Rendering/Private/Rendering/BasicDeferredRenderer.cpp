@@ -11,6 +11,7 @@
 
 #include "Rendering/PostProcess/PostProcess.h"
 #include "Rendering/PostProcess/PostProcessSettings.h"
+#include "Rendering/RenderingSettings.h"
 
 #include "Container/HashMap.h"
 #include "Container/SmartPtr.h"
@@ -105,6 +106,14 @@ namespace AltinaEngine::Rendering {
         struct FPerDrawConstants {
             FMatrix4x4f World;
             FMatrix4x4f NormalMatrix;
+        };
+
+        // Matches `cbuffer IblConstants : register(b1)` in DeferredLighting.hlsl.
+        struct FIblConstants {
+            f32 EnvDiffuseIntensity  = 0.0f;
+            f32 EnvSpecularIntensity = 0.0f;
+            f32 SpecularMaxLod       = 0.0f;
+            f32 EnvSaturation        = 1.0f;
         };
 
         [[nodiscard]] auto ComputeNormalMatrix(const FMatrix4x4f& world) noexcept -> FMatrix4x4f {
@@ -234,6 +243,8 @@ namespace AltinaEngine::Rendering {
             RenderCore::FShaderRegistry::FShaderKey           OutputPSKey;
             RenderCore::FShaderRegistry::FShaderKey           LightingVSKey;
             RenderCore::FShaderRegistry::FShaderKey           LightingPSKey;
+            RenderCore::FShaderRegistry::FShaderKey           SsaoVSKey;
+            RenderCore::FShaderRegistry::FShaderKey           SsaoPSKey;
             RenderCore::FShaderRegistry::FShaderKey           SkyBoxVSKey;
             RenderCore::FShaderRegistry::FShaderKey           SkyBoxPSKey;
             RenderCore::FMaterialPassDesc                     DefaultPassDesc;
@@ -251,6 +262,15 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiBindGroupLayoutRef                       LightingLayout;
             Rhi::FRhiPipelineLayoutRef                        LightingPipelineLayout;
             Rhi::FRhiPipelineRef                              LightingPipeline;
+
+            // SSAO (FSQ -> AO texture).
+            Rhi::FRhiBindGroupLayoutRef                       SsaoLayout;
+            Rhi::FRhiPipelineLayoutRef                        SsaoPipelineLayout;
+            Rhi::FRhiPipelineRef                              SsaoPipeline;
+
+            // IBL fallbacks (used when view has no sky IBL resources bound).
+            Rhi::FRhiTextureRef                               IblBlackCube;
+            Rhi::FRhiTextureRef                               IblBlack2D;
 
             // Skybox (FSQ -> SceneColorHDR).
             Rhi::FRhiBindGroupLayoutRef                       SkyBoxLayout;
@@ -439,6 +459,46 @@ namespace AltinaEngine::Rendering {
             return resources.LightingPipeline.Get() != nullptr;
         }
 
+        auto EnsureSsaoPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)
+            -> bool {
+            if (resources.SsaoPipeline) {
+                return true;
+            }
+
+            if (!resources.SsaoVSKey.IsValid() || !resources.SsaoPSKey.IsValid()) {
+                LogError(TEXT("Deferred SSAO shaders are not configured."));
+                return false;
+            }
+
+            auto vs = resources.Registry.FindShader(resources.SsaoVSKey);
+            auto ps = resources.Registry.FindShader(resources.SsaoPSKey);
+            if (!vs || !ps) {
+                LogError(TEXT("Deferred SSAO shaders are not registered."));
+                return false;
+            }
+
+            if (!resources.SsaoPipelineLayout) {
+                LogError(TEXT("Deferred SSAO pipeline layout is missing."));
+                return false;
+            }
+
+            Rhi::FRhiGraphicsPipelineDesc desc{};
+            desc.mDebugName.Assign(TEXT("BasicDeferred.SsaoPipeline"));
+            desc.mVertexShader            = vs.Get();
+            desc.mPixelShader             = ps.Get();
+            desc.mPipelineLayout          = resources.SsaoPipelineLayout.Get();
+            desc.mVertexLayout            = {};
+            desc.mRasterState             = {};
+            desc.mDepthState              = {};
+            desc.mBlendState              = {};
+            desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
+            desc.mDepthState.mDepthEnable = false;
+            desc.mDepthState.mDepthWrite  = false;
+            resources.SsaoPipeline        = device.CreateGraphicsPipeline(desc);
+
+            return resources.SsaoPipeline.Get() != nullptr;
+        }
+
         auto EnsureSkyBoxPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)
             -> bool {
             if (resources.SkyBoxPipeline) {
@@ -557,8 +617,15 @@ namespace AltinaEngine::Rendering {
                 cbuffer.mVisibility = Rhi::ERhiShaderStageFlags::All;
                 layoutDesc.mEntries.PushBack(cbuffer);
 
-                // t0..t4
-                for (u32 binding = 0U; binding < 5U; ++binding) {
+                // b1 (IBL constants)
+                Rhi::FRhiBindGroupLayoutEntry iblCbuffer{};
+                iblCbuffer.mBinding    = 1U;
+                iblCbuffer.mType       = Rhi::ERhiBindingType::ConstantBuffer;
+                iblCbuffer.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(iblCbuffer);
+
+                // t0..t8
+                for (u32 binding = 0U; binding < 9U; ++binding) {
                     Rhi::FRhiBindGroupLayoutEntry texture{};
                     texture.mBinding    = binding;
                     texture.mType       = Rhi::ERhiBindingType::SampledTexture;
@@ -577,12 +644,102 @@ namespace AltinaEngine::Rendering {
                 resources.LightingLayout = device.CreateBindGroupLayout(layoutDesc);
             }
 
+            if (!resources.SsaoLayout) {
+                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+                layoutDesc.mSetIndex = 0U;
+
+                // b0: per-frame constants (shared with deferred lighting).
+                Rhi::FRhiBindGroupLayoutEntry perFrame{};
+                perFrame.mBinding    = 0U;
+                perFrame.mType       = Rhi::ERhiBindingType::ConstantBuffer;
+                perFrame.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(perFrame);
+
+                // b1: SSAO parameters.
+                Rhi::FRhiBindGroupLayoutEntry ssaoCb{};
+                ssaoCb.mBinding    = 1U;
+                ssaoCb.mType       = Rhi::ERhiBindingType::ConstantBuffer;
+                ssaoCb.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(ssaoCb);
+
+                // t0..t1
+                for (u32 binding = 0U; binding < 2U; ++binding) {
+                    Rhi::FRhiBindGroupLayoutEntry texture{};
+                    texture.mBinding    = binding;
+                    texture.mType       = Rhi::ERhiBindingType::SampledTexture;
+                    texture.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                    layoutDesc.mEntries.PushBack(texture);
+                }
+
+                // s0
+                Rhi::FRhiBindGroupLayoutEntry sampler{};
+                sampler.mBinding    = 0U;
+                sampler.mType       = Rhi::ERhiBindingType::Sampler;
+                sampler.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                layoutDesc.mEntries.PushBack(sampler);
+
+                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
+                resources.SsaoLayout   = device.CreateBindGroupLayout(layoutDesc);
+            }
+
+            if (!resources.IblBlackCube || !resources.IblBlack2D) {
+                auto* rhiDevice = Rhi::RHIGetDevice();
+                if (rhiDevice != nullptr) {
+                    if (!resources.IblBlackCube) {
+                        Rhi::FRhiTextureDesc texDesc{};
+                        texDesc.mDebugName.Assign(TEXT("IBL.BlackCube"));
+                        texDesc.mDimension     = Rhi::ERhiTextureDimension::Cube;
+                        texDesc.mWidth         = 1U;
+                        texDesc.mHeight        = 1U;
+                        texDesc.mMipLevels     = 1U;
+                        texDesc.mArrayLayers   = 6U;
+                        texDesc.mFormat        = Rhi::ERhiFormat::R16G16B16A16Float;
+                        texDesc.mBindFlags     = Rhi::ERhiTextureBindFlags::ShaderResource;
+                        resources.IblBlackCube = Rhi::RHICreateTexture(texDesc);
+                        if (resources.IblBlackCube) {
+                            const u16 pixel[4] = { 0, 0, 0, 0 };
+                            for (u32 face = 0U; face < 6U; ++face) {
+                                Rhi::FRhiTextureSubresource sub{};
+                                sub.mMipLevel   = 0U;
+                                sub.mArrayLayer = face;
+                                rhiDevice->UpdateTextureSubresource(
+                                    resources.IblBlackCube.Get(), sub, pixel, 8U, 8U);
+                            }
+                        }
+                    }
+                    if (!resources.IblBlack2D) {
+                        Rhi::FRhiTextureDesc texDesc{};
+                        texDesc.mDebugName.Assign(TEXT("IBL.Black2D"));
+                        texDesc.mDimension   = Rhi::ERhiTextureDimension::Tex2D;
+                        texDesc.mWidth       = 1U;
+                        texDesc.mHeight      = 1U;
+                        texDesc.mMipLevels   = 1U;
+                        texDesc.mFormat      = Rhi::ERhiFormat::R8G8B8A8Unorm;
+                        texDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::ShaderResource;
+                        resources.IblBlack2D = Rhi::RHICreateTexture(texDesc);
+                        if (resources.IblBlack2D) {
+                            const u8 pixel[4] = { 0, 0, 0, 0 };
+                            rhiDevice->UpdateTextureSubresource(resources.IblBlack2D.Get(),
+                                Rhi::FRhiTextureSubresource{}, pixel, 4U, 4U);
+                        }
+                    }
+                }
+            }
+
             if (!resources.LightingPipelineLayout) {
                 Rhi::FRhiPipelineLayoutDesc layoutDesc{};
                 if (resources.LightingLayout) {
                     layoutDesc.mBindGroupLayouts.PushBack(resources.LightingLayout.Get());
                 }
                 resources.LightingPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+            }
+
+            if (!resources.SsaoPipelineLayout) {
+                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
+                if (resources.SsaoLayout) {
+                    layoutDesc.mBindGroupLayouts.PushBack(resources.SsaoLayout.Get());
+                }
+                resources.SsaoPipelineLayout = device.CreatePipelineLayout(layoutDesc);
             }
 
             if (!resources.SkyBoxLayout) {
@@ -868,6 +1025,15 @@ namespace AltinaEngine::Rendering {
         resources.LightingPipeline.Reset();
     }
 
+    void FBasicDeferredRenderer::SetSsaoShaderKeys(
+        const RenderCore::FShaderRegistry::FShaderKey& vs,
+        const RenderCore::FShaderRegistry::FShaderKey& ps) noexcept {
+        auto& resources     = GetSharedResources();
+        resources.SsaoVSKey = vs;
+        resources.SsaoPSKey = ps;
+        resources.SsaoPipeline.Reset();
+    }
+
     void FBasicDeferredRenderer::SetSkyBoxShaderKeys(
         const RenderCore::FShaderRegistry::FShaderKey& vs,
         const RenderCore::FShaderRegistry::FShaderKey& ps) noexcept {
@@ -895,6 +1061,9 @@ namespace AltinaEngine::Rendering {
         if (!EnsureLightingPipeline(device, resources)) {
             return;
         }
+        if (!EnsureSsaoPipeline(device, resources)) {
+            return;
+        }
 
         if (!mPerFrameBuffer) {
             Rhi::FRhiBufferDesc desc{};
@@ -904,6 +1073,37 @@ namespace AltinaEngine::Rendering {
             desc.mBindFlags = Rhi::ERhiBufferBindFlags::Constant;
             desc.mCpuAccess = Rhi::ERhiCpuAccess::Write;
             mPerFrameBuffer = device.CreateBuffer(desc);
+        }
+
+        if (!mIblConstantsBuffer) {
+            Rhi::FRhiBufferDesc desc{};
+            desc.mDebugName.Assign(TEXT("Deferred.IBLConstants"));
+            desc.mSizeBytes     = sizeof(FIblConstants);
+            desc.mUsage         = Rhi::ERhiResourceUsage::Dynamic;
+            desc.mBindFlags     = Rhi::ERhiBufferBindFlags::Constant;
+            desc.mCpuAccess     = Rhi::ERhiCpuAccess::Write;
+            mIblConstantsBuffer = device.CreateBuffer(desc);
+        }
+
+        struct FSsaoConstants {
+            u32 Enable      = 1U;
+            u32 SampleCount = 12U;
+            f32 RadiusVS    = 0.55f;
+            f32 BiasNdc     = 0.0005f;
+            f32 Power       = 1.6f;
+            f32 Intensity   = 1.0f;
+            f32 _pad0       = 0.0f;
+            f32 _pad1       = 0.0f;
+        };
+
+        if (!mSsaoConstantsBuffer) {
+            Rhi::FRhiBufferDesc desc{};
+            desc.mDebugName.Assign(TEXT("Deferred.SsaoConstants"));
+            desc.mSizeBytes      = sizeof(FSsaoConstants);
+            desc.mUsage          = Rhi::ERhiResourceUsage::Dynamic;
+            desc.mBindFlags      = Rhi::ERhiBufferBindFlags::Constant;
+            desc.mCpuAccess      = Rhi::ERhiCpuAccess::Write;
+            mSsaoConstantsBuffer = device.CreateBuffer(desc);
         }
 
         if (!mPerFrameGroup && mPerFrameBuffer && resources.PerFrameLayout) {
@@ -1243,14 +1443,46 @@ namespace AltinaEngine::Rendering {
         const auto*                      shadowDrawList = mViewContext.ShadowDrawList;
 
         RenderCore::Shadow::FCSMSettings csmSettings{};
-        csmSettings.CascadeCount = RenderCore::Shadow::kMaxCascades;
-        // NOTE: The demo scenes typically have a huge camera far plane (and far-away sky
-        // objects). Keeping the CSM range too large causes visible shimmering/aliasing.
-        // Clamp the shadow range to a smaller distance for more stable results.
-        csmSettings.SplitLambda   = 0.65f;
-        csmSettings.MaxDistance   = 250.0f;
-        csmSettings.ShadowMapSize = 2048U;
-        csmSettings.ReceiverBias  = 0.0015f;
+        {
+            // Defaults: tuned for demos with large far planes. Keep the CSM range reasonable for
+            // more stable results (less shimmering/aliasing).
+            u32 cascades = RenderCore::Shadow::kMaxCascades;
+            f32 lambda   = 0.65f;
+            f32 maxDist  = 250.0f;
+            u32 mapSize  = 2048U;
+            f32 recvBias = 0.0015f;
+
+            if (lights != nullptr && lights->bHasMainDirectionalLight) {
+                const auto& dl = lights->MainDirectionalLight;
+                cascades       = dl.ShadowCascadeCount;
+                lambda         = dl.ShadowSplitLambda;
+                maxDist        = dl.ShadowMaxDistance;
+                mapSize        = dl.ShadowMapSize;
+                recvBias       = dl.ShadowReceiverBias;
+            }
+
+            cascades = std::max(1U, std::min(cascades, RenderCore::Shadow::kMaxCascades));
+            if (lambda < 0.0f) {
+                lambda = 0.0f;
+            } else if (lambda > 1.0f) {
+                lambda = 1.0f;
+            }
+            if (maxDist < 0.0f) {
+                maxDist = 0.0f;
+            }
+            if (mapSize == 0U) {
+                mapSize = 2048U;
+            }
+            if (recvBias < 0.0f) {
+                recvBias = 0.0f;
+            }
+
+            csmSettings.CascadeCount  = cascades;
+            csmSettings.SplitLambda   = lambda;
+            csmSettings.MaxDistance   = maxDist;
+            csmSettings.ShadowMapSize = mapSize;
+            csmSettings.ReceiverBias  = recvBias;
+        }
 
         RenderCore::Shadow::FCSMData csmData{};
         if (lights != nullptr && lights->bHasMainDirectionalLight
@@ -1445,6 +1677,270 @@ namespace AltinaEngine::Rendering {
             }
         }
 
+        // Fill shared per-frame constants once (used by SSAO and deferred lighting).
+        FPerFrameConstants perFrameConstants{};
+        {
+            perFrameConstants.ViewProjection = view->Matrices.ViewProjJittered;
+            perFrameConstants.View           = view->Matrices.View;
+            perFrameConstants.Proj           = view->Matrices.ProjJittered;
+            perFrameConstants.ViewProj       = view->Matrices.ViewProjJittered;
+            perFrameConstants.InvViewProj    = view->Matrices.InvViewProjJittered;
+
+            perFrameConstants.ViewOriginWS[0]  = view->ViewOrigin[0];
+            perFrameConstants.ViewOriginWS[1]  = view->ViewOrigin[1];
+            perFrameConstants.ViewOriginWS[2]  = view->ViewOrigin[2];
+            perFrameConstants.bReverseZ        = view->bReverseZ ? 1U : 0U;
+            perFrameConstants.DebugShadingMode = gDeferredLightingDebugShadingMode;
+
+            const f32 w = static_cast<f32>(view->RenderTargetExtent.Width);
+            const f32 h = static_cast<f32>(view->RenderTargetExtent.Height);
+            perFrameConstants.RenderTargetSize[0]    = w;
+            perFrameConstants.RenderTargetSize[1]    = h;
+            perFrameConstants.InvRenderTargetSize[0] = (w > 0.0f) ? (1.0f / w) : 0.0f;
+            perFrameConstants.InvRenderTargetSize[1] = (h > 0.0f) ? (1.0f / h) : 0.0f;
+
+            // Lighting inputs.
+            RenderCore::Lighting::FDirectionalLight dir{};
+            if (lights != nullptr && lights->bHasMainDirectionalLight) {
+                dir = lights->MainDirectionalLight;
+            } else {
+                dir.DirectionWS  = FVector3f(0.4f, 0.6f, 0.7f);
+                dir.Color        = FVector3f(1.0f, 1.0f, 1.0f);
+                dir.Intensity    = 2.0f;
+                dir.bCastShadows = false;
+            }
+
+            perFrameConstants.DirLightDirectionWS[0] = dir.DirectionWS[0];
+            perFrameConstants.DirLightDirectionWS[1] = dir.DirectionWS[1];
+            perFrameConstants.DirLightDirectionWS[2] = dir.DirectionWS[2];
+            perFrameConstants.DirLightColor[0]       = dir.Color[0];
+            perFrameConstants.DirLightColor[1]       = dir.Color[1];
+            perFrameConstants.DirLightColor[2]       = dir.Color[2];
+            perFrameConstants.DirLightIntensity      = dir.Intensity;
+
+            // Point lights.
+            perFrameConstants.PointLightCount = 0U;
+            if (lights != nullptr && !lights->PointLights.IsEmpty()) {
+                const u32 count   = static_cast<u32>(lights->PointLights.Size());
+                const u32 clamped = (count > kMaxPointLights) ? kMaxPointLights : count;
+                perFrameConstants.PointLightCount = clamped;
+                for (u32 i = 0U; i < clamped; ++i) {
+                    const auto& src                                = lights->PointLights[i];
+                    perFrameConstants.PointLights[i].PositionWS[0] = src.PositionWS[0];
+                    perFrameConstants.PointLights[i].PositionWS[1] = src.PositionWS[1];
+                    perFrameConstants.PointLights[i].PositionWS[2] = src.PositionWS[2];
+                    perFrameConstants.PointLights[i].Range         = src.Range;
+                    perFrameConstants.PointLights[i].Color[0]      = src.Color[0];
+                    perFrameConstants.PointLights[i].Color[1]      = src.Color[1];
+                    perFrameConstants.PointLights[i].Color[2]      = src.Color[2];
+                    perFrameConstants.PointLights[i].Intensity     = src.Intensity;
+                }
+            }
+
+            // CSM.
+            perFrameConstants.CSMCascadeCount = csmData.CascadeCount;
+            perFrameConstants.ShadowBias      = csmSettings.ReceiverBias;
+            if (csmSettings.ShadowMapSize > 0U) {
+                const f32 inv = 1.0f / static_cast<f32>(csmSettings.ShadowMapSize);
+                perFrameConstants.ShadowMapInvSize[0] = inv;
+                perFrameConstants.ShadowMapInvSize[1] = inv;
+            }
+
+            for (u32 i = 0U; i < RenderCore::Shadow::kMaxCascades; ++i) {
+                perFrameConstants.CSM_SplitsVS[i][0] = 0.0f;
+                perFrameConstants.CSM_SplitsVS[i][1] = 0.0f;
+                perFrameConstants.CSM_SplitsVS[i][2] = 0.0f;
+                perFrameConstants.CSM_SplitsVS[i][3] = 0.0f;
+            }
+
+            if (csmData.CascadeCount > 0U) {
+                for (u32 i = 0U; i < csmData.CascadeCount && i < RenderCore::Shadow::kMaxCascades;
+                    ++i) {
+                    perFrameConstants.CSM_SplitsVS[i][0] = csmData.Cascades[i].SplitVS[0];
+                    perFrameConstants.CSM_SplitsVS[i][1] = csmData.Cascades[i].SplitVS[1];
+                }
+
+                // Copy up to 4 cascades into explicit matrices.
+                perFrameConstants.CSM_LightViewProj0 = csmData.Cascades[0].LightViewProj;
+                if (csmData.CascadeCount > 1U) {
+                    perFrameConstants.CSM_LightViewProj1 = csmData.Cascades[1].LightViewProj;
+                }
+                if (csmData.CascadeCount > 2U) {
+                    perFrameConstants.CSM_LightViewProj2 = csmData.Cascades[2].LightViewProj;
+                }
+                if (csmData.CascadeCount > 3U) {
+                    perFrameConstants.CSM_LightViewProj3 = csmData.Cascades[3].LightViewProj;
+                }
+            }
+        }
+
+        RenderCore::FFrameGraphTextureRef ssaoTexture;
+
+        // SSAO pass: produces an AO factor texture from GBuffer normal + depth (Reverse-Z aware).
+        if (gbufferB.IsValid() && sceneDepth.IsValid()) {
+            struct FSsaoPassData {
+                RenderCore::FFrameGraphTextureRef Output;
+                RenderCore::FFrameGraphRTVRef     OutputRTV;
+                RenderCore::FFrameGraphTextureRef GBufferB;
+                RenderCore::FFrameGraphTextureRef Depth;
+            };
+
+            RenderCore::FFrameGraphPassDesc ssaoPassDesc{};
+            ssaoPassDesc.mName  = "BasicDeferred.SSAO";
+            ssaoPassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
+            ssaoPassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
+
+            graph.AddPass<FSsaoPassData>(
+                ssaoPassDesc,
+                [&](RenderCore::FFrameGraphPassBuilder& builder, FSsaoPassData& data) -> void {
+                    data.GBufferB = builder.Read(gbufferB, Rhi::ERhiResourceState::ShaderResource);
+                    data.Depth = builder.Read(sceneDepth, Rhi::ERhiResourceState::ShaderResource);
+
+                    RenderCore::FFrameGraphTextureDesc aoDesc{};
+                    aoDesc.mDesc.mDebugName.Assign(TEXT("SSAO"));
+                    aoDesc.mDesc.mWidth  = width;
+                    aoDesc.mDesc.mHeight = height;
+                    // R8Unorm is not available in current ERhiFormat list; use a single-channel
+                    // float RT.
+                    aoDesc.mDesc.mFormat    = Rhi::ERhiFormat::R32Float;
+                    aoDesc.mDesc.mBindFlags = Rhi::ERhiTextureBindFlags::RenderTarget
+                        | Rhi::ERhiTextureBindFlags::ShaderResource;
+
+                    data.Output = builder.CreateTexture(aoDesc);
+                    data.Output = builder.Write(data.Output, Rhi::ERhiResourceState::RenderTarget);
+
+                    Rhi::FRhiRenderTargetViewDesc rtvDesc{};
+                    rtvDesc.mDebugName.Assign(TEXT("SSAO.RTV"));
+                    rtvDesc.mFormat = Rhi::ERhiFormat::R32Float;
+                    data.OutputRTV  = builder.CreateRTV(data.Output, rtvDesc);
+
+                    RenderCore::FRdgRenderTargetBinding rt{};
+                    rt.mRTV        = data.OutputRTV;
+                    rt.mLoadOp     = Rhi::ERhiLoadOp::Clear;
+                    rt.mStoreOp    = Rhi::ERhiStoreOp::Store;
+                    rt.mClearColor = Rhi::FRhiClearColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+                    builder.SetRenderTargets(&rt, 1U, nullptr);
+
+                    ssaoTexture = data.Output;
+                },
+                [viewRect, sharedConstants = perFrameConstants,
+                    perFrameBuffer = mPerFrameBuffer.Get(),
+                    ssaoBuffer     = mSsaoConstantsBuffer.Get()](Rhi::FRhiCmdContext& ctx,
+                    const RenderCore::FFrameGraphPassResources&                   res,
+                    const FSsaoPassData&                                          data) -> void {
+                    auto& shared = GetSharedResources();
+                    if (!shared.SsaoPipeline || !shared.SsaoLayout || !shared.OutputSampler) {
+                        return;
+                    }
+
+                    auto* normalTex = res.GetTexture(data.GBufferB);
+                    auto* depthTex  = res.GetTexture(data.Depth);
+                    auto* outTex    = res.GetTexture(data.Output);
+                    if (!normalTex || !depthTex || !outTex) {
+                        return;
+                    }
+
+                    auto* device = Rhi::RHIGetDevice();
+                    if (!device) {
+                        return;
+                    }
+
+                    if (perFrameBuffer == nullptr || ssaoBuffer == nullptr) {
+                        return;
+                    }
+
+                    // Update per-frame constants (b0) so SSAO can reconstruct positions (Reverse-Z
+                    // aware).
+                    ctx.RHIUpdateDynamicBufferDiscard(
+                        perFrameBuffer, &sharedConstants, sizeof(sharedConstants), 0ULL);
+
+                    struct FSsaoConstants {
+                        u32 Enable      = 1U;
+                        u32 SampleCount = 12U;
+                        f32 RadiusVS    = 0.55f;
+                        f32 BiasNdc     = 0.0005f;
+                        f32 Power       = 1.6f;
+                        f32 Intensity   = 1.0f;
+                        f32 _pad0       = 0.0f;
+                        f32 _pad1       = 0.0f;
+                    };
+
+                    FSsaoConstants ssao{};
+                    ssao.Enable      = (rSsaoEnable.Get() != 0) ? 1U : 0U;
+                    ssao.SampleCount = static_cast<u32>(std::max(0, rSsaoSampleCount.Get()));
+                    ssao.RadiusVS    = rSsaoRadiusVS.Get();
+                    ssao.BiasNdc     = rSsaoBiasNdc.Get();
+                    ssao.Power       = rSsaoPower.Get();
+                    ssao.Intensity   = rSsaoIntensity.Get();
+
+                    ctx.RHIUpdateDynamicBufferDiscard(ssaoBuffer, &ssao, sizeof(ssao), 0ULL);
+
+                    // Bind group (b0 + b1 + t0..t1 + s0).
+                    Rhi::FRhiBindGroupDesc groupDesc{};
+                    groupDesc.mLayout = shared.SsaoLayout.Get();
+
+                    Rhi::FRhiBindGroupEntry cb{};
+                    cb.mBinding = 0U;
+                    cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
+                    cb.mBuffer  = perFrameBuffer;
+                    cb.mOffset  = 0ULL;
+                    cb.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
+                    groupDesc.mEntries.PushBack(cb);
+
+                    Rhi::FRhiBindGroupEntry ssaoCb{};
+                    ssaoCb.mBinding = 1U;
+                    ssaoCb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
+                    ssaoCb.mBuffer  = ssaoBuffer;
+                    ssaoCb.mOffset  = 0ULL;
+                    ssaoCb.mSize    = static_cast<u64>(sizeof(FSsaoConstants));
+                    groupDesc.mEntries.PushBack(ssaoCb);
+
+                    Rhi::FRhiBindGroupEntry eNormal{};
+                    eNormal.mBinding = 0U;
+                    eNormal.mType    = Rhi::ERhiBindingType::SampledTexture;
+                    eNormal.mTexture = normalTex;
+                    groupDesc.mEntries.PushBack(eNormal);
+
+                    Rhi::FRhiBindGroupEntry eDepth{};
+                    eDepth.mBinding = 1U;
+                    eDepth.mType    = Rhi::ERhiBindingType::SampledTexture;
+                    eDepth.mTexture = depthTex;
+                    groupDesc.mEntries.PushBack(eDepth);
+
+                    Rhi::FRhiBindGroupEntry sampler{};
+                    sampler.mBinding = 0U;
+                    sampler.mType    = Rhi::ERhiBindingType::Sampler;
+                    sampler.mSampler = shared.OutputSampler.Get();
+                    groupDesc.mEntries.PushBack(sampler);
+
+                    auto bindGroup = device->CreateBindGroup(groupDesc);
+                    Assert(!(!bindGroup), TEXT("BasicDeferredRenderer"),
+                        "Failed to create bind group");
+
+                    ctx.RHISetGraphicsPipeline(shared.SsaoPipeline.Get());
+
+                    Rhi::FRhiViewportRect viewport{};
+                    viewport.mX        = static_cast<f32>(viewRect.X);
+                    viewport.mY        = static_cast<f32>(viewRect.Y);
+                    viewport.mWidth    = static_cast<f32>(viewRect.Width);
+                    viewport.mHeight   = static_cast<f32>(viewRect.Height);
+                    viewport.mMinDepth = 0.0f;
+                    viewport.mMaxDepth = 1.0f;
+                    ctx.RHISetViewport(viewport);
+
+                    Rhi::FRhiScissorRect scissor{};
+                    scissor.mX      = viewRect.X;
+                    scissor.mY      = viewRect.Y;
+                    scissor.mWidth  = viewRect.Width;
+                    scissor.mHeight = viewRect.Height;
+                    ctx.RHISetScissor(scissor);
+
+                    ctx.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
+                    ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
+                    ctx.RHIDraw(3U, 1U, 0U, 0U);
+                });
+        }
+
         auto outputTexture = graph.ImportTexture(outputTarget, Rhi::ERhiResourceState::Present);
         RenderCore::FFrameGraphTextureRef sceneColorHDR;
 
@@ -1456,6 +1952,7 @@ namespace AltinaEngine::Rendering {
             RenderCore::FFrameGraphTextureRef GBufferC;
             RenderCore::FFrameGraphTextureRef Depth;
             RenderCore::FFrameGraphTextureRef Shadow;
+            RenderCore::FFrameGraphTextureRef Ssao;
         };
 
         RenderCore::FFrameGraphPassDesc lightingPassDesc{};
@@ -1477,6 +1974,10 @@ namespace AltinaEngine::Rendering {
                 }
                 if (sceneDepth.IsValid()) {
                     builder.Read(sceneDepth, Rhi::ERhiResourceState::ShaderResource);
+                }
+
+                if (ssaoTexture.IsValid()) {
+                    builder.Read(ssaoTexture, Rhi::ERhiResourceState::ShaderResource);
                 }
 
                 if (shadowMap.IsValid()) {
@@ -1501,6 +2002,7 @@ namespace AltinaEngine::Rendering {
                 data.GBufferB = gbufferB;
                 data.GBufferC = gbufferC;
                 data.Depth    = sceneDepth;
+                data.Ssao     = ssaoTexture;
 
                 // Lighting output goes to an internal HDR texture; post-process will write
                 // backbuffer.
@@ -1535,8 +2037,12 @@ namespace AltinaEngine::Rendering {
 
                 builder.SetRenderTargets(&rtvBinding, 1U, nullptr);
             },
-            [viewRect, view, lights, csmData, csmSettings, perFrameBuffer = mPerFrameBuffer.Get()](
-                Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources& res,
+            [viewRect, sharedConstants = perFrameConstants, perFrameBuffer = mPerFrameBuffer.Get(),
+                iblBuffer = mIblConstantsBuffer.Get(), bHasSkyIbl = mViewContext.bHasSkyIbl,
+                skyIrradiance = mViewContext.SkyIrradianceCube,
+                skySpecular = mViewContext.SkySpecularCube, brdfLut = mViewContext.BrdfLutTexture,
+                specularMaxLod = mViewContext.SkySpecularMaxLod](Rhi::FRhiCmdContext& ctx,
+                const RenderCore::FFrameGraphPassResources&                           res,
                 const FLightingPassData& data) -> void {
                 // LogInfo(TEXT("FG Pass: BasicDeferred.DeferredLighting"));
                 auto& shared = GetSharedResources();
@@ -1549,7 +2055,8 @@ namespace AltinaEngine::Rendering {
                 auto* texC      = res.GetTexture(data.GBufferC);
                 auto* depthTex  = res.GetTexture(data.Depth);
                 auto* shadowTex = res.GetTexture(data.Shadow);
-                if (!texA || !texB || !texC || !depthTex || !shadowTex) {
+                auto* ssaoTex   = res.GetTexture(data.Ssao);
+                if (!texA || !texB || !texC || !depthTex || !shadowTex || !ssaoTex) {
                     return;
                 }
 
@@ -1558,94 +2065,31 @@ namespace AltinaEngine::Rendering {
                     return;
                 }
 
-                if (perFrameBuffer == nullptr || view == nullptr) {
+                if (perFrameBuffer == nullptr) {
                     return;
                 }
 
                 // Fill per-frame constants (b0).
-                FPerFrameConstants constants{};
-                constants.ViewProjection = view->Matrices.ViewProjJittered;
-                constants.View           = view->Matrices.View;
-                constants.Proj           = view->Matrices.ProjJittered;
-                constants.ViewProj       = view->Matrices.ViewProjJittered;
-                constants.InvViewProj    = view->Matrices.InvViewProjJittered;
-
-                constants.ViewOriginWS[0]  = view->ViewOrigin[0];
-                constants.ViewOriginWS[1]  = view->ViewOrigin[1];
-                constants.ViewOriginWS[2]  = view->ViewOrigin[2];
-                constants.bReverseZ        = view->bReverseZ ? 1U : 0U;
-                constants.DebugShadingMode = gDeferredLightingDebugShadingMode;
-
-                const f32 w                   = static_cast<f32>(view->RenderTargetExtent.Width);
-                const f32 h                   = static_cast<f32>(view->RenderTargetExtent.Height);
-                constants.RenderTargetSize[0] = w;
-                constants.RenderTargetSize[1] = h;
-                constants.InvRenderTargetSize[0] = (w > 0.0f) ? (1.0f / w) : 0.0f;
-                constants.InvRenderTargetSize[1] = (h > 0.0f) ? (1.0f / h) : 0.0f;
-
-                // Lighting inputs.
-                RenderCore::Lighting::FDirectionalLight dir{};
-                if (lights != nullptr && lights->bHasMainDirectionalLight) {
-                    dir = lights->MainDirectionalLight;
-                } else {
-                    dir.DirectionWS  = FVector3f(0.4f, 0.6f, 0.7f);
-                    dir.Color        = FVector3f(1.0f, 1.0f, 1.0f);
-                    dir.Intensity    = 2.0f;
-                    dir.bCastShadows = false;
-                }
-
-                constants.DirLightDirectionWS[0] = dir.DirectionWS[0];
-                constants.DirLightDirectionWS[1] = dir.DirectionWS[1];
-                constants.DirLightDirectionWS[2] = dir.DirectionWS[2];
-                constants.DirLightColor[0]       = dir.Color[0];
-                constants.DirLightColor[1]       = dir.Color[1];
-                constants.DirLightColor[2]       = dir.Color[2];
-                constants.DirLightIntensity      = dir.Intensity;
-
-                // Point lights.
-                constants.PointLightCount = 0U;
-                if (lights != nullptr && !lights->PointLights.IsEmpty()) {
-                    const u32 count           = static_cast<u32>(lights->PointLights.Size());
-                    const u32 clamped         = (count > kMaxPointLights) ? kMaxPointLights : count;
-                    constants.PointLightCount = clamped;
-                    for (u32 i = 0U; i < clamped; ++i) {
-                        const auto& src                        = lights->PointLights[i];
-                        constants.PointLights[i].PositionWS[0] = src.PositionWS[0];
-                        constants.PointLights[i].PositionWS[1] = src.PositionWS[1];
-                        constants.PointLights[i].PositionWS[2] = src.PositionWS[2];
-                        constants.PointLights[i].Range         = src.Range;
-                        constants.PointLights[i].Color[0]      = src.Color[0];
-                        constants.PointLights[i].Color[1]      = src.Color[1];
-                        constants.PointLights[i].Color[2]      = src.Color[2];
-                        constants.PointLights[i].Intensity     = src.Intensity;
-                    }
-                }
-
-                // CSM.
-                constants.CSMCascadeCount = csmData.CascadeCount;
-                constants.ShadowBias      = csmSettings.ReceiverBias;
-                if (csmSettings.ShadowMapSize > 0U) {
-                    const f32 inv = 1.0f / static_cast<f32>(csmSettings.ShadowMapSize);
-                    constants.ShadowMapInvSize[0] = inv;
-                    constants.ShadowMapInvSize[1] = inv;
-                }
-                for (u32 i = 0U; i < RenderCore::Shadow::kMaxCascades; ++i) {
-                    constants.CSM_SplitsVS[i][0] = csmData.Cascades[i].SplitVS[0];
-                    constants.CSM_SplitsVS[i][1] = csmData.Cascades[i].SplitVS[1];
-                    constants.CSM_SplitsVS[i][2] = 0.0f;
-                    constants.CSM_SplitsVS[i][3] = 0.0f;
-                }
-                // Avoid matrix arrays in the shared constant buffer (see FPerFrameConstants comment
-                // above).
-                constants.CSM_LightViewProj0 = csmData.Cascades[0].LightViewProj;
-                constants.CSM_LightViewProj1 = csmData.Cascades[1].LightViewProj;
-                constants.CSM_LightViewProj2 = csmData.Cascades[2].LightViewProj;
-                constants.CSM_LightViewProj3 = csmData.Cascades[3].LightViewProj;
-
                 ctx.RHIUpdateDynamicBufferDiscard(
-                    perFrameBuffer, &constants, sizeof(constants), 0ULL);
+                    perFrameBuffer, &sharedConstants, sizeof(sharedConstants), 0ULL);
 
-                // Bind group (b0 + t0..t4 + s0).
+                // Fill IBL constants (b1). If IBL is not available, keep intensities at zero.
+                FIblConstants iblConstants{};
+                const bool    bEnableIbl = (rIblEnable.Get() != 0) && bHasSkyIbl
+                    && (skyIrradiance != nullptr) && (skySpecular != nullptr)
+                    && (brdfLut != nullptr);
+                if (bEnableIbl) {
+                    iblConstants.EnvDiffuseIntensity  = rIblDiffuseIntensity.Get();
+                    iblConstants.EnvSpecularIntensity = rIblSpecularIntensity.Get();
+                    iblConstants.SpecularMaxLod       = specularMaxLod;
+                    iblConstants.EnvSaturation        = rIblSaturation.Get();
+                }
+                if (iblBuffer != nullptr) {
+                    ctx.RHIUpdateDynamicBufferDiscard(
+                        iblBuffer, &iblConstants, sizeof(iblConstants), 0ULL);
+                }
+
+                // Bind group (b0 + b1 + t0..t8 + s0).
                 Rhi::FRhiBindGroupDesc groupDesc{};
                 groupDesc.mLayout = shared.LightingLayout.Get();
 
@@ -1656,6 +2100,14 @@ namespace AltinaEngine::Rendering {
                 cb.mOffset  = 0ULL;
                 cb.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
                 groupDesc.mEntries.PushBack(cb);
+
+                Rhi::FRhiBindGroupEntry iblCb{};
+                iblCb.mBinding = 1U;
+                iblCb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
+                iblCb.mBuffer  = (iblBuffer != nullptr) ? iblBuffer : perFrameBuffer;
+                iblCb.mOffset  = 0ULL;
+                iblCb.mSize    = static_cast<u64>(sizeof(FIblConstants));
+                groupDesc.mEntries.PushBack(iblCb);
 
                 Rhi::FRhiBindGroupEntry eA{};
                 eA.mBinding = 0U;
@@ -1686,6 +2138,36 @@ namespace AltinaEngine::Rendering {
                 eShadow.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eShadow.mTexture = shadowTex;
                 groupDesc.mEntries.PushBack(eShadow);
+
+                // IBL textures (t5..t7).
+                auto* irrTex  = bEnableIbl ? skyIrradiance : shared.IblBlackCube.Get();
+                auto* specTex = bEnableIbl ? skySpecular : shared.IblBlackCube.Get();
+                auto* lutTex  = bEnableIbl ? brdfLut : shared.IblBlack2D.Get();
+
+                Rhi::FRhiBindGroupEntry eIrr{};
+                eIrr.mBinding = 5U;
+                eIrr.mType    = Rhi::ERhiBindingType::SampledTexture;
+                eIrr.mTexture = irrTex;
+                groupDesc.mEntries.PushBack(eIrr);
+
+                Rhi::FRhiBindGroupEntry eSpec{};
+                eSpec.mBinding = 6U;
+                eSpec.mType    = Rhi::ERhiBindingType::SampledTexture;
+                eSpec.mTexture = specTex;
+                groupDesc.mEntries.PushBack(eSpec);
+
+                Rhi::FRhiBindGroupEntry eLut{};
+                eLut.mBinding = 7U;
+                eLut.mType    = Rhi::ERhiBindingType::SampledTexture;
+                eLut.mTexture = lutTex;
+                groupDesc.mEntries.PushBack(eLut);
+
+                // SSAO (t8).
+                Rhi::FRhiBindGroupEntry eSsao{};
+                eSsao.mBinding = 8U;
+                eSsao.mType    = Rhi::ERhiBindingType::SampledTexture;
+                eSsao.mTexture = ssaoTex;
+                groupDesc.mEntries.PushBack(eSsao);
 
                 Rhi::FRhiBindGroupEntry sampler{};
                 sampler.mBinding = 0U;
@@ -1877,6 +2359,8 @@ namespace AltinaEngine::Rendering {
                     FPostProcessParamValue(rPostProcessBloomKawaseOffset.Get());
                 node.Params[FString(TEXT("Iterations"))] =
                     FPostProcessParamValue(rPostProcessBloomIterations.Get());
+                node.Params[FString(TEXT("FirstDownsampleLumaWeight"))] =
+                    FPostProcessParamValue(rPostProcessBloomFirstDownsampleLumaWeight.Get());
                 pp.Stack.PushBack(Move(node));
             }
 

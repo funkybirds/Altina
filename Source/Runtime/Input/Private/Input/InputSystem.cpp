@@ -96,7 +96,11 @@ namespace AltinaEngine::Input {
     }
 
     void FInputSystem::OnKeyDown(EKey InKey, bool InRepeat) {
-        if (!InRepeat && (mPressedKeys.count(InKey) == 0U)) {
+        // Robustness: some platforms / message pumps may mark the initial keydown as "repeat"
+        // depending on focus changes or message ordering. We treat a transition from "not down"
+        // to "down" as a press regardless of the repeat flag.
+        if (mPressedKeys.count(InKey) == 0U) {
+            (void)InRepeat;
             mKeysPressedThisFrame.insert(InKey);
         }
         mPressedKeys.insert(InKey);

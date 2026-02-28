@@ -25,6 +25,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -200,6 +201,36 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return "Unknown";
             }
         }
+
+        struct FCookTimingScope {
+            explicit FCookTimingScope(const FAssetRecord& asset)
+                : Asset(asset), Start(std::chrono::steady_clock::now()) {}
+
+            ~FCookTimingScope() {
+                if (!Enabled) {
+                    return;
+                }
+
+                const auto end = std::chrono::steady_clock::now();
+                const auto ms =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(end - Start).count();
+
+                std::cout << "[AssetTool][CookTiming]"
+                          << " type=" << AssetTypeToString(Asset.Type) << " virtual="
+                          << (Asset.VirtualPath.empty() ? "<none>" : Asset.VirtualPath)
+                          << " source=" << Asset.SourcePathRel
+                          << " result=" << (Result == nullptr ? "unknown" : Result)
+                          << " wrote=" << (WroteCookedFile ? "true" : "false")
+                          << " generatedWrote=" << GeneratedWritten << " timeMs=" << ms << "\n";
+            }
+
+            const FAssetRecord&                   Asset;
+            std::chrono::steady_clock::time_point Start;
+            const char*                           Result           = "unknown";
+            bool                                  WroteCookedFile  = false;
+            size_t                                GeneratedWritten = 0;
+            bool                                  Enabled          = true;
+        };
 
         auto ParseAssetType(std::string value) -> Asset::EAssetType {
             ToLowerAscii(value);
@@ -763,6 +794,23 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::cout << "  validate --registry <PathToAssetRegistry.json>\n";
             std::cout << "  clean    --root <repoRoot> [--build-root <BuildRoot>] --cache\n";
             std::cout << "  modelinfo --source <PathToModel> [--target-radius <R>]\n";
+            std::cout << "  selftest --envmap\n";
+        }
+
+        auto SelfTest(const FCommandLine& command) -> int {
+            const bool envmap = command.Options.find("envmap") != command.Options.end();
+            if (!envmap) {
+                std::cerr << "Specify --envmap.\n";
+                return 1;
+            }
+
+            std::string error;
+            if (!RunEnvMapSelfTest(error)) {
+                std::cerr << error << "\n";
+                return 1;
+            }
+
+            return 0;
         }
 
         auto BuildPaths(const FCommandLine& command, const std::string& platform) -> FToolPaths {
@@ -1136,9 +1184,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     continue;
                 }
 
-                std::vector<u8> bytes;
+                FCookTimingScope timing(asset);
+
+                std::vector<u8>  bytes;
                 if (!ReadFileBytes(asset.SourcePath, bytes)) {
                     std::cerr << "Failed to read source: " << asset.SourcePath.string() << "\n";
+                    timing.Result = "read_failed";
                     continue;
                 }
 
@@ -1171,6 +1222,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     if (!ParseScriptDescriptor(bytes, scriptAssemblyPath, scriptTypeName)) {
                         std::cerr << "Failed to read script descriptor: "
                                   << asset.SourcePath.string() << "\n";
+                        timing.Result = "script_desc_failed";
                         continue;
                     }
                     hasScriptDesc = true;
@@ -1191,6 +1243,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                                 std::cerr << " (" << envError << ")";
                             }
                             std::cerr << "\n";
+                            timing.Result = "cook_failed";
                             continue;
                         }
                         cookedBytes     = envMapResult.CookedBytes;
@@ -1208,6 +1261,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
                             std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
                                       << "\n";
+                            timing.Result = "cook_failed";
                             continue;
                         }
                     }
@@ -1216,39 +1270,50 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     ToLowerAscii(ext);
                     std::string cookError;
                     if (ext == ".exr") {
-                        if (!CookSkyCubeFromExr(
-                                asset.SourcePath, bytes, skyCubeResult, cookError)) {
+                        Asset::FAssetHandle baseHandle{};
+                        baseHandle.Uuid = asset.Uuid;
+                        baseHandle.Type = asset.Type;
+                        if (!CookSkyCubeFromExr(asset.SourcePath, bytes, baseHandle,
+                                asset.VirtualPath, skyCubeResult, cookError)) {
                             std::cerr << "Failed to cook sky cubemap EXR: "
                                       << asset.SourcePath.string();
                             if (!cookError.empty()) {
                                 std::cerr << " (" << cookError << ")";
                             }
                             std::cerr << "\n";
+                            timing.Result = "cook_failed";
                             continue;
                         }
                     } else if (ext == ".hdr") {
-                        if (!CookSkyCubeFromHdr(
-                                asset.SourcePath, bytes, skyCubeResult, cookError)) {
+                        Asset::FAssetHandle baseHandle{};
+                        baseHandle.Uuid = asset.Uuid;
+                        baseHandle.Type = asset.Type;
+                        if (!CookSkyCubeFromHdr(asset.SourcePath, bytes, baseHandle,
+                                asset.VirtualPath, skyCubeResult, cookError)) {
                             std::cerr << "Failed to cook sky cubemap HDR: "
                                       << asset.SourcePath.string();
                             if (!cookError.empty()) {
                                 std::cerr << " (" << cookError << ")";
                             }
                             std::cerr << "\n";
+                            timing.Result = "cook_failed";
                             continue;
                         }
                     } else {
                         std::cerr << "Unsupported cubemap source: " << asset.SourcePath.string()
                                   << "\n";
+                        timing.Result = "unsupported_source";
                         continue;
                     }
 
-                    cookedBytes   = skyCubeResult.CookedBytes;
-                    cubeMapDesc   = skyCubeResult.Desc;
-                    cookKeyExtras = skyCubeResult.CookKeyExtras;
+                    cookedBytes     = skyCubeResult.CookedBytes;
+                    cubeMapDesc     = skyCubeResult.Desc;
+                    cookKeyExtras   = skyCubeResult.CookKeyExtras;
+                    generatedAssets = Move(skyCubeResult.Generated);
                 } else if (isMesh) {
                     if (!CookMesh(asset.SourcePath, cookedBytes, meshDesc, cookKeyExtras)) {
                         std::cerr << "Failed to cook mesh: " << asset.SourcePath.string() << "\n";
+                        timing.Result = "cook_failed";
                         continue;
                     }
                 } else if (isModel) {
@@ -1263,6 +1328,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             std::cerr << " (" << modelError << ")";
                         }
                         std::cerr << "\n";
+                        timing.Result = "cook_failed";
                         continue;
                     }
                     cookedBytes     = modelResult.CookedBytes;
@@ -1274,18 +1340,21 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             bytes, assetsByVirtualPath, materialDeps, materialDesc, cookedBytes)) {
                         std::cerr << "Failed to cook material: " << asset.SourcePath.string()
                                   << "\n";
+                        timing.Result = "cook_failed";
                         continue;
                     }
                     cookKeyExtras = cookedBytes;
                 } else if (isShader) {
                     if (!CookShader(asset.SourcePath, bytes, paths.Root, cookedBytes, shaderDesc)) {
                         std::cerr << "Failed to cook shader: " << asset.SourcePath.string() << "\n";
+                        timing.Result = "cook_failed";
                         continue;
                     }
                     cookKeyExtras = cookedBytes;
                 } else if (isAudio) {
                     if (!CookAudio(asset.SourcePath, bytes, cookedBytes, audioDesc)) {
                         std::cerr << "Failed to cook audio: " << asset.SourcePath.string() << "\n";
+                        timing.Result = "cook_failed";
                         continue;
                     }
                 } else {
@@ -1315,9 +1384,14 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     if (!WriteBytesFile(cookedPath, cookedBytes)) {
                         std::cerr << "Failed to write cooked asset: " << cookedPath.string()
                                   << "\n";
+                        timing.Result = "write_failed";
                         continue;
                     }
                     ++cookedCount;
+                    timing.WroteCookedFile = true;
+                    timing.Result          = "wrote";
+                } else {
+                    timing.Result = "up_to_date";
                 }
 
                 FCookCacheEntry cacheEntry{};
@@ -1387,6 +1461,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                                 continue;
                             }
                             ++cookedCount;
+                            ++timing.GeneratedWritten;
                         }
 
                         FRegistryEntry genEntry{};
@@ -1399,6 +1474,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         if (generated.Type == Asset::EAssetType::Texture2D) {
                             genEntry.TextureDesc    = generated.TextureDesc;
                             genEntry.HasTextureDesc = true;
+                        } else if (generated.Type == Asset::EAssetType::CubeMap) {
+                            genEntry.CubeMapDesc    = generated.CubeMapDesc;
+                            genEntry.HasCubeMapDesc = true;
                         } else if (generated.Type == Asset::EAssetType::Mesh) {
                             genEntry.MeshDesc    = generated.MeshDesc;
                             genEntry.HasMeshDesc = true;
@@ -1819,6 +1897,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
         if (cmdLower == "modelinfo") {
             return ModelInfo(command);
+        }
+        if (cmdLower == "selftest") {
+            return SelfTest(command);
         }
 
         PrintUsage();

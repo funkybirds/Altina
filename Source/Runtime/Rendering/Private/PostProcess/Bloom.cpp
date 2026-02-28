@@ -17,11 +17,12 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
         using Detail::FBloomConstants;
 
         struct FBloomParams {
-            f32 Threshold    = 1.0f;
-            f32 Knee         = 0.5f;
-            f32 Intensity    = 0.05f;
-            f32 KawaseOffset = 1.0f;
-            i32 Iterations   = 5;
+            f32  Threshold                  = 1.0f;
+            f32  Knee                       = 0.5f;
+            f32  Intensity                  = 0.05f;
+            f32  KawaseOffset               = 1.0f;
+            i32  Iterations                 = 5;
+            bool bFirstDownsampleLumaWeight = false;
         };
 
         void UpdateConstantBuffer(Rhi::FRhiBuffer* buffer, const void* data, u64 sizeBytes) {
@@ -160,6 +161,184 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                 Rhi::ERhiTextureBindFlags::RenderTarget | Rhi::ERhiTextureBindFlags::ShaderResource;
             return desc;
         }
+
+        [[nodiscard]] auto MakeBloomIntermediateTextureDesc(u32 width, u32 height,
+            const AltinaEngine::TChar* name, u32 level) -> RenderCore::FFrameGraphTextureDesc {
+            RenderCore::FFrameGraphTextureDesc desc{};
+            desc.mDesc.mDebugName.Assign(name);
+            desc.mDesc.mDebugName.AppendNumber(level);
+            desc.mDesc.mWidth       = width;
+            desc.mDesc.mHeight      = height;
+            desc.mDesc.mArrayLayers = 1U;
+            desc.mDesc.mFormat      = Rhi::ERhiFormat::R16G16B16A16Float;
+            desc.mDesc.mBindFlags =
+                Rhi::ERhiTextureBindFlags::RenderTarget | Rhi::ERhiTextureBindFlags::ShaderResource;
+            return desc;
+        }
+
+        [[nodiscard]] auto AddGaussianBlur(RenderCore::FFrameGraph& graph,
+            RenderCore::FFrameGraphTextureRef input, u32 width, u32 height, u32 level,
+            const FBloomParams& params) -> RenderCore::FFrameGraphTextureRef {
+            // Horizontal blur
+            RenderCore::FFrameGraphTextureRef blurH{};
+            {
+                struct FPassData {
+                    RenderCore::FFrameGraphTextureRef In;
+                    RenderCore::FFrameGraphTextureRef Out;
+                    RenderCore::FFrameGraphRTVRef     OutRTV;
+                    FBloomParams                      Params;
+                    u32                               Width  = 1U;
+                    u32                               Height = 1U;
+                    u32                               Level  = 0U;
+                };
+
+                RenderCore::FFrameGraphPassDesc desc{};
+                desc.mName  = "PostProcess.Bloom.BlurH";
+                desc.mType  = RenderCore::EFrameGraphPassType::Raster;
+                desc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
+
+                graph.AddPass<FPassData>(
+                    desc,
+                    [&](RenderCore::FFrameGraphPassBuilder& builder, FPassData& data) {
+                        data.Params = params;
+                        data.Width  = width;
+                        data.Height = height;
+                        data.Level  = level;
+
+                        data.In  = builder.Read(input, Rhi::ERhiResourceState::ShaderResource);
+                        data.Out = builder.CreateTexture(MakeBloomIntermediateTextureDesc(
+                            width, height, TEXT("PostProcess.Bloom.BlurH"), level));
+                        data.Out = builder.Write(data.Out, Rhi::ERhiResourceState::RenderTarget);
+                        blurH    = data.Out;
+
+                        Rhi::FRhiTextureViewRange viewRange{};
+                        viewRange.mMipCount        = 1U;
+                        viewRange.mLayerCount      = 1U;
+                        viewRange.mDepthSliceCount = 1U;
+
+                        Rhi::FRhiRenderTargetViewDesc rtvDesc{};
+                        rtvDesc.mDebugName.Assign(TEXT("PostProcess.Bloom.BlurH.RTV"));
+                        rtvDesc.mDebugName.AppendNumber(level);
+                        rtvDesc.mFormat = Rhi::ERhiFormat::R16G16B16A16Float;
+                        rtvDesc.mRange  = viewRange;
+                        data.OutRTV     = builder.CreateRTV(data.Out, rtvDesc);
+
+                        RenderCore::FRdgRenderTargetBinding rtv{};
+                        rtv.mRTV     = data.OutRTV;
+                        rtv.mLoadOp  = Rhi::ERhiLoadOp::DontCare;
+                        rtv.mStoreOp = Rhi::ERhiStoreOp::Store;
+                        builder.SetRenderTargets(&rtv, 1U, nullptr);
+                    },
+                    [](Rhi::FRhiCmdContext& cmd, const RenderCore::FFrameGraphPassResources& res,
+                        const FPassData& data) {
+                        auto& shared = Detail::GetPostProcessSharedResources();
+                        if (!shared.BloomBlurHPipeline || !shared.Layout || !shared.LinearSampler
+                            || !shared.BloomConstantsBuffer) {
+                            return;
+                        }
+
+                        auto* inTex  = res.GetTexture(data.In);
+                        auto* device = Rhi::RHIGetDevice();
+                        if (!inTex || device == nullptr) {
+                            return;
+                        }
+
+                        WriteBloomConstants(data.Params);
+
+                        auto bindGroup = MakeBindGroup(*device, shared, inTex);
+                        if (!bindGroup) {
+                            return;
+                        }
+
+                        SetViewportScissor(cmd, data.Width, data.Height);
+                        cmd.RHISetGraphicsPipeline(shared.BloomBlurHPipeline.Get());
+                        cmd.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
+                        cmd.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
+                        cmd.RHIDraw(3U, 1U, 0U, 0U);
+                    });
+            }
+
+            // Vertical blur
+            RenderCore::FFrameGraphTextureRef blurV{};
+            {
+                struct FPassData {
+                    RenderCore::FFrameGraphTextureRef In;
+                    RenderCore::FFrameGraphTextureRef Out;
+                    RenderCore::FFrameGraphRTVRef     OutRTV;
+                    FBloomParams                      Params;
+                    u32                               Width  = 1U;
+                    u32                               Height = 1U;
+                    u32                               Level  = 0U;
+                };
+
+                RenderCore::FFrameGraphPassDesc desc{};
+                desc.mName  = "PostProcess.Bloom.BlurV";
+                desc.mType  = RenderCore::EFrameGraphPassType::Raster;
+                desc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
+
+                graph.AddPass<FPassData>(
+                    desc,
+                    [&](RenderCore::FFrameGraphPassBuilder& builder, FPassData& data) {
+                        data.Params = params;
+                        data.Width  = width;
+                        data.Height = height;
+                        data.Level  = level;
+
+                        data.In  = builder.Read(blurH, Rhi::ERhiResourceState::ShaderResource);
+                        data.Out = builder.CreateTexture(MakeBloomIntermediateTextureDesc(
+                            width, height, TEXT("PostProcess.Bloom.BlurV"), level));
+                        data.Out = builder.Write(data.Out, Rhi::ERhiResourceState::RenderTarget);
+                        blurV    = data.Out;
+
+                        Rhi::FRhiTextureViewRange viewRange{};
+                        viewRange.mMipCount        = 1U;
+                        viewRange.mLayerCount      = 1U;
+                        viewRange.mDepthSliceCount = 1U;
+
+                        Rhi::FRhiRenderTargetViewDesc rtvDesc{};
+                        rtvDesc.mDebugName.Assign(TEXT("PostProcess.Bloom.BlurV.RTV"));
+                        rtvDesc.mDebugName.AppendNumber(level);
+                        rtvDesc.mFormat = Rhi::ERhiFormat::R16G16B16A16Float;
+                        rtvDesc.mRange  = viewRange;
+                        data.OutRTV     = builder.CreateRTV(data.Out, rtvDesc);
+
+                        RenderCore::FRdgRenderTargetBinding rtv{};
+                        rtv.mRTV     = data.OutRTV;
+                        rtv.mLoadOp  = Rhi::ERhiLoadOp::DontCare;
+                        rtv.mStoreOp = Rhi::ERhiStoreOp::Store;
+                        builder.SetRenderTargets(&rtv, 1U, nullptr);
+                    },
+                    [](Rhi::FRhiCmdContext& cmd, const RenderCore::FFrameGraphPassResources& res,
+                        const FPassData& data) {
+                        auto& shared = Detail::GetPostProcessSharedResources();
+                        if (!shared.BloomBlurVPipeline || !shared.Layout || !shared.LinearSampler
+                            || !shared.BloomConstantsBuffer) {
+                            return;
+                        }
+
+                        auto* inTex  = res.GetTexture(data.In);
+                        auto* device = Rhi::RHIGetDevice();
+                        if (!inTex || device == nullptr) {
+                            return;
+                        }
+
+                        WriteBloomConstants(data.Params);
+
+                        auto bindGroup = MakeBindGroup(*device, shared, inTex);
+                        if (!bindGroup) {
+                            return;
+                        }
+
+                        SetViewportScissor(cmd, data.Width, data.Height);
+                        cmd.RHISetGraphicsPipeline(shared.BloomBlurVPipeline.Get());
+                        cmd.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
+                        cmd.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
+                        cmd.RHIDraw(3U, 1U, 0U, 0U);
+                    });
+            }
+
+            return blurV;
+        }
     } // namespace
 
     void AddBloom(RenderCore::FFrameGraph& graph, const RenderCore::View::FViewData& view,
@@ -186,6 +365,8 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
         params.Intensity    = GetParamF32(node.Params, TEXT("Intensity"), 0.05f);
         params.KawaseOffset = GetParamF32(node.Params, TEXT("KawaseOffset"), 1.0f);
         params.Iterations   = GetParamI32(node.Params, TEXT("Iterations"), 5);
+        params.bFirstDownsampleLumaWeight =
+            (GetParamI32(node.Params, TEXT("FirstDownsampleLumaWeight"), 0) != 0);
 
         if (params.Iterations < 1) {
             params.Iterations = 1;
@@ -201,6 +382,8 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
         RenderCore::FFrameGraphTextureRef down[kMaxLevels]{};
 
         const u32                         levelCount = static_cast<u32>(params.Iterations);
+        const u32                         baseDownW  = (baseW >> 1U) > 0U ? (baseW >> 1U) : 1U;
+        const u32                         baseDownH  = (baseH >> 1U) > 0U ? (baseH >> 1U) : 1U;
 
         // Prefilter + downsample: scene -> down[0] (half-res).
         {
@@ -222,8 +405,8 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                 desc,
                 [&](RenderCore::FFrameGraphPassBuilder& builder, FPassData& data) {
                     data.Params = params;
-                    data.Width  = (baseW >> 1U) > 0U ? (baseW >> 1U) : 1U;
-                    data.Height = (baseH >> 1U) > 0U ? (baseH >> 1U) : 1U;
+                    data.Width  = baseDownW;
+                    data.Height = baseDownH;
 
                     data.In = builder.Read(io.SceneColor, Rhi::ERhiResourceState::ShaderResource);
                     data.Out =
@@ -243,7 +426,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                     data.OutRTV     = builder.CreateRTV(data.Out, rtvDesc);
 
                     RenderCore::FRdgRenderTargetBinding rtv{};
-                    rtv.mRTV = data.OutRTV;
+                    rtv.mRTV     = data.OutRTV;
+                    rtv.mLoadOp  = Rhi::ERhiLoadOp::DontCare;
+                    rtv.mStoreOp = Rhi::ERhiStoreOp::Store;
                     builder.SetRenderTargets(&rtv, 1U, nullptr);
                 },
                 [](Rhi::FRhiCmdContext& cmd, const RenderCore::FFrameGraphPassResources& res,
@@ -275,16 +460,22 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                 });
         }
 
+        down[0] = AddGaussianBlur(graph, down[0], baseDownW, baseDownH, 0U, params);
+
         // Downsample chain: down[i-1] -> down[i]
         for (u32 i = 1U; i < levelCount; ++i) {
+            const u32  levelW                 = (baseW >> (i + 1U)) > 0U ? (baseW >> (i + 1U)) : 1U;
+            const u32  levelH                 = (baseH >> (i + 1U)) > 0U ? (baseH >> (i + 1U)) : 1U;
+            const bool bUseWeightedDownsample = (i == 1U) && params.bFirstDownsampleLumaWeight;
             struct FPassData {
                 RenderCore::FFrameGraphTextureRef In;
                 RenderCore::FFrameGraphTextureRef Out;
                 RenderCore::FFrameGraphRTVRef     OutRTV;
                 FBloomParams                      Params;
-                u32                               Width  = 1U;
-                u32                               Height = 1U;
-                u32                               Level  = 0U;
+                u32                               Width                  = 1U;
+                u32                               Height                 = 1U;
+                u32                               Level                  = 0U;
+                bool                              bUseWeightedDownsample = false;
             };
 
             RenderCore::FFrameGraphPassDesc desc{};
@@ -295,10 +486,11 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
             graph.AddPass<FPassData>(
                 desc,
                 [&](RenderCore::FFrameGraphPassBuilder& builder, FPassData& data) {
-                    data.Params = params;
-                    data.Level  = i;
-                    data.Width  = (baseW >> (i + 1U)) > 0U ? (baseW >> (i + 1U)) : 1U;
-                    data.Height = (baseH >> (i + 1U)) > 0U ? (baseH >> (i + 1U)) : 1U;
+                    data.Params                 = params;
+                    data.Level                  = i;
+                    data.Width                  = levelW;
+                    data.Height                 = levelH;
+                    data.bUseWeightedDownsample = bUseWeightedDownsample;
 
                     data.In = builder.Read(down[i - 1U], Rhi::ERhiResourceState::ShaderResource);
                     data.Out =
@@ -318,7 +510,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                     data.OutRTV     = builder.CreateRTV(data.Out, rtvDesc);
 
                     RenderCore::FRdgRenderTargetBinding rtv{};
-                    rtv.mRTV = data.OutRTV;
+                    rtv.mRTV     = data.OutRTV;
+                    rtv.mLoadOp  = Rhi::ERhiLoadOp::DontCare;
+                    rtv.mStoreOp = Rhi::ERhiStoreOp::Store;
                     builder.SetRenderTargets(&rtv, 1U, nullptr);
                 },
                 [](Rhi::FRhiCmdContext& cmd, const RenderCore::FFrameGraphPassResources& res,
@@ -343,11 +537,17 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
                     }
 
                     SetViewportScissor(cmd, data.Width, data.Height);
-                    cmd.RHISetGraphicsPipeline(shared.BloomDownsamplePipeline.Get());
+                    auto* pipeline = shared.BloomDownsamplePipeline.Get();
+                    if (data.bUseWeightedDownsample && shared.BloomDownsampleWeightedPipeline) {
+                        pipeline = shared.BloomDownsampleWeightedPipeline.Get();
+                    }
+                    cmd.RHISetGraphicsPipeline(pipeline);
                     cmd.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
                     cmd.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
                     cmd.RHIDraw(3U, 1U, 0U, 0U);
                 });
+
+            down[i] = AddGaussianBlur(graph, down[i], levelW, levelH, i, params);
         }
 
         // Upsample chain: down[i] += upsample(down[i+1]) using additive blending.
@@ -379,6 +579,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
 
                     data.InLow =
                         builder.Read(down[ui + 1U], Rhi::ERhiResourceState::ShaderResource);
+                    // This pass uses LoadOp=Load to accumulate onto down[ui]. Add a read dependency
+                    // so the frame graph keeps the existing contents of down[ui].
+                    (void)builder.Read(down[ui], Rhi::ERhiResourceState::RenderTarget);
                     data.OutHigh = builder.Write(down[ui], Rhi::ERhiResourceState::RenderTarget);
 
                     Rhi::FRhiTextureViewRange viewRange{};

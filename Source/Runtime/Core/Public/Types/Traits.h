@@ -3,6 +3,8 @@
 #include "InternalTraits.h"
 #include "Aliases.h"
 
+#include <climits>
+
 // Forward-declare TTuple to avoid ordering issues when used in traits specializations
 
 namespace AltinaEngine::Core::Container {
@@ -167,6 +169,31 @@ namespace AltinaEngine {
         template <> struct TTypeIsFloatingPoint<double> : TTrueType {};
         template <> struct TTypeIsFloatingPoint<long double> : TTrueType {};
 
+        template <typename> struct TTypeIsSigned : TFalseType {};
+        template <> struct TTypeIsSigned<bool> : TFalseType {};
+        template <> struct TTypeIsSigned<signed char> : TTrueType {};
+        template <> struct TTypeIsSigned<unsigned char> : TFalseType {};
+        template <> struct TTypeIsSigned<short> : TTrueType {};
+        template <> struct TTypeIsSigned<unsigned short> : TFalseType {};
+        template <> struct TTypeIsSigned<int> : TTrueType {};
+        template <> struct TTypeIsSigned<unsigned int> : TFalseType {};
+        template <> struct TTypeIsSigned<long> : TTrueType {};
+        template <> struct TTypeIsSigned<unsigned long> : TFalseType {};
+        template <> struct TTypeIsSigned<long long> : TTrueType {};
+        template <> struct TTypeIsSigned<unsigned long long> : TFalseType {};
+
+        template <> struct TTypeIsSigned<char> : TBoolConstant<(CHAR_MIN < 0)> {};
+#if defined(__cpp_char8_t)
+        template <> struct TTypeIsSigned<char8_t> : TFalseType {};
+#endif
+        template <> struct TTypeIsSigned<char16_t> : TFalseType {};
+        template <> struct TTypeIsSigned<char32_t> : TFalseType {};
+#if defined(WCHAR_MIN)
+        template <> struct TTypeIsSigned<wchar_t> : TBoolConstant<(WCHAR_MIN < 0)> {};
+#else
+        template <> struct TTypeIsSigned<wchar_t> : TFalseType {};
+#endif
+
     } // namespace Detail::BasicTypes
 
     template <typename T>
@@ -177,7 +204,8 @@ namespace AltinaEngine {
 
     template <typename T, bool = TTypeIsIntegral<T>::Value> struct TTypeIsSigned : TFalseType {};
     template <typename T>
-    struct TTypeIsSigned<T, true> : TBoolConstant<(static_cast<T>(-1) < static_cast<T>(0))> {};
+    struct TTypeIsSigned<T, true> :
+        Detail::BasicTypes::TTypeIsSigned<typename TRemoveCV<T>::TType> {};
 
     template <typename T>
     concept CCharType = CSameAs<T, char>

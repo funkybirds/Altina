@@ -15,6 +15,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         std::vector<u8>                  CookedBytes;
         std::vector<Asset::FAssetHandle> Dependencies;
         Asset::FTexture2DDesc            TextureDesc{};
+        Asset::FCubeMapDesc              CubeMapDesc{};
         Asset::FMeshDesc                 MeshDesc{};
         Asset::FMaterialDesc             MaterialDesc{};
     };

@@ -21,6 +21,8 @@ namespace AltinaEngine::Rendering {
             const RenderCore::FShaderRegistry::FShaderKey&                             ps) noexcept;
         static void SetLightingShaderKeys(const RenderCore::FShaderRegistry::FShaderKey& vs,
             const RenderCore::FShaderRegistry::FShaderKey& ps) noexcept;
+        static void SetSsaoShaderKeys(const RenderCore::FShaderRegistry::FShaderKey& vs,
+            const RenderCore::FShaderRegistry::FShaderKey&                           ps) noexcept;
         static void SetSkyBoxShaderKeys(const RenderCore::FShaderRegistry::FShaderKey& vs,
             const RenderCore::FShaderRegistry::FShaderKey&                             ps) noexcept;
         [[nodiscard]] static auto RegisterShader(
@@ -40,6 +42,8 @@ namespace AltinaEngine::Rendering {
         Rhi::FRhiBindGroupRef                          mPerFrameGroup;
         Rhi::FRhiBufferRef                             mPerDrawBuffer;
         Rhi::FRhiBindGroupRef                          mPerDrawGroup;
+        Rhi::FRhiBufferRef                             mIblConstantsBuffer;
+        Rhi::FRhiBufferRef                             mSsaoConstantsBuffer;
 
         // D3D11 deferred context: updating the same cbuffer multiple times while recording can
         // make all draws see the "last written" data at Execute time. Use per-cascade cbuffers.

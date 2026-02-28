@@ -200,6 +200,11 @@ function(ae_add_reflection_codegen)
                 "void RegisterReflection_${module_ident}() {\n"
                 "}\n"
                 "} // namespace AltinaEngine::Core::Reflection\n"
+                "\n"
+                "namespace AltinaEngine::GameScene {\n"
+                "void RegisterComponent_${module_ident}() {\n"
+                "}\n"
+                "} // namespace AltinaEngine::GameScene\n"
             )
             list(JOIN stub_content "" stub_content_joined)
             file(GENERATE OUTPUT "${gen_cpp}" CONTENT "${stub_content_joined}")

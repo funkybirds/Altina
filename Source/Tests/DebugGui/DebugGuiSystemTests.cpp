@@ -74,6 +74,44 @@ TEST_CASE("DebugGui panel drawing increases draw stats") {
     DestroyDebugGuiSystem(sys);
 }
 
+TEST_CASE("DebugGui primitives: RoundedRect/Capsule increase draw stats") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 640, 480, 10, 10);
+
+    sys->TickGameThread(input, 1.0f / 60.0f, 640, 480);
+    const auto baseline = sys->GetLastFrameStats();
+
+    sys->RegisterPanel(TEXT("PrimTest"), [](IDebugGui& gui) {
+        const FRect clip{ FVector2f(0.0f, 0.0f), FVector2f(200.0f, 120.0f) };
+        gui.PushClipRect(clip);
+
+        const FRect rr{ FVector2f(10.0f, 10.0f), FVector2f(190.0f, 60.0f) };
+        gui.DrawRoundedRectFilled(rr, MakeColor32(20, 80, 160, 200), 10.0f);
+        gui.DrawRoundedRect(rr, MakeColor32(255, 255, 255, 255), 10.0f, 2.0f);
+
+        const FVector2f a(30.0f, 90.0f);
+        const FVector2f b(170.0f, 90.0f);
+        gui.DrawCapsuleFilled(a, b, 12.0f, MakeColor32(160, 80, 20, 200));
+        gui.DrawCapsule(a, b, 12.0f, MakeColor32(255, 255, 255, 255), 2.0f);
+
+        gui.PopClipRect();
+    });
+
+    PrepareInput(input, 640, 480, 10, 10);
+    sys->TickGameThread(input, 1.0f / 60.0f, 640, 480);
+    const auto withPanel = sys->GetLastFrameStats();
+
+    REQUIRE(withPanel.VertexCount > baseline.VertexCount);
+    REQUIRE(withPanel.IndexCount > baseline.IndexCount);
+    REQUIRE(withPanel.CmdCount >= baseline.CmdCount);
+
+    DestroyDebugGuiSystem(sys);
+}
+
 TEST_CASE("DebugGui toggles off with F1") {
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);
@@ -126,6 +164,30 @@ TEST_CASE("DebugGui widgets: Button/Checkbox/Slider/InputText basic interactions
     const AltinaEngine::i32           contentY = winY + 18 + 8;
     const AltinaEngine::i32           contentX = 10 + 8;
 
+    // Widget layout matches DebugGuiSystem.cpp's immediate-mode layout:
+    // - Button/Checkbox: one line each.
+    // - Slider/InputText: each emits a Text(label) line, then the control on the next line.
+    // Keep this test resilient to theme tweaks by computing Y positions from the current theme.
+    const auto                        theme   = sys->GetTheme();
+    constexpr AltinaEngine::i32       kGlyphH = 11; // FFontAtlas::kDrawGlyphH (private to module).
+
+    const AltinaEngine::i32           buttonH =
+        kGlyphH + static_cast<AltinaEngine::i32>(theme.ButtonPaddingY * 2.0f);
+    const AltinaEngine::i32 afterBtnY =
+        contentY + buttonH + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+    const AltinaEngine::i32 afterCbY = afterBtnY
+        + static_cast<AltinaEngine::i32>(theme.CheckboxBoxSize)
+        + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+
+    const AltinaEngine::i32 sliderTopY =
+        afterCbY + kGlyphH + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+    const AltinaEngine::i32 afterSliderY = sliderTopY
+        + static_cast<AltinaEngine::i32>(theme.SliderHeight + theme.SliderBottomSpacingY)
+        + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+
+    const AltinaEngine::i32 inputTopY =
+        afterSliderY + kGlyphH + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+
     // Button click (press then release).
     PrepareInput(input, kW, kH, contentX + 10, contentY + 5);
     input.OnMouseButtonDown(0U);
@@ -138,36 +200,34 @@ TEST_CASE("DebugGui widgets: Button/Checkbox/Slider/InputText basic interactions
 
     // Checkbox toggles on click.
     clicked = false;
-    PrepareInput(input, kW, kH, contentX + 10, contentY + 22);
+    PrepareInput(input, kW, kH, contentX + 10, afterBtnY + 2);
     input.OnMouseButtonDown(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
 
-    PrepareInput(input, kW, kH, contentX + 10, contentY + 22);
+    PrepareInput(input, kW, kH, contentX + 10, afterBtnY + 2);
     input.OnMouseButtonUp(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
     REQUIRE(check);
 
     // Slider drag roughly to the right.
-    const AltinaEngine::i32 sliderY = contentY + 50;
-    PrepareInput(input, kW, kH, contentX + 5, sliderY);
+    PrepareInput(input, kW, kH, contentX + 5, sliderTopY + 2);
     input.OnMouseButtonDown(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
 
-    PrepareInput(input, kW, kH, contentX + 430, sliderY);
+    PrepareInput(input, kW, kH, contentX + 430, sliderTopY + 2);
     sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
 
-    PrepareInput(input, kW, kH, contentX + 430, sliderY);
+    PrepareInput(input, kW, kH, contentX + 430, sliderTopY + 2);
     input.OnMouseButtonUp(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
     REQUIRE(slider > 0.7f);
 
     // InputText: click to focus, type 'abc'.
-    const AltinaEngine::i32 inputY = contentY + 88;
-    PrepareInput(input, kW, kH, contentX + 10, inputY);
+    PrepareInput(input, kW, kH, contentX + 10, inputTopY + 2);
     input.OnMouseButtonDown(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
 
-    PrepareInput(input, kW, kH, contentX + 10, inputY);
+    PrepareInput(input, kW, kH, contentX + 10, inputTopY + 2);
     input.OnMouseButtonUp(0U);
     input.OnCharInput(static_cast<AltinaEngine::u32>('a'));
     input.OnCharInput(static_cast<AltinaEngine::u32>('b'));
@@ -215,6 +275,47 @@ TEST_CASE("DebugGui console executes 'set' command via Enter") {
     sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
 
     REQUIRE_EQ(cvar->GetValue<int>(), 123);
+
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("DebugGui window collapse toggle reduces draw stats") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 20, 20);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto baseline = sys->GetLastFrameStats();
+    REQUIRE(baseline.VertexCount > 0U);
+
+    // Stats window is the first window (index 0): pos=(10,10), size=(460,260).
+    // Collapse button: x = 10 + 460 - 6 - 12 = 452, y = 10 + 3 = 13.
+    const AltinaEngine::i32 btnX = 456;
+    const AltinaEngine::i32 btnY = 18;
+
+    // Click collapse.
+    PrepareInput(input, 1280, 720, btnX, btnY);
+    input.OnMouseButtonDown(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+
+    PrepareInput(input, 1280, 720, btnX, btnY);
+    input.OnMouseButtonUp(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto collapsed = sys->GetLastFrameStats();
+    REQUIRE(collapsed.VertexCount < baseline.VertexCount);
+
+    // Click expand.
+    PrepareInput(input, 1280, 720, btnX, btnY);
+    input.OnMouseButtonDown(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+
+    PrepareInput(input, 1280, 720, btnX, btnY);
+    input.OnMouseButtonUp(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto expanded = sys->GetLastFrameStats();
+    REQUIRE(expanded.VertexCount > collapsed.VertexCount);
 
     DestroyDebugGuiSystem(sys);
 }

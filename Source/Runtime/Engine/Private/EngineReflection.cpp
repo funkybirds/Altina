@@ -4,6 +4,10 @@ namespace AltinaEngine::Core::Reflection {
     void RegisterReflection_AltinaEngineEngine();
 }
 
+namespace AltinaEngine::GameScene {
+    void RegisterComponent_AltinaEngineEngine();
+}
+
 namespace AltinaEngine::Engine {
     void RegisterEngineReflection() {
         static bool gRegistered = false;
@@ -12,5 +16,6 @@ namespace AltinaEngine::Engine {
         }
         gRegistered = true;
         Core::Reflection::RegisterReflection_AltinaEngineEngine();
+        GameScene::RegisterComponent_AltinaEngineEngine();
     }
 } // namespace AltinaEngine::Engine

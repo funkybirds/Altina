@@ -15,6 +15,8 @@ namespace AltinaEngine::Rendering {
     TConsoleVariable<f32> rPostProcessBloomKawaseOffset(
         TEXT("r.PostProcess.Bloom.KawaseOffset"), 1.0f);
     TConsoleVariable<i32> rPostProcessBloomIterations(TEXT("r.PostProcess.Bloom.Iterations"), 5);
+    TConsoleVariable<i32> rPostProcessBloomFirstDownsampleLumaWeight(
+        TEXT("r.PostProcess.Bloom.FirstDownsampleLumaWeight"), 1);
 
     TConsoleVariable<f32> rPostProcessFxaaEdgeThreshold(
         TEXT("r.PostProcess.Fxaa.EdgeThreshold"), 0.125f);

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Engine/EngineAPI.h"
-#include "Engine/GameScene/Component.h"
+#include "Engine/GameScene/ScriptComponentBase.h"
 #include "Container/String.h"
 #include "Container/StringView.h"
 #include "Asset/AssetTypes.h"
@@ -15,7 +15,7 @@ namespace AltinaEngine::Asset {
 
 namespace AltinaEngine::GameScene {
 
-    class ACLASS() AE_ENGINE_API FScriptComponent final : public FComponent {
+    class ACLASS() AE_ENGINE_API FScriptComponent final : public FScriptComponentBase {
     public:
         FScriptComponent() = default;
 

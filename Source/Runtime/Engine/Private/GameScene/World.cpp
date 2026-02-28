@@ -15,10 +15,10 @@ using AltinaEngine::Core::Container::FStringView;
 using AltinaEngine::Core::Container::MakeUnique;
 namespace AltinaEngine::GameScene {
     namespace {
-        Core::Threading::TAtomic<u32> gNextWorldId(1);
+        TAtomic<u32> gNextWorldId(1);
 
-        auto                          AcquireWorldId() -> u32 { return gNextWorldId.FetchAdd(1); }
-        void                          BumpWorldId(u32 worldId) {
+        auto         AcquireWorldId() -> u32 { return gNextWorldId.FetchAdd(1); }
+        void         BumpWorldId(u32 worldId) {
             u32 current = gNextWorldId.Load();
             while (current <= worldId) {
                 if (gNextWorldId.CompareExchangeStrong(current, worldId + 1U)) {
@@ -58,7 +58,7 @@ namespace AltinaEngine::GameScene {
         }
 
         auto ReadTransform(Core::Reflection::IDeserializer& deserializer)
-            -> Core::Math::LinAlg::FSpatialTransform {
+            -> LinAlg::FSpatialTransform {
             Core::Math::LinAlg::FSpatialTransform transform{};
             transform.Rotation.x = deserializer.Read<f32>();
             transform.Rotation.y = deserializer.Read<f32>();

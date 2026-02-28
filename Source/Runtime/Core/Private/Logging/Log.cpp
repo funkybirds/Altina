@@ -33,6 +33,12 @@ namespace AltinaEngine::Core::Logging {
         constexpr TChar                       kErrorLabel[]      = TEXT("ERROR");
         constexpr TChar                       kFatalLabel[]      = TEXT("FATAL");
 
+        // ANSI escape sequences for colored console output.
+        // Keep this platform-agnostic (no platform headers in Core).
+        constexpr TChar                       kAnsiReset[]  = TEXT("\x1b[0m");
+        constexpr TChar                       kAnsiRed[]    = TEXT("\x1b[31m");
+        constexpr TChar                       kAnsiYellow[] = TEXT("\x1b[33m");
+
         Threading::FAtomicInt32               gMinimumLevel(static_cast<int32_t>(ELogLevel::Info));
         FLogSink                              gUserSink = nullptr;
         void*                                 gUserData = nullptr;
@@ -109,6 +115,18 @@ namespace AltinaEngine::Core::Logging {
             }
         }
 
+        auto LevelToAnsiColor(const ELogLevel Level) noexcept -> FStringView {
+            switch (Level) {
+                case ELogLevel::Warning:
+                    return LiteralView(kAnsiYellow);
+                case ELogLevel::Error:
+                case ELogLevel::Fatal:
+                    return LiteralView(kAnsiRed);
+                default:
+                    return {};
+            }
+        }
+
         auto ConsoleStream() noexcept -> std::basic_ostream<TChar>& {
             if constexpr (std::is_same_v<TChar, wchar_t>) {
                 return std::wcout;
@@ -120,6 +138,11 @@ namespace AltinaEngine::Core::Logging {
         void DefaultSink(ELogLevel Level, FStringView Category, FStringView Message, void*) {
             auto&             stream = ConsoleStream();
             const FStringView label  = LevelToLabel(Level);
+            const FStringView color  = LevelToAnsiColor(Level);
+
+            if (!color.IsEmpty()) {
+                stream.write(color.Data(), static_cast<std::streamsize>(color.Length()));
+            }
 
             stream << TEXT('[');
             if (!label.IsEmpty()) {
@@ -133,6 +156,12 @@ namespace AltinaEngine::Core::Logging {
             if (!Message.IsEmpty()) {
                 stream.write(Message.Data(), static_cast<std::streamsize>(Message.Length()));
             }
+
+            if (!color.IsEmpty()) {
+                const auto reset = LiteralView(kAnsiReset);
+                stream.write(reset.Data(), static_cast<std::streamsize>(reset.Length()));
+            }
+
             stream << TEXT('\n');
             stream.flush();
         }

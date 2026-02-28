@@ -85,6 +85,21 @@ ae_add_test_target(AltinaEngineTestsRhiMock
     LIBS AltinaEngine::Rhi::Mock
 )
 
+file(GLOB_RECURSE AE_TEST_RHI_VULKAN_SOURCES
+    CONFIGURE_DEPENDS
+    ${AE_TESTS_ROOT}/Rhi/Vulkan/*.cpp
+)
+
+if(AE_TEST_RHI_VULKAN_SOURCES)
+    ae_add_test_target(AltinaEngineTestsRhiVulkan
+        FOLDER "Rhi/Vulkan"
+        SOURCES ${AE_TEST_RHI_VULKAN_SOURCES}
+        LIBS
+            AltinaEngine::Rhi::Vulkan
+            AltinaEngine::ShaderCompiler
+    )
+endif()
+
 if(WIN32)
     file(GLOB_RECURSE AE_TEST_RHI_D3D11_SOURCES
         CONFIGURE_DEPENDS

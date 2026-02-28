@@ -9,9 +9,10 @@ using AltinaEngine::Core::Container::FString;
 
 namespace AltinaEngine::GameScene {
     namespace {
-        AltinaEngine::Asset::FAssetManager* gScriptAssetManager = nullptr;
+        Asset::FAssetManager* gScriptAssetManager = nullptr;
 
-        auto                                ToFStringFromUtf8(FNativeStringView text) -> FString {
+        // TODO: (Refactor,Manual) Utility function
+        auto                  ToFStringFromUtf8(FNativeStringView text) -> FString {
             FString out;
             if (text.IsEmpty()) {
                 return out;
@@ -28,11 +29,11 @@ namespace AltinaEngine::GameScene {
         }
     } // namespace
 
-    void FScriptComponent::SetAssetManager(AltinaEngine::Asset::FAssetManager* manager) {
+    void FScriptComponent::SetAssetManager(Asset::FAssetManager* manager) {
         gScriptAssetManager = manager;
     }
 
-    auto FScriptComponent::GetAssetManager() noexcept -> AltinaEngine::Asset::FAssetManager* {
+    auto FScriptComponent::GetAssetManager() noexcept -> Asset::FAssetManager* {
         return gScriptAssetManager;
     }
 

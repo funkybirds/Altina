@@ -56,11 +56,11 @@ public sealed class DemoScript : ScriptComponent
         float moveZ = 0.0f;
         if (Input.IsKeyDown(EKey.W))
         {
-            moveY += 1.0f;
+            moveZ += 1.0f;
         }
         if (Input.IsKeyDown(EKey.S))
         {
-            moveY -= 1.0f;
+            moveZ -= 1.0f;
         }
         if (Input.IsKeyDown(EKey.A))
         {
@@ -72,11 +72,11 @@ public sealed class DemoScript : ScriptComponent
         }
         if (Input.IsKeyDown(EKey.Q))
         {
-            moveZ -= 1.0f;
+            moveY -= 1.0f;
         }
         if (Input.IsKeyDown(EKey.E))
         {
-            moveZ += 1.0f;
+            moveY += 1.0f;
         }
         if (moveX != 0.0f || moveY != 0.0f || moveZ != 0.0f)
         {

@@ -92,7 +92,7 @@ namespace AltinaEngine::Launch {
         Application::FPlatformWindow* gMainWindowForManagedTitle = nullptr;
 
         auto ToFStringFromUtf8Bytes(const char* data) -> Core::Container::FString {
-            using Core::Container::FString;
+            using Container::FString;
             if (data == nullptr || data[0] == '\0') {
                 return {};
             }
@@ -118,7 +118,7 @@ namespace AltinaEngine::Launch {
         #endif
     #else
             // Non-unicode builds: treat input as native bytes.
-            return FString(data, length);
+            return { data, length };
     #endif
         }
 
@@ -752,9 +752,15 @@ namespace AltinaEngine::Launch {
         }
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
-        constexpr auto kScriptingCategory    = TEXT("Scripting.CoreCLR");
-        constexpr auto kManagedRuntimeConfig = TEXT("AltinaEngine.Managed.runtimeconfig.json");
-        constexpr auto kManagedAssembly      = TEXT("AltinaEngine.Managed.dll");
+        constexpr auto kScriptingCategory = TEXT("Scripting.CoreCLR");
+        // NOTE: hostfxr native-hosting does not accept "includedFrameworks" runtimeconfig files
+        // produced by some self-contained publish flows. Keep a host-friendly runtimeconfig
+        // alongside the executable and fall back to the build-generated one if needed.
+        constexpr auto kManagedRuntimeConfigHost =
+            TEXT("AltinaEngine.Managed.host.runtimeconfig.json");
+        constexpr auto kManagedRuntimeConfigFallback =
+            TEXT("AltinaEngine.Managed.runtimeconfig.json");
+        constexpr auto kManagedAssembly = TEXT("AltinaEngine.Managed.dll");
         constexpr auto kManagedType =
             TEXT("AltinaEngine.Managed.ManagedBootstrap, AltinaEngine.Managed");
         constexpr auto kManagedStartupMethod = TEXT("Startup");
@@ -992,14 +998,18 @@ namespace AltinaEngine::Launch {
             Scripting::FScriptRuntimeConfig runtimeConfig{};
             const auto                      exeDir =
                 Core::Utility::Filesystem::FPath(Core::Platform::GetExecutableDir());
-            const auto runtimePath = ResolveManagedPath(exeDir, kManagedRuntimeConfig);
-            if (runtimePath.mPath.IsEmpty()) {
-                runtimeConfig.mRuntimeConfigPath.Assign(kManagedRuntimeConfig);
-            } else {
-                runtimeConfig.mRuntimeConfigPath = ToFString(runtimePath.mPath);
-            }
+            FManagedPathResolve runtimePath = ResolveManagedPath(exeDir, kManagedRuntimeConfigHost);
             if (!runtimePath.mExists) {
-                LogWarningCat(kScriptingCategory, TEXT("Managed runtime config not found at {}."),
+                runtimePath = ResolveManagedPath(exeDir, kManagedRuntimeConfigFallback);
+            }
+
+            const auto& runtimePathValue     = runtimePath.mPath.IsEmpty()
+                    ? Core::Utility::Filesystem::FPath(kManagedRuntimeConfigHost)
+                    : runtimePath.mPath;
+            runtimeConfig.mRuntimeConfigPath = ToFString(runtimePathValue);
+            if (!runtimePath.mExists) {
+                LogWarningCat(kScriptingCategory,
+                    TEXT("Managed runtime config not found at {} (also tried fallback)."),
                     runtimeConfig.mRuntimeConfigPath.ToView());
             }
 

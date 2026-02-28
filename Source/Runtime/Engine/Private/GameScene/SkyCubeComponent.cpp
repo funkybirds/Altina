@@ -13,7 +13,7 @@ namespace AltinaEngine::GameScene {
 
             serializer.Write(static_cast<u8>(handle.Type));
             const auto& bytes = handle.Uuid.GetBytes();
-            for (AltinaEngine::usize i = 0U; i < AltinaEngine::FUuid::kByteCount; ++i) {
+            for (usize i = 0U; i < AltinaEngine::FUuid::kByteCount; ++i) {
                 serializer.Write(bytes[i]);
             }
         }
@@ -25,11 +25,11 @@ namespace AltinaEngine::GameScene {
             Asset::FAssetHandle handle{};
             handle.Type = static_cast<Asset::EAssetType>(deserializer.Read<u8>());
 
-            AltinaEngine::FUuid::FBytes bytes{};
-            for (AltinaEngine::usize i = 0U; i < AltinaEngine::FUuid::kByteCount; ++i) {
+            FUuid::FBytes bytes{};
+            for (usize i = 0U; i < FUuid::kByteCount; ++i) {
                 bytes[i] = deserializer.Read<u8>();
             }
-            handle.Uuid = AltinaEngine::FUuid(bytes);
+            handle.Uuid = FUuid(bytes);
 
             component.SetCubeMapAsset(handle);
         }

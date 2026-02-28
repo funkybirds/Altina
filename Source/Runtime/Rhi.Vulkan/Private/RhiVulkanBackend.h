@@ -46,6 +46,30 @@ namespace AltinaEngine::Rhi {
         VkSwapchainKHR                mSwapchain  = VK_NULL_HANDLE;
         u32                           mImageIndex = 0U;
         TVector<VkSemaphore>          mPresentWaitSemaphores;
+
+        // Optional CPU-side completion for synchronous submissions (e.g. WaitIdle).
+        struct FCompletion {
+            FMutex             mMutex;
+            FConditionVariable mCond;
+            bool               mDone = false;
+
+            void               Signal() {
+                {
+                    FScopedLock lock(mMutex);
+                    mDone = true;
+                }
+                mCond.NotifyOne();
+            }
+
+            void Wait() {
+                FScopedLock lock(mMutex);
+                while (!mDone) {
+                    (void)mCond.Wait(mMutex, Core::Threading::kInfiniteWait);
+                }
+            }
+        };
+
+        FCompletion* mCompletion = nullptr;
     };
 
     class FRhiVulkanCommandSubmitter {

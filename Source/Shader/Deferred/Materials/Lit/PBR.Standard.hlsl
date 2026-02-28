@@ -31,6 +31,9 @@ FPbrGBufferData DecodePbrGBuffer(float4 gbufferA, float4 gbufferB, float4 gbuffe
     return data;
 }
 
+float3 EvaluatePbrDirect(
+    const FPbrGBufferData data, float3 N, float3 V, float3 L, float3 lightColor);
+
 float3 EvaluateDeferredPbr(const FPbrGBufferData data)
 {
     float3 N = normalize(data.Normal);

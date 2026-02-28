@@ -1,3 +1,5 @@
+#include <iostream>
+#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -10,12 +12,26 @@ namespace Container = AltinaEngine::Core::Container;
 using Container::FString;
 using Container::FStringView;
 using namespace AltinaEngine::Core::Logging;
+using AltinaEngine::TChar;
 
 namespace {
     struct FCapturedLog {
         ELogLevel Level;
         FString   Category;
         FString   Message;
+    };
+
+    template <typename CharT> struct FStreamRedirect {
+        std::basic_ostream<CharT>&   Stream;
+        std::basic_streambuf<CharT>* OldBuffer;
+
+        FStreamRedirect(std::basic_ostream<CharT>& InStream, std::basic_streambuf<CharT>* NewBuffer)
+            : Stream(InStream), OldBuffer(InStream.rdbuf(NewBuffer)) {}
+
+        ~FStreamRedirect() { Stream.rdbuf(OldBuffer); }
+
+        FStreamRedirect(const FStreamRedirect&)            = delete;
+        FStreamRedirect& operator=(const FStreamRedirect&) = delete;
     };
 
     void CaptureSink(ELogLevel Level, FStringView Category, FStringView Message, void* UserData) {
@@ -90,4 +106,48 @@ TEST_CASE("Logger appends stacktrace for error and fatal") {
     FLogger::ResetLogSink();
     FLogger::SetLogLevel(ELogLevel::Info);
     FLogger::ResetDefaultCategory();
+}
+
+TEST_CASE("Default sink emits ANSI colors for warning and error levels") {
+    FLogger::SetLogLevel(ELogLevel::Trace);
+
+#if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+    auto& consoleStream = std::wcout;
+#else
+    auto& consoleStream = std::cout;
+#endif
+
+    {
+        std::basic_ostringstream<TChar> capture;
+        FStreamRedirect<TChar>          redirect(consoleStream, capture.rdbuf());
+
+        FLogger::LogToDefaultSink(ELogLevel::Warning, TEXT("Test"), TEXT("Warn"));
+        const auto out = capture.str();
+
+        REQUIRE(out.find(TEXT("\x1b[33m")) != std::basic_string<TChar>::npos);
+        REQUIRE(out.find(TEXT("\x1b[0m")) != std::basic_string<TChar>::npos);
+    }
+
+    {
+        std::basic_ostringstream<TChar> capture;
+        FStreamRedirect<TChar>          redirect(consoleStream, capture.rdbuf());
+
+        FLogger::LogToDefaultSink(ELogLevel::Error, TEXT("Test"), TEXT("Err"));
+        const auto out = capture.str();
+
+        REQUIRE(out.find(TEXT("\x1b[31m")) != std::basic_string<TChar>::npos);
+        REQUIRE(out.find(TEXT("\x1b[0m")) != std::basic_string<TChar>::npos);
+    }
+
+    {
+        std::basic_ostringstream<TChar> capture;
+        FStreamRedirect<TChar>          redirect(consoleStream, capture.rdbuf());
+
+        FLogger::LogToDefaultSink(ELogLevel::Info, TEXT("Test"), TEXT("Info"));
+        const auto out = capture.str();
+
+        REQUIRE(out.find(TEXT("\x1b[")) == std::basic_string<TChar>::npos);
+    }
+
+    FLogger::SetLogLevel(ELogLevel::Info);
 }

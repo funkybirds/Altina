@@ -181,6 +181,16 @@ namespace AltinaEngine::DebugGui {
         virtual void               SetEnabled(bool enabled) noexcept  = 0;
         [[nodiscard]] virtual auto IsEnabled() const noexcept -> bool = 0;
 
+        // Built-in panels visibility. (Useful for tests and for host applications that want to
+        // control which default windows are present.)
+        virtual void               SetShowStats(bool show) noexcept   = 0;
+        virtual void               SetShowConsole(bool show) noexcept = 0;
+        virtual void               SetShowCVars(bool show) noexcept   = 0;
+
+        [[nodiscard]] virtual auto IsStatsShown() const noexcept -> bool   = 0;
+        [[nodiscard]] virtual auto IsConsoleShown() const noexcept -> bool = 0;
+        [[nodiscard]] virtual auto IsCVarsShown() const noexcept -> bool   = 0;
+
         virtual void               RegisterPanel(FStringView name, FPanelFn fn) = 0;
         // Overlay panels are rendered without window chrome. Prefer IDebugGui::DrawText and other
         // low-level draw calls (no widgets) so they do not capture input.

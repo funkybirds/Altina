@@ -8,6 +8,9 @@
 #include "Types/Traits.h"
 
 #include "RhiVulkanInternal.h"
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+    #include "RhiVulkanDeviceCaps.h"
+#endif
 #include "CoreMinimal.h"
 
 #include <type_traits>
@@ -403,51 +406,8 @@ namespace AltinaEngine::Rhi {
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
-        VkPhysicalDeviceFeatures2 features2{};
-        features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-
-        VkPhysicalDeviceVulkan13Features features13{};
-        features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-        VkPhysicalDeviceVulkan12Features features12{};
-        features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-        VkPhysicalDeviceDescriptorIndexingFeatures descIndex{};
-        descIndex.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-        VkPhysicalDeviceTimelineSemaphoreFeatures timeline{};
-        timeline.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-        VkPhysicalDeviceSynchronization2Features sync2{};
-        sync2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
-        VkPhysicalDeviceDynamicRenderingFeatures dynRendering{};
-        dynRendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
-
-        features2.pNext  = &features13;
-        features13.pNext = &features12;
-        features12.pNext = &descIndex;
-        descIndex.pNext  = &timeline;
-        timeline.pNext   = &sync2;
-        sync2.pNext      = &dynRendering;
-
-        vkGetPhysicalDeviceFeatures2(physical, &features2);
-
-        features13.dynamicRendering = features13.dynamicRendering || dynRendering.dynamicRendering;
-        sync2.synchronization2      = sync2.synchronization2;
-
-        // Enable supported feature subset.
-        VkPhysicalDeviceFeatures2 enabledFeatures = features2;
-        enabledFeatures.pNext                     = &features13;
-        features13.pNext                          = &features12;
-        features12.pNext                          = &descIndex;
-        descIndex.pNext                           = &timeline;
-        timeline.pNext                            = &sync2;
-        sync2.pNext                               = &dynRendering;
-
-        // Enable commonly used core features if supported.
-        enabledFeatures.features.samplerAnisotropy = features2.features.samplerAnisotropy;
-        enabledFeatures.features.fillModeNonSolid  = features2.features.fillModeNonSolid;
-
-        timeline.timelineSemaphore = timeline.timelineSemaphore;
-        sync2.synchronization2     = sync2.synchronization2;
-        dynRendering.dynamicRendering =
-            dynRendering.dynamicRendering || features13.dynamicRendering;
+        Vulkan::Detail::FVulkanDeviceCreateInfo caps{};
+        Vulkan::Detail::BuildDeviceCreateInfo(physical, caps);
 
         // Queue family selection
         u32 queueFamilyCount = 0;
@@ -510,23 +470,12 @@ namespace AltinaEngine::Rhi {
         addQueueInfo(computeFamily);
         addQueueInfo(transferFamily);
 
-        TVector<const char*> deviceExtensions;
-        deviceExtensions.PushBack(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-        if (sync2.synchronization2) {
-            deviceExtensions.PushBack(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-        }
-        if (dynRendering.dynamicRendering) {
-            deviceExtensions.PushBack(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-        }
-        if (timeline.timelineSemaphore) {
-            deviceExtensions.PushBack(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-        }
-
-        createInfo.pQueueCreateInfos       = queueInfos.Data();
-        createInfo.queueCreateInfoCount    = static_cast<u32>(queueInfos.Size());
-        createInfo.ppEnabledExtensionNames = deviceExtensions.Data();
-        createInfo.enabledExtensionCount   = static_cast<u32>(deviceExtensions.Size());
-        createInfo.pNext                   = &enabledFeatures;
+        createInfo.pQueueCreateInfos    = queueInfos.Data();
+        createInfo.queueCreateInfoCount = static_cast<u32>(queueInfos.Size());
+        createInfo.ppEnabledExtensionNames =
+            caps.mEnabledExtensions.IsEmpty() ? nullptr : caps.mEnabledExtensions.Data();
+        createInfo.enabledExtensionCount = static_cast<u32>(caps.mEnabledExtensions.Size());
+        createInfo.pNext                 = &caps.mFeatures2;
 
         VkDevice device = VK_NULL_HANDLE;
         if (vkCreateDevice(physical, &createInfo, nullptr, &device) != VK_SUCCESS) {
@@ -534,8 +483,10 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        return MakeSharedAs<FRhiDevice, FRhiVulkanDevice>(
-            desc, adapter->GetDesc(), mState->mInstance, physical, device);
+        return MakeSharedAs<FRhiDevice, FRhiVulkanDevice>(desc, adapter->GetDesc(),
+            mState->mInstance, physical, device, caps.mEnabled.mSync2,
+            caps.mEnabled.mDynamicRendering, caps.mEnabled.mTimelineSemaphore,
+            caps.mEnabled.mExtendedDynamicState1);
 #else
         (void)adapter;
         (void)desc;

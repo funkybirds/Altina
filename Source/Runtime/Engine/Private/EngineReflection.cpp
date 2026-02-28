@@ -1,11 +1,11 @@
 #include "Engine/EngineReflection.h"
 
 namespace AltinaEngine::Core::Reflection {
-    void RegisterReflection_AltinaEngineEngine();
+    void RegisterReflection_AltinaEngineEngine(); // NOLINT
 }
 
 namespace AltinaEngine::GameScene {
-    void RegisterComponent_AltinaEngineEngine();
+    void RegisterComponent_AltinaEngineEngine(); // NOLINT
 }
 
 namespace AltinaEngine::Engine {

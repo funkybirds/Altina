@@ -214,6 +214,9 @@ if(AE_DOTNET_HOST)
             ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.dll
             ${DemoBinaryDir}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.host.runtimeconfig.json
+            ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.runtimeconfig.json
             ${DemoBinaryDir}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different

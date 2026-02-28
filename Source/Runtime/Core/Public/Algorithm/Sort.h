@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Types/Concepts.h"
 #include "Types/Traits.h"
 
 using AltinaEngine::Move;
@@ -110,7 +109,7 @@ namespace AltinaEngine::Core::Algorithm {
 
         template <typename It, typename Comp>
         constexpr void HeapSort(It first, It last, Comp& comp) {
-            const isize count = static_cast<isize>(last - first);
+            const auto count = static_cast<isize>(last - first);
             if (count <= 1)
                 return;
 
@@ -139,11 +138,11 @@ namespace AltinaEngine::Core::Algorithm {
                 }
 
                 --depthLimit;
-                It          pivot = Partition(first, last, comp);
+                It         pivot = Partition(first, last, comp);
 
                 // Recurse into the smaller partition to bound recursion depth.
-                const isize leftCount  = static_cast<isize>(pivot - first);
-                const isize rightCount = static_cast<isize>(last - (pivot + 1));
+                const auto leftCount  = static_cast<isize>(pivot - first);
+                const auto rightCount = static_cast<isize>(last - (pivot + 1));
                 if (leftCount < rightCount) {
                     IntroSort(first, pivot, comp, depthLimit);
                     first = pivot + 1;
@@ -171,7 +170,8 @@ namespace AltinaEngine::Core::Algorithm {
         Detail::Sort::IntroSort(first, last, comp, depthLimit);
     }
 
-    template <AltinaEngine::CRange R, typename Comp = TLess<>>
+    // TODO: (Refactor,Manual) Clang-tidy rvalue
+    template <CRange R, typename Comp = TLess<>>
         requires AltinaEngine::CRandomAccessIterator<decltype(Declval<R>().begin())>
         && AltinaEngine::CWritableIterator<decltype(Declval<R>().begin())>
         && requires(Comp c, decltype(*Declval<decltype(Declval<R>().begin())>()) a,

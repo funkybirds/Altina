@@ -32,11 +32,16 @@ namespace AltinaEngine::Rhi {
 
     FRhiVulkanDevice::FRhiVulkanDevice(const FRhiDeviceDesc& desc,
         const FRhiAdapterDesc& adapterDesc, VkInstance instance, VkPhysicalDevice physicalDevice,
-        VkDevice device)
+        VkDevice device, bool enableSync2, bool enableDynamicRendering,
+        bool enableTimelineSemaphore, bool enableExtendedDynamicState)
         : FRhiDevice(desc, adapterDesc) {
         (void)instance;
         (void)physicalDevice;
         (void)device;
+        (void)enableSync2;
+        (void)enableDynamicRendering;
+        (void)enableTimelineSemaphore;
+        (void)enableExtendedDynamicState;
     }
 
     FRhiVulkanDevice::~FRhiVulkanDevice() = default;
@@ -251,9 +256,10 @@ namespace AltinaEngine::Rhi {
     }
 
     FRhiVulkanGraphicsPipeline::FRhiVulkanGraphicsPipeline(
-        const FRhiGraphicsPipelineDesc& desc, VkDevice device)
+        const FRhiGraphicsPipelineDesc& desc, VkDevice device, bool supportsExtendedDynamicState)
         : FRhiPipeline(desc) {
         (void)device;
+        (void)supportsExtendedDynamicState;
     }
     FRhiVulkanGraphicsPipeline::~FRhiVulkanGraphicsPipeline() = default;
     auto FRhiVulkanGraphicsPipeline::GetNativePipeline() const noexcept -> VkPipeline {

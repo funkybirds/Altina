@@ -50,7 +50,8 @@ namespace AltinaEngine::Rhi {
 
     class AE_RHI_VULKAN_API FRhiVulkanGraphicsPipeline final : public FRhiPipeline {
     public:
-        FRhiVulkanGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc, VkDevice device);
+        FRhiVulkanGraphicsPipeline(const FRhiGraphicsPipelineDesc& desc, VkDevice device,
+            bool supportsExtendedDynamicState);
         ~FRhiVulkanGraphicsPipeline() override;
 
         [[nodiscard]] auto GetNativePipeline() const noexcept -> VkPipeline;

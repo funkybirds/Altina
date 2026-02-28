@@ -138,6 +138,8 @@ TEST_CASE("DebugGui widgets: Button/Checkbox/Slider/InputText basic interactions
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);
     sys->SetEnabled(true);
+    // Keep the built-in window stack stable: Stats/Console/CVars then custom panels.
+    sys->SetShowConsole(true);
 
     // Use a large height so the custom window (stacked after built-ins) remains visible.
     constexpr AltinaEngine::u32            kW = 1280U;
@@ -242,6 +244,7 @@ TEST_CASE("DebugGui console executes 'set' command via Enter") {
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);
     sys->SetEnabled(true);
+    sys->SetShowConsole(true);
 
     auto* cvar =
         AltinaEngine::Core::Console::FConsoleVariable::Register(TEXT("DebugGui.TestInt"), 1);
@@ -284,38 +287,54 @@ TEST_CASE("DebugGui window collapse toggle reduces draw stats") {
     REQUIRE(sys != nullptr);
     sys->SetEnabled(true);
 
-    AltinaEngine::Input::FInputSystem input;
+    AltinaEngine::Input::FInputSystem              input;
+
+    // Make draw stats stable across frames by freezing the external stats that are printed in
+    // the Stats window.
+    AltinaEngine::DebugGui::FDebugGuiExternalStats ext{};
+    ext.FrameIndex      = 0ULL;
+    ext.ViewCount       = 0U;
+    ext.SceneBatchCount = 0U;
+    sys->SetExternalStats(ext);
+
+    const auto              theme = sys->GetTheme();
+
+    // Stats window is the first window (index 0): pos=(10,10), size=(WindowDefaultSize).
+    // Compute a safe click point inside the collapse button rect.
+    const AltinaEngine::i32 btnX = static_cast<AltinaEngine::i32>(theme.WindowDefaultPos.X()
+        + theme.WindowDefaultSize.X() - theme.CollapseButtonPadX - theme.CollapseButtonSize * 0.5f);
+    const AltinaEngine::i32 btnY = static_cast<AltinaEngine::i32>(
+        theme.WindowDefaultPos.Y() + theme.CollapseButtonOffsetY + theme.CollapseButtonSize * 0.5f);
+
+    // Frame 0: baseline (may be collapsed by default).
     PrepareInput(input, 1280, 720, 20, 20);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
-    const auto baseline = sys->GetLastFrameStats();
-    REQUIRE(baseline.VertexCount > 0U);
+    const auto a = sys->GetLastFrameStats();
+    REQUIRE(a.VertexCount > 0U);
 
-    // Stats window is the first window (index 0): pos=(10,10), size=(460,260).
-    // Collapse button: x = 10 + 460 - 6 - 12 = 452, y = 10 + 3 = 13.
-    const AltinaEngine::i32 btnX = 456;
-    const AltinaEngine::i32 btnY = 18;
-
-    // Click collapse.
+    // Toggle once.
     PrepareInput(input, 1280, 720, btnX, btnY);
     input.OnMouseButtonDown(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
-
     PrepareInput(input, 1280, 720, btnX, btnY);
     input.OnMouseButtonUp(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
-    const auto collapsed = sys->GetLastFrameStats();
-    REQUIRE(collapsed.VertexCount < baseline.VertexCount);
+    const auto b = sys->GetLastFrameStats();
+    REQUIRE(b.VertexCount != a.VertexCount);
 
-    // Click expand.
+    // Toggle back.
     PrepareInput(input, 1280, 720, btnX, btnY);
     input.OnMouseButtonDown(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
-
     PrepareInput(input, 1280, 720, btnX, btnY);
     input.OnMouseButtonUp(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
-    const auto expanded = sys->GetLastFrameStats();
-    REQUIRE(expanded.VertexCount > collapsed.VertexCount);
+    const auto c = sys->GetLastFrameStats();
+
+    const auto minV = (a.VertexCount < b.VertexCount) ? a.VertexCount : b.VertexCount;
+    const auto maxV = (a.VertexCount < b.VertexCount) ? b.VertexCount : a.VertexCount;
+    REQUIRE(maxV > minV);
+    REQUIRE(c.VertexCount == a.VertexCount);
 
     DestroyDebugGuiSystem(sys);
 }

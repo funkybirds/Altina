@@ -29,7 +29,9 @@ namespace AltinaEngine::Rhi {
     class AE_RHI_VULKAN_API FRhiVulkanDevice final : public FRhiDevice {
     public:
         FRhiVulkanDevice(const FRhiDeviceDesc& desc, const FRhiAdapterDesc& adapterDesc,
-            VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device);
+            VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device, bool enableSync2,
+            bool enableDynamicRendering, bool enableTimelineSemaphore,
+            bool enableExtendedDynamicState);
         ~FRhiVulkanDevice() override;
 
         FRhiVulkanDevice(const FRhiVulkanDevice&)                                  = delete;

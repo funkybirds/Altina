@@ -43,8 +43,7 @@ namespace AltinaEngine::GameScene {
         }
 
     private:
-        template <auto Member>
-        friend struct AltinaEngine::Core::Reflection::Detail::TAutoMemberAccessor;
+        template <auto Member> friend struct Core::Reflection::Detail::TAutoMemberAccessor;
 
     public:
         APROPERTY()

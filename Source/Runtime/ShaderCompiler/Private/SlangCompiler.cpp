@@ -574,10 +574,13 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 outAccess = EShaderResourceAccess::ReadWrite;
             }
 
+            auto contains = [](FNativeStringView  haystack,
+                                FNativeStringView needle) noexcept -> bool {
+                return (!haystack.IsEmpty()) && (haystack.Find(needle) != FNativeStringView::npos);
+            };
+
             const FNativeStringView kindView(kind.GetData(), kind.Length());
-            if (kindView.IsEmpty()) {
-                return EShaderResourceType::Texture;
-            }
+            const FNativeStringView shapeView(baseShape.GetData(), baseShape.Length());
 
             if (kindView == FNativeStringView("constantBuffer")) {
                 return EShaderResourceType::ConstantBuffer;
@@ -585,17 +588,25 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             if (kindView == FNativeStringView("samplerState")) {
                 return EShaderResourceType::Sampler;
             }
-            if (kindView == FNativeStringView("resource")) {
-                const FNativeStringView shapeView(baseShape.GetData(), baseShape.Length());
-                if (!shapeView.IsEmpty()) {
-                    if (shapeView.Find(FNativeStringView("texture")) != FNativeStringView::npos) {
-                        return (outAccess == EShaderResourceAccess::ReadWrite)
-                            ? EShaderResourceType::StorageTexture
-                            : EShaderResourceType::Texture;
-                    }
-                    if (shapeView.Find(FNativeStringView("buffer")) != FNativeStringView::npos) {
-                        return EShaderResourceType::StorageBuffer;
-                    }
+
+            // Slang reflection JSON isn't stable across versions for resource kinds. Handle the
+            // expected "resource" kind, but also fall back to shape/name heuristics so RW buffers
+            // don't get misclassified as textures.
+            if (kindView == FNativeStringView("resource") || kindView.IsEmpty()
+                || contains(kindView, FNativeStringView("resource"))
+                || contains(kindView, FNativeStringView("buffer"))
+                || contains(kindView, FNativeStringView("texture"))) {
+                if (contains(shapeView, FNativeStringView("texture"))
+                    || contains(shapeView, FNativeStringView("Texture"))) {
+                    return (outAccess == EShaderResourceAccess::ReadWrite)
+                        ? EShaderResourceType::StorageTexture
+                        : EShaderResourceType::Texture;
+                }
+                if (contains(shapeView, FNativeStringView("buffer"))
+                    || contains(shapeView, FNativeStringView("Buffer"))
+                    || contains(kindView, FNativeStringView("buffer"))
+                    || contains(kindView, FNativeStringView("Buffer"))) {
+                    return EShaderResourceType::StorageBuffer;
                 }
                 return EShaderResourceType::Texture;
             }

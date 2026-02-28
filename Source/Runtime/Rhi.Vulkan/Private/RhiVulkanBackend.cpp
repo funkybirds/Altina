@@ -65,6 +65,9 @@ namespace AltinaEngine::Rhi {
                 if (work.mQueue) {
                     vkQueueWaitIdle(work.mQueue);
                 }
+                if (work.mCompletion) {
+                    work.mCompletion->Signal();
+                }
                 continue;
             }
 
@@ -77,6 +80,9 @@ namespace AltinaEngine::Rhi {
                 present.waitSemaphoreCount = static_cast<u32>(work.mPresentWaitSemaphores.Size());
                 present.pWaitSemaphores    = work.mPresentWaitSemaphores.Data();
                 vkQueuePresentKHR(work.mQueue, &present);
+                if (work.mCompletion) {
+                    work.mCompletion->Signal();
+                }
                 continue;
             }
 
@@ -107,6 +113,10 @@ namespace AltinaEngine::Rhi {
             submit.pSignalSemaphores    = work.mSignalSemaphores.Data();
 
             vkQueueSubmit(work.mQueue, 1, &submit, work.mFence);
+
+            if (work.mCompletion) {
+                work.mCompletion->Signal();
+            }
         }
         Core::Jobs::UnregisterNamedThread(Core::Jobs::ENamedThread::RHI);
     }
@@ -258,7 +268,10 @@ namespace AltinaEngine::Rhi {
         FSubmitWork work;
         work.mType  = FSubmitWork::EType::WaitIdle;
         work.mQueue = mQueue;
+        FSubmitWork::FCompletion completion{};
+        work.mCompletion = &completion;
         mSubmitter->Enqueue(Move(work));
+        completion.Wait();
     }
 
     void FRhiVulkanQueue::Present(const FRhiPresentInfo& info) {

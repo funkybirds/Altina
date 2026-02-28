@@ -130,7 +130,7 @@ namespace AltinaEngine::Imaging {
         }
 
         [[nodiscard]] auto View() const noexcept -> FImageView {
-            return FImageView(GetData(), mWidth, mHeight, mFormat, mRowPitch);
+            return { GetData(), mWidth, mHeight, mFormat, mRowPitch };
         }
 
     private:

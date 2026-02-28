@@ -1805,6 +1805,36 @@ namespace AltinaEngine::DebugGui {
                 return mEnabledGameThread;
             }
 
+            void SetShowStats(bool show) noexcept override {
+                FScopedLock lock(mMutex);
+                mShowStats = show;
+            }
+
+            void SetShowConsole(bool show) noexcept override {
+                FScopedLock lock(mMutex);
+                mShowConsole = show;
+            }
+
+            void SetShowCVars(bool show) noexcept override {
+                FScopedLock lock(mMutex);
+                mShowCVars = show;
+            }
+
+            [[nodiscard]] auto IsStatsShown() const noexcept -> bool override {
+                FScopedLock lock(mMutex);
+                return mShowStats;
+            }
+
+            [[nodiscard]] auto IsConsoleShown() const noexcept -> bool override {
+                FScopedLock lock(mMutex);
+                return mShowConsole;
+            }
+
+            [[nodiscard]] auto IsCVarsShown() const noexcept -> bool override {
+                FScopedLock lock(mMutex);
+                return mShowCVars;
+            }
+
             void RegisterPanel(FStringView name, FPanelFn fn) override {
                 if (name.IsEmpty() || !fn) {
                     return;

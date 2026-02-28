@@ -90,6 +90,12 @@ if(AE_DOTNET_HOST)
     set(AE_MANAGED_PROJECT ${AE_MANAGED_ROOT}/AltinaEngine.Managed.csproj)
     set(AE_MANAGED_OUT_DIR ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed)
     set(AE_MANAGED_DLL ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.dll)
+    set(AE_MANAGED_HOST_RUNTIME_CONFIG_SRC
+        ${AE_MANAGED_ROOT}/AltinaEngine.Managed.host.runtimeconfig.json
+    )
+    set(AE_MANAGED_HOST_RUNTIME_CONFIG_DST
+        ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.host.runtimeconfig.json
+    )
     set(AE_MANAGED_STAMP ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.build.stamp)
     # Shared location for self-contained publish output (used by demos for Shipping).
     set(AE_MANAGED_PUBLISH_SELFCONTAINED_DIR
@@ -108,6 +114,11 @@ if(AE_DOTNET_HOST)
             /p:MSBuildProjectExtensionsPath=${AE_MANAGED_OUT_DIR}/obj/
             /p:BaseIntermediateOutputPath=${AE_MANAGED_OUT_DIR}/obj/
             /p:IntermediateOutputPath=${AE_MANAGED_OUT_DIR}/obj/$<IF:$<CONFIG:Debug>,Debug,Release>/
+        # Stash a host-friendly runtimeconfig next to the managed runtime output so native hosting
+        # can avoid self-contained "includedFrameworks" runtimeconfig files.
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${AE_MANAGED_HOST_RUNTIME_CONFIG_SRC}
+            ${AE_MANAGED_HOST_RUNTIME_CONFIG_DST}
         COMMAND ${CMAKE_COMMAND} -E touch ${AE_MANAGED_STAMP}
         DEPENDS
             ${AE_MANAGED_PROJECT}
@@ -120,9 +131,11 @@ if(AE_DOTNET_HOST)
             ${AE_MANAGED_ROOT}/Window.cs
             ${AE_MANAGED_ROOT}/Vector3.cs
             ${AE_MANAGED_ROOT}/Quaternion.cs
+            ${AE_MANAGED_HOST_RUNTIME_CONFIG_SRC}
         BYPRODUCTS
             ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.dll
             ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.runtimeconfig.json
+            ${AE_MANAGED_HOST_RUNTIME_CONFIG_DST}
             ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.deps.json
             ${AE_MANAGED_OUT_DIR}/AltinaEngine.Managed.pdb
         COMMENT "Building managed scripting runtime assembly"

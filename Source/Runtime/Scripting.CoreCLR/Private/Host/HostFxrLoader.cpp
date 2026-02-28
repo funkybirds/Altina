@@ -40,6 +40,7 @@ using AltinaEngine::Core::Container::FString;
 using AltinaEngine::Core::Container::FStringView;
 using AltinaEngine::Core::Container::TVector;
 using AltinaEngine::Core::Logging::LogErrorCat;
+using AltinaEngine::Core::Logging::LogInfoCat;
 using AltinaEngine::Core::Utility::Filesystem::EnumerateDirectory;
 using AltinaEngine::Core::Utility::Filesystem::FDirectoryEntry;
 using AltinaEngine::Core::Utility::Filesystem::FPath;
@@ -229,6 +230,69 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             return {};
         }
 
+#if AE_PLATFORM_WIN
+        // If DOTNET_ROOT isn't set, try to resolve dotnet.exe from PATH. This is the common setup
+        // on developer machines (e.g. "C:\\Program Files\\dotnet\\dotnet.exe").
+        auto GetDotnetRootFromPath() -> FPath {
+            constexpr const wchar_t* kDotnetExe = L"dotnet.exe";
+
+            DWORD required = SearchPathW(nullptr, kDotnetExe, nullptr, 0, nullptr, nullptr);
+            if (required == 0) {
+                return {};
+            }
+
+            std::wstring buffer(static_cast<size_t>(required), L'\0');
+            DWORD        written =
+                SearchPathW(nullptr, kDotnetExe, nullptr, required, buffer.data(), nullptr);
+            if (written == 0 || written >= required) {
+                return {};
+            }
+            buffer.resize(static_cast<size_t>(written));
+
+            const FPath dotnetExe(
+                MakeFStringFromWide(buffer.c_str(), static_cast<usize>(buffer.size())));
+            return dotnetExe.ParentPath();
+        }
+
+        // Fallback for machines where dotnet isn't on PATH: query the official install location.
+        auto GetDotnetRootFromRegistry() -> FPath {
+            auto ReadRegSz = [](HKEY root, const wchar_t* subkey,
+                                 const wchar_t* valueName) -> std::wstring {
+                DWORD type = 0;
+                DWORD size = 0;
+                if (RegGetValueW(root, subkey, valueName, RRF_RT_REG_SZ, &type, nullptr, &size)
+                    != ERROR_SUCCESS) {
+                    return {};
+                }
+                if (size < sizeof(wchar_t)) {
+                    return {};
+                }
+                std::wstring data(static_cast<size_t>(size / sizeof(wchar_t)), L'\0');
+                if (RegGetValueW(root, subkey, valueName, RRF_RT_REG_SZ, &type, data.data(), &size)
+                    != ERROR_SUCCESS) {
+                    return {};
+                }
+                // Trim the trailing NUL, if present.
+                if (!data.empty() && data.back() == L'\0') {
+                    data.pop_back();
+                }
+                return data;
+            };
+
+            // See: https://learn.microsoft.com/dotnet/core/install/windows
+            constexpr const wchar_t* kSubkey = L"SOFTWARE\\dotnet\\Setup\\InstalledVersions\\x64";
+            constexpr const wchar_t* kValue  = L"InstallLocation";
+
+            if (auto value = ReadRegSz(HKEY_LOCAL_MACHINE, kSubkey, kValue); !value.empty()) {
+                return FPath(MakeFStringFromWide(value.c_str(), static_cast<usize>(value.size())));
+            }
+            if (auto value = ReadRegSz(HKEY_CURRENT_USER, kSubkey, kValue); !value.empty()) {
+                return FPath(MakeFStringFromWide(value.c_str(), static_cast<usize>(value.size())));
+            }
+            return {};
+        }
+#endif
+
         auto FindHostFxrWithNethost(const TVector<FPath>& roots, const FPath& dotnetRoot) -> FPath {
             FPath nethostPath;
             for (const auto& root : roots) {
@@ -399,38 +463,70 @@ namespace AltinaEngine::Scripting::CoreCLR::Host {
             }
         }
 
-        FPath hostFxrPath;
-        for (const auto& root : localRoots) {
-            hostFxrPath = FindLibraryInRoot(root, HostFxrLibraryName());
-            if (!hostFxrPath.IsEmpty()) {
-                break;
-            }
-        }
-
-        FPath dotnetRootPath;
+        FPath        dotnetRootPath;
+        const TChar* dotnetRootSource = TEXT("None");
         if (!dotnetRoot.IsEmptyString()) {
-            dotnetRootPath = ToPath(dotnetRoot.ToView());
+            dotnetRootPath   = ToPath(dotnetRoot.ToView());
+            dotnetRootSource = TEXT("Config");
         } else {
             dotnetRootPath = GetDotnetRootFromEnv();
+            if (!dotnetRootPath.IsEmpty()) {
+                dotnetRootSource = TEXT("Env");
+            }
         }
+#if AE_PLATFORM_WIN
+        if (dotnetRootPath.IsEmpty()) {
+            dotnetRootPath = GetDotnetRootFromPath();
+            if (!dotnetRootPath.IsEmpty()) {
+                dotnetRootSource = TEXT("PATH");
+            }
+        }
+        if (dotnetRootPath.IsEmpty()) {
+            dotnetRootPath = GetDotnetRootFromRegistry();
+            if (!dotnetRootPath.IsEmpty()) {
+                dotnetRootSource = TEXT("Registry");
+            }
+        }
+#endif
         if (dotnetRootPath.IsEmpty()) {
             if (!runtimeRoot.IsEmptyString()) {
                 dotnetRootPath = ToPath(runtimeRoot.ToView());
+                if (!dotnetRootPath.IsEmpty()) {
+                    dotnetRootSource = TEXT("RuntimeRoot");
+                }
             } else if (!runtimeConfigPath.IsEmptyString()) {
                 const auto configPath = ToPath(runtimeConfigPath.ToView());
                 if (!configPath.IsEmpty()) {
                     dotnetRootPath = configPath.ParentPath();
+                    if (!dotnetRootPath.IsEmpty()) {
+                        dotnetRootSource = TEXT("RuntimeConfigDir");
+                    }
                 }
             }
         }
 
-        if (hostFxrPath.IsEmpty() && !dotnetRootPath.IsEmpty()) {
+        // Prefer a real .NET install root when available, even if a demo stages an app-local
+        // runtime next to the executable. Component hosting requires a framework install.
+        FPath hostFxrPath;
+        if (!dotnetRootPath.IsEmpty()) {
             hostFxrPath = FindLibraryInRoot(dotnetRootPath, HostFxrLibraryName());
+        }
+        if (hostFxrPath.IsEmpty()) {
+            for (const auto& root : localRoots) {
+                hostFxrPath = FindLibraryInRoot(root, HostFxrLibraryName());
+                if (!hostFxrPath.IsEmpty()) {
+                    break;
+                }
+            }
         }
 
         if (hostFxrPath.IsEmpty()) {
             hostFxrPath = FindHostFxrWithNethost(localRoots, dotnetRootPath);
         }
+
+        LogInfoCat(kLogCategory, TEXT("hostfxr: dotnetRoot='{}' (source={}) hostfxr='{}'"),
+            dotnetRootPath.GetString().ToView(), dotnetRootSource,
+            hostFxrPath.GetString().ToView());
 
         if (hostFxrPath.IsEmpty()) {
             hostFxrPath = FPath(HostFxrLibraryName());

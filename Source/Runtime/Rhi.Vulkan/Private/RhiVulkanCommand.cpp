@@ -9,6 +9,7 @@
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiInit.h"
+#include "Types/CheckedCast.h"
 
 #include "RhiVulkanInternal.h"
 
@@ -551,6 +552,15 @@ namespace AltinaEngine::Rhi {
         if (mState->mSupportsExtendedDynamicState) {
             vkCmdSetPrimitiveTopology(
                 mState->mCmd, Vulkan::Detail::ToVkPrimitiveTopology(topology));
+        } else if (!mState->mUseComputePipeline && mState->mGraphicsPipeline) {
+            const VkPipeline pipelineHandle = mState->mGraphicsPipeline->GetOrCreatePipeline(
+                mState->mAttachmentHash, mState->mLegacyRenderPass,
+                mState->mDynamicRendering ? &mState->mPipelineRenderingInfo : nullptr,
+                Vulkan::Detail::ToVkPrimitiveTopology(mState->mTopology));
+            if (pipelineHandle != VK_NULL_HANDLE && pipelineHandle != mState->mBoundPipeline) {
+                vkCmdBindPipeline(mState->mCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineHandle);
+                mState->mBoundPipeline = pipelineHandle;
+            }
         }
 #else
         (void)topology;
@@ -858,6 +868,381 @@ namespace AltinaEngine::Rhi {
             }
         }
         mState->mInRenderPass = false;
+#endif
+    }
+
+    void FRhiVulkanCommandContext::RHIBeginTransition(const FRhiTransitionCreateInfo& info) {
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        if (!mState || !mState->mCmd || info.mTransitionCount == 0U
+            || info.mTransitions == nullptr) {
+            return;
+        }
+        if (mState->mOwner == nullptr) {
+            return;
+        }
+
+        const bool crossQueue = (info.mSrcQueue != info.mDstQueue);
+        const u32  srcFamily  = crossQueue ? mState->mOwner->GetQueueFamilyIndex(info.mSrcQueue)
+                                           : VK_QUEUE_FAMILY_IGNORED;
+        const u32  dstFamily  = crossQueue ? mState->mOwner->GetQueueFamilyIndex(info.mDstQueue)
+                                           : VK_QUEUE_FAMILY_IGNORED;
+
+        for (u32 i = 0; i < info.mTransitionCount; ++i) {
+            const auto& tr = info.mTransitions[i];
+            if (!tr.mResource) {
+                continue;
+            }
+
+            // Stateless barrier generation based solely on the transition info.
+            if (auto* texture = AltinaEngine::CheckedCast<FRhiTexture*>(tr.mResource)) {
+                auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
+                if (!vkTex) {
+                    continue;
+                }
+
+                const auto& texDesc = vkTex->GetDesc();
+                const bool  isDepth = Vulkan::Detail::IsDepthFormat(texDesc.mFormat);
+
+                const auto  before = Vulkan::Detail::MapResourceState(tr.mBefore, isDepth);
+                const auto  after  = Vulkan::Detail::MapResourceState(tr.mAfter, isDepth);
+
+                VkImageSubresourceRange range{};
+                range.aspectMask     = Vulkan::Detail::ToVkAspectFlags(texDesc.mFormat);
+                range.baseMipLevel   = tr.mTextureRange.mBaseMip;
+                range.levelCount     = (tr.mTextureRange.mMipCount == 0U) ? texDesc.mMipLevels
+                                                                          : tr.mTextureRange.mMipCount;
+                range.baseArrayLayer = tr.mTextureRange.mBaseArrayLayer;
+                range.layerCount     = (tr.mTextureRange.mLayerCount == 0U)
+                        ? texDesc.mArrayLayers
+                        : tr.mTextureRange.mLayerCount;
+
+                if (mState->mSupportsSync2) {
+                    VkImageMemoryBarrier2 barrier{};
+                    barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                    barrier.image               = vkTex->GetNativeImage();
+                    barrier.subresourceRange    = range;
+                    barrier.oldLayout           = before.mLayout;
+                    barrier.newLayout           = crossQueue ? before.mLayout : after.mLayout;
+                    barrier.srcQueueFamilyIndex = srcFamily;
+                    barrier.dstQueueFamilyIndex = dstFamily;
+                    barrier.srcStageMask        = before.mStages;
+                    barrier.srcAccessMask       = before.mAccess;
+                    barrier.dstStageMask  = crossQueue ? VK_PIPELINE_STAGE_2_NONE : after.mStages;
+                    barrier.dstAccessMask = crossQueue ? 0 : after.mAccess;
+
+                    VkDependencyInfo dep{};
+                    dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    dep.imageMemoryBarrierCount = 1;
+                    dep.pImageMemoryBarriers    = &barrier;
+                    vkCmdPipelineBarrier2(mState->mCmd, &dep);
+                } else {
+                    VkImageMemoryBarrier barrier{};
+                    barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                    barrier.image               = vkTex->GetNativeImage();
+                    barrier.subresourceRange    = range;
+                    barrier.oldLayout           = before.mLayout;
+                    barrier.newLayout           = crossQueue ? before.mLayout : after.mLayout;
+                    barrier.srcQueueFamilyIndex = srcFamily;
+                    barrier.dstQueueFamilyIndex = dstFamily;
+                    barrier.srcAccessMask       = static_cast<VkAccessFlags>(before.mAccess);
+                    barrier.dstAccessMask =
+                        crossQueue ? 0 : static_cast<VkAccessFlags>(after.mAccess);
+
+                    vkCmdPipelineBarrier(mState->mCmd,
+                        static_cast<VkPipelineStageFlags>(before.mStages),
+                        crossQueue ? VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+                                   : static_cast<VkPipelineStageFlags>(after.mStages),
+                        0, 0, nullptr, 0, nullptr, 1, &barrier);
+                }
+            } else if (auto* buffer = AltinaEngine::CheckedCast<FRhiBuffer*>(tr.mResource)) {
+                auto* vkBuf = static_cast<FRhiVulkanBuffer*>(buffer);
+                if (!vkBuf) {
+                    continue;
+                }
+
+                const auto before = Vulkan::Detail::MapResourceState(tr.mBefore, false);
+                const auto after  = Vulkan::Detail::MapResourceState(tr.mAfter, false);
+
+                if (mState->mSupportsSync2) {
+                    VkBufferMemoryBarrier2 barrier{};
+                    barrier.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+                    barrier.buffer              = vkBuf->GetNativeBuffer();
+                    barrier.offset              = 0;
+                    barrier.size                = VK_WHOLE_SIZE;
+                    barrier.srcQueueFamilyIndex = srcFamily;
+                    barrier.dstQueueFamilyIndex = dstFamily;
+                    barrier.srcStageMask        = before.mStages;
+                    barrier.srcAccessMask       = before.mAccess;
+                    barrier.dstStageMask  = crossQueue ? VK_PIPELINE_STAGE_2_NONE : after.mStages;
+                    barrier.dstAccessMask = crossQueue ? 0 : after.mAccess;
+
+                    VkDependencyInfo dep{};
+                    dep.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    dep.bufferMemoryBarrierCount = 1;
+                    dep.pBufferMemoryBarriers    = &barrier;
+                    vkCmdPipelineBarrier2(mState->mCmd, &dep);
+                } else {
+                    VkBufferMemoryBarrier barrier{};
+                    barrier.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+                    barrier.buffer              = vkBuf->GetNativeBuffer();
+                    barrier.offset              = 0;
+                    barrier.size                = VK_WHOLE_SIZE;
+                    barrier.srcQueueFamilyIndex = srcFamily;
+                    barrier.dstQueueFamilyIndex = dstFamily;
+                    barrier.srcAccessMask       = static_cast<VkAccessFlags>(before.mAccess);
+                    barrier.dstAccessMask =
+                        crossQueue ? 0 : static_cast<VkAccessFlags>(after.mAccess);
+
+                    vkCmdPipelineBarrier(mState->mCmd,
+                        static_cast<VkPipelineStageFlags>(before.mStages),
+                        crossQueue ? VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+                                   : static_cast<VkPipelineStageFlags>(after.mStages),
+                        0, 0, nullptr, 1, &barrier, 0, nullptr);
+                }
+            }
+        }
+#else
+        (void)info;
+#endif
+    }
+
+    void FRhiVulkanCommandContext::RHIEndTransition(const FRhiTransitionCreateInfo& info) {
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        if (!mState || !mState->mCmd || info.mTransitionCount == 0U
+            || info.mTransitions == nullptr) {
+            return;
+        }
+        if (mState->mOwner == nullptr) {
+            return;
+        }
+        if (info.mSrcQueue == info.mDstQueue) {
+            return;
+        }
+
+        const u32 srcFamily = mState->mOwner->GetQueueFamilyIndex(info.mSrcQueue);
+        const u32 dstFamily = mState->mOwner->GetQueueFamilyIndex(info.mDstQueue);
+
+        for (u32 i = 0; i < info.mTransitionCount; ++i) {
+            const auto& tr = info.mTransitions[i];
+            if (!tr.mResource) {
+                continue;
+            }
+
+            if (auto* texture = AltinaEngine::CheckedCast<FRhiTexture*>(tr.mResource)) {
+                auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
+                if (!vkTex) {
+                    continue;
+                }
+
+                const auto& texDesc = vkTex->GetDesc();
+                const bool  isDepth = Vulkan::Detail::IsDepthFormat(texDesc.mFormat);
+                const auto  before  = Vulkan::Detail::MapResourceState(tr.mBefore, isDepth);
+                const auto  after   = Vulkan::Detail::MapResourceState(tr.mAfter, isDepth);
+
+                VkImageSubresourceRange range{};
+                range.aspectMask     = Vulkan::Detail::ToVkAspectFlags(texDesc.mFormat);
+                range.baseMipLevel   = tr.mTextureRange.mBaseMip;
+                range.levelCount     = (tr.mTextureRange.mMipCount == 0U) ? texDesc.mMipLevels
+                                                                          : tr.mTextureRange.mMipCount;
+                range.baseArrayLayer = tr.mTextureRange.mBaseArrayLayer;
+                range.layerCount     = (tr.mTextureRange.mLayerCount == 0U)
+                        ? texDesc.mArrayLayers
+                        : tr.mTextureRange.mLayerCount;
+
+                if (mState->mSupportsSync2) {
+                    VkImageMemoryBarrier2 barrier{};
+                    barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                    barrier.image               = vkTex->GetNativeImage();
+                    barrier.subresourceRange    = range;
+                    barrier.oldLayout           = before.mLayout;
+                    barrier.newLayout           = after.mLayout;
+                    barrier.srcQueueFamilyIndex = srcFamily;
+                    barrier.dstQueueFamilyIndex = dstFamily;
+                    barrier.srcStageMask        = VK_PIPELINE_STAGE_2_NONE;
+                    barrier.srcAccessMask       = 0;
+                    barrier.dstStageMask        = after.mStages;
+                    barrier.dstAccessMask       = after.mAccess;
+
+                    VkDependencyInfo dep{};
+                    dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    dep.imageMemoryBarrierCount = 1;
+                    dep.pImageMemoryBarriers    = &barrier;
+                    vkCmdPipelineBarrier2(mState->mCmd, &dep);
+                } else {
+                    VkImageMemoryBarrier barrier{};
+                    barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                    barrier.image               = vkTex->GetNativeImage();
+                    barrier.subresourceRange    = range;
+                    barrier.oldLayout           = before.mLayout;
+                    barrier.newLayout           = after.mLayout;
+                    barrier.srcQueueFamilyIndex = srcFamily;
+                    barrier.dstQueueFamilyIndex = dstFamily;
+                    barrier.srcAccessMask       = 0;
+                    barrier.dstAccessMask       = static_cast<VkAccessFlags>(after.mAccess);
+
+                    vkCmdPipelineBarrier(mState->mCmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        static_cast<VkPipelineStageFlags>(after.mStages), 0, 0, nullptr, 0, nullptr,
+                        1, &barrier);
+                }
+            } else if (auto* buffer = AltinaEngine::CheckedCast<FRhiBuffer*>(tr.mResource)) {
+                auto* vkBuf = static_cast<FRhiVulkanBuffer*>(buffer);
+                if (!vkBuf) {
+                    continue;
+                }
+
+                const auto after = Vulkan::Detail::MapResourceState(tr.mAfter, false);
+
+                if (mState->mSupportsSync2) {
+                    VkBufferMemoryBarrier2 barrier{};
+                    barrier.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+                    barrier.buffer              = vkBuf->GetNativeBuffer();
+                    barrier.offset              = 0;
+                    barrier.size                = VK_WHOLE_SIZE;
+                    barrier.srcQueueFamilyIndex = srcFamily;
+                    barrier.dstQueueFamilyIndex = dstFamily;
+                    barrier.srcStageMask        = VK_PIPELINE_STAGE_2_NONE;
+                    barrier.srcAccessMask       = 0;
+                    barrier.dstStageMask        = after.mStages;
+                    barrier.dstAccessMask       = after.mAccess;
+
+                    VkDependencyInfo dep{};
+                    dep.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    dep.bufferMemoryBarrierCount = 1;
+                    dep.pBufferMemoryBarriers    = &barrier;
+                    vkCmdPipelineBarrier2(mState->mCmd, &dep);
+                } else {
+                    VkBufferMemoryBarrier barrier{};
+                    barrier.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+                    barrier.buffer              = vkBuf->GetNativeBuffer();
+                    barrier.offset              = 0;
+                    barrier.size                = VK_WHOLE_SIZE;
+                    barrier.srcQueueFamilyIndex = srcFamily;
+                    barrier.dstQueueFamilyIndex = dstFamily;
+                    barrier.srcAccessMask       = 0;
+                    barrier.dstAccessMask       = static_cast<VkAccessFlags>(after.mAccess);
+
+                    vkCmdPipelineBarrier(mState->mCmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        static_cast<VkPipelineStageFlags>(after.mStages), 0, 0, nullptr, 1,
+                        &barrier, 0, nullptr);
+                }
+            }
+        }
+#else
+        (void)info;
+#endif
+    }
+
+    void FRhiVulkanCommandContext::RHIClearColor(
+        FRhiTexture* colorTarget, const FRhiClearColor& color) {
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        if (!mState || !mState->mCmd || colorTarget == nullptr) {
+            return;
+        }
+        auto* vkTex = static_cast<FRhiVulkanTexture*>(colorTarget);
+        if (!vkTex) {
+            return;
+        }
+
+        VkClearColorValue clear{};
+        clear.float32[0] = color.mR;
+        clear.float32[1] = color.mG;
+        clear.float32[2] = color.mB;
+        clear.float32[3] = color.mA;
+
+        VkImageSubresourceRange range{};
+        range.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        range.baseMipLevel   = 0;
+        range.levelCount     = 1;
+        range.baseArrayLayer = 0;
+        range.layerCount     = 1;
+
+        vkCmdClearColorImage(
+            mState->mCmd, vkTex->GetNativeImage(), VK_IMAGE_LAYOUT_GENERAL, &clear, 1, &range);
+#else
+        (void)colorTarget;
+        (void)color;
+#endif
+    }
+
+    void FRhiVulkanCommandContext::RHISetBindGroup(
+        u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets, u32 dynamicOffsetCount) {
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        if (!mState || !mState->mCmd || group == nullptr) {
+            return;
+        }
+
+        auto* vkGroup = static_cast<FRhiVulkanBindGroup*>(group);
+        if (!vkGroup) {
+            return;
+        }
+
+        VkPipelineLayout    layout    = VK_NULL_HANDLE;
+        VkPipelineBindPoint bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        if (mState->mUseComputePipeline && mState->mComputePipeline) {
+            layout    = mState->mComputePipeline->GetNativeLayout();
+            bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+        } else if (mState->mGraphicsPipeline) {
+            layout    = mState->mGraphicsPipeline->GetNativeLayout();
+            bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        }
+
+        if (!layout) {
+            return;
+        }
+
+        VkDescriptorSet set = vkGroup->GetDescriptorSet();
+        vkCmdBindDescriptorSets(
+            mState->mCmd, bindPoint, layout, setIndex, 1, &set, dynamicOffsetCount, dynamicOffsets);
+#else
+        (void)setIndex;
+        (void)group;
+        (void)dynamicOffsets;
+        (void)dynamicOffsetCount;
+#endif
+    }
+
+    void FRhiVulkanCommandContext::RHIDraw(
+        u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        if (!mState || !mState->mCmd) {
+            return;
+        }
+        vkCmdDraw(mState->mCmd, vertexCount, instanceCount, firstVertex, firstInstance);
+#else
+        (void)vertexCount;
+        (void)instanceCount;
+        (void)firstVertex;
+        (void)firstInstance;
+#endif
+    }
+
+    void FRhiVulkanCommandContext::RHIDrawIndexed(
+        u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        if (!mState || !mState->mCmd) {
+            return;
+        }
+        vkCmdDrawIndexed(
+            mState->mCmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+#else
+        (void)indexCount;
+        (void)instanceCount;
+        (void)firstIndex;
+        (void)vertexOffset;
+        (void)firstInstance;
+#endif
+    }
+
+    void FRhiVulkanCommandContext::RHIDispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) {
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        if (!mState || !mState->mCmd) {
+            return;
+        }
+        vkCmdDispatch(mState->mCmd, groupCountX, groupCountY, groupCountZ);
+#else
+        (void)groupCountX;
+        (void)groupCountY;
+        (void)groupCountZ;
 #endif
     }
 } // namespace AltinaEngine::Rhi

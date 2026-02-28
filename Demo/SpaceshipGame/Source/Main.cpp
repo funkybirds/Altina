@@ -4,7 +4,7 @@
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
-#include "Engine/GameScene/ScriptComponent.h"
+#include "Engine/GameScene/NativeScriptComponent.h"
 #include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
@@ -16,6 +16,12 @@
 #include "Math/Rotation.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
 #include "Rendering/PostProcess/PostProcessSettings.h"
+#include "DebugGui/DebugGui.h"
+
+#include "NativeScripts/ShipCameraModesNative.h"
+#include "NativeScripts/ShipOrbitControllerNative.h"
+#include "NativeScripts/SpaceshipNativeContext.h"
+#include "NativeScripts/SpaceshipNativeScripts.h"
 
 #include <cmath>
 
@@ -30,6 +36,8 @@ namespace {
     using Math::FVector2f;
     using Math::FVector3f;
     using Math::FVector4f;
+
+    namespace SpaceshipNative = Demo::SpaceshipGame::NativeScripts;
 
     [[nodiscard]] auto LengthXZ(const FVector3f& v) -> f32 {
         const f32 x = v.X();
@@ -187,7 +195,58 @@ namespace {
     class FSpaceshipGameClient final : public Launch::FGameClient {
     public:
         auto OnInit(Launch::FEngineLoop& engineLoop) -> bool override {
-            auto&      assetManager = engineLoop.GetAssetManager();
+            auto& assetManager = engineLoop.GetAssetManager();
+
+            SpaceshipNative::SetNativeScriptContext(
+                engineLoop.GetInputSystem(), engineLoop.GetMainWindow());
+            SpaceshipNative::RegisterSpaceshipNativeScripts();
+
+            if (auto* debugGui = engineLoop.GetDebugGui()) {
+                debugGui->RegisterOverlay(TEXT("SpaceshipHelp"), [](DebugGui::IDebugGui& gui) {
+                    constexpr f32 pad       = 10.0f;
+                    constexpr f32 lineH     = 18.0f;
+                    constexpr f32 boxW      = 420.0f;
+                    constexpr u32 lineCount = 6U;
+                    const auto    display   = gui.GetDisplaySize();
+
+                    const f32     boxH = pad * 2.0f + static_cast<f32>(lineCount) * lineH;
+                    f32           x    = pad;
+                    f32           y    = display.Y() - pad - boxH;
+                    if (y < 0.0f) {
+                        y = 0.0f;
+                    }
+
+                    const DebugGui::FRect rect{
+                        DebugGui::FVector2f(x, y),
+                        DebugGui::FVector2f(x + boxW, y + boxH),
+                    };
+
+                    constexpr DebugGui::FColor32 bg     = DebugGui::MakeColor32(10, 10, 10, 150);
+                    constexpr DebugGui::FColor32 border = DebugGui::MakeColor32(255, 255, 255, 80);
+                    constexpr DebugGui::FColor32 text   = DebugGui::MakeColor32(235, 235, 235, 255);
+
+                    gui.DrawRectFilled(rect, bg);
+                    gui.DrawRect(rect, border, 1.0f);
+
+                    f32 ty = y + pad;
+                    gui.DrawText(DebugGui::FVector2f(x + pad, ty), text,
+                        TEXT("C: Toggle camera (first/third person)"));
+                    ty += lineH;
+                    gui.DrawText(DebugGui::FVector2f(x + pad, ty), text,
+                        TEXT("Space: Change orbit / transfer"));
+                    ty += lineH;
+                    gui.DrawText(DebugGui::FVector2f(x + pad, ty), text, TEXT("Q: Time scale up"));
+                    ty += lineH;
+                    gui.DrawText(
+                        DebugGui::FVector2f(x + pad, ty), text, TEXT("E: Time scale down"));
+                    ty += lineH;
+                    gui.DrawText(
+                        DebugGui::FVector2f(x + pad, ty), text, TEXT("F1: Toggle Debug GUI"));
+                    ty += lineH;
+                    gui.DrawText(
+                        DebugGui::FVector2f(x + pad, ty), text, TEXT("Esc: Toggle mouse lock"));
+                });
+            }
 
             const auto sunMaterialHandle =
                 engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/spaceshipgame/materials/sun"));
@@ -212,17 +271,11 @@ namespace {
             const auto skyCubeHandle = engineLoop.GetAssetRegistry().FindByPath(
                 TEXT("demo/spaceshipgame/skyboxes/nebulae"));
 
-            const auto shipScriptHandle = engineLoop.GetAssetRegistry().FindByPath(
-                TEXT("demo/spaceshipgame/scripts/shiporbit"));
-            const auto cameraScriptHandle = engineLoop.GetAssetRegistry().FindByPath(
-                TEXT("demo/spaceshipgame/scripts/shipcameramodes"));
-
             if (!sunMaterialHandle.IsValid() || !earthMaterialHandle.IsValid()
                 || !moonMaterialHandle.IsValid() || !shipMaterialHandle.IsValid()
                 || !orbitLineMaterialHandle.IsValid() || !skyCubeHandle.IsValid()
                 || !sunModelHandle.IsValid() || !earthModelHandle.IsValid()
-                || !moonModelHandle.IsValid() || !shipModelHandle.IsValid()
-                || !shipScriptHandle.IsValid() || !cameraScriptHandle.IsValid()) {
+                || !moonModelHandle.IsValid() || !shipModelHandle.IsValid()) {
                 return false;
             }
 
@@ -271,8 +324,7 @@ namespace {
                 t.Scale        = Core::Math::FVector3f(1.0f);
                 shipRootObject.SetWorldTransform(t);
 
-                (void)shipRootObject.AddComponent<GameScene::FScriptComponent>(
-                    [&](auto& comp) { comp.SetScriptAsset(shipScriptHandle); });
+                (void)shipRootObject.AddComponent<SpaceshipNative::FShipOrbitControllerNative>();
             }
 
             // Ship visual (model).
@@ -325,8 +377,7 @@ namespace {
                     cameraComp.Get().SetFarPlane(5000.0f);
                 }
 
-                (void)cameraObject.AddComponent<GameScene::FScriptComponent>(
-                    [&](auto& comp) { comp.SetScriptAsset(cameraScriptHandle); });
+                (void)cameraObject.AddComponent<SpaceshipNative::FShipCameraModesNative>();
             }
 
             auto CreateBodyFromModel =

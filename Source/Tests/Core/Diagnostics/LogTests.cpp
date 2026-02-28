@@ -69,3 +69,25 @@ TEST_CASE("Logger respects minimum log level") {
     FLogger::SetLogLevel(ELogLevel::Info);
     FLogger::ResetDefaultCategory();
 }
+
+TEST_CASE("Logger appends stacktrace for error and fatal") {
+    std::vector<FCapturedLog> Captured;
+    FLogger::SetLogLevel(ELogLevel::Trace);
+    FLogger::SetDefaultCategory(TEXT("Test"));
+    FLogger::SetLogSink(&CaptureSink, &Captured);
+
+    AltinaEngine::LogError(TEXT("Boom"));
+    REQUIRE_EQ(Captured.size(), 1U);
+    REQUIRE_EQ(Captured[0].Level, ELogLevel::Error);
+    REQUIRE(Captured[0].Message.ToView().Contains(TEXT("StackTrace:")));
+
+    Captured.clear();
+    FLogger::Log(ELogLevel::Fatal, TEXT("Test"), TEXT("Kaboom"));
+    REQUIRE_EQ(Captured.size(), 1U);
+    REQUIRE_EQ(Captured[0].Level, ELogLevel::Fatal);
+    REQUIRE(Captured[0].Message.ToView().Contains(TEXT("StackTrace:")));
+
+    FLogger::ResetLogSink();
+    FLogger::SetLogLevel(ELogLevel::Info);
+    FLogger::ResetDefaultCategory();
+}

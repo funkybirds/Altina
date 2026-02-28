@@ -365,6 +365,13 @@ namespace AltinaEngine::DebugGui {
                     state.Size         = th.WindowDefaultSize;
                     state.Pos          = th.WindowDefaultPos;
 
+                    // Built-in panels: keep Console hidden by default, and start Stats/CVars in a
+                    // collapsed state to reduce screen clutter on first launch.
+                    if (title == FStringView(TEXT("DebugGui Stats"))
+                        || title == FStringView(TEXT("DebugGui CVars"))) {
+                        state.bCollapsed = true;
+                    }
+
                     if (mWindowOrder != nullptr) {
                         // Place windows in columns if the display height is too small for pure
                         // vertical stacking.
@@ -1809,6 +1816,17 @@ namespace AltinaEngine::DebugGui {
                 mPanels.PushBack(Move(e));
             }
 
+            void RegisterOverlay(FStringView name, FPanelFn fn) override {
+                if (name.IsEmpty() || !fn) {
+                    return;
+                }
+                FScopedLock lock(mMutex);
+                FPanelEntry e{};
+                e.Name.Assign(name);
+                e.Fn = Move(fn);
+                mOverlays.PushBack(Move(e));
+            }
+
             void SetExternalStats(const FDebugGuiExternalStats& stats) noexcept override {
                 FScopedLock lock(mMutex);
                 mExternalStats = stats;
@@ -1892,6 +1910,16 @@ namespace AltinaEngine::DebugGui {
                                 p.Fn(ctx);
                                 ctx.EndWindow();
                             }
+                        }
+                    }
+                }
+
+                // Overlays (no window chrome).
+                {
+                    FScopedLock lock(mMutex);
+                    for (auto& o : mOverlays) {
+                        if (o.Fn) {
+                            o.Fn(ctx);
                         }
                     }
                 }
@@ -2390,6 +2418,7 @@ namespace AltinaEngine::DebugGui {
             bool                                   mEnabledGameThread   = true;
             bool                                   mEnabledRenderThread = true;
             TVector<FPanelEntry>                   mPanels;
+            TVector<FPanelEntry>                   mOverlays;
             FDebugGuiExternalStats                 mExternalStats{};
             FDebugGuiTheme                         mTheme{};
 
@@ -2429,7 +2458,7 @@ namespace AltinaEngine::DebugGui {
 
             // Panel toggles.
             bool         mShowStats   = true;
-            bool         mShowConsole = true;
+            bool         mShowConsole = false;
             bool         mShowCVars   = true;
         };
     } // namespace

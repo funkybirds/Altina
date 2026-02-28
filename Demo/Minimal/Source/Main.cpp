@@ -169,7 +169,7 @@ namespace {
                     // range so objects in view don't get clamped to the last cascade too early.
                     light.mShadowCascadeCount = 4U;
                     light.mShadowSplitLambda  = 0.75f;
-                    light.mShadowMaxDistance  = 100.0f;
+                    light.mShadowMaxDistance  = 800.0f;
                     light.mShadowMapSize      = 2048U;
                     light.mShadowReceiverBias = 0.0015f;
 

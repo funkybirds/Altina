@@ -182,6 +182,9 @@ namespace AltinaEngine::DebugGui {
         [[nodiscard]] virtual auto IsEnabled() const noexcept -> bool = 0;
 
         virtual void               RegisterPanel(FStringView name, FPanelFn fn) = 0;
+        // Overlay panels are rendered without window chrome. Prefer IDebugGui::DrawText and other
+        // low-level draw calls (no widgets) so they do not capture input.
+        virtual void               RegisterOverlay(FStringView name, FPanelFn fn) = 0;
 
         virtual void SetExternalStats(const FDebugGuiExternalStats& stats) noexcept = 0;
         virtual void SetTheme(const FDebugGuiTheme& theme) noexcept                 = 0;

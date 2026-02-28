@@ -2,7 +2,7 @@ set(TargetName AltinaEngineDemoMinimal)
 
 add_executable(${TargetName})
 
-option(AE_DEMO_ENABLE_SHIPPING "Stage Demo/<Name>/Shipping from Demo/<Name>/Binaries (copies Assets + *.exe/*.dll only)" ON)
+option(AE_DEMO_ENABLE_SHIPPING "Stage Demo/<Name>/Shipping from Demo/<Name>/Binaries (copies runtime payload recursively; excludes debug artifacts)" ON)
 
 set(Target_Private_Sources
     Source/Main.cpp
@@ -19,6 +19,10 @@ target_link_libraries(${TargetName}
         AltinaEngine::ShaderCompiler
         AltinaEngine::Gameplay
 )
+
+if(TARGET AltinaEngineDemoLauncher)
+    add_dependencies(${TargetName} AltinaEngineDemoLauncher)
+endif()
 
 if(WIN32)
     target_link_libraries(${TargetName}
@@ -42,7 +46,7 @@ set(DemoConfigRoot ${CMAKE_CURRENT_SOURCE_DIR}/Config)
 set(DemoCookedRoot ${DemoBinaryDir}/Assets)
 set(EngineShaderRoot ${CMAKE_SOURCE_DIR}/Source/Shader)
 set(DemoStagedShaderRoot ${DemoBinaryDir}/Assets/Shader)
-set(AE_DEMO_STAGE_SHIPPING_SCRIPT ${CMAKE_SOURCE_DIR}/Scripts/StageDemoShipping.cmake)
+set(AE_DEMO_STAGE_SHIPPING_SCRIPT ${CMAKE_SOURCE_DIR}/Scripts/StageDemoShippingRuntime.cmake)
 file(GLOB_RECURSE DemoAssetSources CONFIGURE_DEPENDS
     ${DemoAssetsRoot}/*
 )
@@ -98,6 +102,9 @@ add_custom_target(AltinaEngineDemoMinimalStageShaders ALL
 )
 set_property(TARGET AltinaEngineDemoMinimalStageShaders PROPERTY FOLDER "Demo/Minimal")
 add_dependencies(${TargetName} AltinaEngineDemoMinimalStageShaders)
+if(TARGET AltinaEngineDemoLauncher)
+    add_dependencies(AltinaEngineDemoMinimalStageShaders AltinaEngineDemoLauncher)
+endif()
 
 if(WIN32)
     add_custom_command(
@@ -119,6 +126,8 @@ if(AE_DEMO_ENABLE_SHIPPING)
         COMMAND ${CMAKE_COMMAND}
             -DDEMO_BIN_DIR:PATH=${DemoBinaryDir}
             -DDEMO_SHIP_DIR:PATH=${DemoShippingDir}
+            -DDEMO_EXE_NAME:STRING=$<TARGET_FILE_NAME:${TargetName}>
+            -DDEMO_LAUNCHER_EXE:FILEPATH=$<TARGET_FILE:AltinaEngineDemoLauncher>
             -P ${AE_DEMO_STAGE_SHIPPING_SCRIPT}
         COMMENT "Staging Minimal demo Shipping folder"
         VERBATIM
@@ -132,6 +141,8 @@ if(AE_DEMO_ENABLE_SHIPPING)
         COMMAND ${CMAKE_COMMAND}
             -DDEMO_BIN_DIR:PATH=${DemoBinaryDir}
             -DDEMO_SHIP_DIR:PATH=${DemoShippingDir}
+            -DDEMO_EXE_NAME:STRING=$<TARGET_FILE_NAME:${TargetName}>
+            -DDEMO_LAUNCHER_EXE:FILEPATH=$<TARGET_FILE:AltinaEngineDemoLauncher>
             -P ${AE_DEMO_STAGE_SHIPPING_SCRIPT}
         COMMENT "Staging Minimal demo Shipping folder (shader changes)"
         VERBATIM
@@ -179,6 +190,9 @@ if(AE_DOTNET_HOST)
     if(TARGET AltinaEngineManagedBuild)
         add_dependencies(AltinaEngineDemoMinimalManagedBuild AltinaEngineManagedBuild)
     endif()
+    if(TARGET AltinaEngineManagedPublishSelfContained)
+        add_dependencies(AltinaEngineDemoMinimalManagedBuild AltinaEngineManagedPublishSelfContained)
+    endif()
 
     add_custom_command(
         TARGET AltinaEngineDemoMinimalManagedBuild
@@ -210,6 +224,18 @@ if(AE_DOTNET_HOST)
             ${DemoBinaryDir}
         COMMENT "Staging Minimal demo managed scripting assembly"
     )
+
+    if(TARGET AltinaEngineManagedPublishSelfContained)
+        add_custom_command(
+            TARGET AltinaEngineDemoMinimalManagedBuild
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}
+                ${DemoBinaryDir}
+            COMMENT "Staging self-contained .NET runtime for Minimal demo"
+            VERBATIM
+        )
+    endif()
 else()
     message(STATUS "dotnet not found; skipping Minimal demo managed build.")
 endif()
@@ -233,6 +259,9 @@ add_custom_command(
 add_custom_target(AltinaEngineDemoMinimalCookAssets
     DEPENDS ${DemoAssetCookOutput}
 )
+if(TARGET AltinaEngineDemoLauncher)
+    add_dependencies(AltinaEngineDemoMinimalCookAssets AltinaEngineDemoLauncher)
+endif()
 
 if(AE_DEMO_ENABLE_SHIPPING)
     add_custom_command(
@@ -241,6 +270,8 @@ if(AE_DEMO_ENABLE_SHIPPING)
         COMMAND ${CMAKE_COMMAND}
             -DDEMO_BIN_DIR:PATH=${DemoBinaryDir}
             -DDEMO_SHIP_DIR:PATH=${DemoShippingDir}
+            -DDEMO_EXE_NAME:STRING=$<TARGET_FILE_NAME:${TargetName}>
+            -DDEMO_LAUNCHER_EXE:FILEPATH=$<TARGET_FILE:AltinaEngineDemoLauncher>
             -P ${AE_DEMO_STAGE_SHIPPING_SCRIPT}
         COMMENT "Staging Minimal demo Shipping folder (asset changes)"
         VERBATIM

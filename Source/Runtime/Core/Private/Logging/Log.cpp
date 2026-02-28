@@ -3,10 +3,20 @@
 #include "../../Public/Threading/Atomic.h"
 #include <iostream>
 #include "../../Public/Threading/Mutex.h"
+#include "Container/String.h"
 #include <string>
+#include <string_view>
 #include <type_traits>
 
+#if __has_include(<stacktrace>)
+    #include <stacktrace>
+    #define AE_HAS_STD_STACKTRACE 1
+#else
+    #define AE_HAS_STD_STACKTRACE 0
+#endif
+
 namespace Container = AltinaEngine::Core::Container;
+using Container::FString;
 using Container::FStringView;
 
 namespace AltinaEngine::Core::Logging {
@@ -29,6 +39,57 @@ namespace AltinaEngine::Core::Logging {
         Threading::FMutex                     gLogMutex;
         thread_local std::basic_string<TChar> gThreadDefaultCategory;
         thread_local bool                     gThreadHasCustomCategory = false;
+
+        constexpr TChar                       kStackTraceHeader[] = TEXT("StackTrace:");
+
+        auto ShouldEmitStackTrace(const ELogLevel Level) noexcept -> bool {
+            return (Level == ELogLevel::Error) || (Level == ELogLevel::Fatal);
+        }
+
+        void AppendAscii(FString& Out, const std::string_view Text) {
+            for (const char ch : Text) {
+                Out.Append(static_cast<TChar>(ch));
+            }
+        }
+
+        void AppendStackTrace(FString& Out) {
+#if AE_HAS_STD_STACKTRACE && defined(__cpp_lib_stacktrace)
+            // Keep the output bounded; ERROR/FATAL are rare, so a little extra work is OK.
+            constexpr usize kSkipFrames = 3;  // skip logger frames
+            constexpr usize kMaxFrames  = 32; // keep logs readable
+
+            const auto      trace = std::stacktrace::current(kSkipFrames, kMaxFrames);
+            if (trace.empty()) {
+                return;
+            }
+
+            Out.Append(TEXT('\n'));
+            Out.Append(LiteralView(kStackTraceHeader));
+            Out.Append(TEXT('\n'));
+
+            usize index = 0;
+            for (const auto& entry : trace) {
+                Out.Append(TEXT("  #"));
+                Out.AppendNumber(index++);
+                Out.Append(TEXT(": "));
+
+                AppendAscii(Out, entry.description());
+
+                const auto file = entry.source_file();
+                if (!file.empty()) {
+                    Out.Append(TEXT(" ("));
+                    AppendAscii(Out, file);
+                    Out.Append(TEXT(':'));
+                    Out.AppendNumber(entry.source_line());
+                    Out.Append(TEXT(')'));
+                }
+
+                Out.Append(TEXT('\n'));
+            }
+#else
+            (void)Out;
+#endif
+        }
 
         auto LevelToLabel(const ELogLevel Level) noexcept -> FStringView {
             switch (Level) {
@@ -107,7 +168,16 @@ namespace AltinaEngine::Core::Logging {
         if (!ShouldLog(Level)) {
             return;
         }
-        DefaultSink(Level, Category, Message, nullptr);
+
+        if (!ShouldEmitStackTrace(Level)) {
+            DefaultSink(Level, Category, Message, nullptr);
+            return;
+        }
+
+        FString composed;
+        composed.Append(Message);
+        AppendStackTrace(composed);
+        DefaultSink(Level, Category, composed.ToView(), nullptr);
     }
 
     auto FLogger::ShouldLog(ELogLevel Level) noexcept -> bool {
@@ -147,10 +217,24 @@ namespace AltinaEngine::Core::Logging {
             userDataCopy = gUserData;
         }
 
+        if (!ShouldEmitStackTrace(Level)) {
+            if (sinkCopy) {
+                sinkCopy(Level, Category, Message, userDataCopy);
+            } else {
+                DefaultSink(Level, Category, Message, nullptr);
+            }
+            return;
+        }
+
+        FString composed;
+        composed.Append(Message);
+        AppendStackTrace(composed);
+        const auto view = composed.ToView();
+
         if (sinkCopy) {
-            sinkCopy(Level, Category, Message, userDataCopy);
+            sinkCopy(Level, Category, view, userDataCopy);
         } else {
-            DefaultSink(Level, Category, Message, nullptr);
+            DefaultSink(Level, Category, view, nullptr);
         }
     }
 

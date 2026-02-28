@@ -139,14 +139,18 @@ if(AE_DOTNET_HOST)
     if(WIN32)
         # Produce a self-contained .NET runtime folder that can be staged next to the demo executable.
         # This enables running Shipping builds on machines without .NET installed.
+        set(AE_MANAGED_PUBLISH_SELFCONTAINED_OBJ_DIR
+            ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/publish-selfcontained-obj
+        )
         set(AE_MANAGED_PUBLISH_SELFCONTAINED_STAMP
-            ${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}/AltinaEngine.Managed.publish-selfcontained.stamp
+            ${CMAKE_BINARY_DIR}/Source/Managed/AltinaEngine.Managed/AltinaEngine.Managed.publish-selfcontained.stamp
         )
 
         add_custom_command(
             OUTPUT ${AE_MANAGED_PUBLISH_SELFCONTAINED_STAMP}
             COMMAND ${CMAKE_COMMAND} -E rm -rf ${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}
             COMMAND ${CMAKE_COMMAND} -E make_directory ${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${AE_MANAGED_PUBLISH_SELFCONTAINED_OBJ_DIR}
             COMMAND ${AE_DOTNET_HOST} publish ${AE_MANAGED_PROJECT}
                 -o ${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}
                 -c $<IF:$<CONFIG:Debug>,Debug,Release>
@@ -156,9 +160,9 @@ if(AE_DOTNET_HOST)
                 /p:NoIncremental=true
                 /p:PublishTrimmed=false
                 /p:PublishReadyToRun=false
-                /p:MSBuildProjectExtensionsPath=${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}/obj/
-                /p:BaseIntermediateOutputPath=${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}/obj/
-                /p:IntermediateOutputPath=${AE_MANAGED_PUBLISH_SELFCONTAINED_DIR}/obj/$<IF:$<CONFIG:Debug>,Debug,Release>/
+                /p:MSBuildProjectExtensionsPath=${AE_MANAGED_PUBLISH_SELFCONTAINED_OBJ_DIR}/
+                /p:BaseIntermediateOutputPath=${AE_MANAGED_PUBLISH_SELFCONTAINED_OBJ_DIR}/
+                /p:IntermediateOutputPath=${AE_MANAGED_PUBLISH_SELFCONTAINED_OBJ_DIR}/$<IF:$<CONFIG:Debug>,Debug,Release>/
             COMMAND ${CMAKE_COMMAND} -E touch ${AE_MANAGED_PUBLISH_SELFCONTAINED_STAMP}
             DEPENDS
                 ${AE_MANAGED_PROJECT}

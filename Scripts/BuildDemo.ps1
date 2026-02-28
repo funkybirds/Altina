@@ -96,10 +96,10 @@ try {
 
     if ($Demo -eq "SpaceshipGame" -or $Demo -eq "All") {
         Write-Host "[CMake] Cleaning Demo/SpaceshipGame output folders (Binaries/Shipping)"
-        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoSpaceshipGamePreClean")
+        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "SpaceshipGamePreClean")
 
-        Write-Host "[CMake] Building AltinaEngineDemoSpaceshipGame via preset '$Preset'"
-        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoSpaceshipGame")
+        Write-Host "[CMake] Building SpaceshipGame via preset '$Preset'"
+        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "SpaceshipGame")
     }
 }
 finally {

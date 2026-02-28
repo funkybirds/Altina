@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Logging/Log.h"
 #include "Container/String.h"
 
 namespace AltinaEngine {

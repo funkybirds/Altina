@@ -12,13 +12,16 @@
     #include "RhiVulkanDeviceCaps.h"
 #endif
 #include "CoreMinimal.h"
-
-#include <type_traits>
+#include "RhiVulkanCommon.h"
+#include "Utility/Assert.h"
 
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
+using AltinaEngine::Core::Container::MakeSharedAs;
 using AltinaEngine::Core::Container::TAllocator;
 using AltinaEngine::Core::Container::TAllocatorTraits;
+using AltinaEngine::Core::Utility::Assert;
+
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::MakeUnique;
@@ -38,44 +41,13 @@ namespace AltinaEngine::Rhi {
 #endif
 
     namespace {
-        template <typename TBase, typename TDerived, typename... Args>
-        auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
-            using TAllocatorType = TAllocator<TDerived>;
-            using Traits         = TAllocatorTraits<TAllocatorType>;
-
-            static_assert(std::is_base_of_v<TBase, TDerived>,
-                "MakeSharedAs requires TDerived to derive from TBase.");
-
-            TAllocatorType allocator;
-            TDerived*      ptr = Traits::Allocate(allocator, 1);
-            try {
-                Traits::Construct(allocator, ptr, Forward<Args>(args)...);
-            } catch (...) {
-                Traits::Deallocate(allocator, ptr, 1);
-                throw;
-            }
-
-            struct FDeleter {
-                TAllocatorType mAllocator;
-                void           operator()(TBase* basePtr) {
-                    if (!basePtr) {
-                        return;
-                    }
-                    auto* derivedPtr = AltinaEngine::CheckedCast<TDerived*>(basePtr);
-                    Traits::Destroy(mAllocator, derivedPtr);
-                    Traits::Deallocate(mAllocator, derivedPtr, 1);
-                }
-            };
-
-            return TShared<TBase>(ptr, FDeleter{ allocator });
-        }
 
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         auto GetVulkanVersion() -> u32 {
             u32   version   = VK_API_VERSION_1_0;
-            auto* enumerate = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
-                vkGetInstanceProcAddr(nullptr, "vkEnumerateInstanceVersion"));
-            if (enumerate) {
+            auto* enumerate = SafeWrapper::GetInstanceProcAddrTs<PFN_vkEnumerateInstanceVersion>(
+                nullptr, "vkEnumerateInstanceVersion");
+            if (enumerate != nullptr) {
                 enumerate(&version);
             }
             return version;
@@ -93,11 +65,11 @@ namespace AltinaEngine::Rhi {
         }
 
         auto HasLayer(const TVector<VkLayerProperties>& layers, const char* name) -> bool {
-            if (!name) {
+            if (name == nullptr) {
                 return false;
             }
             for (const auto& layer : layers) {
-                if (std::strcmp(layer.layerName, name) == 0) {
+                if (Core::Algorithm::RawStringEqualUnsafe(layer.layerName, name)) {
                     return true;
                 }
             }
@@ -109,7 +81,7 @@ namespace AltinaEngine::Rhi {
                 return false;
             }
             for (const auto& ext : exts) {
-                if (std::strcmp(ext.extensionName, name) == 0) {
+                if (Core::Algorithm::RawStringEqualUnsafe(ext.extensionName, name)) {
                     return true;
                 }
             }
@@ -308,7 +280,7 @@ namespace AltinaEngine::Rhi {
         createInfo.ppEnabledExtensionNames = mState->mEnabledExtensions.Data();
 
         if (vkCreateInstance(&createInfo, nullptr, &mState->mInstance) != VK_SUCCESS) {
-            LogError(TEXT("RHI(Vulkan): Failed to create VkInstance."));
+            LogErrorCat(TEXT("RHI.Vulkan"), TEXT("RHI(Vulkan): Failed to create VkInstance."));
             return false;
         }
 
@@ -316,7 +288,7 @@ namespace AltinaEngine::Rhi {
             mState->mDebugMessenger = CreateDebugMessenger(mState->mInstance);
         }
 
-        LogInfo(TEXT("RHI(Vulkan): Instance created (API={}.{}.{})"),
+        LogInfoCat(TEXT("RHI.Vulkan"), TEXT("RHI(Vulkan): Instance created (API={}.{}.{})"),
             VK_VERSION_MAJOR(mState->mInstanceVersion), VK_VERSION_MINOR(mState->mInstanceVersion),
             VK_VERSION_PATCH(mState->mInstanceVersion));
         return true;
@@ -348,9 +320,9 @@ namespace AltinaEngine::Rhi {
     void FRhiVulkanContext::EnumerateAdaptersInternal(TVector<TShared<FRhiAdapter>>& outAdapters) {
         outAdapters.Clear();
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
-        if (!mState || mState->mInstance == VK_NULL_HANDLE) {
-            return;
-        }
+        Assert(mState != nullptr, TEXT("RHI.Vulkan"), "Device lost while enumerating adapters");
+        Assert(mState->mInstance != VK_NULL_HANDLE, TEXT("RHI.Vulkan"),
+            "Device lost while enumerating adapters");
 
         u32 deviceCount = 0;
         if (vkEnumeratePhysicalDevices(mState->mInstance, &deviceCount, nullptr) != VK_SUCCESS
@@ -440,7 +412,7 @@ namespace AltinaEngine::Rhi {
         u32       transferFamily = selectFamily(VK_QUEUE_TRANSFER_BIT, VK_QUEUE_TRANSFER_BIT);
 
         if (graphicsFamily == UINT32_MAX) {
-            LogError(TEXT("RHI(Vulkan): No graphics queue family found."));
+            LogErrorCat(TEXT("RHI.Vulkan"), TEXT("RHI(Vulkan): No graphics queue family found."));
             return {};
         }
         if (computeFamily == UINT32_MAX) {

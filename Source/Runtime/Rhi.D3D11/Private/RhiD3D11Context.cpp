@@ -31,9 +31,11 @@
 
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
+using AltinaEngine::Core::Container::MakeSharedAs;
 using AltinaEngine::Core::Container::TAllocator;
 using AltinaEngine::Core::Container::TAllocatorTraits;
 using AltinaEngine::Core::Container::TVector;
+
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::MakeUnique;
@@ -49,37 +51,6 @@ namespace AltinaEngine::Rhi {
 #endif
 
     namespace {
-        template <typename TBase, typename TDerived, typename... Args>
-        auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
-            using TAllocatorType = TAllocator<TDerived>;
-            using Traits         = TAllocatorTraits<TAllocatorType>;
-
-            static_assert(std::is_base_of_v<TBase, TDerived>,
-                "MakeSharedAs requires TDerived to derive from TBase.");
-
-            TAllocatorType allocator;
-            TDerived*      ptr = Traits::Allocate(allocator, 1);
-            try {
-                Traits::Construct(allocator, ptr, Forward<Args>(args)...);
-            } catch (...) {
-                Traits::Deallocate(allocator, ptr, 1);
-                throw;
-            }
-
-            struct FDeleter {
-                TAllocatorType mAllocator;
-                void           operator()(TBase* basePtr) {
-                    if (!basePtr) {
-                        return;
-                    }
-                    auto* derivedPtr = AltinaEngine::CheckedCast<TDerived*>(basePtr);
-                    Traits::Destroy(mAllocator, derivedPtr);
-                    Traits::Deallocate(mAllocator, derivedPtr, 1);
-                }
-            };
-
-            return TShared<TBase>(ptr, FDeleter{ allocator });
-        }
 
 #if AE_PLATFORM_WIN
         auto ToVendorId(u32 vendorId) noexcept -> ERhiVendorId {

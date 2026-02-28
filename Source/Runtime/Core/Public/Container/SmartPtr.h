@@ -1,8 +1,9 @@
 #pragma once
 
 #include "Allocator.h"
-#include "../Threading/Atomic.h"
-#include "../Types/Traits.h"
+#include "Threading/Atomic.h"
+#include "Types/Traits.h"
+#include "Types/CheckedCast.h"
 
 using AltinaEngine::CClassBaseOf;
 using AltinaEngine::Forward;
@@ -84,6 +85,30 @@ namespace AltinaEngine::Core::Container {
         D        mDeleter;
     };
 
+    template <typename T, typename D>
+    [[nodiscard]] constexpr auto operator==(const TOwner<T, D>& Ptr, decltype(nullptr)) noexcept
+        -> bool {
+        return Ptr.Get() == nullptr;
+    }
+
+    template <typename T, typename D>
+    [[nodiscard]] constexpr auto operator==(decltype(nullptr), const TOwner<T, D>& Ptr) noexcept
+        -> bool {
+        return Ptr.Get() == nullptr;
+    }
+
+    template <typename T, typename D>
+    [[nodiscard]] constexpr auto operator!=(const TOwner<T, D>& Ptr, decltype(nullptr)) noexcept
+        -> bool {
+        return Ptr.Get() != nullptr;
+    }
+
+    template <typename T, typename D>
+    [[nodiscard]] constexpr auto operator!=(decltype(nullptr), const TOwner<T, D>& Ptr) noexcept
+        -> bool {
+        return Ptr.Get() != nullptr;
+    }
+
     template <typename T, typename D> class TOwner<T[], D> {
     public:
         using TPointer     = T*;
@@ -143,6 +168,30 @@ namespace AltinaEngine::Core::Container {
         TPointer mPtr;
         D        mDeleter;
     };
+
+    template <typename T, typename D>
+    [[nodiscard]] constexpr auto operator==(const TOwner<T[], D>& Ptr, decltype(nullptr)) noexcept
+        -> bool {
+        return Ptr.Get() == nullptr;
+    }
+
+    template <typename T, typename D>
+    [[nodiscard]] constexpr auto operator==(decltype(nullptr), const TOwner<T[], D>& Ptr) noexcept
+        -> bool {
+        return Ptr.Get() == nullptr;
+    }
+
+    template <typename T, typename D>
+    [[nodiscard]] constexpr auto operator!=(const TOwner<T[], D>& Ptr, decltype(nullptr)) noexcept
+        -> bool {
+        return Ptr.Get() != nullptr;
+    }
+
+    template <typename T, typename D>
+    [[nodiscard]] constexpr auto operator!=(decltype(nullptr), const TOwner<T[], D>& Ptr) noexcept
+        -> bool {
+        return Ptr.Get() != nullptr;
+    }
 
     template <typename T, typename... Args> auto MakeUnique(Args&&... args) -> TOwner<T> {
         if constexpr (kSmartPtrUseManagedAllocator) {
@@ -391,6 +440,30 @@ namespace AltinaEngine::Core::Container {
         FSharedControlBlock* mControl;
     };
 
+    template <typename T>
+    [[nodiscard]] constexpr auto operator==(const TShared<T>& Ptr, decltype(nullptr)) noexcept
+        -> bool {
+        return Ptr.Get() == nullptr;
+    }
+
+    template <typename T>
+    [[nodiscard]] constexpr auto operator==(decltype(nullptr), const TShared<T>& Ptr) noexcept
+        -> bool {
+        return Ptr.Get() == nullptr;
+    }
+
+    template <typename T>
+    [[nodiscard]] constexpr auto operator!=(const TShared<T>& Ptr, decltype(nullptr)) noexcept
+        -> bool {
+        return Ptr.Get() != nullptr;
+    }
+
+    template <typename T>
+    [[nodiscard]] constexpr auto operator!=(decltype(nullptr), const TShared<T>& Ptr) noexcept
+        -> bool {
+        return Ptr.Get() != nullptr;
+    }
+
     template <typename T, typename... Args> auto MakeShared(Args&&... args) -> TShared<T> {
         if constexpr (kSmartPtrUseManagedAllocator) {
             TAllocator<T> allocator;
@@ -430,4 +503,34 @@ namespace AltinaEngine::Core::Container {
         owner.Release();
         return result;
     }
+
+    template <typename TBase, typename TDerived, typename... Args>
+        requires CClassBaseOf<TBase, TDerived>
+    auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
+        using TAllocatorType = TAllocator<TDerived>;
+        using TTraits        = TAllocatorTraits<TAllocatorType>;
+
+        TAllocatorType allocator;
+        TDerived*      ptr = TTraits::Allocate(allocator, 1);
+        try {
+            TTraits::Construct(allocator, ptr, Forward<Args>(args)...);
+        } catch (...) {
+            TTraits::Deallocate(allocator, ptr, 1);
+            throw;
+        }
+
+        struct FDeleter {
+            TAllocatorType mAllocator;
+            void           operator()(TBase* basePtr) {
+                if (!basePtr) {
+                    return;
+                }
+                auto* derivedPtr = CheckedCast<TDerived*>(basePtr);
+                TTraits::Destroy(mAllocator, derivedPtr);
+                TTraits::Deallocate(mAllocator, derivedPtr, 1);
+            }
+        };
+
+        return TShared<TBase>(ptr, FDeleter{ allocator });
+    } // namespace AltinaEngine::Core::Container
 } // namespace AltinaEngine::Core::Container

@@ -289,6 +289,9 @@ namespace AltinaEngine::Rhi {
 
     FRhiVulkanCommandList::FRhiVulkanCommandList(const FRhiCommandListDesc& desc)
         : FRhiCommandList(desc) {
+        // TODO: (Require Refactor, Manual, Unidentified) Potential memory leak by allocating cmd
+        // bufs
+        // TODO: (Require Refactor, Manual, CodeStyle) DO NOT USE NEW
         mState = new FState{};
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         mState->mLevel = (desc.mListType == ERhiCommandListType::Bundle)

@@ -30,7 +30,7 @@ namespace AltinaEngine::Rhi {
                 return UINT32_MAX;
             }
 
-            Core::Container::TVector<VkQueueFamilyProperties> families;
+            TVector<VkQueueFamilyProperties> families;
             families.Resize(queueFamilyCount);
             vkGetPhysicalDeviceQueueFamilyProperties(physical, &queueFamilyCount, families.Data());
 
@@ -487,6 +487,8 @@ namespace AltinaEngine::Rhi {
         allocInfo.commandPool        = pool;
         allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = 1;
+
+        // TODO: (Require Refactor, Manual) inappropriate command pool allocation
         if (vkAllocateCommandBuffers(mState->mDevice, &allocInfo, &cmd) != VK_SUCCESS) {
             vkDestroyCommandPool(mState->mDevice, pool, nullptr);
             if (stagingAlloc.IsValid()) {
@@ -562,6 +564,9 @@ namespace AltinaEngine::Rhi {
         VkFence           fence = VK_NULL_HANDLE;
         VkFenceCreateInfo fenceInfo{};
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+        // TODO: (Require Refactor, Manual) This code blocks CPU execution, try async transfer and
+        // explicit CPU waiting
         vkCreateFence(mState->mDevice, &fenceInfo, nullptr, &fence);
 
         VkSubmitInfo submit{};
@@ -574,10 +579,12 @@ namespace AltinaEngine::Rhi {
             vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, UINT64_MAX);
             vkDestroyFence(mState->mDevice, fence, nullptr);
         } else {
+            // TODO: (Require Refactor, Manual) This operation is TOO HEAVY.
             vkQueueWaitIdle(mState->mGraphicsQueue);
         }
 
         vkFreeCommandBuffers(mState->mDevice, pool, 1, &cmd);
+        // TODO: (Require Refactor, Manual) This operation is TOO HEAVY.
         vkDestroyCommandPool(mState->mDevice, pool, nullptr);
 
         if (stagingAlloc.IsValid()) {

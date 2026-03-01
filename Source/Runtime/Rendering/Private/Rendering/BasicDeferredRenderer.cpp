@@ -1866,12 +1866,13 @@ namespace AltinaEngine::Rendering {
                     };
 
                     FSsaoConstants ssao{};
-                    ssao.Enable      = (rSsaoEnable.Get() != 0) ? 1U : 0U;
-                    ssao.SampleCount = static_cast<u32>(std::max(0, rSsaoSampleCount.Get()));
-                    ssao.RadiusVS    = rSsaoRadiusVS.Get();
-                    ssao.BiasNdc     = rSsaoBiasNdc.Get();
-                    ssao.Power       = rSsaoPower.Get();
-                    ssao.Intensity   = rSsaoIntensity.Get();
+                    ssao.Enable = (rSsaoEnable.GetRenderValue() != 0) ? 1U : 0U;
+                    ssao.SampleCount =
+                        static_cast<u32>(std::max(0, rSsaoSampleCount.GetRenderValue()));
+                    ssao.RadiusVS  = rSsaoRadiusVS.GetRenderValue();
+                    ssao.BiasNdc   = rSsaoBiasNdc.GetRenderValue();
+                    ssao.Power     = rSsaoPower.GetRenderValue();
+                    ssao.Intensity = rSsaoIntensity.GetRenderValue();
 
                     ctx.RHIUpdateDynamicBufferDiscard(ssaoBuffer, &ssao, sizeof(ssao), 0ULL);
 
@@ -2075,14 +2076,14 @@ namespace AltinaEngine::Rendering {
 
                 // Fill IBL constants (b1). If IBL is not available, keep intensities at zero.
                 FIblConstants iblConstants{};
-                const bool    bEnableIbl = (rIblEnable.Get() != 0) && bHasSkyIbl
+                const bool    bEnableIbl = (rIblEnable.GetRenderValue() != 0) && bHasSkyIbl
                     && (skyIrradiance != nullptr) && (skySpecular != nullptr)
                     && (brdfLut != nullptr);
                 if (bEnableIbl) {
-                    iblConstants.EnvDiffuseIntensity  = rIblDiffuseIntensity.Get();
-                    iblConstants.EnvSpecularIntensity = rIblSpecularIntensity.Get();
+                    iblConstants.EnvDiffuseIntensity  = rIblDiffuseIntensity.GetRenderValue();
+                    iblConstants.EnvSpecularIntensity = rIblSpecularIntensity.GetRenderValue();
                     iblConstants.SpecularMaxLod       = specularMaxLod;
-                    iblConstants.EnvSaturation        = rIblSaturation.Get();
+                    iblConstants.EnvSaturation        = rIblSaturation.GetRenderValue();
                 }
                 if (iblBuffer != nullptr) {
                     ctx.RHIUpdateDynamicBufferDiscard(
@@ -2330,41 +2331,41 @@ namespace AltinaEngine::Rendering {
         // Post-process chain (stack + registry) -> Present.
         {
             FPostProcessStack pp{};
-            pp.bEnable = (rPostProcessEnable.Get() != 0);
+            pp.bEnable = (rPostProcessEnable.GetRenderValue() != 0);
 
-            const bool bEnableTaa = (rPostProcessTaa.Get() != 0);
+            const bool bEnableTaa = (rPostProcessTaa.GetRenderValue() != 0);
             if (bEnableTaa) {
                 FPostProcessNode node{};
                 node.EffectId.Assign(TEXT("TAA"));
                 node.bEnabled = true;
                 node.Params[FString(TEXT("Alpha"))] =
-                    FPostProcessParamValue(rPostProcessTaaAlpha.Get());
+                    FPostProcessParamValue(rPostProcessTaaAlpha.GetRenderValue());
                 node.Params[FString(TEXT("ClampK"))] =
-                    FPostProcessParamValue(rPostProcessTaaClampK.Get());
+                    FPostProcessParamValue(rPostProcessTaaClampK.GetRenderValue());
                 pp.Stack.PushBack(Move(node));
             }
 
-            if (rPostProcessBloom.Get() != 0) {
+            if (rPostProcessBloom.GetRenderValue() != 0) {
                 FPostProcessNode node{};
                 node.EffectId.Assign(TEXT("Bloom"));
                 node.bEnabled = true;
                 // Defaults can be tuned via CVars; can be overridden later via stack params.
                 node.Params[FString(TEXT("Threshold"))] =
-                    FPostProcessParamValue(rPostProcessBloomThreshold.Get());
+                    FPostProcessParamValue(rPostProcessBloomThreshold.GetRenderValue());
                 node.Params[FString(TEXT("Knee"))] =
-                    FPostProcessParamValue(rPostProcessBloomKnee.Get());
+                    FPostProcessParamValue(rPostProcessBloomKnee.GetRenderValue());
                 node.Params[FString(TEXT("Intensity"))] =
-                    FPostProcessParamValue(rPostProcessBloomIntensity.Get());
+                    FPostProcessParamValue(rPostProcessBloomIntensity.GetRenderValue());
                 node.Params[FString(TEXT("KawaseOffset"))] =
-                    FPostProcessParamValue(rPostProcessBloomKawaseOffset.Get());
+                    FPostProcessParamValue(rPostProcessBloomKawaseOffset.GetRenderValue());
                 node.Params[FString(TEXT("Iterations"))] =
-                    FPostProcessParamValue(rPostProcessBloomIterations.Get());
-                node.Params[FString(TEXT("FirstDownsampleLumaWeight"))] =
-                    FPostProcessParamValue(rPostProcessBloomFirstDownsampleLumaWeight.Get());
+                    FPostProcessParamValue(rPostProcessBloomIterations.GetRenderValue());
+                node.Params[FString(TEXT("FirstDownsampleLumaWeight"))] = FPostProcessParamValue(
+                    rPostProcessBloomFirstDownsampleLumaWeight.GetRenderValue());
                 pp.Stack.PushBack(Move(node));
             }
 
-            if (rPostProcessTonemap.Get() != 0) {
+            if (rPostProcessTonemap.GetRenderValue() != 0) {
                 FPostProcessNode node{};
                 node.EffectId.Assign(TEXT("Tonemap"));
                 node.bEnabled = true;
@@ -2374,17 +2375,17 @@ namespace AltinaEngine::Rendering {
                 pp.Stack.PushBack(Move(node));
             }
 
-            if (!bEnableTaa && rPostProcessFxaa.Get() != 0) {
+            if (!bEnableTaa && rPostProcessFxaa.GetRenderValue() != 0) {
                 FPostProcessNode node{};
                 node.EffectId.Assign(TEXT("Fxaa"));
                 node.bEnabled = true;
                 // Defaults can be tuned via CVars; can be overridden later via stack params.
                 node.Params[FString(TEXT("EdgeThreshold"))] =
-                    FPostProcessParamValue(rPostProcessFxaaEdgeThreshold.Get());
+                    FPostProcessParamValue(rPostProcessFxaaEdgeThreshold.GetRenderValue());
                 node.Params[FString(TEXT("EdgeThresholdMin"))] =
-                    FPostProcessParamValue(rPostProcessFxaaEdgeThresholdMin.Get());
+                    FPostProcessParamValue(rPostProcessFxaaEdgeThresholdMin.GetRenderValue());
                 node.Params[FString(TEXT("Subpix"))] =
-                    FPostProcessParamValue(rPostProcessFxaaSubpix.Get());
+                    FPostProcessParamValue(rPostProcessFxaaSubpix.GetRenderValue());
                 pp.Stack.PushBack(Move(node));
             }
 

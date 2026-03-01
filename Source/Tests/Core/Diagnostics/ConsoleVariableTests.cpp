@@ -46,3 +46,23 @@ TEST_CASE("ConsoleVariable: basic register and parsing") {
     FConsoleVariable::ForEach([&](const FConsoleVariable&) { ++count; });
     REQUIRE(count >= 4);
 }
+
+TEST_CASE("ConsoleVariable: render thread latch") {
+    FConsoleVariable* latched =
+        FConsoleVariable::Register(TEXT("test.latched.int"), 1, ECVarFlags::SnapshotPerFrame);
+    REQUIRE(latched);
+
+    LatchRenderThreadCVars();
+    REQUIRE_EQ(latched->GetRenderValue<int>(), 1);
+
+    latched->Set(2);
+    REQUIRE_EQ(latched->GetRenderValue<int>(), 1);
+
+    LatchRenderThreadCVars();
+    REQUIRE_EQ(latched->GetRenderValue<int>(), 2);
+
+    FConsoleVariable* immediate = FConsoleVariable::Register(TEXT("test.latched.immediate"), 10);
+    REQUIRE(immediate);
+    immediate->Set(11);
+    REQUIRE_EQ(immediate->GetRenderValue<int>(), 11);
+}

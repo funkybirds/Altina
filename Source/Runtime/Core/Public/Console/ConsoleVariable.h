@@ -14,6 +14,7 @@ using AltinaEngine::CFloatingPoint;
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
 using AltinaEngine::TDecay;
+using AltinaEngine::ToUnderlying;
 using AltinaEngine::TTypeIsAnyOf;
 using AltinaEngine::TTypeSameAs;
 using AltinaEngine::TTypeSet;
@@ -56,6 +57,26 @@ namespace AltinaEngine::Core::Console {
     X(double)                  \
     X(long double)
 
+    enum class ECVarFlags : u32 {
+        None             = 0U,
+        SnapshotPerFrame = 1U << 0U,
+        VolatileRead     = 1U << 1U,
+    };
+
+    [[nodiscard]] constexpr auto operator|(ECVarFlags lhs, ECVarFlags rhs) noexcept -> ECVarFlags {
+        return static_cast<ECVarFlags>(ToUnderlying(lhs) | ToUnderlying(rhs));
+    }
+
+    [[nodiscard]] constexpr auto operator&(ECVarFlags lhs, ECVarFlags rhs) noexcept -> ECVarFlags {
+        return static_cast<ECVarFlags>(ToUnderlying(lhs) & ToUnderlying(rhs));
+    }
+
+    [[nodiscard]] constexpr auto HasAnyFlags(ECVarFlags value, ECVarFlags test) noexcept -> bool {
+        return ToUnderlying(value & test) != 0U;
+    }
+
+    AE_CORE_API void LatchRenderThreadCVars() noexcept;
+
     class AE_CORE_API FConsoleVariable {
     public:
         enum class EType {
@@ -77,13 +98,21 @@ namespace AltinaEngine::Core::Console {
         static constexpr bool CConsoleValueType =
             TTypeIsAnyOf<typename TDecay<T>::TType, FConsoleValueTypes>::Value;
 
-        FConsoleVariable(const FString& name, FConsoleValue value, EType type);
+        FConsoleVariable(const FString& name, FConsoleValue value, EType type, ECVarFlags flags);
 
         const FString& GetName() const noexcept;
 
         FString        GetString() const noexcept;
 
+        FString        GetRenderString() const noexcept;
+
         void           SetFromString(const FString& v) noexcept;
+
+        auto           GetFlags() const noexcept -> ECVarFlags { return mFlags; }
+
+        auto HasFlag(ECVarFlags flag) const noexcept -> bool { return HasAnyFlags(mFlags, flag); }
+
+        auto GetValueCopy() const noexcept -> FConsoleValue;
 
         template <typename T>
             requires CConsoleValueType<T>
@@ -112,12 +141,37 @@ namespace AltinaEngine::Core::Console {
             return out;
         }
 
+        template <typename T>
+            requires CConsoleValueType<T>
+        auto GetRenderValue() const noexcept -> typename TDecay<T>::TType {
+            using TDecayed = typename TDecay<T>::TType;
+            if constexpr (TTypeSameAs<TDecayed, FString>::Value) {
+                return GetRenderString();
+            }
+            if (!HasFlag(ECVarFlags::SnapshotPerFrame)) {
+                return GetValue<TDecayed>();
+            }
+            FConsoleValue latched{};
+            if (!TryGetLatchedValue(this, latched)) {
+                return GetValue<TDecayed>();
+            }
+            TDecayed out{};
+            if (TryGetScalarValue(latched, out)) {
+                return out;
+            }
+            if (auto s = latched.TryGet<FString>()) {
+                return ParseScalar<TDecayed>(*s);
+            }
+            return out;
+        }
+
         EType GetType() const noexcept { return mType; }
 
         // Registry helpers (header-only convenience API)
         template <typename T>
             requires CConsoleValueType<T>
-        static FConsoleVariable* Register(const TChar* name, T&& defaultValue) noexcept {
+        static FConsoleVariable* Register(
+            const TChar* name, T&& defaultValue, ECVarFlags flags = ECVarFlags::None) noexcept {
             if (name == nullptr || name[0] == static_cast<TChar>(0)) {
                 return nullptr;
             }
@@ -125,7 +179,7 @@ namespace AltinaEngine::Core::Console {
             FConsoleValue value;
             using TDecayed = typename TDecay<T>::TType;
             value.Emplace<TDecayed>(Forward<T>(defaultValue));
-            return RegisterInternal(nameStr, Move(value), TypeFrom<TDecayed>());
+            return RegisterInternal(nameStr, Move(value), TypeFrom<TDecayed>(), flags);
         }
 
         static FConsoleVariable* Find(const FString& name) noexcept;
@@ -145,8 +199,11 @@ namespace AltinaEngine::Core::Console {
             }
         }
 
-        static auto                                 GuessType(const FString& v) noexcept -> EType;
-        static auto                                 ParseBool(const FString& v) noexcept -> bool;
+        static auto GuessType(const FString& v) noexcept -> EType;
+        static auto ParseBool(const FString& v) noexcept -> bool;
+        static auto TryGetLatchedValue(const FConsoleVariable* var, FConsoleValue& out) noexcept
+            -> bool;
+        static auto ToStringFromValue(const FConsoleValue& value) -> FString;
 
         template <typename T> static constexpr auto IsSignedIntegral() noexcept -> bool {
             using TDecayed = typename TDecay<T>::TType;
@@ -243,12 +300,13 @@ namespace AltinaEngine::Core::Console {
         }
 
         static FConsoleVariable* RegisterInternal(
-            const FString& name, FConsoleValue&& value, EType type) noexcept;
+            const FString& name, FConsoleValue&& value, EType type, ECVarFlags flags) noexcept;
 
         FString        mName;
         FConsoleValue  mValue;
         mutable FMutex mMutex;
         EType          mType;
+        ECVarFlags     mFlags = ECVarFlags::None;
 
         // Hash / equality helpers for FString as THashMap key
         struct FStringHash {
@@ -273,12 +331,17 @@ namespace AltinaEngine::Core::Console {
 
         TConsoleVariable() noexcept = default;
 
-        explicit TConsoleVariable(const TChar* name, T&& defaultValue) noexcept {
-            mVariable = FConsoleVariable::Register(name, Forward<T>(defaultValue));
+        explicit TConsoleVariable(
+            const TChar* name, T&& defaultValue, ECVarFlags flags = ECVarFlags::None) noexcept {
+            mVariable = FConsoleVariable::Register(name, Forward<T>(defaultValue), flags);
         }
 
         auto Get() const noexcept -> TValue {
             return mVariable ? mVariable->GetValue<TValue>() : TValue{};
+        }
+
+        auto GetRenderValue() const noexcept -> TValue {
+            return mVariable ? mVariable->GetRenderValue<TValue>() : TValue{};
         }
 
         void Set(TValue value) noexcept {

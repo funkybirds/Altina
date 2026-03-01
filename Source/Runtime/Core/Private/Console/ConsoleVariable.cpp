@@ -91,8 +91,12 @@ namespace AltinaEngine::Core::Console {
         }
     } // namespace
 
-    FConsoleVariable::FConsoleVariable(const FString& name, FConsoleValue value, EType type)
-        : mName(name), mValue(Move(value)), mType(type) {}
+    THashMap<FConsoleVariable*, FConsoleVariable::FConsoleValue> gLatchedValues;
+    FMutex                                                       gLatchedMutex;
+
+    FConsoleVariable::FConsoleVariable(
+        const FString& name, FConsoleValue value, EType type, ECVarFlags flags)
+        : mName(name), mValue(Move(value)), mType(type), mFlags(flags) {}
 
     const FString& FConsoleVariable::GetName() const noexcept { return mName; }
 
@@ -113,6 +117,22 @@ namespace AltinaEngine::Core::Console {
         AE_CVAR_SCALAR_LIST(AE_CVAR_TRY_STRING)
 #undef AE_CVAR_TRY_STRING
         return FString();
+    }
+
+    FString FConsoleVariable::GetRenderString() const noexcept {
+        if (!HasAnyFlags(mFlags, ECVarFlags::SnapshotPerFrame)) {
+            return GetString();
+        }
+        FConsoleValue latched{};
+        if (!TryGetLatchedValue(this, latched)) {
+            return GetString();
+        }
+        return ToStringFromValue(latched);
+    }
+
+    auto FConsoleVariable::GetValueCopy() const noexcept -> FConsoleValue {
+        FScopedLock lock(mMutex);
+        return mValue;
     }
 
     void FConsoleVariable::SetFromString(const FString& v) noexcept {
@@ -209,13 +229,24 @@ namespace AltinaEngine::Core::Console {
         }
     }
 
+    void LatchRenderThreadCVars() noexcept {
+        FScopedLock lock(gLatchedMutex);
+        gLatchedValues.clear();
+        FConsoleVariable::ForEach([&](const FConsoleVariable& v) {
+            if (!HasAnyFlags(v.GetFlags(), ECVarFlags::SnapshotPerFrame)) {
+                return;
+            }
+            gLatchedValues.emplace(const_cast<FConsoleVariable*>(&v), v.GetValueCopy());
+        });
+    }
+
     FConsoleVariable* FConsoleVariable::RegisterInternal(
-        const FString& name, FConsoleValue&& value, EType type) noexcept {
+        const FString& name, FConsoleValue&& value, EType type, ECVarFlags flags) noexcept {
         FScopedLock lock(gRegistryMutex);
         auto        it = gRegistry.find(name);
         if (it != gRegistry.end())
             return it->second.Get();
-        auto var = MakeShared<FConsoleVariable>(name, Move(value), type);
+        auto var = MakeShared<FConsoleVariable>(name, Move(value), type, flags);
         gRegistry.emplace(name, Move(var));
         return gRegistry.find(name)->second.Get();
     }
@@ -280,6 +311,38 @@ namespace AltinaEngine::Core::Console {
         if (s.Length() == 2 && s[0] == 'o' && s[1] == 'n')
             return true;
         return false;
+    }
+
+    auto FConsoleVariable::TryGetLatchedValue(
+        const FConsoleVariable* var, FConsoleValue& out) noexcept -> bool {
+        if (var == nullptr) {
+            return false;
+        }
+        FScopedLock lock(gLatchedMutex);
+        auto        it = gLatchedValues.find(const_cast<FConsoleVariable*>(var));
+        if (it == gLatchedValues.end()) {
+            return false;
+        }
+        out = it->second;
+        return true;
+    }
+
+    auto FConsoleVariable::ToStringFromValue(const FConsoleValue& value) -> FString {
+        if (auto s = value.TryGet<FString>()) {
+            return *s;
+        }
+        if (auto b = value.TryGet<bool>()) {
+            return ToFStringScalar(*b);
+        }
+
+#define AE_CVAR_TRY_STRING(Type)         \
+    if (auto v = value.TryGet<Type>()) { \
+        return ToFStringScalar(*v);      \
+    }
+
+        AE_CVAR_SCALAR_LIST(AE_CVAR_TRY_STRING)
+#undef AE_CVAR_TRY_STRING
+        return FString();
     }
 
     size_t FConsoleVariable::FStringHash::operator()(const FString& s) const noexcept {

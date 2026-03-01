@@ -1187,6 +1187,7 @@ namespace AltinaEngine::Launch {
                     return;
 
                 device->BeginFrame(frameIndex);
+                Core::Console::LatchRenderThreadCVars();
 
                 if (viewport && width > 0U && height > 0U) {
                     if (shouldResize) {

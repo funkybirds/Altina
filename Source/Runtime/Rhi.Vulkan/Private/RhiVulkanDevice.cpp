@@ -21,7 +21,6 @@
 using AltinaEngine::Move;
 
 namespace AltinaEngine::Rhi {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     namespace {
         [[nodiscard]] auto SelectQueueFamilyIndex(VkPhysicalDevice physical, VkQueueFlags required,
             VkQueueFlags preferExclusive) noexcept -> u32 {
@@ -869,8 +868,4 @@ namespace AltinaEngine::Rhi {
         mState->mUploadManager.EndFrame();
     }
 
-#else
-    // Real implementation compiled out when Vulkan is unavailable. Stubs live in
-    // RhiVulkanStubs.cpp.
-#endif
 } // namespace AltinaEngine::Rhi

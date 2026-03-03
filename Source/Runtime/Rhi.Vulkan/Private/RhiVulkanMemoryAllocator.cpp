@@ -1,7 +1,6 @@
 #include "RhiVulkanMemoryAllocator.h"
 
 namespace AltinaEngine::Rhi::Vulkan::Detail {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     FVulkanMemoryAllocator::~FVulkanMemoryAllocator() { Shutdown(); }
 
     void FVulkanMemoryAllocator::Init(VkPhysicalDevice physicalDevice, VkDevice device) {
@@ -158,5 +157,4 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         }
         allocation = {};
     }
-#endif
 } // namespace AltinaEngine::Rhi::Vulkan::Detail

@@ -5,9 +5,7 @@
 #include "Logging/Log.h"
 #include "Types/Traits.h"
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
-    #include <vulkan/vulkan.h>
-#endif
+#include <vulkan/vulkan.h>
 
 namespace AltinaEngine::Rhi::Vulkan::Detail {
     using AltinaEngine::Rhi::ERhiBlendFactor;
@@ -21,7 +19,6 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
     using AltinaEngine::Rhi::ERhiResourceState;
     using AltinaEngine::Rhi::ERhiTextureBindFlags;
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     [[nodiscard]] VkFormat            ToVkFormat(ERhiFormat format) noexcept;
     [[nodiscard]] VkImageAspectFlags  ToVkAspectFlags(ERhiFormat format) noexcept;
     [[nodiscard]] VkImageUsageFlags   ToVkImageUsage(ERhiTextureBindFlags flags) noexcept;
@@ -44,5 +41,4 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
     [[nodiscard]] inline bool   IsDepthFormat(ERhiFormat format) noexcept {
         return format == ERhiFormat::D24UnormS8Uint || format == ERhiFormat::D32Float;
     }
-#endif
 } // namespace AltinaEngine::Rhi::Vulkan::Detail

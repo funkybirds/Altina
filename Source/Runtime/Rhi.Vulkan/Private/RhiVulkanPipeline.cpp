@@ -8,7 +8,6 @@
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     namespace {
         [[nodiscard]] auto ToVkStageFlags(ERhiShaderStageFlags visibility) noexcept
             -> VkShaderStageFlags {
@@ -619,11 +618,11 @@ namespace AltinaEngine::Rhi {
         VkDynamicState dynStates[3]  = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
         u32            dynStateCount = 2U;
         if (mState->mSupportsExtendedDynamicState) {
-    #if defined(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT)
+#if defined(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT)
             dynStates[dynStateCount++] = VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT;
-    #else
+#else
             dynStates[dynStateCount++] = VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY;
-    #endif
+#endif
         }
         VkPipelineDynamicStateCreateInfo dyn{};
         dyn.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -719,7 +718,4 @@ namespace AltinaEngine::Rhi {
         return (mState != nullptr) ? mState->mLayout : VK_NULL_HANDLE;
     }
 
-#else
-    // Compiled out when Vulkan is unavailable. Stubs live in RhiVulkanStubs.cpp.
-#endif
 } // namespace AltinaEngine::Rhi

@@ -19,7 +19,6 @@ namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::TVector;
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     namespace {
         [[nodiscard]] auto ToVkIndexType(ERhiIndexType type) noexcept -> VkIndexType {
             return (type == ERhiIndexType::Uint16) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
@@ -216,20 +215,16 @@ namespace AltinaEngine::Rhi {
             return true;
         }
     } // namespace
-#endif
     struct FRhiVulkanCommandPool::FState {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         VkDevice      mDevice      = VK_NULL_HANDLE;
         VkCommandPool mPool        = VK_NULL_HANDLE;
         u32           mQueueFamily = 0U;
-#endif
     };
 
     FRhiVulkanCommandPool::FRhiVulkanCommandPool(
         const FRhiCommandPoolDesc& desc, VkDevice device, u32 queueFamilyIndex, bool transient)
         : FRhiCommandPool(desc) {
         mState = new FState{};
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (mState) {
             mState->mDevice      = device;
             mState->mQueueFamily = queueFamilyIndex;
@@ -242,29 +237,18 @@ namespace AltinaEngine::Rhi {
             }
             vkCreateCommandPool(device, &info, nullptr, &mState->mPool);
         }
-#else
-        (void)device;
-        (void)queueFamilyIndex;
-        (void)transient;
-#endif
     }
 
     FRhiVulkanCommandPool::~FRhiVulkanCommandPool() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (mState && mState->mDevice && mState->mPool) {
             vkDestroyCommandPool(mState->mDevice, mState->mPool, nullptr);
         }
-#endif
         delete mState;
         mState = nullptr;
     }
 
     auto FRhiVulkanCommandPool::GetNativePool() const noexcept -> VkCommandPool {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         return mState ? mState->mPool : VK_NULL_HANDLE;
-#else
-        return nullptr;
-#endif
     }
 
     auto FRhiVulkanCommandPool::GetQueueFamilyIndex() const noexcept -> u32 {
@@ -272,21 +256,17 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandPool::Reset() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (mState && mState->mDevice && mState->mPool) {
             vkResetCommandPool(mState->mDevice, mState->mPool, 0);
         }
-#endif
     }
 
     struct FRhiVulkanCommandList::FState {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         VkDevice                    mDevice = VK_NULL_HANDLE;
         VkCommandPool               mPool   = VK_NULL_HANDLE;
         VkCommandBuffer             mBuffer = VK_NULL_HANDLE;
         VkCommandBufferLevel        mLevel  = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         TVector<FRhiVulkanTexture*> mTouchedTextures;
-#endif
     };
 
     FRhiVulkanCommandList::FRhiVulkanCommandList(const FRhiCommandListDesc& desc)
@@ -294,45 +274,32 @@ namespace AltinaEngine::Rhi {
         // TODO: (Require Refactor, Manual, Unidentified) Potential memory leak by allocating cmd
         // bufs
         // TODO: (Require Refactor, Manual, CodeStyle) DO NOT USE NEW
-        mState = new FState{};
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        mState         = new FState{};
         mState->mLevel = (desc.mListType == ERhiCommandListType::Bundle)
             ? VK_COMMAND_BUFFER_LEVEL_SECONDARY
             : VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-#endif
     }
 
     FRhiVulkanCommandList::~FRhiVulkanCommandList() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (mState && mState->mDevice && mState->mPool && mState->mBuffer) {
             vkFreeCommandBuffers(mState->mDevice, mState->mPool, 1, &mState->mBuffer);
         }
-#endif
         delete mState;
         mState = nullptr;
     }
 
     auto FRhiVulkanCommandList::GetNativeCommandBuffer() const noexcept -> VkCommandBuffer {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         return (mState != nullptr) ? mState->mBuffer : VK_NULL_HANDLE;
-#else
-        return nullptr;
-#endif
     }
 
     void FRhiVulkanCommandList::SetNativeCommandBuffer(VkCommandBuffer buffer) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState) {
             return;
         }
         mState->mBuffer = buffer;
-#else
-        (void)buffer;
-#endif
     }
 
     void FRhiVulkanCommandList::Reset(FRhiCommandPool* pool) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         auto* vkPool = static_cast<FRhiVulkanCommandPool*>(pool);
         if (!mState || !vkPool) {
             return;
@@ -350,19 +317,15 @@ namespace AltinaEngine::Rhi {
         } else {
             vkResetCommandBuffer(mState->mBuffer, 0);
         }
-#endif
     }
 
     void FRhiVulkanCommandList::Close() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (mState && mState->mBuffer) {
             vkEndCommandBuffer(mState->mBuffer);
         }
-#endif
     }
 
     void FRhiVulkanCommandList::AddTouchedTexture(FRhiVulkanTexture* texture) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || texture == nullptr) {
             return;
         }
@@ -372,9 +335,6 @@ namespace AltinaEngine::Rhi {
             }
         }
         mState->mTouchedTextures.PushBack(texture);
-#else
-        (void)texture;
-#endif
     }
 
     auto FRhiVulkanCommandList::GetTouchedTextures() const noexcept
@@ -384,14 +344,11 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandList::ClearTouchedTextures() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (mState) {
             mState->mTouchedTextures.Clear();
         }
-#endif
     }
     struct FRhiVulkanCommandContext::FState {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         VkDevice                           mDevice                       = VK_NULL_HANDLE;
         VkCommandBuffer                    mCmd                          = VK_NULL_HANDLE;
         FRhiVulkanGraphicsPipeline*        mGraphicsPipeline             = nullptr;
@@ -418,7 +375,6 @@ namespace AltinaEngine::Rhi {
         TVector<VkFormat>                  mColorFormats;
         VkFormat                           mDepthFormat = VK_FORMAT_UNDEFINED;
         FRhiVulkanDevice*                  mOwner       = nullptr;
-#endif
     };
 
     FRhiVulkanCommandContext::FRhiVulkanCommandContext(const FRhiCommandContextDesc& desc,
@@ -426,7 +382,6 @@ namespace AltinaEngine::Rhi {
         FRhiCommandListRef commandList)
         : FRhiCommandContext(desc), mPool(Move(pool)), mCommandList(Move(commandList)) {
         mState = new FState{};
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (mState) {
             mState->mDevice = device;
             mState->mOwner  = owner;
@@ -437,10 +392,6 @@ namespace AltinaEngine::Rhi {
                 mState->mQueueFamilyIndex             = owner->GetQueueFamilyIndex(desc.mQueueType);
             }
         }
-#else
-        (void)device;
-        (void)owner;
-#endif
     }
 
     FRhiVulkanCommandContext::~FRhiVulkanCommandContext() {
@@ -449,7 +400,6 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::Begin() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mDevice) {
             return;
         }
@@ -477,11 +427,9 @@ namespace AltinaEngine::Rhi {
         mState->mInRenderPass       = false;
         mState->mTopology           = ERhiPrimitiveTopology::TriangleList;
         mState->mAttachmentHash     = 0ULL;
-#endif
     }
 
     void FRhiVulkanCommandContext::End() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -489,7 +437,6 @@ namespace AltinaEngine::Rhi {
             RHIEndRenderPass();
         }
         vkEndCommandBuffer(mState->mCmd);
-#endif
     }
 
     auto FRhiVulkanCommandContext::GetCommandList() const noexcept -> FRhiCommandList* {
@@ -512,15 +459,10 @@ namespace AltinaEngine::Rhi {
     }
 
     auto FRhiVulkanCommandContext::GetNativeCommandBuffer() const noexcept -> VkCommandBuffer {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         return mState ? mState->mCmd : VK_NULL_HANDLE;
-#else
-        return nullptr;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHISetGraphicsPipeline(FRhiPipeline* pipeline) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -548,13 +490,9 @@ namespace AltinaEngine::Rhi {
                 mState->mBoundPipeline = pipelineHandle;
             }
         }
-#else
-        (void)pipeline;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHISetComputePipeline(FRhiPipeline* pipeline) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -574,13 +512,9 @@ namespace AltinaEngine::Rhi {
                 mState->mBoundPipeline = pipelineHandle;
             }
         }
-#else
-        (void)pipeline;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHISetPrimitiveTopology(ERhiPrimitiveTopology topology) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -598,13 +532,9 @@ namespace AltinaEngine::Rhi {
                 mState->mBoundPipeline = pipelineHandle;
             }
         }
-#else
-        (void)topology;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -615,14 +545,9 @@ namespace AltinaEngine::Rhi {
             buffer         = vkBuffer ? vkBuffer->GetNativeBuffer() : VK_NULL_HANDLE;
         }
         vkCmdBindVertexBuffers(mState->mCmd, slot, 1, &buffer, &offset);
-#else
-        (void)slot;
-        (void)view;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHISetIndexBuffer(const FRhiIndexBufferView& view) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -635,13 +560,9 @@ namespace AltinaEngine::Rhi {
             vkCmdBindIndexBuffer(mState->mCmd, buffer, static_cast<VkDeviceSize>(view.mOffsetBytes),
                 ToVkIndexType(view.mIndexType));
         }
-#else
-        (void)view;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHISetViewport(const FRhiViewportRect& viewport) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -653,13 +574,9 @@ namespace AltinaEngine::Rhi {
         vp.minDepth = viewport.mMinDepth;
         vp.maxDepth = viewport.mMaxDepth;
         vkCmdSetViewport(mState->mCmd, 0, 1, &vp);
-#else
-        (void)viewport;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHISetScissor(const FRhiScissorRect& scissor) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -669,13 +586,9 @@ namespace AltinaEngine::Rhi {
         rect.extent.width  = scissor.mWidth;
         rect.extent.height = scissor.mHeight;
         vkCmdSetScissor(mState->mCmd, 0, 1, &rect);
-#else
-        (void)scissor;
-#endif
     }
     void FRhiVulkanCommandContext::RHISetRenderTargets(
         u32 colorTargetCount, FRhiTexture* const* colorTargets, FRhiTexture* depthTarget) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -736,15 +649,9 @@ namespace AltinaEngine::Rhi {
         passDesc.mColorAttachments = colorAttachments.IsEmpty() ? nullptr : colorAttachments.Data();
         passDesc.mDepthStencilAttachment = depthView ? &depthAttachment : nullptr;
         RHIBeginRenderPass(passDesc);
-#else
-        (void)colorTargetCount;
-        (void)colorTargets;
-        (void)depthTarget;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHIBeginRenderPass(const FRhiRenderPassDesc& desc) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -906,13 +813,9 @@ namespace AltinaEngine::Rhi {
                 mState->mBoundPipeline = pipelineHandle;
             }
         }
-#else
-        (void)desc;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHIEndRenderPass() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd || !mState->mInRenderPass) {
             return;
         }
@@ -930,11 +833,9 @@ namespace AltinaEngine::Rhi {
             }
         }
         mState->mInRenderPass = false;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHIBeginTransition(const FRhiTransitionCreateInfo& info) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd || info.mTransitionCount == 0U
             || info.mTransitions == nullptr) {
             return;
@@ -1078,13 +979,9 @@ namespace AltinaEngine::Rhi {
                 }
             }
         }
-#else
-        (void)info;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHIEndTransition(const FRhiTransitionCreateInfo& info) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd || info.mTransitionCount == 0U
             || info.mTransitions == nullptr) {
             return;
@@ -1217,14 +1114,10 @@ namespace AltinaEngine::Rhi {
                 }
             }
         }
-#else
-        (void)info;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHIClearColor(
         FRhiTexture* colorTarget, const FRhiClearColor& color) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd || colorTarget == nullptr) {
             return;
         }
@@ -1252,15 +1145,10 @@ namespace AltinaEngine::Rhi {
 
         vkCmdClearColorImage(
             mState->mCmd, vkTex->GetNativeImage(), VK_IMAGE_LAYOUT_GENERAL, &clear, 1, &range);
-#else
-        (void)colorTarget;
-        (void)color;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHISetBindGroup(
         u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets, u32 dynamicOffsetCount) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd || group == nullptr) {
             return;
         }
@@ -1299,56 +1187,29 @@ namespace AltinaEngine::Rhi {
         VkDescriptorSet set = vkGroup->GetDescriptorSet();
         vkCmdBindDescriptorSets(
             mState->mCmd, bindPoint, layout, setIndex, 1, &set, dynamicOffsetCount, dynamicOffsets);
-#else
-        (void)setIndex;
-        (void)group;
-        (void)dynamicOffsets;
-        (void)dynamicOffsetCount;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHIDraw(
         u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
         vkCmdDraw(mState->mCmd, vertexCount, instanceCount, firstVertex, firstInstance);
-#else
-        (void)vertexCount;
-        (void)instanceCount;
-        (void)firstVertex;
-        (void)firstInstance;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHIDrawIndexed(
         u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
         vkCmdDrawIndexed(
             mState->mCmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-#else
-        (void)indexCount;
-        (void)instanceCount;
-        (void)firstIndex;
-        (void)vertexOffset;
-        (void)firstInstance;
-#endif
     }
 
     void FRhiVulkanCommandContext::RHIDispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mCmd) {
             return;
         }
         vkCmdDispatch(mState->mCmd, groupCountX, groupCountY, groupCountZ);
-#else
-        (void)groupCountX;
-        (void)groupCountY;
-        (void)groupCountZ;
-#endif
     }
 } // namespace AltinaEngine::Rhi

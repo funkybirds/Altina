@@ -15,7 +15,6 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         bool mExtendedDynamicState1 = false; // VK_EXT_extended_dynamic_state (primitive topology)
     };
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     struct FVulkanDeviceCreateInfo {
         // Enabled feature chain that is safe to reference until vkCreateDevice returns.
         VkPhysicalDeviceFeatures2                       mFeatures2{};
@@ -35,12 +34,4 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
     // Builds the vkCreateDevice pNext feature chain and enabled device extension list.
     // Keep this logic centralized to avoid "queried but never enabled" feature mismatches.
     void BuildDeviceCreateInfo(VkPhysicalDevice physical, FVulkanDeviceCreateInfo& out) noexcept;
-#else
-    struct FVulkanDeviceCreateInfo {
-        Container::TVector<const char*> mEnabledExtensions;
-        FVulkanDeviceEnabledFeatures    mEnabled{};
-    };
-
-    inline void BuildDeviceCreateInfo(VkPhysicalDevice, FVulkanDeviceCreateInfo&) noexcept {}
-#endif
 } // namespace AltinaEngine::Rhi::Vulkan::Detail

@@ -8,7 +8,6 @@
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     void FRhiVulkanCommandSubmitter::FSubmitQueue::Push(FSubmitWork&& work) {
         {
             FScopedLock lock(mMutex);
@@ -352,5 +351,4 @@ namespace AltinaEngine::Rhi {
         }
         mSubmitter->Enqueue(Move(work));
     }
-#endif
 } // namespace AltinaEngine::Rhi

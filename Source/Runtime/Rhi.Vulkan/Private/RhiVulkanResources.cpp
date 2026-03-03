@@ -7,7 +7,6 @@
 #include "Rhi/RhiInit.h"
 
 namespace AltinaEngine::Rhi {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     namespace {
         [[nodiscard]] auto GetAllocator() noexcept -> Vulkan::Detail::FVulkanMemoryAllocator* {
             auto* device = static_cast<FRhiVulkanDevice*>(RHIGetDevice());
@@ -651,7 +650,4 @@ namespace AltinaEngine::Rhi {
         return (mState != nullptr) ? mState->mView : VK_NULL_HANDLE;
     }
 
-#else
-    // Compiled out when Vulkan is unavailable. Stubs live in RhiVulkanStubs.cpp.
-#endif
 } // namespace AltinaEngine::Rhi

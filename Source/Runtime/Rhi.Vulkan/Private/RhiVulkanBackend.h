@@ -19,7 +19,6 @@ namespace AltinaEngine::Rhi {
     using Core::Threading::FMutex;
     using Core::Threading::FScopedLock;
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     class FRhiVulkanCommandList;
     class FRhiVulkanViewport;
     class FRhiVulkanDevice;
@@ -141,5 +140,4 @@ namespace AltinaEngine::Rhi {
         FRhiVulkanCommandSubmitter* mSubmitter = nullptr;
         FRhiVulkanDevice*           mDevice    = nullptr;
     };
-#endif
 } // namespace AltinaEngine::Rhi

@@ -8,7 +8,7 @@
 #include "Logging/Log.h"
 #include "Math/Common.h"
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE && AE_PLATFORM_WIN
+#if AE_PLATFORM_WIN
     #ifndef WIN32_LEAN_AND_MEAN
         #define WIN32_LEAN_AND_MEAN
     #endif
@@ -24,7 +24,6 @@
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     namespace Container = Core::Container;
     using Container::TVector;
 
@@ -255,7 +254,7 @@ namespace AltinaEngine::Rhi {
             return true;
         };
 
-    #if AE_PLATFORM_WIN
+#if AE_PLATFORM_WIN
         HWND hwnd = reinterpret_cast<HWND>(desc.mNativeHandle);
         if (hwnd == nullptr) {
             LogError(TEXT("RHI(Vulkan): Viewport requires a valid HWND."));
@@ -276,9 +275,9 @@ namespace AltinaEngine::Rhi {
         if (!createSwapchain(desc)) {
             LogError(TEXT("RHI(Vulkan): Failed to create swapchain."));
         }
-    #else
+#else
         (void)desc;
-    #endif
+#endif
     }
 
     FRhiVulkanViewport::~FRhiVulkanViewport() {
@@ -317,7 +316,6 @@ namespace AltinaEngine::Rhi {
 
     void FRhiVulkanViewport::Resize(u32 width, u32 height) {
         UpdateExtent(width, height);
-    #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState) {
             return;
         }
@@ -468,14 +466,9 @@ namespace AltinaEngine::Rhi {
 
         mState->mAcquired   = false;
         mState->mImageIndex = 0U;
-    #else
-        (void)width;
-        (void)height;
-    #endif
     }
 
     auto FRhiVulkanViewport::GetBackBuffer() const noexcept -> FRhiTexture* {
-    #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || !mState->mSwapchain || mState->mImages.IsEmpty()) {
             return nullptr;
         }
@@ -502,21 +495,16 @@ namespace AltinaEngine::Rhi {
             return nullptr;
         }
         return mState->mBackBuffers[mState->mImageIndex].Get();
-    #else
-        return nullptr;
-    #endif
     }
 
     void FRhiVulkanViewport::Present(const FRhiPresentInfo& info) {
         (void)info;
-    #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState) {
             return;
         }
         // Actual present is executed by the queue submit thread via FRhiVulkanQueue::Present.
         mState->mFrameIndex++;
         mState->mAcquired = false;
-    #endif
     }
 
     auto FRhiVulkanViewport::GetNativeSwapchain() const noexcept -> VkSwapchainKHR {
@@ -545,7 +533,4 @@ namespace AltinaEngine::Rhi {
         return (mState != nullptr) ? mState->mImageIndex : 0U;
     }
 
-#else
-    // Compiled out when Vulkan is unavailable. Stubs live in RhiVulkanStubs.cpp.
-#endif
 } // namespace AltinaEngine::Rhi

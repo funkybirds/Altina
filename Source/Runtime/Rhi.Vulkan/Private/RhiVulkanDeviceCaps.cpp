@@ -3,7 +3,6 @@
 #include <cstring>
 
 namespace AltinaEngine::Rhi::Vulkan::Detail {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     namespace {
         [[nodiscard]] auto HasDeviceExtension(
             const Core::Container::TVector<VkExtensionProperties>& props, const char* name) noexcept
@@ -208,9 +207,4 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         }
         appendFeature(&out.mExtDyn);
     }
-#else
-    void BuildDeviceCreateInfo(VkPhysicalDevice, FVulkanDeviceCreateInfo& out) noexcept {
-        out = {};
-    }
-#endif
 } // namespace AltinaEngine::Rhi::Vulkan::Detail

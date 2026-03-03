@@ -8,9 +8,7 @@
 #include "Types/Traits.h"
 
 #include "RhiVulkanInternal.h"
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
-    #include "RhiVulkanDeviceCaps.h"
-#endif
+#include "RhiVulkanDeviceCaps.h"
 #include "CoreMinimal.h"
 #include "RhiVulkanCommon.h"
 #include "Utility/Assert.h"
@@ -27,7 +25,6 @@ namespace AltinaEngine::Rhi {
     using Container::MakeUnique;
     using Container::TVector;
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     struct FRhiVulkanContextState {
         VkInstance               mInstance          = VK_NULL_HANDLE;
         VkDebugUtilsMessengerEXT mDebugMessenger    = VK_NULL_HANDLE;
@@ -36,13 +33,9 @@ namespace AltinaEngine::Rhi {
         TVector<const char*>     mEnabledLayers;
         TVector<const char*>     mEnabledExtensions;
     };
-#else
-    struct FRhiVulkanContextState {};
-#endif
 
     namespace {
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         auto GetVulkanVersion() -> u32 {
             u32   version   = VK_API_VERSION_1_0;
             auto* enumerate = SafeWrapper::GetInstanceProcAddrTs<PFN_vkEnumerateInstanceVersion>(
@@ -54,13 +47,13 @@ namespace AltinaEngine::Rhi {
         }
 
         auto PickApiVersion(u32 available) -> u32 {
-    #if defined(VK_API_VERSION_1_4)
+#if defined(VK_API_VERSION_1_4)
             const u32 preferred = VK_API_VERSION_1_4;
-    #elif defined(VK_API_VERSION_1_3)
+#elif defined(VK_API_VERSION_1_3)
             const u32 preferred = VK_API_VERSION_1_3;
-    #else
+#else
             const u32 preferred = VK_API_VERSION_1_2;
-    #endif
+#endif
             return (available < preferred) ? available : preferred;
         }
 
@@ -195,14 +188,9 @@ namespace AltinaEngine::Rhi {
         private:
             VkPhysicalDevice mPhysical = VK_NULL_HANDLE;
         };
-#endif
     } // namespace
 
-    FRhiVulkanContext::FRhiVulkanContext() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
-        mState = MakeUnique<FRhiVulkanContextState>();
-#endif
-    }
+    FRhiVulkanContext::FRhiVulkanContext() { mState = MakeUnique<FRhiVulkanContextState>(); }
 
     FRhiVulkanContext::~FRhiVulkanContext() {
         Shutdown();
@@ -217,7 +205,6 @@ namespace AltinaEngine::Rhi {
     }
 
     auto FRhiVulkanContext::InitializeBackend(const FRhiInitDesc& desc) -> bool {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState) {
             mState = MakeUnique<FRhiVulkanContextState>();
         }
@@ -262,9 +249,9 @@ namespace AltinaEngine::Rhi {
         }
 
         mState->mEnabledExtensions.PushBack(VK_KHR_SURFACE_EXTENSION_NAME);
-    #if AE_PLATFORM_WIN
+#if AE_PLATFORM_WIN
         mState->mEnabledExtensions.PushBack(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-    #endif
+#endif
         if ((desc.mEnableDebugLayer || desc.mEnableDebugNames)
             && HasExtension(exts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
             mState->mEnabledExtensions.PushBack(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -292,15 +279,9 @@ namespace AltinaEngine::Rhi {
             VK_VERSION_MAJOR(mState->mInstanceVersion), VK_VERSION_MINOR(mState->mInstanceVersion),
             VK_VERSION_PATCH(mState->mInstanceVersion));
         return true;
-#else
-        (void)desc;
-        LogWarning(TEXT("RHI(Vulkan): Vulkan not available on this build."));
-        return false;
-#endif
     }
 
     void FRhiVulkanContext::ShutdownBackend() {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState) {
             return;
         }
@@ -314,12 +295,10 @@ namespace AltinaEngine::Rhi {
         }
         mState->mEnabledExtensions.Clear();
         mState->mEnabledLayers.Clear();
-#endif
     }
 
     void FRhiVulkanContext::EnumerateAdaptersInternal(TVector<TShared<FRhiAdapter>>& outAdapters) {
         outAdapters.Clear();
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         Assert(mState != nullptr, TEXT("RHI.Vulkan"), "Device lost while enumerating adapters");
         Assert(mState->mInstance != VK_NULL_HANDLE, TEXT("RHI.Vulkan"),
             "Device lost while enumerating adapters");
@@ -353,14 +332,10 @@ namespace AltinaEngine::Rhi {
 
             outAdapters.PushBack(MakeSharedAs<FRhiAdapter, FRhiVulkanAdapter>(desc, physical));
         }
-#else
-        (void)outAdapters;
-#endif
     }
 
     auto FRhiVulkanContext::CreateDeviceInternal(
         const TShared<FRhiAdapter>& adapter, const FRhiDeviceDesc& desc) -> TShared<FRhiDevice> {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (!mState || mState->mInstance == VK_NULL_HANDLE || !adapter) {
             return {};
         }
@@ -459,11 +434,6 @@ namespace AltinaEngine::Rhi {
             mState->mInstance, physical, device, caps.mEnabled.mSync2,
             caps.mEnabled.mDynamicRendering, caps.mEnabled.mTimelineSemaphore,
             caps.mEnabled.mExtendedDynamicState1);
-#else
-        (void)adapter;
-        (void)desc;
-        return {};
-#endif
     }
 
 } // namespace AltinaEngine::Rhi

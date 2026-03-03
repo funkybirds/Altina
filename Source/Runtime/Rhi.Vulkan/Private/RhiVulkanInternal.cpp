@@ -1,7 +1,6 @@
 #include "RhiVulkanInternal.h"
 
 namespace AltinaEngine::Rhi::Vulkan::Detail {
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     VkFormat ToVkFormat(ERhiFormat format) noexcept {
         switch (format) {
             case ERhiFormat::R8G8B8A8Unorm:
@@ -258,5 +257,4 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         }
         return mapping;
     }
-#endif
 } // namespace AltinaEngine::Rhi::Vulkan::Detail

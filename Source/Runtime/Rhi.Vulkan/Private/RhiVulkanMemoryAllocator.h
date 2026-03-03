@@ -15,7 +15,6 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
     using Core::Threading::FMutex;
     using Core::Threading::FScopedLock;
 
-#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
     struct FVulkanMemoryAllocation {
         VkDeviceMemory     mMemory          = VK_NULL_HANDLE;
         u64                mOffset          = 0ULL;
@@ -77,5 +76,4 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         static constexpr u64             kDefaultHostPoolSize   = 64ULL * 1024ULL * 1024ULL;
         static constexpr u64             kDefaultMinBlockSize   = 256ULL;
     };
-#endif
 } // namespace AltinaEngine::Rhi::Vulkan::Detail

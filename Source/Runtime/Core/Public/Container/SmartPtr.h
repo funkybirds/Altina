@@ -14,6 +14,26 @@ using AltinaEngine::Core::Threading::TAtomic;
 
 namespace AltinaEngine::Core::Container {
 
+    template <typename T, typename D> class TOwner;
+    template <typename T> class TShared;
+    template <typename T> class TPolymorphicDeleter;
+    template <typename T, typename Alloc> struct TAllocatorDeleter;
+
+    template <typename T, typename... Args>
+    auto MakeUnique(Args&&... args) -> TOwner<T, TDefaultDeleter<T>>;
+    template <typename TBase, typename TDerived, typename... Args>
+        requires CClassBaseOf<TBase, TDerived>
+    auto MakeUniqueAs(Args&&... args) -> TOwner<TBase, TPolymorphicDeleter<TBase>>;
+    template <typename T, typename Alloc, typename... Args>
+    auto AllocateUnique(Alloc& alloc, Args&&... args) -> TOwner<T, TAllocatorDeleter<T, Alloc>>;
+
+    template <typename T, typename... Args> auto MakeShared(Args&&... args) -> TShared<T>;
+    template <typename T, typename Alloc, typename... Args>
+    auto AllocateShared(Alloc& alloc, Args&&... args) -> TShared<T>;
+    template <typename TBase, typename TDerived, typename... Args>
+        requires CClassBaseOf<TBase, TDerived>
+    auto MakeSharedAs(Args&&... args) -> TShared<TBase>;
+
     template <typename T, typename D = TDefaultDeleter<T>> class TOwner {
     public:
         using TPointer     = T*;
@@ -23,10 +43,9 @@ namespace AltinaEngine::Core::Container {
         constexpr TOwner() noexcept : mPtr(nullptr) {}
         constexpr TOwner(decltype(nullptr)) noexcept : mPtr(nullptr) {}
 
-        explicit TOwner(TPointer p) noexcept : mPtr(p) {}
-
-        TOwner(TPointer p, const D& d) noexcept : mPtr(p), mDeleter(d) {}
-        TOwner(TPointer p, D&& d) noexcept : mPtr(p), mDeleter(Move(d)) {}
+        explicit TOwner(TPointer p) noexcept    = delete;
+        TOwner(TPointer p, const D& d) noexcept = delete;
+        TOwner(TPointer p, D&& d) noexcept      = delete;
 
         TOwner(TOwner&& Other) noexcept
             : mPtr(Other.Release()), mDeleter(Forward<D>(Other.GetDeleter())) {}
@@ -81,6 +100,21 @@ namespace AltinaEngine::Core::Container {
         auto     operator->() const noexcept -> TPointer { return mPtr; }
 
     private:
+        struct FFactoryTag {};
+
+        explicit TOwner(FFactoryTag, TPointer p) noexcept : mPtr(p) {}
+        TOwner(FFactoryTag, TPointer p, const D& d) noexcept : mPtr(p), mDeleter(d) {}
+        TOwner(FFactoryTag, TPointer p, D&& d) noexcept : mPtr(p), mDeleter(Move(d)) {}
+
+        template <typename U, typename... Args>
+        friend auto MakeUnique(Args&&... args) -> TOwner<U, TDefaultDeleter<U>>;
+        template <typename TBase, typename TDerived, typename... Args>
+            requires CClassBaseOf<TBase, TDerived>
+        friend auto MakeUniqueAs(Args&&... args) -> TOwner<TBase, TPolymorphicDeleter<TBase>>;
+        template <typename U, typename Alloc, typename... Args>
+        friend auto AllocateUnique(Alloc& alloc, Args&&... args)
+            -> TOwner<U, TAllocatorDeleter<U, Alloc>>;
+
         TPointer mPtr;
         D        mDeleter;
     };
@@ -118,10 +152,9 @@ namespace AltinaEngine::Core::Container {
         constexpr TOwner() noexcept : mPtr(nullptr) {}
         constexpr TOwner(decltype(nullptr)) noexcept : mPtr(nullptr) {}
 
-        explicit TOwner(TPointer p) noexcept : mPtr(p) {}
-
-        TOwner(TPointer p, const D& d) noexcept : mPtr(p), mDeleter(d) {}
-        TOwner(TPointer p, D&& d) noexcept : mPtr(p), mDeleter(Move(d)) {}
+        explicit TOwner(TPointer p) noexcept    = delete;
+        TOwner(TPointer p, const D& d) noexcept = delete;
+        TOwner(TPointer p, D&& d) noexcept      = delete;
 
         TOwner(TOwner&& Other) noexcept
             : mPtr(Other.Release()), mDeleter(Forward<D>(Other.GetDeleter())) {}
@@ -198,9 +231,9 @@ namespace AltinaEngine::Core::Container {
             TAllocator<T> allocator;
             T*            ptr = TAllocatorTraits<TAllocator<T>>::Allocate(allocator, 1);
             TAllocatorTraits<TAllocator<T>>::Construct(allocator, ptr, Forward<Args>(args)...);
-            return TOwner<T>(ptr);
+            return TOwner<T>(typename TOwner<T>::FFactoryTag{}, ptr);
         } else {
-            return TOwner<T>(new T(Forward<Args>(args)...));
+            return TOwner<T>(typename TOwner<T>::FFactoryTag{}, new T(Forward<Args>(args)...));
         }
     }
 
@@ -259,7 +292,8 @@ namespace AltinaEngine::Core::Container {
         }
 
         return TOwner<TBase, TPolymorphicDeleter<TBase>>(
-            ptr, TPolymorphicDeleter<TBase>(&DestroyPolymorphic<TBase, TDerived>));
+            typename TOwner<TBase, TPolymorphicDeleter<TBase>>::FFactoryTag{}, ptr,
+            TPolymorphicDeleter<TBase>(&DestroyPolymorphic<TBase, TDerived>));
     }
 
     template <typename T, typename Alloc> struct TAllocatorDeleter {
@@ -279,7 +313,9 @@ namespace AltinaEngine::Core::Container {
     auto AllocateUnique(Alloc& alloc, Args&&... args) -> TOwner<T, TAllocatorDeleter<T, Alloc>> {
         T* ptr = TAllocatorTraits<Alloc>::Allocate(alloc, 1);
         TAllocatorTraits<Alloc>::Construct(alloc, ptr, Forward<Args>(args)...);
-        return TOwner<T, TAllocatorDeleter<T, Alloc>>(ptr, TAllocatorDeleter<T, Alloc>(alloc));
+        return TOwner<T, TAllocatorDeleter<T, Alloc>>(
+            typename TOwner<T, TAllocatorDeleter<T, Alloc>>::FFactoryTag{}, ptr,
+            TAllocatorDeleter<T, Alloc>(alloc));
     }
 
     class FSharedControlBlock {
@@ -341,14 +377,8 @@ namespace AltinaEngine::Core::Container {
             Other.mControl = nullptr;
         }
 
-        explicit TShared(TPointer InPtr) : TShared(InPtr, TDefaultDeleter<TElementType>{}) {}
-
-        template <typename D>
-        explicit TShared(TPointer InPtr, D&& InDeleter) : mPtr(InPtr), mControl(nullptr) {
-            if (mPtr) {
-                InitializeControlBlock(Forward<D>(InDeleter));
-            }
-        }
+        explicit TShared(TPointer InPtr)                                      = delete;
+        template <typename D> explicit TShared(TPointer InPtr, D&& InDeleter) = delete;
 
         ~TShared() { Release(); }
 
@@ -408,6 +438,24 @@ namespace AltinaEngine::Core::Container {
         }
 
     private:
+        struct FFactoryTag {};
+
+        template <typename D>
+        explicit TShared(FFactoryTag, TPointer InPtr, D&& InDeleter)
+            : mPtr(InPtr), mControl(nullptr) {
+            if (mPtr) {
+                InitializeControlBlock(Forward<D>(InDeleter));
+            }
+        }
+
+        template <typename U, typename... Args>
+        friend auto MakeShared(Args&&... args) -> TShared<U>;
+        template <typename U, typename Alloc, typename... Args>
+        friend auto AllocateShared(Alloc& alloc, Args&&... args) -> TShared<U>;
+        template <typename TBase, typename TDerived, typename... Args>
+            requires CClassBaseOf<TBase, TDerived>
+        friend auto MakeSharedAs(Args&&... args) -> TShared<TBase>;
+
         template <typename D> using TDecayDeleter = TDecay<D>::TType;
 
         template <typename D> void InitializeControlBlock(D&& InDeleter) {
@@ -474,17 +522,11 @@ namespace AltinaEngine::Core::Container {
                 TAllocatorTraits<TAllocator<T>>::Deallocate(allocator, ptr, 1);
                 throw;
             }
-
-            TOwner<T, TAllocatorDeleter<T, TAllocator<T>>> owner(
-                ptr, TAllocatorDeleter<T, TAllocator<T>>(allocator));
-            TShared<T> result(owner.Get(), owner.GetDeleter());
-            owner.Release();
-            return result;
+            return TShared<T>(typename TShared<T>::FFactoryTag{}, ptr,
+                TAllocatorDeleter<T, TAllocator<T>>(allocator));
         } else {
-            TOwner<T>  Owner(new T(Forward<Args>(args)...));
-            TShared<T> Result(Owner.Get(), Owner.GetDeleter());
-            Owner.Release();
-            return Result;
+            return TShared<T>(typename TShared<T>::FFactoryTag{}, new T(Forward<Args>(args)...),
+                TDefaultDeleter<T>{});
         }
     }
 
@@ -498,10 +540,8 @@ namespace AltinaEngine::Core::Container {
             throw;
         }
 
-        TOwner<T, TAllocatorDeleter<T, Alloc>> owner(ptr, TAllocatorDeleter<T, Alloc>(alloc));
-        TShared<T>                             result(owner.Get(), owner.GetDeleter());
-        owner.Release();
-        return result;
+        return TShared<T>(
+            typename TShared<T>::FFactoryTag{}, ptr, TAllocatorDeleter<T, Alloc>(alloc));
     }
 
     template <typename TBase, typename TDerived, typename... Args>
@@ -531,6 +571,6 @@ namespace AltinaEngine::Core::Container {
             }
         };
 
-        return TShared<TBase>(ptr, FDeleter{ allocator });
+        return TShared<TBase>(typename TShared<TBase>::FFactoryTag{}, ptr, FDeleter{ allocator });
     } // namespace AltinaEngine::Core::Container
 } // namespace AltinaEngine::Core::Container

@@ -56,34 +56,9 @@ namespace AltinaEngine::Rhi {
 
         template <typename TBase, typename TDerived, typename... Args>
         auto MakeSharedAs(Args&&... args) -> TShared<TBase> {
-            using AllocatorType = TAllocator<TDerived>;
-            using Traits        = TAllocatorTraits<AllocatorType>;
-
             static_assert(std::is_base_of_v<TBase, TDerived>,
                 "MakeSharedAs requires TDerived to derive from TBase.");
-
-            AllocatorType allocator;
-            TDerived*     ptr = Traits::Allocate(allocator, 1);
-            try {
-                Traits::Construct(allocator, ptr, Forward<Args>(args)...);
-            } catch (...) {
-                Traits::Deallocate(allocator, ptr, 1);
-                throw;
-            }
-
-            struct FDeleter {
-                AllocatorType mAllocator;
-                void          operator()(TBase* basePtr) {
-                    if (!basePtr) {
-                        return;
-                    }
-                    auto* derivedPtr = static_cast<TDerived*>(basePtr);
-                    Traits::Destroy(mAllocator, derivedPtr);
-                    Traits::Deallocate(mAllocator, derivedPtr, 1);
-                }
-            };
-
-            return TShared<TBase>(ptr, FDeleter{ allocator });
+            return Container::MakeSharedAs<TBase, TDerived>(Forward<Args>(args)...);
         }
 
         class FRhiMockAdapter final : public FRhiAdapter {

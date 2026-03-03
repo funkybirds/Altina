@@ -58,32 +58,7 @@ namespace AltinaEngine::Asset {
 
         template <typename TDerived, typename... Args>
         auto MakeSharedAsset(Args&&... args) -> TShared<IAsset> {
-            using Container::kSmartPtrUseManagedAllocator;
-            using Container::TAllocator;
-            using Container::TAllocatorTraits;
-            using Container::TPolymorphicDeleter;
-
-            TDerived* ptr = nullptr;
-            if constexpr (kSmartPtrUseManagedAllocator) {
-                TAllocator<TDerived> allocator;
-                ptr = TAllocatorTraits<TAllocator<TDerived>>::Allocate(allocator, 1);
-                if (ptr == nullptr) {
-                    return {};
-                }
-
-                try {
-                    TAllocatorTraits<TAllocator<TDerived>>::Construct(
-                        allocator, ptr, Forward<Args>(args)...);
-                } catch (...) {
-                    TAllocatorTraits<TAllocator<TDerived>>::Deallocate(allocator, ptr, 1);
-                    return {};
-                }
-            } else {
-                ptr = new TDerived(Forward<Args>(args)...); // NOLINT
-            }
-
-            return TShared<IAsset>(
-                ptr, TPolymorphicDeleter<IAsset>(&DestroyPolymorphic<IAsset, TDerived>));
+            return Container::MakeSharedAs<IAsset, TDerived>(Forward<Args>(args)...);
         }
 
         auto ParseAssetTypeText(const FJsonValue* value, EAssetType& outType) -> bool {

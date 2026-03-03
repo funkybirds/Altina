@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 
+#include "Container/SmartPtr.h"
 #include "Container/String.h"
 #include "Container/HashMap.h"
 #include "Container/Vector.h"
@@ -43,8 +44,10 @@ namespace AltinaEngine::DebugGui {
     namespace {
         using AltinaEngine::Move;
         namespace Container = Core::Container;
+        using Container::DestroyPolymorphic;
         using Container::FString;
         using Container::FStringView;
+        using Container::MakeUniqueAs;
         using Container::TVector;
         using Core::Logging::ELogLevel;
         using Core::Logging::LogError;
@@ -2477,10 +2480,11 @@ namespace AltinaEngine::DebugGui {
     } // namespace
 
     auto CreateDebugGuiSystem() -> IDebugGuiSystem* {
-        return new FDebugGuiSystem(); // NOLINT
+        auto owner = MakeUniqueAs<IDebugGuiSystem, FDebugGuiSystem>();
+        return owner.Release();
     }
 
     void DestroyDebugGuiSystem(IDebugGuiSystem* sys) {
-        delete sys; // NOLINT
+        DestroyPolymorphic<IDebugGuiSystem, FDebugGuiSystem>(sys);
     }
 } // namespace AltinaEngine::DebugGui

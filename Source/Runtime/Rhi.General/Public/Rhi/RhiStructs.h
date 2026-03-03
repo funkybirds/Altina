@@ -434,6 +434,46 @@ namespace AltinaEngine::Rhi {
         u64                     mFenceValue = 0ULL;
     };
 
+    enum class ERhiCommandSectionState : u8 {
+        Pending = 0,
+        Active,
+        Enqueued,
+        HostSubmitted,
+        DeviceExecuted,
+        Recyclable
+    };
+
+    struct FRhiCommandSubmissionStamp {
+        FRhiSemaphore*     mSemaphore  = nullptr;
+        u64                mValue      = 0ULL;
+        u64                mSerial     = 0ULL;
+        u64                mFrameIndex = 0ULL;
+
+        [[nodiscard]] auto IsValid() const noexcept -> bool {
+            return (mSemaphore != nullptr) || (mSerial != 0ULL) || (mValue != 0ULL);
+        }
+    };
+
+    struct FRhiCommandHostSyncPoint {
+        u64                mSubmissionSerial = 0ULL;
+        u64                mSubsectionSerial = 0ULL;
+
+        [[nodiscard]] auto IsValid() const noexcept -> bool {
+            return (mSubmissionSerial != 0ULL) || (mSubsectionSerial != 0ULL);
+        }
+    };
+
+    struct FRhiCommandContextSubmitInfo {
+        const FRhiQueueWait*   mWaits                = nullptr;
+        u32                    mWaitCount            = 0U;
+        const FRhiQueueSignal* mSignals              = nullptr;
+        u32                    mSignalCount          = 0U;
+        FRhiFence*             mFence                = nullptr;
+        u64                    mFenceValue           = 0ULL;
+        FRhiSemaphore*         mSignalSemaphore      = nullptr;
+        u64                    mSignalSemaphoreValue = 0ULL;
+    };
+
     struct FRhiPresentInfo {
         FRhiViewport* mViewport     = nullptr;
         u32           mSyncInterval = 1U;

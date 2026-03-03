@@ -443,13 +443,11 @@ namespace AltinaEngine::Rhi {
             TShared<FRhiMockCounters> mCounters;
         };
 
-        class FRhiMockCommandContext final : public FRhiCommandContext, public IRhiCmdContextOps {
+        class FRhiMockCommandContext final : public FRhiCommandContext {
         public:
-            FRhiMockCommandContext(const FRhiCommandContextDesc& desc,
-                FRhiCommandListRef commandList, TShared<FRhiMockCounters> counters)
-                : FRhiCommandContext(desc)
-                , mCommandList(Move(commandList))
-                , mCounters(Move(counters)) {
+            FRhiMockCommandContext(
+                const FRhiCommandContextDesc& desc, TShared<FRhiMockCounters> counters)
+                : FRhiCommandContext(desc), mCounters(Move(counters)) {
                 if (mCounters) {
                     ++mCounters->mResourceCreated;
                 }
@@ -461,10 +459,24 @@ namespace AltinaEngine::Rhi {
                 }
             }
 
-            void               Begin() override {}
-            void               End() override {}
-            [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override {
-                return mCommandList.Get();
+            auto RHISubmitActiveSection(const FRhiCommandContextSubmitInfo& submitInfo)
+                -> FRhiCommandSubmissionStamp override {
+                for (u32 i = 0; i < submitInfo.mSignalCount; ++i) {
+                    const auto& signal = submitInfo.mSignals[i];
+                    if (signal.mSemaphore == nullptr || !signal.mSemaphore->IsTimeline()) {
+                        continue;
+                    }
+                    auto* mockSemaphore = static_cast<FRhiMockSemaphore*>(signal.mSemaphore);
+                    mockSemaphore->Signal(signal.mValue);
+                }
+                if (submitInfo.mFence != nullptr) {
+                    submitInfo.mFence->SignalCPU(submitInfo.mFenceValue);
+                }
+                FRhiCommandSubmissionStamp stamp{};
+                stamp.mSemaphore = submitInfo.mSignalSemaphore;
+                stamp.mValue     = submitInfo.mSignalSemaphoreValue;
+                stamp.mSerial    = 1ULL;
+                return stamp;
             }
 
             void RHIUpdateDynamicBufferDiscard(
@@ -505,7 +517,6 @@ namespace AltinaEngine::Rhi {
                 u32 /*groupCountX*/, u32 /*groupCountY*/, u32 /*groupCountZ*/) override {}
 
         private:
-            FRhiCommandListRef        mCommandList;
             TShared<FRhiMockCounters> mCounters;
         };
 
@@ -661,12 +672,7 @@ namespace AltinaEngine::Rhi {
 
             auto CreateCommandContext(const FRhiCommandContextDesc& desc)
                 -> FRhiCommandContextRef override {
-                FRhiCommandListDesc listDesc;
-                listDesc.mDebugName = desc.mDebugName;
-                listDesc.mQueueType = desc.mQueueType;
-                listDesc.mListType  = desc.mListType;
-                auto commandList    = MakeResource<FRhiMockCommandList>(listDesc, mCounters);
-                return MakeResource<FRhiMockCommandContext>(desc, Move(commandList), mCounters);
+                return MakeResource<FRhiMockCommandContext>(desc, mCounters);
             }
 
         private:

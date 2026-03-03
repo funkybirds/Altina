@@ -112,23 +112,22 @@ TEST_CASE("Rhi.Vulkan.Smoke.InitDeviceAndDispatch") {
         ctxDesc.mQueueType = ERhiQueueType::Compute;
         auto cmd           = device->CreateCommandContext(ctxDesc);
         REQUIRE(cmd.Get() != nullptr);
-        auto* ops = AltinaEngine::CheckedCast<AltinaEngine::Rhi::IRhiCmdContextOps*>(cmd.Get());
+        auto* ops = static_cast<AltinaEngine::Rhi::IRhiCmdContextOps*>(cmd.Get());
         REQUIRE(ops != nullptr);
 
-        cmd->Begin();
         ops->RHISetComputePipeline(pipeline.Get());
         ops->RHIDispatch(1, 1, 1);
-        cmd->End();
+        cmd->RHIFlushContextDevice({});
 
         auto queue = device->GetQueue(ERhiQueueType::Compute);
         REQUIRE(queue.Get() != nullptr);
-        AltinaEngine::Rhi::FRhiCommandList* list = cmd->GetCommandList();
-        REQUIRE(list != nullptr);
-        AltinaEngine::Rhi::FRhiSubmitInfo submit{};
-        submit.mCommandLists     = &list;
-        submit.mCommandListCount = 1U;
-        queue->Submit(submit);
         queue->WaitIdle();
+
+        cmd.Reset();
+        pipeline.Reset();
+        layout.Reset();
+        shader.Reset();
+        queue.Reset();
     } else {
         // Stub-only builds: Vulkan backend isn't enabled, but the module should remain buildable.
         REQUIRE(deviceShared.Get() == nullptr);

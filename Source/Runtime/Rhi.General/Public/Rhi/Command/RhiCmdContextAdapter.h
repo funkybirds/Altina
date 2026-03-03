@@ -17,9 +17,6 @@ namespace AltinaEngine::Rhi {
         FRhiCmdContextAdapter(FRhiCommandContext& context, IRhiCmdContextOps& ops)
             : mContext(&context), mOps(&ops) {}
 
-        void Begin() override { mContext->Begin(); }
-        void End() override { mContext->End(); }
-
         void RHIUpdateDynamicBufferDiscard(
             FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) override {
             mOps->RHIUpdateDynamicBufferDiscard(buffer, data, sizeBytes, offsetBytes);

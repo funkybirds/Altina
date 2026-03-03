@@ -22,12 +22,10 @@ namespace AltinaEngine::RenderCore {
         using AltinaEngine::Rhi::FRhiCmdContextAdapter;
         using AltinaEngine::Rhi::FRhiCommandContext;
         using AltinaEngine::Rhi::FRhiCommandContextDesc;
-        using AltinaEngine::Rhi::FRhiCommandList;
         using AltinaEngine::Rhi::FRhiDevice;
         using AltinaEngine::Rhi::FRhiQueue;
         using AltinaEngine::Rhi::FRhiQueueSignal;
         using AltinaEngine::Rhi::FRhiQueueWait;
-        using AltinaEngine::Rhi::FRhiSubmitInfo;
         using AltinaEngine::Rhi::FRhiTransition;
         using AltinaEngine::Rhi::FRhiTransitionCreateInfo;
         using AltinaEngine::Rhi::FRhiTransitionInfo;
@@ -89,7 +87,6 @@ namespace AltinaEngine::RenderCore {
             if (state.mRecording || !state.mContext || state.mOps == nullptr) {
                 return;
             }
-            state.mContext->Begin();
             state.mRecording   = true;
             state.mHasCommands = true;
         }
@@ -99,18 +96,14 @@ namespace AltinaEngine::RenderCore {
             if (!state.mRecording) {
                 return;
             }
-            state.mContext->End();
-            FRhiCommandList* list = state.mContext->GetCommandList();
-            if (list == nullptr || !state.mQueue) {
+            if (!state.mContext) {
                 state.mPendingWaits.Clear();
                 state.mRecording   = false;
                 state.mHasCommands = false;
                 return;
             }
 
-            FRhiSubmitInfo submit{};
-            submit.mCommandLists     = &list;
-            submit.mCommandListCount = 1U;
+            Rhi::FRhiCommandContextSubmitInfo submit{};
             if (!state.mPendingWaits.IsEmpty()) {
                 submit.mWaits     = state.mPendingWaits.Data();
                 submit.mWaitCount = static_cast<u32>(state.mPendingWaits.Size());
@@ -119,7 +112,7 @@ namespace AltinaEngine::RenderCore {
                 submit.mSignals     = signals->Data();
                 submit.mSignalCount = static_cast<u32>(signals->Size());
             }
-            state.mQueue->Submit(submit);
+            state.mContext->RHIFlushContextDevice(submit);
 
             state.mPendingWaits.Clear();
             state.mRecording   = false;

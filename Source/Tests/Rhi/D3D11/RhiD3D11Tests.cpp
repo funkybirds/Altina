@@ -54,11 +54,9 @@ namespace {
     using AltinaEngine::u32;
     using AltinaEngine::Rhi::ERhiQueueType;
     using AltinaEngine::Rhi::FRhiCommandContextDesc;
-    using AltinaEngine::Rhi::FRhiCommandList;
     using AltinaEngine::Rhi::FRhiD3D11CommandContext;
     using AltinaEngine::Rhi::FRhiD3D11Device;
     using AltinaEngine::Rhi::FRhiShaderDesc;
-    using AltinaEngine::Rhi::FRhiSubmitInfo;
 
 #if AE_PLATFORM_WIN
     auto CompileD3D11ShaderDXBC(const char* source, const char* entryPoint,
@@ -233,25 +231,16 @@ TEST_CASE("RhiD3D11.DeferredContextSubmitExecutes") {
     auto* d3dContext = static_cast<FRhiD3D11CommandContext*>(cmdContext.Get());
     REQUIRE(d3dContext);
 
-    d3dContext->Begin();
     ID3D11DeviceContext* deferredContext = d3dContext->GetDeferredContext();
     if (!deferredContext) {
         return;
     }
 
     deferredContext->End(query.Get());
-    d3dContext->End();
-
-    auto* rhiCommandList = d3dContext->GetCommandList();
-    REQUIRE(rhiCommandList);
-    FRhiCommandList* commandLists[] = { rhiCommandList };
-    FRhiSubmitInfo   submit{};
-    submit.mCommandLists     = commandLists;
-    submit.mCommandListCount = 1U;
 
     auto queue = device->GetQueue(ERhiQueueType::Graphics);
     REQUIRE(queue);
-    queue->Submit(submit);
+    d3dContext->RHIFlushContextDevice({});
 
     immediateContext->Flush();
 
@@ -374,9 +363,8 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
     REQUIRE(d3dContext);
 
     FRhiCmdContextAdapter adapter(*d3dContext);
-    adapter.Begin();
 
-    ID3D11DeviceContext* deferredContext = d3dContext->GetDeferredContext();
+    ID3D11DeviceContext*  deferredContext = d3dContext->GetDeferredContext();
     if (!deferredContext) {
         return;
     }
@@ -389,18 +377,9 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
     cmdList.Emplace<FRhiCmdDispatch>(1U, 1U, 1U);
     FRhiCmdExecutor::Execute(cmdList, adapter);
 
-    adapter.End();
-
-    auto* rhiCommandList = d3dContext->GetCommandList();
-    REQUIRE(rhiCommandList);
-    FRhiCommandList* commandLists[] = { rhiCommandList };
-    FRhiSubmitInfo   submit{};
-    submit.mCommandLists     = commandLists;
-    submit.mCommandListCount = 1U;
-
     auto queue = device->GetQueue(ERhiQueueType::Compute);
     REQUIRE(queue);
-    queue->Submit(submit);
+    d3dContext->RHIFlushContextDevice({});
 
     ID3D11UnorderedAccessView* nullUavs[] = { nullptr };
     immediateContext->CSSetUnorderedAccessViews(0, 1, nullUavs, nullptr);
@@ -561,7 +540,6 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
 
     auto* d3dContext = static_cast<FRhiD3D11CommandContext*>(cmdContext.Get());
     REQUIRE(d3dContext);
-    d3dContext->Begin();
 
     FRhiTexture* colorTargets[] = { colorTarget.Get() };
     d3dContext->RHISetRenderTargets(1U, colorTargets, nullptr);
@@ -585,8 +563,6 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
 
     REQUIRE(rtv.Get() == expectedRtv);
     REQUIRE(uav.Get() == expectedUav);
-
-    d3dContext->End();
 #else
     // Non-Windows platforms do not support D3D11.
 #endif

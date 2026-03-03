@@ -161,4 +161,27 @@ namespace AltinaEngine::Rhi {
 
     FRhiCommandContext::~FRhiCommandContext() = default;
 
+    auto FRhiCommandContext::RHISubmitActiveSection(
+        const FRhiCommandContextSubmitInfo& /*submitInfo*/) -> FRhiCommandSubmissionStamp {
+        return {};
+    }
+
+    auto FRhiCommandContext::RHIFlushContextHost(const FRhiCommandContextSubmitInfo& submitInfo)
+        -> FRhiCommandHostSyncPoint {
+        const FRhiCommandSubmissionStamp stamp = RHIFlushContextDevice(submitInfo);
+        FRhiCommandHostSyncPoint         syncPoint{};
+        syncPoint.mSubmissionSerial = stamp.mSerial;
+        return syncPoint;
+    }
+
+    auto FRhiCommandContext::RHIFlushContextDevice(const FRhiCommandContextSubmitInfo& submitInfo)
+        -> FRhiCommandSubmissionStamp {
+        return RHISubmitActiveSection(submitInfo);
+    }
+
+    auto FRhiCommandContext::RHISwitchContextCapability(ERhiContextCapability /*capability*/)
+        -> FRhiCommandSubmissionStamp {
+        return RHIFlushContextDevice({});
+    }
+
 } // namespace AltinaEngine::Rhi

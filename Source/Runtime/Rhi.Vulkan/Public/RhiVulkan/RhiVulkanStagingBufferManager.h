@@ -30,6 +30,7 @@ namespace AltinaEngine::Rhi {
 
         void Init(FRhiVulkanDevice* device);
         void Reset();
+        void Shutdown();
 
         auto Acquire(u64 sizeBytes, ERhiCpuAccess access) -> FVulkanStagingAllocation;
         void Release(const FVulkanStagingAllocation& allocation);

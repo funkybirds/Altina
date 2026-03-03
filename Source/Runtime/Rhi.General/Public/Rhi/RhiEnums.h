@@ -36,6 +36,11 @@ namespace AltinaEngine::Rhi {
         Copy
     };
 
+    enum class ERhiContextCapability : u8 {
+        Graphics = 0,
+        AsyncCompute
+    };
+
     enum class ERhiCommandListType : u8 {
         Direct = 0,
         Bundle

@@ -2,6 +2,7 @@
 
 #include "RhiD3D11API.h"
 #include "Rhi/RhiCommandContext.h"
+#include "Rhi/Command/Internal/RhiCommandSection.h"
 #include "Rhi/Command/RhiCmdContextOps.h"
 #include "Rhi/RhiRefs.h"
 
@@ -9,20 +10,26 @@ struct ID3D11Device;
 struct ID3D11DeviceContext;
 
 namespace AltinaEngine::Rhi {
-    class AE_RHI_D3D11_API FRhiD3D11CommandContext final :
-        public FRhiCommandContext,
-        public IRhiCmdContextOps {
+    class FRhiD3D11Device;
+    class FRhiD3D11CommandList;
+
+    class AE_RHI_D3D11_API FRhiD3D11CommandContext final : public FRhiCommandContext {
     public:
-        FRhiD3D11CommandContext(const FRhiCommandContextDesc& desc, ID3D11Device* device,
-            FRhiCommandListRef commandList);
+        FRhiD3D11CommandContext(
+            const FRhiCommandContextDesc& desc, ID3D11Device* device, FRhiD3D11Device* owner);
         ~FRhiD3D11CommandContext() override;
 
-        void               Begin() override;
-        void               End() override;
-        [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override;
+        auto RHISubmitActiveSection(const FRhiCommandContextSubmitInfo& submitInfo)
+            -> FRhiCommandSubmissionStamp override;
+        auto RHIFlushContextHost(const FRhiCommandContextSubmitInfo& submitInfo)
+            -> FRhiCommandHostSyncPoint override;
+        auto RHIFlushContextDevice(const FRhiCommandContextSubmitInfo& submitInfo)
+            -> FRhiCommandSubmissionStamp override;
+        auto RHISwitchContextCapability(ERhiContextCapability capability)
+            -> FRhiCommandSubmissionStamp override;
 
-        void               RHIUpdateDynamicBufferDiscard(
-                          FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) override;
+        void RHIUpdateDynamicBufferDiscard(
+            FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) override;
 
         void RHISetGraphicsPipeline(FRhiPipeline* pipeline) override;
         void RHISetComputePipeline(FRhiPipeline* pipeline) override;
@@ -46,15 +53,24 @@ namespace AltinaEngine::Rhi {
             u32 firstInstance) override;
         void RHIDispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) override;
 
-        [[nodiscard]] auto GetDeferredContext() const noexcept -> ID3D11DeviceContext*;
+        [[nodiscard]] auto GetDeferredContext() noexcept -> ID3D11DeviceContext*;
 
         // Implementation state (defined in the .cpp). Exposed as an incomplete type so translation
         // units in this module can reference it without violating access control.
         struct FState;
 
     private:
-        FState*            mState = nullptr;
-        FRhiCommandListRef mCommandList;
+        auto                   AcquireActiveSection() -> FRhiCommandSection*;
+        void                   EnsureRecording();
+        void                   FinalizeRecording();
+        auto                   GetExecutionCommandList() const noexcept -> FRhiD3D11CommandList*;
+
+        FState*                mState = nullptr;
+        FRhiD3D11Device*       mOwner = nullptr;
+        FRhiCommandSectionPool mSectionPool;
+        FRhiCommandSubmissionProcessor mSubmissionProcessor;
+        FRhiCommandSection*            mActiveSection = nullptr;
+        FRhiCommandSubmissionStamp     mLastStamp;
     };
 
 } // namespace AltinaEngine::Rhi

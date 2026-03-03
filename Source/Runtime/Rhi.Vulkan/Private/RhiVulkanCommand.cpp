@@ -377,10 +377,9 @@ namespace AltinaEngine::Rhi {
         FRhiVulkanDevice*                  mOwner       = nullptr;
     };
 
-    FRhiVulkanCommandContext::FRhiVulkanCommandContext(const FRhiCommandContextDesc& desc,
-        VkDevice device, FRhiVulkanDevice* owner, FRhiCommandPoolRef pool,
-        FRhiCommandListRef commandList)
-        : FRhiCommandContext(desc), mPool(Move(pool)), mCommandList(Move(commandList)) {
+    FRhiVulkanCommandContext::FRhiVulkanCommandContext(
+        const FRhiCommandContextDesc& desc, VkDevice device, FRhiVulkanDevice* owner)
+        : FRhiCommandContext(desc) {
         mState = new FState{};
         if (mState) {
             mState->mDevice = device;
@@ -390,6 +389,11 @@ namespace AltinaEngine::Rhi {
                 mState->mSupportsSync2                = owner->SupportsSynchronization2();
                 mState->mSupportsExtendedDynamicState = owner->SupportsExtendedDynamicState();
                 mState->mQueueFamilyIndex             = owner->GetQueueFamilyIndex(desc.mQueueType);
+
+                FRhiCommandPoolDesc poolDesc{};
+                poolDesc.mQueueType = desc.mQueueType;
+                poolDesc.mDebugName = desc.mDebugName;
+                mPool               = owner->CreateCommandPool(poolDesc);
             }
         }
     }
@@ -399,14 +403,95 @@ namespace AltinaEngine::Rhi {
         mState = nullptr;
     }
 
-    void FRhiVulkanCommandContext::Begin() {
+    auto FRhiVulkanCommandContext::AcquireActiveSection() -> FRhiCommandSection* {
+        if (mActiveSection != nullptr) {
+            return mActiveSection;
+        }
+        mActiveSection = mSectionPool.Acquire([this](bool /*uploading*/) {
+            if (mState == nullptr || mState->mOwner == nullptr) {
+                return FRhiCommandListRef{};
+            }
+            FRhiCommandListDesc listDesc{};
+            listDesc.mQueueType = GetQueueType();
+            listDesc.mListType  = GetListType();
+            listDesc.mDebugName = GetDesc().mDebugName;
+            return mState->mOwner->CreateCommandList(listDesc);
+        });
+        return mActiveSection;
+    }
+
+    auto FRhiVulkanCommandContext::GetExecutionCommandList() const noexcept
+        -> FRhiVulkanCommandList* {
+        if (mActiveSection == nullptr) {
+            return nullptr;
+        }
+        return static_cast<FRhiVulkanCommandList*>(mActiveSection->mExecution.mCommandList.Get());
+    }
+
+    auto FRhiVulkanCommandContext::RHISubmitActiveSection(
+        const FRhiCommandContextSubmitInfo& submitInfo) -> FRhiCommandSubmissionStamp {
+        if (mActiveSection == nullptr || mState == nullptr || mState->mOwner == nullptr) {
+            return {};
+        }
+
+        FinalizeRecording();
+        auto* list  = GetExecutionCommandList();
+        auto  queue = mState->mOwner->GetQueue(GetQueueType());
+        if (queue && list != nullptr) {
+            FRhiCommandList* submitList = list;
+            FRhiSubmitInfo   submit{};
+            submit.mCommandLists     = &submitList;
+            submit.mCommandListCount = 1U;
+            submit.mWaits            = submitInfo.mWaits;
+            submit.mWaitCount        = submitInfo.mWaitCount;
+            submit.mSignals          = submitInfo.mSignals;
+            submit.mSignalCount      = submitInfo.mSignalCount;
+            submit.mFence            = submitInfo.mFence;
+            submit.mFenceValue       = submitInfo.mFenceValue;
+            queue->Submit(submit);
+        }
+
+        mLastStamp.mSerial += 1ULL;
+        mLastStamp.mSemaphore  = submitInfo.mSignalSemaphore;
+        mLastStamp.mValue      = submitInfo.mSignalSemaphoreValue;
+        mLastStamp.mFrameIndex = mLastStamp.mFrameIndex + 1ULL;
+        mActiveSection->mState = ERhiCommandSectionState::DeviceExecuted;
+        mSectionPool.Recycle(mActiveSection);
+        mActiveSection = nullptr;
+        return mLastStamp;
+    }
+
+    auto FRhiVulkanCommandContext::RHIFlushContextHost(
+        const FRhiCommandContextSubmitInfo& submitInfo) -> FRhiCommandHostSyncPoint {
+        const FRhiCommandSubmissionStamp stamp = RHISubmitActiveSection(submitInfo);
+        FRhiCommandHostSyncPoint         syncPoint{};
+        syncPoint.mSubmissionSerial = stamp.mSerial;
+        syncPoint.mSubsectionSerial = stamp.mSerial;
+        return syncPoint;
+    }
+
+    auto FRhiVulkanCommandContext::RHIFlushContextDevice(
+        const FRhiCommandContextSubmitInfo& submitInfo) -> FRhiCommandSubmissionStamp {
+        return RHISubmitActiveSection(submitInfo);
+    }
+
+    auto FRhiVulkanCommandContext::RHISwitchContextCapability(ERhiContextCapability /*capability*/)
+        -> FRhiCommandSubmissionStamp {
+        return RHIFlushContextDevice({});
+    }
+
+    void FRhiVulkanCommandContext::EnsureRecording() {
         if (!mState || !mState->mDevice) {
             return;
         }
+        if (mState->mCmd != VK_NULL_HANDLE) {
+            return;
+        }
+        AcquireActiveSection();
         if (mPool) {
             mPool->Reset();
         }
-        auto* list = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+        auto* list = GetExecutionCommandList();
         if (list) {
             list->Reset(mPool.Get());
             mState->mCmd = list->GetNativeCommandBuffer();
@@ -427,9 +512,14 @@ namespace AltinaEngine::Rhi {
         mState->mInRenderPass       = false;
         mState->mTopology           = ERhiPrimitiveTopology::TriangleList;
         mState->mAttachmentHash     = 0ULL;
+        if (mActiveSection) {
+            mActiveSection->mState              = ERhiCommandSectionState::Active;
+            mActiveSection->mExecution.mState   = ERhiCommandSectionState::Active;
+            mActiveSection->mExecution.mTouched = true;
+        }
     }
 
-    void FRhiVulkanCommandContext::End() {
+    void FRhiVulkanCommandContext::FinalizeRecording() {
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -437,10 +527,7 @@ namespace AltinaEngine::Rhi {
             RHIEndRenderPass();
         }
         vkEndCommandBuffer(mState->mCmd);
-    }
-
-    auto FRhiVulkanCommandContext::GetCommandList() const noexcept -> FRhiCommandList* {
-        return mCommandList.Get();
+        mState->mCmd = VK_NULL_HANDLE;
     }
 
     void FRhiVulkanCommandContext::RHIUpdateDynamicBufferDiscard(
@@ -463,6 +550,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHISetGraphicsPipeline(FRhiPipeline* pipeline) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -493,6 +581,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHISetComputePipeline(FRhiPipeline* pipeline) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -515,6 +604,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHISetPrimitiveTopology(ERhiPrimitiveTopology topology) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -535,6 +625,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -548,6 +639,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHISetIndexBuffer(const FRhiIndexBufferView& view) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -563,6 +655,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHISetViewport(const FRhiViewportRect& viewport) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -577,6 +670,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHISetScissor(const FRhiScissorRect& scissor) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -589,10 +683,11 @@ namespace AltinaEngine::Rhi {
     }
     void FRhiVulkanCommandContext::RHISetRenderTargets(
         u32 colorTargetCount, FRhiTexture* const* colorTargets, FRhiTexture* depthTarget) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
-        auto* list = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+        auto*                                  list = GetExecutionCommandList();
 
         TVector<FRhiRenderPassColorAttachment> colorAttachments;
         colorAttachments.Reserve(colorTargetCount);
@@ -652,6 +747,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHIBeginRenderPass(const FRhiRenderPassDesc& desc) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -668,7 +764,7 @@ namespace AltinaEngine::Rhi {
         const u32 colorCount = desc.mColorAttachmentCount;
         mState->mColorAttachments.Reserve(colorCount);
         mState->mColorFormats.Reserve(colorCount);
-        auto* list = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+        auto* list = GetExecutionCommandList();
 
         for (u32 i = 0; i < colorCount; ++i) {
             const auto& color = desc.mColorAttachments[i];
@@ -816,6 +912,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHIEndRenderPass() {
+        EnsureRecording();
         if (!mState || !mState->mCmd || !mState->mInRenderPass) {
             return;
         }
@@ -836,6 +933,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHIBeginTransition(const FRhiTransitionCreateInfo& info) {
+        EnsureRecording();
         if (!mState || !mState->mCmd || info.mTransitionCount == 0U
             || info.mTransitions == nullptr) {
             return;
@@ -853,7 +951,7 @@ namespace AltinaEngine::Rhi {
             }
         }
         auto addTouchedTexture = [this](FRhiTexture* texture) {
-            auto* list  = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+            auto* list  = GetExecutionCommandList();
             auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
             if (list && vkTex) {
                 list->AddTouchedTexture(vkTex);
@@ -982,6 +1080,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHIEndTransition(const FRhiTransitionCreateInfo& info) {
+        EnsureRecording();
         if (!mState || !mState->mCmd || info.mTransitionCount == 0U
             || info.mTransitions == nullptr) {
             return;
@@ -998,7 +1097,7 @@ namespace AltinaEngine::Rhi {
             return;
         }
         auto addTouchedTexture = [this](FRhiTexture* texture) {
-            auto* list  = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+            auto* list  = GetExecutionCommandList();
             auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
             if (list && vkTex) {
                 list->AddTouchedTexture(vkTex);
@@ -1118,6 +1217,7 @@ namespace AltinaEngine::Rhi {
 
     void FRhiVulkanCommandContext::RHIClearColor(
         FRhiTexture* colorTarget, const FRhiClearColor& color) {
+        EnsureRecording();
         if (!mState || !mState->mCmd || colorTarget == nullptr) {
             return;
         }
@@ -1125,7 +1225,7 @@ namespace AltinaEngine::Rhi {
         if (!vkTex) {
             return;
         }
-        auto* list = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+        auto* list = GetExecutionCommandList();
         if (list) {
             list->AddTouchedTexture(vkTex);
         }
@@ -1149,6 +1249,7 @@ namespace AltinaEngine::Rhi {
 
     void FRhiVulkanCommandContext::RHISetBindGroup(
         u32 setIndex, FRhiBindGroup* group, const u32* dynamicOffsets, u32 dynamicOffsetCount) {
+        EnsureRecording();
         if (!mState || !mState->mCmd || group == nullptr) {
             return;
         }
@@ -1157,7 +1258,7 @@ namespace AltinaEngine::Rhi {
         if (!vkGroup) {
             return;
         }
-        auto* list = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+        auto* list = GetExecutionCommandList();
         if (list) {
             const auto& desc = group->GetDesc();
             for (const auto& entry : desc.mEntries) {
@@ -1191,6 +1292,7 @@ namespace AltinaEngine::Rhi {
 
     void FRhiVulkanCommandContext::RHIDraw(
         u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -1199,6 +1301,7 @@ namespace AltinaEngine::Rhi {
 
     void FRhiVulkanCommandContext::RHIDrawIndexed(
         u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }
@@ -1207,6 +1310,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHIDispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) {
+        EnsureRecording();
         if (!mState || !mState->mCmd) {
             return;
         }

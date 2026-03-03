@@ -43,6 +43,17 @@ namespace AltinaEngine::Rhi {
         }
     }
 
+    void FVulkanStagingBufferManager::Shutdown() {
+        for (auto& entry : mEntries) {
+            if (entry.mLock.IsValid() && entry.mBuffer) {
+                entry.mBuffer->Unlock(entry.mLock);
+                entry.mLock = {};
+            }
+        }
+        mEntries.Clear();
+        mDevice = nullptr;
+    }
+
     auto FVulkanStagingBufferManager::Acquire(u64 sizeBytes, ERhiCpuAccess access)
         -> FVulkanStagingAllocation {
         if (mDevice == nullptr || sizeBytes == 0ULL || access == ERhiCpuAccess::None) {

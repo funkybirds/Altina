@@ -2,26 +2,31 @@
 
 #include "RhiVulkanAPI.h"
 #include "Rhi/RhiCommandContext.h"
+#include "Rhi/Command/Internal/RhiCommandSection.h"
 #include "Rhi/Command/RhiCmdContextOps.h"
 #include "Rhi/RhiRefs.h"
 
 namespace AltinaEngine::Rhi {
     class FRhiVulkanDevice;
+    class FRhiVulkanCommandList;
 
-    class AE_RHI_VULKAN_API FRhiVulkanCommandContext final :
-        public FRhiCommandContext,
-        public IRhiCmdContextOps {
+    class AE_RHI_VULKAN_API FRhiVulkanCommandContext final : public FRhiCommandContext {
     public:
-        FRhiVulkanCommandContext(const FRhiCommandContextDesc& desc, VkDevice device,
-            FRhiVulkanDevice* owner, FRhiCommandPoolRef pool, FRhiCommandListRef commandList);
+        FRhiVulkanCommandContext(
+            const FRhiCommandContextDesc& desc, VkDevice device, FRhiVulkanDevice* owner);
         ~FRhiVulkanCommandContext() override;
 
-        void               Begin() override;
-        void               End() override;
-        [[nodiscard]] auto GetCommandList() const noexcept -> FRhiCommandList* override;
+        auto RHISubmitActiveSection(const FRhiCommandContextSubmitInfo& submitInfo)
+            -> FRhiCommandSubmissionStamp override;
+        auto RHIFlushContextHost(const FRhiCommandContextSubmitInfo& submitInfo)
+            -> FRhiCommandHostSyncPoint override;
+        auto RHIFlushContextDevice(const FRhiCommandContextSubmitInfo& submitInfo)
+            -> FRhiCommandSubmissionStamp override;
+        auto RHISwitchContextCapability(ERhiContextCapability capability)
+            -> FRhiCommandSubmissionStamp override;
 
-        void               RHIUpdateDynamicBufferDiscard(
-                          FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) override;
+        void RHIUpdateDynamicBufferDiscard(
+            FRhiBuffer* buffer, const void* data, u64 sizeBytes, u64 offsetBytes) override;
 
         void RHISetGraphicsPipeline(FRhiPipeline* pipeline) override;
         void RHISetComputePipeline(FRhiPipeline* pipeline) override;
@@ -48,10 +53,18 @@ namespace AltinaEngine::Rhi {
         [[nodiscard]] auto GetNativeCommandBuffer() const noexcept -> VkCommandBuffer;
 
     private:
+        auto AcquireActiveSection() -> FRhiCommandSection*;
+        void EnsureRecording();
+        void FinalizeRecording();
+        auto GetExecutionCommandList() const noexcept -> FRhiVulkanCommandList*;
+
         struct FState;
-        FState*            mState = nullptr;
-        FRhiCommandPoolRef mPool;
-        FRhiCommandListRef mCommandList;
+        FState*                        mState = nullptr;
+        FRhiCommandPoolRef             mPool;
+        FRhiCommandSectionPool         mSectionPool;
+        FRhiCommandSubmissionProcessor mSubmissionProcessor;
+        FRhiCommandSection*            mActiveSection = nullptr;
+        FRhiCommandSubmissionStamp     mLastStamp;
     };
 
 } // namespace AltinaEngine::Rhi

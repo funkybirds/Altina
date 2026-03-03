@@ -87,6 +87,9 @@ namespace AltinaEngine::Rhi {
     struct FRhiQueueWait;
     struct FRhiQueueSignal;
     struct FRhiSubmitInfo;
+    struct FRhiCommandSubmissionStamp;
+    struct FRhiCommandHostSyncPoint;
+    struct FRhiCommandContextSubmitInfo;
     struct FRhiPresentInfo;
     struct FRhiTransitionDesc;
     struct FRhiTransitionInfo;

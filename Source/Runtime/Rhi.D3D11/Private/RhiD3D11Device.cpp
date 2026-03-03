@@ -217,8 +217,8 @@ namespace AltinaEngine::Rhi {
     void FRhiD3D11CommandList::Close() {}
 
     FRhiD3D11CommandContext::FRhiD3D11CommandContext(
-        const FRhiCommandContextDesc& desc, ID3D11Device* device, FRhiCommandListRef commandList)
-        : FRhiCommandContext(desc), mCommandList(Move(commandList)) {
+        const FRhiCommandContextDesc& desc, ID3D11Device* device, FRhiD3D11Device* owner)
+        : FRhiCommandContext(desc), mOwner(owner) {
         mState = new FState{};
 #if AE_PLATFORM_WIN
         if (mState && (device != nullptr)) {
@@ -234,11 +234,90 @@ namespace AltinaEngine::Rhi {
         mState = nullptr;
     }
 
-    void FRhiD3D11CommandContext::Begin() {
+    auto FRhiD3D11CommandContext::AcquireActiveSection() -> FRhiCommandSection* {
+        if (mActiveSection != nullptr) {
+            return mActiveSection;
+        }
+        mActiveSection = mSectionPool.Acquire([this](bool /*uploading*/) {
+            FRhiCommandListDesc listDesc{};
+            listDesc.mQueueType = GetQueueType();
+            listDesc.mListType  = GetListType();
+            listDesc.mDebugName = GetDesc().mDebugName;
+            if (mOwner == nullptr) {
+                return FRhiCommandListRef{};
+            }
+            return mOwner->CreateCommandList(listDesc);
+        });
+        return mActiveSection;
+    }
+
+    auto FRhiD3D11CommandContext::GetExecutionCommandList() const noexcept
+        -> FRhiD3D11CommandList* {
+        if (mActiveSection == nullptr) {
+            return nullptr;
+        }
+        return static_cast<FRhiD3D11CommandList*>(mActiveSection->mExecution.mCommandList.Get());
+    }
+
+    auto FRhiD3D11CommandContext::RHISubmitActiveSection(
+        const FRhiCommandContextSubmitInfo& submitInfo) -> FRhiCommandSubmissionStamp {
+        if (mActiveSection == nullptr) {
+            return {};
+        }
+
+        FinalizeRecording();
+        FRhiCommandList* list = GetExecutionCommandList();
+        if (mOwner != nullptr) {
+            auto queue = mOwner->GetQueue(GetQueueType());
+            if (queue && list != nullptr) {
+                FRhiSubmitInfo submit{};
+                submit.mCommandLists     = &list;
+                submit.mCommandListCount = 1U;
+                submit.mWaits            = submitInfo.mWaits;
+                submit.mWaitCount        = submitInfo.mWaitCount;
+                submit.mSignals          = submitInfo.mSignals;
+                submit.mSignalCount      = submitInfo.mSignalCount;
+                submit.mFence            = submitInfo.mFence;
+                submit.mFenceValue       = submitInfo.mFenceValue;
+                queue->Submit(submit);
+            }
+        }
+
+        mLastStamp.mSerial += 1ULL;
+        mLastStamp.mSemaphore  = submitInfo.mSignalSemaphore;
+        mLastStamp.mValue      = submitInfo.mSignalSemaphoreValue;
+        mLastStamp.mFrameIndex = mLastStamp.mFrameIndex + 1ULL;
+        mActiveSection->mState = ERhiCommandSectionState::DeviceExecuted;
+        mSectionPool.Recycle(mActiveSection);
+        mActiveSection = nullptr;
+        return mLastStamp;
+    }
+
+    auto FRhiD3D11CommandContext::RHIFlushContextHost(
+        const FRhiCommandContextSubmitInfo& submitInfo) -> FRhiCommandHostSyncPoint {
+        const FRhiCommandSubmissionStamp stamp = RHISubmitActiveSection(submitInfo);
+        FRhiCommandHostSyncPoint         syncPoint{};
+        syncPoint.mSubmissionSerial = stamp.mSerial;
+        syncPoint.mSubsectionSerial = stamp.mSerial;
+        return syncPoint;
+    }
+
+    auto FRhiD3D11CommandContext::RHIFlushContextDevice(
+        const FRhiCommandContextSubmitInfo& submitInfo) -> FRhiCommandSubmissionStamp {
+        return RHISubmitActiveSection(submitInfo);
+    }
+
+    auto FRhiD3D11CommandContext::RHISwitchContextCapability(ERhiContextCapability /*capability*/)
+        -> FRhiCommandSubmissionStamp {
+        return RHIFlushContextDevice({});
+    }
+
+    void FRhiD3D11CommandContext::EnsureRecording() {
 #if AE_PLATFORM_WIN
-        if (!mState || !mState->mDevice) {
+        if (!mState || !mState->mDevice || mState->mDeferredContext || mState->mUseImmediate) {
             return;
         }
+        AcquireActiveSection();
 
         if (!mState->mImmediateContext) {
             ComPtr<ID3D11DeviceContext> immediate;
@@ -274,14 +353,20 @@ namespace AltinaEngine::Rhi {
             mState->mCurrentRtvs[i] = nullptr;
         }
 
-        auto* commandList = static_cast<FRhiD3D11CommandList*>(mCommandList.Get());
+        auto* commandList = GetExecutionCommandList();
         if (commandList) {
             commandList->Reset(nullptr);
+        }
+        if (mActiveSection != nullptr) {
+            mActiveSection->mState              = ERhiCommandSectionState::Active;
+            mActiveSection->mExecution.mState   = ERhiCommandSectionState::Active;
+            mActiveSection->mExecution.mTouched = false;
+            mActiveSection->mUploading.mTouched = false;
         }
 #endif
     }
 
-    void FRhiD3D11CommandContext::End() {
+    void FRhiD3D11CommandContext::FinalizeRecording() {
 #if AE_PLATFORM_WIN
         if (!mState || mState->mUseImmediate || !mState->mDeferredContext) {
             return;
@@ -293,20 +378,15 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        auto* rhiCommandList = static_cast<FRhiD3D11CommandList*>(mCommandList.Get());
+        auto* rhiCommandList = GetExecutionCommandList();
         if (rhiCommandList) {
             rhiCommandList->SetNativeCommandList(commandList.Detach());
         }
 
         mState->mDeferredContext->ClearState();
+        mState->mDeferredContext.Reset();
+        mState->mDeferredContext1.Reset();
 #endif
-    }
-
-    auto FRhiD3D11CommandContext::GetCommandList() const noexcept -> FRhiCommandList* {
-        if (mState && mState->mUseImmediate) {
-            return nullptr;
-        }
-        return mCommandList.Get();
     }
 
     void FRhiD3D11CommandContext::RHIUpdateDynamicBufferDiscard(
@@ -1959,10 +2039,16 @@ namespace AltinaEngine::Rhi {
 #endif
     }
 
-    auto FRhiD3D11CommandContext::GetDeferredContext() const noexcept -> ID3D11DeviceContext* {
+    auto FRhiD3D11CommandContext::GetDeferredContext() noexcept -> ID3D11DeviceContext* {
 #if AE_PLATFORM_WIN
         if (!mState) {
             return nullptr;
+        }
+        if (mActiveSection == nullptr || (!mState->mDeferredContext && !mState->mUseImmediate)) {
+            EnsureRecording();
+        }
+        if (mActiveSection) {
+            mActiveSection->mExecution.mTouched = true;
         }
         if (mState->mDeferredContext) {
             return mState->mDeferredContext.Get();
@@ -3023,12 +3109,7 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiD3D11Device::CreateCommandContext(const FRhiCommandContextDesc& desc)
         -> FRhiCommandContextRef {
-        FRhiCommandListDesc listDesc;
-        listDesc.mDebugName = desc.mDebugName;
-        listDesc.mQueueType = desc.mQueueType;
-        listDesc.mListType  = desc.mListType;
-        auto commandList    = MakeResource<FRhiD3D11CommandList>(listDesc);
-        return MakeResource<FRhiD3D11CommandContext>(desc, GetNativeDevice(), Move(commandList));
+        return MakeResource<FRhiD3D11CommandContext>(desc, GetNativeDevice(), this);
     }
 
     void FRhiD3D11Device::BeginFrame(u64 frameIndex) {

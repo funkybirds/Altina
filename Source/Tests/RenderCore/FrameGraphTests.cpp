@@ -85,9 +85,6 @@ namespace {
 
     class FTestCmdContext final : public AltinaEngine::Rhi::FRhiCmdContext {
     public:
-        void Begin() override {}
-        void End() override {}
-
         void RHIUpdateDynamicBufferDiscard(AltinaEngine::Rhi::FRhiBuffer* /*buffer*/,
             const void* /*data*/, u64 /*sizeBytes*/, u64 /*offsetBytes*/) override {}
 
@@ -186,19 +183,28 @@ namespace {
         void Close() override {}
     };
 
-    class FTestCommandContext final :
-        public AltinaEngine::Rhi::FRhiCommandContext,
-        public AltinaEngine::Rhi::IRhiCmdContextOps {
+    class FTestCommandContext final : public AltinaEngine::Rhi::FRhiCommandContext {
     public:
         FTestCommandContext(const AltinaEngine::Rhi::FRhiCommandContextDesc& desc,
-            AltinaEngine::Rhi::FRhiCommandListRef                            commandList)
-            : FRhiCommandContext(desc), mCommandList(Move(commandList)) {}
+            AltinaEngine::Rhi::FRhiQueue*                                    queue)
+            : FRhiCommandContext(desc), mQueue(queue) {}
 
-        void               Begin() override { mRecording = true; }
-        void               End() override { mRecording = false; }
-        [[nodiscard]] auto GetCommandList() const noexcept
-            -> AltinaEngine::Rhi::FRhiCommandList* override {
-            return mCommandList.Get();
+        auto RHISubmitActiveSection(
+            const AltinaEngine::Rhi::FRhiCommandContextSubmitInfo& submitInfo)
+            -> AltinaEngine::Rhi::FRhiCommandSubmissionStamp override {
+            if (mQueue != nullptr) {
+                AltinaEngine::Rhi::FRhiSubmitInfo submit{};
+                submit.mWaits       = submitInfo.mWaits;
+                submit.mWaitCount   = submitInfo.mWaitCount;
+                submit.mSignals     = submitInfo.mSignals;
+                submit.mSignalCount = submitInfo.mSignalCount;
+                submit.mFence       = submitInfo.mFence;
+                submit.mFenceValue  = submitInfo.mFenceValue;
+                mQueue->Submit(submit);
+            }
+            AltinaEngine::Rhi::FRhiCommandSubmissionStamp stamp{};
+            stamp.mSerial = 1ULL;
+            return stamp;
         }
 
         const AltinaEngine::Core::Container::TVector<ETestEvent>& GetEvents() const noexcept {
@@ -243,8 +249,7 @@ namespace {
         }
 
     private:
-        bool                                               mRecording = false;
-        AltinaEngine::Rhi::FRhiCommandListRef              mCommandList;
+        AltinaEngine::Rhi::FRhiQueue*                      mQueue = nullptr;
         AltinaEngine::Core::Container::TVector<ETestEvent> mEvents;
     };
 
@@ -397,12 +402,9 @@ namespace {
         }
         auto CreateCommandContext(const AltinaEngine::Rhi::FRhiCommandContextDesc& desc)
             -> AltinaEngine::Rhi::FRhiCommandContextRef override {
-            AltinaEngine::Rhi::FRhiCommandListDesc listDesc{};
-            listDesc.mQueueType   = desc.mQueueType;
-            listDesc.mListType    = desc.mListType;
-            auto      commandList = MakeResource<FTestCommandList>(listDesc);
-            auto      context     = MakeResource<FTestCommandContext>(desc, Move(commandList));
-            const u32 index       = static_cast<u32>(desc.mQueueType);
+            auto      queue   = GetQueue(desc.mQueueType);
+            auto      context = MakeResource<FTestCommandContext>(desc, queue.Get());
+            const u32 index   = static_cast<u32>(desc.mQueueType);
             if (index < 3U) {
                 mContexts[index] = context.Get();
             }
@@ -677,9 +679,7 @@ TEST_CASE("FrameGraph.BasicPassResources") {
     graph.Compile();
 
     FTestCmdContext cmdContext;
-    cmdContext.Begin();
     graph.Execute(cmdContext);
-    cmdContext.End();
     graph.EndFrame();
 
     REQUIRE(executed);
@@ -724,9 +724,7 @@ TEST_CASE("FrameGraph.ImportedTextureRoundTrip") {
     graph.Compile();
 
     FTestCmdContext cmdContext;
-    cmdContext.Begin();
     graph.Execute(cmdContext);
-    cmdContext.End();
     graph.EndFrame();
 
     REQUIRE(samePointer);
@@ -799,9 +797,7 @@ TEST_CASE("FrameGraph.ImportedTextureWriteAsRenderTarget") {
     graph.Compile();
 
     FTestCmdContext cmdContext;
-    cmdContext.Begin();
     graph.Execute(cmdContext);
-    cmdContext.End();
     graph.EndFrame();
 
     REQUIRE(executed);

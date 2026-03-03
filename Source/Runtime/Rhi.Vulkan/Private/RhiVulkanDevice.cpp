@@ -275,7 +275,7 @@ namespace AltinaEngine::Rhi {
 
             mState->mUploadManager.EndFrame();
             mState->mUploadManager.Reset();
-            mState->mStagingManager.Reset();
+            mState->mStagingManager.Shutdown();
 
             mState->mSubmitter.Stop();
 
@@ -838,19 +838,8 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiVulkanDevice::CreateCommandContext(const FRhiCommandContextDesc& desc)
         -> FRhiCommandContextRef {
-        FRhiCommandPoolDesc poolDesc{};
-        poolDesc.mDebugName      = desc.mDebugName;
-        poolDesc.mQueueType      = desc.mQueueType;
-        auto                pool = CreateCommandPool(poolDesc);
-
-        FRhiCommandListDesc listDesc{};
-        listDesc.mDebugName = desc.mDebugName;
-        listDesc.mQueueType = desc.mQueueType;
-        listDesc.mListType  = desc.mListType;
-        auto list           = CreateCommandList(listDesc);
-
         return MakeResource<FRhiVulkanCommandContext>(
-            desc, mState ? mState->mDevice : VK_NULL_HANDLE, this, Move(pool), Move(list));
+            desc, mState ? mState->mDevice : VK_NULL_HANDLE, this);
     }
 
     void FRhiVulkanDevice::BeginFrame(u64 frameIndex) {

@@ -2,6 +2,7 @@
 
 #include "RhiGeneralAPI.h"
 #include "Rhi/RhiResource.h"
+#include "Rhi/Command/RhiCmdContextOps.h"
 #include "Rhi/RhiStructs.h"
 #include "Container/StringView.h"
 
@@ -9,7 +10,7 @@ namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::FStringView;
 
-    class AE_RHI_GENERAL_API FRhiCommandContext : public FRhiResource {
+    class AE_RHI_GENERAL_API FRhiCommandContext : public FRhiResource, public IRhiCmdContextOps {
     public:
         explicit FRhiCommandContext(const FRhiCommandContextDesc& desc,
             FRhiResourceDeleteQueue*                              deleteQueue = nullptr) noexcept;
@@ -40,9 +41,14 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        virtual void               Begin()                                             = 0;
-        virtual void               End()                                               = 0;
-        [[nodiscard]] virtual auto GetCommandList() const noexcept -> FRhiCommandList* = 0;
+        virtual auto RHISubmitActiveSection(const FRhiCommandContextSubmitInfo& submitInfo)
+            -> FRhiCommandSubmissionStamp;
+        virtual auto RHIFlushContextHost(const FRhiCommandContextSubmitInfo& submitInfo)
+            -> FRhiCommandHostSyncPoint;
+        virtual auto RHIFlushContextDevice(const FRhiCommandContextSubmitInfo& submitInfo)
+            -> FRhiCommandSubmissionStamp;
+        virtual auto RHISwitchContextCapability(ERhiContextCapability capability)
+            -> FRhiCommandSubmissionStamp;
 
     private:
         FRhiCommandContextDesc mDesc;

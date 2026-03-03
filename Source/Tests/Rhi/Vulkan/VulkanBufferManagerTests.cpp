@@ -54,7 +54,6 @@ using AltinaEngine::Rhi::FRhiDevice;
 using AltinaEngine::Rhi::FRhiDeviceDesc;
 using AltinaEngine::Rhi::FRhiInitDesc;
 using AltinaEngine::Rhi::FRhiPipelineLayoutDesc;
-using AltinaEngine::Rhi::FRhiSubmitInfo;
 using AltinaEngine::Rhi::FRhiTextureDesc;
 using AltinaEngine::Rhi::FRhiTextureSubresource;
 using AltinaEngine::Rhi::FRhiTransitionCreateInfo;
@@ -121,7 +120,6 @@ TEST_CASE("Rhi.Vulkan.UploadBufferManager.BasicAllocation") {
         RHIExit(context);
         return;
     }
-
     auto* device = static_cast<FRhiVulkanDevice*>(deviceShared.Get());
     REQUIRE(device != nullptr);
 
@@ -182,7 +180,6 @@ TEST_CASE("Rhi.Vulkan.StagingBufferManager.PoolReuseAndMap") {
 
     auto* device = static_cast<FRhiVulkanDevice*>(deviceShared.Get());
     REQUIRE(device != nullptr);
-
     AltinaEngine::Rhi::FVulkanStagingBufferManager manager;
     manager.Init(device);
 
@@ -207,6 +204,7 @@ TEST_CASE("Rhi.Vulkan.StagingBufferManager.PoolReuseAndMap") {
     REQUIRE(b.IsValid());
     REQUIRE(b.mBuffer == a.mBuffer);
     manager.Release(b);
+    manager.Shutdown();
 
     deviceShared.Reset();
     RHIExit(context);
@@ -422,7 +420,7 @@ TEST_CASE("Rhi.Vulkan.UpdateTextureSubresource.DispatchReadsCorrectTexel") {
         RHIExit(context);
         return;
     }
-    auto* ops = CheckedCast<AltinaEngine::Rhi::IRhiCmdContextOps*>(cmd.Get());
+    auto* ops = static_cast<AltinaEngine::Rhi::IRhiCmdContextOps*>(cmd.Get());
     REQUIRE(ops != nullptr);
     if (!ops) {
         deviceShared.Reset();
@@ -444,12 +442,11 @@ TEST_CASE("Rhi.Vulkan.UpdateTextureSubresource.DispatchReadsCorrectTexel") {
     tr.mSrcQueue        = ERhiQueueType::Compute;
     tr.mDstQueue        = ERhiQueueType::Compute;
 
-    cmd->Begin();
     ops->RHIBeginTransition(tr);
     ops->RHISetComputePipeline(pipeline.Get());
     ops->RHISetBindGroup(texSet, group.Get(), nullptr, 0U);
     ops->RHIDispatch(1U, 1U, 1U);
-    cmd->End();
+    cmd->RHIFlushContextDevice({});
 
     auto queue = device->GetQueue(ERhiQueueType::Compute);
     REQUIRE(queue.Get() != nullptr);
@@ -458,18 +455,6 @@ TEST_CASE("Rhi.Vulkan.UpdateTextureSubresource.DispatchReadsCorrectTexel") {
         RHIExit(context);
         return;
     }
-    AltinaEngine::Rhi::FRhiCommandList* list = cmd->GetCommandList();
-    REQUIRE(list != nullptr);
-    if (!list) {
-        deviceShared.Reset();
-        RHIExit(context);
-        return;
-    }
-
-    FRhiSubmitInfo submit{};
-    submit.mCommandLists     = &list;
-    submit.mCommandListCount = 1U;
-    queue->Submit(submit);
     queue->WaitIdle();
 
     auto lock = outBuffer->Lock(0ULL, 16ULL, AltinaEngine::Rhi::ERhiBufferLockMode::Read);
@@ -488,6 +473,16 @@ TEST_CASE("Rhi.Vulkan.UpdateTextureSubresource.DispatchReadsCorrectTexel") {
     REQUIRE_EQ(out[1], 0x00000000U);
     REQUIRE_EQ(out[2], 0x00000000U);
     REQUIRE_EQ(out[3], 0x3F800000U);
+
+    cmd.Reset();
+    group.Reset();
+    pipeline.Reset();
+    pipelineLayout.Reset();
+    bindGroupLayouts.Clear();
+    shader.Reset();
+    texture.Reset();
+    outBuffer.Reset();
+    queue.Reset();
 
     deviceShared.Reset();
     RHIExit(context);

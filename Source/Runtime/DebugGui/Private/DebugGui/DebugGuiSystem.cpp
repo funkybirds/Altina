@@ -1345,11 +1345,10 @@ namespace AltinaEngine::DebugGui {
                 }
 
                 Rhi::FRhiCmdContextAdapter ctx(*commandContext.Get(), *ops);
-                ctx.Begin();
 
-                const auto& bbDesc = backBuffer->GetDesc();
-                const u32   w      = bbDesc.mWidth;
-                const u32   h      = bbDesc.mHeight;
+                const auto&                bbDesc = backBuffer->GetDesc();
+                const u32                  w      = bbDesc.mWidth;
+                const u32                  h      = bbDesc.mHeight;
 
                 UpdateConstants(w, h);
 
@@ -1412,23 +1411,7 @@ namespace AltinaEngine::DebugGui {
                 }
 
                 ctx.RHIEndRenderPass();
-                ctx.End();
-
-                auto* commandList = commandContext->GetCommandList();
-                if (commandList == nullptr) {
-                    return;
-                }
-
-                auto queue = device.GetQueue(Rhi::ERhiQueueType::Graphics);
-                if (!queue) {
-                    return;
-                }
-
-                Rhi::FRhiCommandList* lists[] = { commandList };
-                Rhi::FRhiSubmitInfo   submit{};
-                submit.mCommandLists     = lists;
-                submit.mCommandListCount = 1U;
-                queue->Submit(submit);
+                commandContext->RHIFlushContextDevice({});
             }
 
         private:

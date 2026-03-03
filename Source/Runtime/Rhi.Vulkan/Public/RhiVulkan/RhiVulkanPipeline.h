@@ -30,6 +30,8 @@ namespace AltinaEngine::Rhi {
         ~FRhiVulkanBindGroupLayout() override;
 
         [[nodiscard]] auto GetNativeLayout() const noexcept -> VkDescriptorSetLayout;
+        [[nodiscard]] auto ResolveBinding(u32 sourceBinding, ERhiBindingType type,
+            u32& outVkBinding, bool& outDynamicOffset) const noexcept -> bool;
 
     private:
         struct FState;

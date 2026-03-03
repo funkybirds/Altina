@@ -26,6 +26,7 @@ namespace AltinaEngine::Rhi {
     using FRhiDepthStencilViewRef    = TCountRef<FRhiDepthStencilView>;
     using FRhiFenceRef               = TCountRef<FRhiFence>;
     using FRhiSemaphoreRef           = TCountRef<FRhiSemaphore>;
+    using FRhiTransitionRef          = TCountRef<FRhiTransition>;
     using FRhiCommandPoolRef         = TCountRef<FRhiCommandPool>;
     using FRhiCommandListRef         = TCountRef<FRhiCommandList>;
     using FRhiCommandContextRef      = TCountRef<FRhiCommandContext>;

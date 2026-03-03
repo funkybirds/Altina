@@ -36,6 +36,11 @@ namespace AltinaEngine::Rendering {
         using ShaderCompiler::FShaderPermutationParseResult;
         using ShaderCompiler::GetShaderCompiler;
 
+        [[nodiscard]] auto ResolveShaderTargetBackend() noexcept -> Rhi::ERhiBackend {
+            const auto backend = Rhi::RHIGetBackend();
+            return (backend != Rhi::ERhiBackend::Unknown) ? backend : Rhi::ERhiBackend::DirectX11;
+        }
+
         // Runtime-staged shader location (preferred): next to the executable under
         // Assets/Shader/... This keeps demo/game builds self-contained without requiring the engine
         // source tree.
@@ -217,7 +222,7 @@ namespace AltinaEngine::Rendering {
                 request.mSource.mIncludeDirs.PushBack(includeDir.GetString());
             }
 
-            request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
+            request.mOptions.mTargetBackend = ResolveShaderTargetBackend();
             request.mOptions.mOptimization  = EShaderOptimization::Default;
             request.mOptions.mDebugInfo     = false;
 

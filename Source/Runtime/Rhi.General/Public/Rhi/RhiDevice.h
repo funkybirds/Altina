@@ -3,6 +3,7 @@
 #include "RhiGeneralAPI.h"
 #include "Rhi/RhiRefs.h"
 #include "Rhi/RhiStructs.h"
+#include "Rhi/RhiTransition.h"
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiResourceDeleteQueue.h"
 #include "Container/Vector.h"
@@ -66,8 +67,9 @@ namespace AltinaEngine::Rhi {
             const FRhiTextureSubresource& subresource, const void* data, u32 rowPitchBytes,
             u32 slicePitchBytes) = 0;
 
-        virtual auto CreateFence(u64 initialValue) -> FRhiFenceRef                        = 0;
-        virtual auto CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef = 0;
+        virtual auto CreateFence(u64 initialValue) -> FRhiFenceRef                         = 0;
+        virtual auto CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef  = 0;
+        virtual auto CreateTransition(const FRhiTransitionDesc& desc) -> FRhiTransitionRef = 0;
 
         virtual auto CreateCommandPool(const FRhiCommandPoolDesc& desc) -> FRhiCommandPoolRef = 0;
         virtual auto CreateCommandList(const FRhiCommandListDesc& desc) -> FRhiCommandListRef = 0;

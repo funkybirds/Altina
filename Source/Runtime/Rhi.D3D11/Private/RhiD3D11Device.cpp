@@ -20,6 +20,7 @@
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiViewport.h"
 #include "Logging/Log.h"
+#include "Utility/Assert.h"
 #include "Container/HashMap.h"
 #include "Threading/Mutex.h"
 #include "Types/Aliases.h"
@@ -1551,13 +1552,31 @@ namespace AltinaEngine::Rhi {
 
     void FRhiD3D11CommandContext::RHIBeginTransition(const FRhiTransitionCreateInfo& info) {
 #if AE_PLATFORM_WIN
-        (void)info;
+        if (info.mSrcQueue != info.mDstQueue) {
+            static bool sLogged = false;
+            if (!sLogged) {
+                sLogged = true;
+                Core::Logging::LogErrorCat(
+                    TEXT("RHI.D3D11"), "Cross-queue transitions are not supported on D3D11.");
+            }
+            Core::Utility::Assert(
+                false, TEXT("RHI.D3D11"), "Cross-queue transition is not supported.");
+        }
 #endif
     }
 
     void FRhiD3D11CommandContext::RHIEndTransition(const FRhiTransitionCreateInfo& info) {
 #if AE_PLATFORM_WIN
-        (void)info;
+        if (info.mSrcQueue != info.mDstQueue) {
+            static bool sLogged = false;
+            if (!sLogged) {
+                sLogged = true;
+                Core::Logging::LogErrorCat(
+                    TEXT("RHI.D3D11"), "Cross-queue transitions are not supported on D3D11.");
+            }
+            Core::Utility::Assert(
+                false, TEXT("RHI.D3D11"), "Cross-queue transition is not supported.");
+        }
 #endif
     }
 
@@ -2295,6 +2314,24 @@ namespace AltinaEngine::Rhi {
             u64  mValue      = 0ULL;
         };
 
+        class FRhiD3D11Transition final : public FRhiTransition {
+        public:
+            FRhiD3D11Transition(const FRhiTransitionDesc& desc, FRhiSemaphoreRef semaphore)
+                : FRhiTransition(desc), mSemaphore(Move(semaphore)) {}
+
+            [[nodiscard]] auto GetSemaphore() const noexcept -> FRhiSemaphore* override {
+                return mSemaphore.Get();
+            }
+            [[nodiscard]] auto GetSignalValue() const noexcept -> u64 override {
+                return mSignalValue;
+            }
+            void SetSignalValue(u64 value) override { mSignalValue = value; }
+
+        private:
+            FRhiSemaphoreRef mSemaphore;
+            u64              mSignalValue = 0ULL;
+        };
+
         class FRhiD3D11CommandPool final : public FRhiCommandPool {
         public:
             explicit FRhiD3D11CommandPool(const FRhiCommandPoolDesc& desc)
@@ -2964,6 +3001,16 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiD3D11Device::CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef {
         return MakeResource<FRhiD3D11Semaphore>(timeline, initialValue);
+    }
+
+    auto FRhiD3D11Device::CreateTransition(const FRhiTransitionDesc& desc) -> FRhiTransitionRef {
+        auto semaphore = CreateSemaphore(true, 0ULL);
+        if (!semaphore) {
+            return {};
+        }
+        auto transition = MakeResource<FRhiD3D11Transition>(desc, Move(semaphore));
+        transition->SetSignalValue(1ULL);
+        return transition;
     }
 
     auto FRhiD3D11Device::CreateCommandPool(const FRhiCommandPoolDesc& desc) -> FRhiCommandPoolRef {

@@ -16,6 +16,7 @@
 #include "RhiVulkanInternal.h"
 #include "RhiVulkanMemoryAllocator.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
+#include "Utility/Assert.h"
 
 using AltinaEngine::Move;
 
@@ -85,6 +86,10 @@ namespace AltinaEngine::Rhi {
             }
         }
 
+        [[nodiscard]] constexpr auto ToQueueIndex(ERhiQueueType type) noexcept -> u32 {
+            return static_cast<u32>(type);
+        }
+
     } // namespace
 
     struct FRhiVulkanDevice::FState {
@@ -111,6 +116,39 @@ namespace AltinaEngine::Rhi {
         FVulkanStagingBufferManager            mStagingManager;
         u64                                    mOptimalCopyOffsetAlignment   = 16ULL;
         u64                                    mOptimalCopyRowPitchAlignment = 1ULL;
+
+        struct FUploadCmd {
+            VkCommandBuffer mCmd         = VK_NULL_HANDLE;
+            u64             mSignalValue = 0ULL;
+        };
+
+        struct FUploadQueueState {
+            VkCommandPool            mPool = VK_NULL_HANDLE;
+            FRhiSemaphoreRef         mTimeline;
+            u64                      mNextValue = 0ULL;
+            TVector<VkCommandBuffer> mFree;
+            TVector<FUploadCmd>      mInFlight;
+            VkQueue                  mQueue  = VK_NULL_HANDLE;
+            u32                      mFamily = 0U;
+        };
+
+        FUploadQueueState mUploadQueues[3];
+    };
+
+    class FRhiVulkanTransition final : public FRhiTransition {
+    public:
+        FRhiVulkanTransition(const FRhiTransitionDesc& desc, FRhiSemaphoreRef semaphore)
+            : FRhiTransition(desc), mSemaphore(Move(semaphore)) {}
+
+        [[nodiscard]] auto GetSemaphore() const noexcept -> FRhiSemaphore* override {
+            return mSemaphore.Get();
+        }
+        [[nodiscard]] auto GetSignalValue() const noexcept -> u64 override { return mSignalValue; }
+        void               SetSignalValue(u64 value) override { mSignalValue = value; }
+
+    private:
+        FRhiSemaphoreRef mSemaphore;
+        u64              mSignalValue = 0ULL;
     };
 
     FRhiVulkanDevice::FRhiVulkanDevice(const FRhiDeviceDesc& desc,
@@ -199,6 +237,29 @@ namespace AltinaEngine::Rhi {
             FRhiQueueRef::Adopt(new FRhiVulkanQueue(
                 ERhiQueueType::Copy, mState->mTransferQueue, &mState->mSubmitter, this)));
 
+        const bool timelineSupported = IsFeatureSupported(ERhiFeature::TimelineSemaphore);
+        auto       initUploadQueue   = [&](ERhiQueueType type, VkQueue queue, u32 family) {
+            const u32 index = ToQueueIndex(type);
+            auto&     state = mState->mUploadQueues[index];
+            state.mQueue    = queue;
+            state.mFamily   = family;
+            if (!timelineSupported || queue == VK_NULL_HANDLE) {
+                return;
+            }
+            VkCommandPoolCreateInfo poolInfo{};
+            poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            poolInfo.queueFamilyIndex = family;
+            poolInfo.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT
+                | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+            vkCreateCommandPool(mState->mDevice, &poolInfo, nullptr, &state.mPool);
+            state.mTimeline  = CreateSemaphore(true, 0ULL);
+            state.mNextValue = 0ULL;
+        };
+
+        initUploadQueue(ERhiQueueType::Graphics, mState->mGraphicsQueue, mState->mGraphicsFamily);
+        initUploadQueue(ERhiQueueType::Compute, mState->mComputeQueue, mState->mComputeFamily);
+        initUploadQueue(ERhiQueueType::Copy, mState->mTransferQueue, mState->mTransferFamily);
+
         mState->mAllocator.Init(mState->mPhysicalDevice, mState->mDevice);
 
         FVulkanUploadBufferManagerDesc uploadDesc{};
@@ -218,6 +279,17 @@ namespace AltinaEngine::Rhi {
             mState->mStagingManager.Reset();
 
             mState->mSubmitter.Stop();
+
+            for (auto& upload : mState->mUploadQueues) {
+                if (upload.mPool != VK_NULL_HANDLE && mState->mDevice) {
+                    vkDestroyCommandPool(mState->mDevice, upload.mPool, nullptr);
+                    upload.mPool = VK_NULL_HANDLE;
+                }
+                upload.mFree.Clear();
+                upload.mInFlight.Clear();
+                upload.mTimeline  = {};
+                upload.mNextValue = 0ULL;
+            }
 
             mState->mAllocator.Shutdown();
 
@@ -468,33 +540,169 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        VkCommandPool           pool = VK_NULL_HANDLE;
-        VkCommandBuffer         cmd  = VK_NULL_HANDLE;
+        const bool    timelineSupported = IsFeatureSupported(ERhiFeature::TimelineSemaphore);
+        ERhiQueueType uploadQueue       = ERhiQueueType::Graphics;
+        if (mState->mTransferQueue != VK_NULL_HANDLE) {
+            uploadQueue = ERhiQueueType::Copy;
+        }
 
-        VkCommandPoolCreateInfo poolInfo{};
-        poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-        poolInfo.queueFamilyIndex = mState->mGraphicsFamily;
-        if (vkCreateCommandPool(mState->mDevice, &poolInfo, nullptr, &pool) != VK_SUCCESS) {
+        auto& uploadState = mState->mUploadQueues[ToQueueIndex(uploadQueue)];
+        if (!timelineSupported || uploadState.mPool == VK_NULL_HANDLE || !uploadState.mTimeline) {
+            // Fallback: block on graphics queue if timeline is unavailable.
+            VkCommandPoolCreateInfo poolInfo{};
+            poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            poolInfo.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+            poolInfo.queueFamilyIndex = mState->mGraphicsFamily;
+
+            VkCommandPool pool = VK_NULL_HANDLE;
+            if (vkCreateCommandPool(mState->mDevice, &poolInfo, nullptr, &pool) != VK_SUCCESS) {
+                if (stagingAlloc.IsValid()) {
+                    mState->mStagingManager.Release(stagingAlloc);
+                }
+                return;
+            }
+
+            VkCommandBufferAllocateInfo allocInfo{};
+            allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            allocInfo.commandPool        = pool;
+            allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            allocInfo.commandBufferCount = 1;
+            VkCommandBuffer cmd          = VK_NULL_HANDLE;
+            if (vkAllocateCommandBuffers(mState->mDevice, &allocInfo, &cmd) != VK_SUCCESS) {
+                vkDestroyCommandPool(mState->mDevice, pool, nullptr);
+                if (stagingAlloc.IsValid()) {
+                    mState->mStagingManager.Release(stagingAlloc);
+                }
+                return;
+            }
+
+            VkCommandBufferBeginInfo begin{};
+            begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            vkBeginCommandBuffer(cmd, &begin);
+
+            const bool              isDepth = Vulkan::Detail::IsDepthFormat(desc.mFormat);
+            VkImageSubresourceRange range{};
+            range.aspectMask   = Vulkan::Detail::ToVkAspectFlags(desc.mFormat);
+            range.baseMipLevel = subresource.mMipLevel;
+            range.levelCount   = 1;
+            range.baseArrayLayer =
+                (desc.mDimension == ERhiTextureDimension::Tex3D) ? 0U : subresource.mArrayLayer;
+            range.layerCount = 1;
+
+            VkImageMemoryBarrier toDst{};
+            toDst.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            toDst.image               = vkTex->GetNativeImage();
+            toDst.subresourceRange    = range;
+            toDst.oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
+            toDst.newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            toDst.srcAccessMask       = 0;
+            toDst.dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT;
+            toDst.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            toDst.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &toDst);
+
+            VkBufferImageCopy copy{};
+            copy.bufferOffset                = srcOffset;
+            const u32 rowLengthTexels        = static_cast<u32>(rowPitchBytes / bpp);
+            copy.bufferRowLength             = (rowLengthTexels == mipWidth) ? 0U : rowLengthTexels;
+            copy.bufferImageHeight           = 0U;
+            copy.imageSubresource.aspectMask = range.aspectMask;
+            copy.imageSubresource.mipLevel   = subresource.mMipLevel;
+            copy.imageSubresource.baseArrayLayer = range.baseArrayLayer;
+            copy.imageSubresource.layerCount     = 1;
+            copy.imageOffset                     = { 0, 0,
+                                    static_cast<i32>((desc.mDimension == ERhiTextureDimension::Tex3D)
+                                            ? subresource.mDepthSlice
+                                            : 0U) };
+            copy.imageExtent                     = { mipWidth, mipHeight, 1U };
+
+            vkCmdCopyBufferToImage(cmd, vkBuf->GetNativeBuffer(), vkTex->GetNativeImage(),
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+            const auto common =
+                Vulkan::Detail::MapResourceState(ERhiResourceState::Common, isDepth);
+            VkImageMemoryBarrier toCommon{};
+            toCommon.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            toCommon.image               = vkTex->GetNativeImage();
+            toCommon.subresourceRange    = range;
+            toCommon.oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            toCommon.newLayout           = common.mLayout;
+            toCommon.srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT;
+            toCommon.dstAccessMask       = 0;
+            toCommon.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            toCommon.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &toCommon);
+
+            vkEndCommandBuffer(cmd);
+
+            VkFence           fence = VK_NULL_HANDLE;
+            VkFenceCreateInfo fenceInfo{};
+            fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            vkCreateFence(mState->mDevice, &fenceInfo, nullptr, &fence);
+
+            VkSubmitInfo submit{};
+            submit.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submit.commandBufferCount = 1;
+            submit.pCommandBuffers    = &cmd;
+            vkQueueSubmit(mState->mGraphicsQueue, 1, &submit, fence);
+
+            if (fence) {
+                vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, UINT64_MAX);
+                vkDestroyFence(mState->mDevice, fence, nullptr);
+            } else {
+                vkQueueWaitIdle(mState->mGraphicsQueue);
+            }
+
+            vkFreeCommandBuffers(mState->mDevice, pool, 1, &cmd);
+            vkDestroyCommandPool(mState->mDevice, pool, nullptr);
+
             if (stagingAlloc.IsValid()) {
                 mState->mStagingManager.Release(stagingAlloc);
             }
             return;
         }
 
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool        = pool;
-        allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
-
-        // TODO: (Require Refactor, Manual) inappropriate command pool allocation
-        if (vkAllocateCommandBuffers(mState->mDevice, &allocInfo, &cmd) != VK_SUCCESS) {
-            vkDestroyCommandPool(mState->mDevice, pool, nullptr);
+        auto* vkTimeline = static_cast<FRhiVulkanSemaphore*>(uploadState.mTimeline.Get());
+        if (!vkTimeline || uploadState.mQueue == VK_NULL_HANDLE) {
             if (stagingAlloc.IsValid()) {
                 mState->mStagingManager.Release(stagingAlloc);
             }
             return;
+        }
+
+        const u64 completedValue = vkTimeline->GetCurrentValue();
+        for (usize i = 0; i < uploadState.mInFlight.Size();) {
+            if (uploadState.mInFlight[i].mSignalValue <= completedValue) {
+                uploadState.mFree.PushBack(uploadState.mInFlight[i].mCmd);
+                uploadState.mInFlight[i] = uploadState.mInFlight.Back();
+                uploadState.mInFlight.PopBack();
+                continue;
+            }
+            ++i;
+        }
+
+        VkCommandBuffer cmd = VK_NULL_HANDLE;
+        if (!uploadState.mFree.IsEmpty()) {
+            cmd = uploadState.mFree.Back();
+            uploadState.mFree.PopBack();
+            vkResetCommandBuffer(cmd, 0);
+        } else {
+            VkCommandBufferAllocateInfo allocInfo{};
+            allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            allocInfo.commandPool        = uploadState.mPool;
+            allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            allocInfo.commandBufferCount = 1;
+            if (vkAllocateCommandBuffers(mState->mDevice, &allocInfo, &cmd) != VK_SUCCESS) {
+                if (stagingAlloc.IsValid()) {
+                    mState->mStagingManager.Release(stagingAlloc);
+                }
+                return;
+            }
         }
 
         VkCommandBufferBeginInfo begin{};
@@ -526,9 +734,7 @@ namespace AltinaEngine::Rhi {
             0, 0, nullptr, 0, nullptr, 1, &toDst);
 
         VkBufferImageCopy copy{};
-        copy.bufferOffset = srcOffset;
-
-        // Vulkan expresses row pitch in texels. If the input is tightly packed, keep these at 0.
+        copy.bufferOffset                    = srcOffset;
         const u32 rowLengthTexels            = static_cast<u32>(rowPitchBytes / bpp);
         copy.bufferRowLength                 = (rowLengthTexels == mipWidth) ? 0U : rowLengthTexels;
         copy.bufferImageHeight               = 0U;
@@ -561,31 +767,30 @@ namespace AltinaEngine::Rhi {
 
         vkEndCommandBuffer(cmd);
 
-        VkFence           fence = VK_NULL_HANDLE;
-        VkFenceCreateInfo fenceInfo{};
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        const u64                     signalValue = ++uploadState.mNextValue;
 
-        // TODO: (Require Refactor, Manual) This code blocks CPU execution, try async transfer and
-        // explicit CPU waiting
-        vkCreateFence(mState->mDevice, &fenceInfo, nullptr, &fence);
+        VkTimelineSemaphoreSubmitInfo timelineInfo{};
+        timelineInfo.sType                     = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+        timelineInfo.signalSemaphoreValueCount = 1;
+        timelineInfo.pSignalSemaphoreValues    = &signalValue;
 
+        VkSemaphore  signalSemaphore = vkTimeline->GetNativeSemaphore();
         VkSubmitInfo submit{};
-        submit.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submit.commandBufferCount = 1;
-        submit.pCommandBuffers    = &cmd;
-        vkQueueSubmit(mState->mGraphicsQueue, 1, &submit, fence);
+        submit.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submit.pNext                = &timelineInfo;
+        submit.commandBufferCount   = 1;
+        submit.pCommandBuffers      = &cmd;
+        submit.signalSemaphoreCount = 1;
+        submit.pSignalSemaphores    = &signalSemaphore;
 
-        if (fence) {
-            vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, UINT64_MAX);
-            vkDestroyFence(mState->mDevice, fence, nullptr);
-        } else {
-            // TODO: (Require Refactor, Manual) This operation is TOO HEAVY.
-            vkQueueWaitIdle(mState->mGraphicsQueue);
-        }
+        vkQueueSubmit(uploadState.mQueue, 1, &submit, VK_NULL_HANDLE);
 
-        vkFreeCommandBuffers(mState->mDevice, pool, 1, &cmd);
-        // TODO: (Require Refactor, Manual) This operation is TOO HEAVY.
-        vkDestroyCommandPool(mState->mDevice, pool, nullptr);
+        FState::FUploadCmd uploadCmd{};
+        uploadCmd.mCmd         = cmd;
+        uploadCmd.mSignalValue = signalValue;
+        uploadState.mInFlight.PushBack(uploadCmd);
+
+        vkTex->SetPendingUpload(uploadState.mTimeline.Get(), signalValue);
 
         if (stagingAlloc.IsValid()) {
             mState->mStagingManager.Release(stagingAlloc);
@@ -599,6 +804,23 @@ namespace AltinaEngine::Rhi {
     auto FRhiVulkanDevice::CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef {
         return MakeResource<FRhiVulkanSemaphore>(
             mState ? mState->mDevice : VK_NULL_HANDLE, timeline, initialValue);
+    }
+
+    auto FRhiVulkanDevice::CreateTransition(const FRhiTransitionDesc& desc) -> FRhiTransitionRef {
+        const bool timelineSupported = IsFeatureSupported(ERhiFeature::TimelineSemaphore);
+        Core::Utility::Assert(timelineSupported, TEXT("RHI.Vulkan"),
+            "FRhiTransition requires timeline semaphore support.");
+        if (!timelineSupported) {
+            return {};
+        }
+
+        auto semaphore = CreateSemaphore(true, 0ULL);
+        if (!semaphore) {
+            return {};
+        }
+        auto transition = MakeResource<FRhiVulkanTransition>(desc, Move(semaphore));
+        transition->SetSignalValue(1ULL);
+        return transition;
     }
 
     auto FRhiVulkanDevice::CreateCommandPool(const FRhiCommandPoolDesc& desc)

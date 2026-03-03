@@ -74,6 +74,7 @@ if(WIN32)
     target_link_libraries(${TargetName}
         PRIVATE
             AltinaEngine::Rhi::D3D11
+            AltinaEngine::Rhi::Vulkan
     )
 else()
     target_link_libraries(${TargetName}

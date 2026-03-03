@@ -6,6 +6,7 @@
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiTexture.h"
 #include "Rhi/RhiResourceView.h"
+#include "Rhi/RhiSemaphore.h"
 
 namespace AltinaEngine::Rhi {
     class AE_RHI_VULKAN_API FRhiVulkanBuffer final : public FRhiBuffer {
@@ -32,6 +33,12 @@ namespace AltinaEngine::Rhi {
 
         [[nodiscard]] auto GetNativeImage() const noexcept -> VkImage;
         [[nodiscard]] auto GetDefaultView() const noexcept -> VkImageView;
+
+        void               SetPendingUpload(FRhiSemaphore* semaphore, u64 value) noexcept;
+        [[nodiscard]] auto HasPendingUpload() const noexcept -> bool;
+        [[nodiscard]] auto GetPendingUpload(
+            FRhiSemaphore*& outSemaphore, u64& outValue) const noexcept -> bool;
+        void ClearPendingUpload() noexcept;
 
     private:
         struct FState;

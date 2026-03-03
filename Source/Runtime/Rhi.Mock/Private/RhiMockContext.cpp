@@ -13,6 +13,7 @@
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiSemaphore.h"
+#include "Rhi/RhiTransition.h"
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiTexture.h"
@@ -381,6 +382,24 @@ namespace AltinaEngine::Rhi {
             TShared<FRhiMockCounters> mCounters;
         };
 
+        class FRhiMockTransition final : public FRhiTransition {
+        public:
+            FRhiMockTransition(const FRhiTransitionDesc& desc, FRhiSemaphoreRef semaphore)
+                : FRhiTransition(desc), mSemaphore(Move(semaphore)) {}
+
+            [[nodiscard]] auto GetSemaphore() const noexcept -> FRhiSemaphore* override {
+                return mSemaphore.Get();
+            }
+            [[nodiscard]] auto GetSignalValue() const noexcept -> u64 override {
+                return mSignalValue;
+            }
+            void SetSignalValue(u64 value) override { mSignalValue = value; }
+
+        private:
+            FRhiSemaphoreRef mSemaphore;
+            u64              mSignalValue = 0ULL;
+        };
+
         class FRhiMockCommandPool final : public FRhiCommandPool {
         public:
             FRhiMockCommandPool(const FRhiCommandPoolDesc& desc, TShared<FRhiMockCounters> counters)
@@ -621,6 +640,15 @@ namespace AltinaEngine::Rhi {
             }
             auto CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef override {
                 return MakeResource<FRhiMockSemaphore>(timeline, initialValue, mCounters);
+            }
+            auto CreateTransition(const FRhiTransitionDesc& desc) -> FRhiTransitionRef override {
+                auto semaphore = CreateSemaphore(true, 0ULL);
+                if (!semaphore) {
+                    return {};
+                }
+                auto transition = MakeResource<FRhiMockTransition>(desc, Move(semaphore));
+                transition->SetSignalValue(1ULL);
+                return transition;
             }
 
             auto CreateCommandPool(const FRhiCommandPoolDesc& desc) -> FRhiCommandPoolRef override {

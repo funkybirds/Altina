@@ -3,7 +3,7 @@ set(TargetName AltinaEngineRhiVulkan)
 add_library(${TargetName} SHARED)
 add_library(AltinaEngine::Rhi::Vulkan ALIAS ${TargetName})
 
-option(AE_RHI_VULKAN_STUB_ONLY "Build Vulkan RHI as stubs (no real Vulkan backend)" ON)
+option(AE_RHI_VULKAN_STUB_ONLY "Build Vulkan RHI as stubs (no real Vulkan backend)" OFF)
 
 file(GLOB_RECURSE Target_Public_Headers
     CONFIGURE_DEPENDS

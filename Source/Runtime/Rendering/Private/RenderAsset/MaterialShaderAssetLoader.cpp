@@ -33,6 +33,11 @@ namespace AltinaEngine::Rendering {
         using Container::FStringView;
         using Core::Utility::Filesystem::FPath;
 
+        [[nodiscard]] auto ResolveShaderTargetBackend() noexcept -> Rhi::ERhiBackend {
+            const auto backend = Rhi::RHIGetBackend();
+            return (backend != Rhi::ERhiBackend::Unknown) ? backend : Rhi::ERhiBackend::DirectX11;
+        }
+
         auto TryParseMaterialPass(FStringView name, RenderCore::EMaterialPass& outPass) -> bool {
             auto EqualsI = [](FStringView lhs, const TChar* rhs) -> bool {
                 if (rhs == nullptr) {
@@ -421,7 +426,7 @@ namespace AltinaEngine::Rendering {
                 request.mSource.mIncludeDirs.PushBack(includeDir.GetString());
             }
 
-            request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
+            request.mOptions.mTargetBackend = ResolveShaderTargetBackend();
             request.mOptions.mOptimization  = ShaderCompiler::EShaderOptimization::Default;
             request.mOptions.mDebugInfo     = false;
 
@@ -633,7 +638,7 @@ namespace AltinaEngine::Rendering {
         if (!tempPath.ParentPath().IsEmpty()) {
             request.mSource.mIncludeDirs.PushBack(tempPath.ParentPath().GetString());
         }
-        request.mOptions.mTargetBackend = Rhi::ERhiBackend::DirectX11;
+        request.mOptions.mTargetBackend = ResolveShaderTargetBackend();
         request.mOptions.mOptimization  = ShaderCompiler::EShaderOptimization::Default;
         request.mOptions.mDebugInfo     = false;
 

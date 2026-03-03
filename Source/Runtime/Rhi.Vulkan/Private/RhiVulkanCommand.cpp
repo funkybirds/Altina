@@ -10,6 +10,7 @@
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiInit.h"
 #include "Types/CheckedCast.h"
+#include "Utility/Assert.h"
 
 #include "RhiVulkanInternal.h"
 
@@ -280,10 +281,11 @@ namespace AltinaEngine::Rhi {
 
     struct FRhiVulkanCommandList::FState {
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
-        VkDevice             mDevice = VK_NULL_HANDLE;
-        VkCommandPool        mPool   = VK_NULL_HANDLE;
-        VkCommandBuffer      mBuffer = VK_NULL_HANDLE;
-        VkCommandBufferLevel mLevel  = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        VkDevice                    mDevice = VK_NULL_HANDLE;
+        VkCommandPool               mPool   = VK_NULL_HANDLE;
+        VkCommandBuffer             mBuffer = VK_NULL_HANDLE;
+        VkCommandBufferLevel        mLevel  = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        TVector<FRhiVulkanTexture*> mTouchedTextures;
 #endif
     };
 
@@ -335,6 +337,7 @@ namespace AltinaEngine::Rhi {
         if (!mState || !vkPool) {
             return;
         }
+        mState->mTouchedTextures.Clear();
         mState->mPool   = vkPool->GetNativePool();
         mState->mDevice = static_cast<FRhiVulkanDevice*>(RHIGetDevice())->GetNativeDevice();
         if (!mState->mBuffer) {
@@ -354,6 +357,36 @@ namespace AltinaEngine::Rhi {
 #if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
         if (mState && mState->mBuffer) {
             vkEndCommandBuffer(mState->mBuffer);
+        }
+#endif
+    }
+
+    void FRhiVulkanCommandList::AddTouchedTexture(FRhiVulkanTexture* texture) {
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        if (!mState || texture == nullptr) {
+            return;
+        }
+        for (auto* existing : mState->mTouchedTextures) {
+            if (existing == texture) {
+                return;
+            }
+        }
+        mState->mTouchedTextures.PushBack(texture);
+#else
+        (void)texture;
+#endif
+    }
+
+    auto FRhiVulkanCommandList::GetTouchedTextures() const noexcept
+        -> const TVector<FRhiVulkanTexture*>& {
+        static TVector<FRhiVulkanTexture*> sEmpty;
+        return mState ? mState->mTouchedTextures : sEmpty;
+    }
+
+    void FRhiVulkanCommandList::ClearTouchedTextures() {
+#if defined(AE_RHI_VULKAN_AVAILABLE) && AE_RHI_VULKAN_AVAILABLE
+        if (mState) {
+            mState->mTouchedTextures.Clear();
         }
 #endif
     }
@@ -646,6 +679,7 @@ namespace AltinaEngine::Rhi {
         if (!mState || !mState->mCmd) {
             return;
         }
+        auto* list = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
 
         TVector<FRhiRenderPassColorAttachment> colorAttachments;
         colorAttachments.Reserve(colorTargetCount);
@@ -654,6 +688,12 @@ namespace AltinaEngine::Rhi {
             FRhiTexture* texture = colorTargets ? colorTargets[i] : nullptr;
             if (!texture) {
                 continue;
+            }
+            if (list) {
+                auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
+                if (vkTex) {
+                    list->AddTouchedTexture(vkTex);
+                }
             }
             FRhiRenderTargetViewDesc rtvDesc{};
             rtvDesc.mTexture = texture;
@@ -672,6 +712,12 @@ namespace AltinaEngine::Rhi {
         FRhiRenderPassDepthStencilAttachment depthAttachment{};
         FRhiDepthStencilViewRef              depthView;
         if (depthTarget) {
+            if (list) {
+                auto* vkTex = static_cast<FRhiVulkanTexture*>(depthTarget);
+                if (vkTex) {
+                    list->AddTouchedTexture(vkTex);
+                }
+            }
             FRhiDepthStencilViewDesc dsvDesc{};
             dsvDesc.mTexture = depthTarget;
             depthView =
@@ -715,6 +761,7 @@ namespace AltinaEngine::Rhi {
         const u32 colorCount = desc.mColorAttachmentCount;
         mState->mColorAttachments.Reserve(colorCount);
         mState->mColorFormats.Reserve(colorCount);
+        auto* list = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
 
         for (u32 i = 0; i < colorCount; ++i) {
             const auto& color = desc.mColorAttachments[i];
@@ -723,8 +770,14 @@ namespace AltinaEngine::Rhi {
                 continue;
             }
 
-            auto*          texture = color.mView->GetTexture();
-            const VkFormat format  = Vulkan::Detail::ToVkFormat(texture->GetDesc().mFormat);
+            auto* texture = color.mView->GetTexture();
+            if (list) {
+                auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
+                if (vkTex) {
+                    list->AddTouchedTexture(vkTex);
+                }
+            }
+            const VkFormat format = Vulkan::Detail::ToVkFormat(texture->GetDesc().mFormat);
             mState->mColorFormats.PushBack(format);
 
             VkRenderingAttachmentInfo attachment{};
@@ -758,7 +811,13 @@ namespace AltinaEngine::Rhi {
             auto*       dsv  = desc.mDepthStencilAttachment->mView;
             VkImageView view = GetDepthStencilViewHandle(dsv);
             if (view && dsv->GetTexture()) {
-                auto* texture        = dsv->GetTexture();
+                auto* texture = dsv->GetTexture();
+                if (list) {
+                    auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
+                    if (vkTex) {
+                        list->AddTouchedTexture(vkTex);
+                    }
+                }
                 mState->mDepthFormat = Vulkan::Detail::ToVkFormat(texture->GetDesc().mFormat);
                 hasDepth             = true;
 
@@ -885,10 +944,24 @@ namespace AltinaEngine::Rhi {
         }
 
         const bool crossQueue = (info.mSrcQueue != info.mDstQueue);
-        const u32  srcFamily  = crossQueue ? mState->mOwner->GetQueueFamilyIndex(info.mSrcQueue)
-                                           : VK_QUEUE_FAMILY_IGNORED;
-        const u32  dstFamily  = crossQueue ? mState->mOwner->GetQueueFamilyIndex(info.mDstQueue)
-                                           : VK_QUEUE_FAMILY_IGNORED;
+        if (crossQueue) {
+            Core::Utility::Assert(info.mTransition != nullptr, TEXT("RHI.Vulkan"),
+                "Cross-queue transition requires a valid FRhiTransition.");
+            if (info.mTransition == nullptr) {
+                return;
+            }
+        }
+        auto addTouchedTexture = [this](FRhiTexture* texture) {
+            auto* list  = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+            auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
+            if (list && vkTex) {
+                list->AddTouchedTexture(vkTex);
+            }
+        };
+        const u32 srcFamily = crossQueue ? mState->mOwner->GetQueueFamilyIndex(info.mSrcQueue)
+                                         : VK_QUEUE_FAMILY_IGNORED;
+        const u32 dstFamily = crossQueue ? mState->mOwner->GetQueueFamilyIndex(info.mDstQueue)
+                                         : VK_QUEUE_FAMILY_IGNORED;
 
         for (u32 i = 0; i < info.mTransitionCount; ++i) {
             const auto& tr = info.mTransitions[i];
@@ -898,6 +971,7 @@ namespace AltinaEngine::Rhi {
 
             // Stateless barrier generation based solely on the transition info.
             if (auto* texture = AltinaEngine::CheckedCast<FRhiTexture*>(tr.mResource)) {
+                addTouchedTexture(texture);
                 auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
                 if (!vkTex) {
                     continue;
@@ -1021,6 +1095,18 @@ namespace AltinaEngine::Rhi {
         if (info.mSrcQueue == info.mDstQueue) {
             return;
         }
+        Core::Utility::Assert(info.mTransition != nullptr, TEXT("RHI.Vulkan"),
+            "Cross-queue transition requires a valid FRhiTransition.");
+        if (info.mTransition == nullptr) {
+            return;
+        }
+        auto addTouchedTexture = [this](FRhiTexture* texture) {
+            auto* list  = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+            auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
+            if (list && vkTex) {
+                list->AddTouchedTexture(vkTex);
+            }
+        };
 
         const u32 srcFamily = mState->mOwner->GetQueueFamilyIndex(info.mSrcQueue);
         const u32 dstFamily = mState->mOwner->GetQueueFamilyIndex(info.mDstQueue);
@@ -1032,6 +1118,7 @@ namespace AltinaEngine::Rhi {
             }
 
             if (auto* texture = AltinaEngine::CheckedCast<FRhiTexture*>(tr.mResource)) {
+                addTouchedTexture(texture);
                 auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
                 if (!vkTex) {
                     continue;
@@ -1145,6 +1232,10 @@ namespace AltinaEngine::Rhi {
         if (!vkTex) {
             return;
         }
+        auto* list = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+        if (list) {
+            list->AddTouchedTexture(vkTex);
+        }
 
         VkClearColorValue clear{};
         clear.float32[0] = color.mR;
@@ -1177,6 +1268,18 @@ namespace AltinaEngine::Rhi {
         auto* vkGroup = static_cast<FRhiVulkanBindGroup*>(group);
         if (!vkGroup) {
             return;
+        }
+        auto* list = static_cast<FRhiVulkanCommandList*>(mCommandList.Get());
+        if (list) {
+            const auto& desc = group->GetDesc();
+            for (const auto& entry : desc.mEntries) {
+                if (entry.mTexture != nullptr) {
+                    auto* vkTex = static_cast<FRhiVulkanTexture*>(entry.mTexture);
+                    if (vkTex) {
+                        list->AddTouchedTexture(vkTex);
+                    }
+                }
+            }
         }
 
         VkPipelineLayout    layout    = VK_NULL_HANDLE;

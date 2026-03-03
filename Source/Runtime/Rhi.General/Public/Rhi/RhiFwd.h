@@ -25,6 +25,7 @@ namespace AltinaEngine::Rhi {
     class FRhiDepthStencilView;
     class FRhiFence;
     class FRhiSemaphore;
+    class FRhiTransition;
     class FRhiCommandPool;
     class FRhiCommandList;
     class FRhiCommandContext;
@@ -87,6 +88,7 @@ namespace AltinaEngine::Rhi {
     struct FRhiQueueSignal;
     struct FRhiSubmitInfo;
     struct FRhiPresentInfo;
+    struct FRhiTransitionDesc;
     struct FRhiTransitionInfo;
     struct FRhiTransitionCreateInfo;
     struct FRhiRenderPassColorAttachment;

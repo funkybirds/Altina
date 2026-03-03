@@ -1,23 +1,39 @@
 #include "TestHarness.h"
 
 #include "FrameGraph/FrameGraph.h"
+#include "FrameGraph/FrameGraphExecutor.h"
 #include "RhiMock/RhiMockContext.h"
 #include "Rhi/Command/RhiCmdContext.h"
+#include "Rhi/RhiCommandContext.h"
+#include "Rhi/RhiCommandPool.h"
+#include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiBindGroup.h"
+#include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiDevice.h"
+#include "Rhi/RhiFence.h"
+#include "Rhi/RhiPipeline.h"
+#include "Rhi/RhiPipelineLayout.h"
+#include "Rhi/RhiSampler.h"
+#include "Rhi/RhiShader.h"
 #include "Rhi/RhiTexture.h"
 #include "Rhi/RhiStructs.h"
+#include "Rhi/RhiTransition.h"
+#include "Rhi/RhiCommandList.h"
+#include "Rhi/RhiViewport.h"
 
 namespace {
     using AltinaEngine::i32;
     using AltinaEngine::TChar;
     using AltinaEngine::u32;
     using AltinaEngine::u64;
+    using AltinaEngine::u8;
     using AltinaEngine::RenderCore::EFrameGraphPassType;
     using AltinaEngine::RenderCore::EFrameGraphQueue;
     using AltinaEngine::RenderCore::FFrameGraph;
     using AltinaEngine::RenderCore::FFrameGraphBufferDesc;
     using AltinaEngine::RenderCore::FFrameGraphBufferRef;
     using AltinaEngine::RenderCore::FFrameGraphDSVRef;
+    using AltinaEngine::RenderCore::FFrameGraphExecutor;
     using AltinaEngine::RenderCore::FFrameGraphPassBuilder;
     using AltinaEngine::RenderCore::FFrameGraphPassDesc;
     using AltinaEngine::RenderCore::FFrameGraphPassResources;
@@ -103,7 +119,445 @@ namespace {
             i32 /*vertexOffset*/, u32 /*firstInstance*/) override {}
         void RHIDispatch(u32 /*groupCountX*/, u32 /*groupCountY*/, u32 /*groupCountZ*/) override {}
     };
+
+    enum class ETestEvent : u8 {
+        BeginTransition = 0,
+        EndTransition,
+        Dispatch
+    };
+
+    struct FSubmitRecord {
+        AltinaEngine::Rhi::ERhiQueueType mQueue = AltinaEngine::Rhi::ERhiQueueType::Graphics;
+        AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiQueueWait>   mWaits;
+        AltinaEngine::Core::Container::TVector<AltinaEngine::Rhi::FRhiQueueSignal> mSignals;
+    };
+
+    class FTestSemaphore final : public AltinaEngine::Rhi::FRhiSemaphore {
+    public:
+        explicit FTestSemaphore(bool timeline, u64 initialValue)
+            : FRhiSemaphore(), mTimeline(timeline), mValue(initialValue) {}
+
+        [[nodiscard]] auto IsTimeline() const noexcept -> bool override { return mTimeline; }
+        [[nodiscard]] auto GetCurrentValue() const noexcept -> u64 override { return mValue; }
+        void               Signal(u64 value) { mValue = value; }
+
+    private:
+        bool mTimeline = true;
+        u64  mValue    = 0ULL;
+    };
+
+    class FTestFence final : public AltinaEngine::Rhi::FRhiFence {
+    public:
+        explicit FTestFence(u64 initialValue) : FRhiFence(), mValue(initialValue) {}
+
+        [[nodiscard]] auto GetCompletedValue() const noexcept -> u64 override { return mValue; }
+        void               SignalCPU(u64 value) override { mValue = value; }
+        void               WaitCPU(u64 value) override { mValue = value; }
+        void               Reset(u64 value) override { mValue = value; }
+
+    private:
+        u64 mValue = 0ULL;
+    };
+
+    class FTestTransition final : public AltinaEngine::Rhi::FRhiTransition {
+    public:
+        FTestTransition(const AltinaEngine::Rhi::FRhiTransitionDesc& desc,
+            AltinaEngine::Rhi::FRhiSemaphoreRef                      semaphore)
+            : FRhiTransition(desc), mSemaphore(Move(semaphore)) {}
+
+        [[nodiscard]] auto GetSemaphore() const noexcept
+            -> AltinaEngine::Rhi::FRhiSemaphore* override {
+            return mSemaphore.Get();
+        }
+        [[nodiscard]] auto GetSignalValue() const noexcept -> u64 override { return mSignalValue; }
+        void               SetSignalValue(u64 value) override { mSignalValue = value; }
+
+    private:
+        AltinaEngine::Rhi::FRhiSemaphoreRef mSemaphore;
+        u64                                 mSignalValue = 0ULL;
+    };
+
+    class FTestCommandList final : public AltinaEngine::Rhi::FRhiCommandList {
+    public:
+        explicit FTestCommandList(const AltinaEngine::Rhi::FRhiCommandListDesc& desc)
+            : FRhiCommandList(desc) {}
+
+        void Reset(AltinaEngine::Rhi::FRhiCommandPool* /*pool*/) override {}
+        void Close() override {}
+    };
+
+    class FTestCommandContext final :
+        public AltinaEngine::Rhi::FRhiCommandContext,
+        public AltinaEngine::Rhi::IRhiCmdContextOps {
+    public:
+        FTestCommandContext(const AltinaEngine::Rhi::FRhiCommandContextDesc& desc,
+            AltinaEngine::Rhi::FRhiCommandListRef                            commandList)
+            : FRhiCommandContext(desc), mCommandList(Move(commandList)) {}
+
+        void               Begin() override { mRecording = true; }
+        void               End() override { mRecording = false; }
+        [[nodiscard]] auto GetCommandList() const noexcept
+            -> AltinaEngine::Rhi::FRhiCommandList* override {
+            return mCommandList.Get();
+        }
+
+        const AltinaEngine::Core::Container::TVector<ETestEvent>& GetEvents() const noexcept {
+            return mEvents;
+        }
+
+        void RHIUpdateDynamicBufferDiscard(AltinaEngine::Rhi::FRhiBuffer* /*buffer*/,
+            const void* /*data*/, u64 /*sizeBytes*/, u64 /*offsetBytes*/) override {}
+
+        void RHISetGraphicsPipeline(AltinaEngine::Rhi::FRhiPipeline* /*pipeline*/) override {}
+        void RHISetComputePipeline(AltinaEngine::Rhi::FRhiPipeline* /*pipeline*/) override {}
+        void RHISetPrimitiveTopology(
+            AltinaEngine::Rhi::ERhiPrimitiveTopology /*topology*/) override {}
+        void RHISetVertexBuffer(
+            u32 /*slot*/, const AltinaEngine::Rhi::FRhiVertexBufferView& /*view*/) override {}
+        void RHISetIndexBuffer(const AltinaEngine::Rhi::FRhiIndexBufferView& /*view*/) override {}
+        void RHISetViewport(const AltinaEngine::Rhi::FRhiViewportRect& /*viewport*/) override {}
+        void RHISetScissor(const AltinaEngine::Rhi::FRhiScissorRect& /*scissor*/) override {}
+        void RHISetRenderTargets(u32 /*colorTargetCount*/,
+            AltinaEngine::Rhi::FRhiTexture* const* /*colorTargets*/,
+            AltinaEngine::Rhi::FRhiTexture* /*depthTarget*/) override {}
+        void RHIBeginRenderPass(const AltinaEngine::Rhi::FRhiRenderPassDesc& /*desc*/) override {}
+        void RHIEndRenderPass() override {}
+        void RHIBeginTransition(
+            const AltinaEngine::Rhi::FRhiTransitionCreateInfo& /*info*/) override {
+            mEvents.PushBack(ETestEvent::BeginTransition);
+        }
+        void RHIEndTransition(
+            const AltinaEngine::Rhi::FRhiTransitionCreateInfo& /*info*/) override {
+            mEvents.PushBack(ETestEvent::EndTransition);
+        }
+        void RHIClearColor(AltinaEngine::Rhi::FRhiTexture* /*colorTarget*/,
+            const AltinaEngine::Rhi::FRhiClearColor& /*color*/) override {}
+        void RHISetBindGroup(u32 /*setIndex*/, AltinaEngine::Rhi::FRhiBindGroup* /*group*/,
+            const u32* /*dynamicOffsets*/, u32 /*dynamicOffsetCount*/) override {}
+        void RHIDraw(u32 /*vertexCount*/, u32 /*instanceCount*/, u32 /*firstVertex*/,
+            u32 /*firstInstance*/) override {}
+        void RHIDrawIndexed(u32 /*indexCount*/, u32 /*instanceCount*/, u32 /*firstIndex*/,
+            i32 /*vertexOffset*/, u32 /*firstInstance*/) override {}
+        void RHIDispatch(u32 /*groupCountX*/, u32 /*groupCountY*/, u32 /*groupCountZ*/) override {
+            mEvents.PushBack(ETestEvent::Dispatch);
+        }
+
+    private:
+        bool                                               mRecording = false;
+        AltinaEngine::Rhi::FRhiCommandListRef              mCommandList;
+        AltinaEngine::Core::Container::TVector<ETestEvent> mEvents;
+    };
+
+    class FTestQueue final : public AltinaEngine::Rhi::FRhiQueue {
+    public:
+        explicit FTestQueue(AltinaEngine::Rhi::ERhiQueueType type) : FRhiQueue(type) {}
+
+        void Submit(const AltinaEngine::Rhi::FRhiSubmitInfo& info) override {
+            FSubmitRecord record{};
+            record.mQueue = GetType();
+            if (info.mWaits && info.mWaitCount > 0U) {
+                record.mWaits.Reserve(info.mWaitCount);
+                for (u32 i = 0U; i < info.mWaitCount; ++i) {
+                    record.mWaits.PushBack(info.mWaits[i]);
+                }
+            }
+            if (info.mSignals && info.mSignalCount > 0U) {
+                record.mSignals.Reserve(info.mSignalCount);
+                for (u32 i = 0U; i < info.mSignalCount; ++i) {
+                    record.mSignals.PushBack(info.mSignals[i]);
+                }
+            }
+            mSubmits.PushBack(record);
+            if (info.mSignals) {
+                for (u32 i = 0U; i < info.mSignalCount; ++i) {
+                    if (info.mSignals[i].mSemaphore && info.mSignals[i].mSemaphore->IsTimeline()) {
+                        auto* sem = static_cast<FTestSemaphore*>(info.mSignals[i].mSemaphore);
+                        if (sem) {
+                            sem->Signal(info.mSignals[i].mValue);
+                        }
+                    }
+                }
+            }
+        }
+
+        void Signal(AltinaEngine::Rhi::FRhiFence* fence, u64 value) override {
+            if (fence) {
+                fence->SignalCPU(value);
+            }
+        }
+        void Wait(AltinaEngine::Rhi::FRhiFence* fence, u64 value) override {
+            if (fence) {
+                fence->WaitCPU(value);
+            }
+        }
+        void WaitIdle() override {}
+        void Present(const AltinaEngine::Rhi::FRhiPresentInfo& /*info*/) override {}
+
+        const AltinaEngine::Core::Container::TVector<FSubmitRecord>& GetSubmits() const noexcept {
+            return mSubmits;
+        }
+
+    private:
+        AltinaEngine::Core::Container::TVector<FSubmitRecord> mSubmits;
+    };
+
+    class FTestDevice final : public AltinaEngine::Rhi::FRhiDevice {
+    public:
+        FTestDevice(bool supportsAsyncCompute, bool supportsAsyncCopy)
+            : FRhiDevice(
+                  AltinaEngine::Rhi::FRhiDeviceDesc{}, AltinaEngine::Rhi::FRhiAdapterDesc{}) {
+            AltinaEngine::Rhi::FRhiQueueCapabilities caps{};
+            caps.mSupportsGraphics     = true;
+            caps.mSupportsCompute      = true;
+            caps.mSupportsCopy         = true;
+            caps.mSupportsAsyncCompute = supportsAsyncCompute;
+            caps.mSupportsAsyncCopy    = supportsAsyncCopy;
+            SetQueueCapabilities(caps);
+
+            RegisterQueue(AltinaEngine::Rhi::ERhiQueueType::Graphics,
+                MakeResource<FTestQueue>(AltinaEngine::Rhi::ERhiQueueType::Graphics));
+            RegisterQueue(AltinaEngine::Rhi::ERhiQueueType::Compute,
+                MakeResource<FTestQueue>(AltinaEngine::Rhi::ERhiQueueType::Compute));
+            RegisterQueue(AltinaEngine::Rhi::ERhiQueueType::Copy,
+                MakeResource<FTestQueue>(AltinaEngine::Rhi::ERhiQueueType::Copy));
+        }
+
+        auto CreateBuffer(const AltinaEngine::Rhi::FRhiBufferDesc& desc)
+            -> AltinaEngine::Rhi::FRhiBufferRef override {
+            return MakeResource<AltinaEngine::Rhi::FRhiBuffer>(desc);
+        }
+        auto CreateTexture(const AltinaEngine::Rhi::FRhiTextureDesc& desc)
+            -> AltinaEngine::Rhi::FRhiTextureRef override {
+            return MakeResource<AltinaEngine::Rhi::FRhiTexture>(desc);
+        }
+        auto CreateViewport(const AltinaEngine::Rhi::FRhiViewportDesc& /*desc*/)
+            -> AltinaEngine::Rhi::FRhiViewportRef override {
+            return {};
+        }
+        auto CreateSampler(const AltinaEngine::Rhi::FRhiSamplerDesc& /*desc*/)
+            -> AltinaEngine::Rhi::FRhiSamplerRef override {
+            return {};
+        }
+        auto CreateShader(const AltinaEngine::Rhi::FRhiShaderDesc& /*desc*/)
+            -> AltinaEngine::Rhi::FRhiShaderRef override {
+            return {};
+        }
+
+        auto CreateGraphicsPipeline(const AltinaEngine::Rhi::FRhiGraphicsPipelineDesc& /*desc*/)
+            -> AltinaEngine::Rhi::FRhiPipelineRef override {
+            return {};
+        }
+        auto CreateComputePipeline(const AltinaEngine::Rhi::FRhiComputePipelineDesc& /*desc*/)
+            -> AltinaEngine::Rhi::FRhiPipelineRef override {
+            return {};
+        }
+        auto CreatePipelineLayout(const AltinaEngine::Rhi::FRhiPipelineLayoutDesc& /*desc*/)
+            -> AltinaEngine::Rhi::FRhiPipelineLayoutRef override {
+            return {};
+        }
+
+        auto CreateBindGroupLayout(const AltinaEngine::Rhi::FRhiBindGroupLayoutDesc& /*desc*/)
+            -> AltinaEngine::Rhi::FRhiBindGroupLayoutRef override {
+            return {};
+        }
+        auto CreateBindGroup(const AltinaEngine::Rhi::FRhiBindGroupDesc& /*desc*/)
+            -> AltinaEngine::Rhi::FRhiBindGroupRef override {
+            return {};
+        }
+
+        void UpdateTextureSubresource(AltinaEngine::Rhi::FRhiTexture* /*texture*/,
+            const AltinaEngine::Rhi::FRhiTextureSubresource& /*subresource*/, const void* /*data*/,
+            u32 /*rowPitchBytes*/, u32 /*slicePitchBytes*/) override {}
+
+        auto CreateFence(u64 initialValue) -> AltinaEngine::Rhi::FRhiFenceRef override {
+            return MakeResource<FTestFence>(initialValue);
+        }
+        auto CreateSemaphore(bool timeline, u64 initialValue)
+            -> AltinaEngine::Rhi::FRhiSemaphoreRef override {
+            return MakeResource<FTestSemaphore>(timeline, initialValue);
+        }
+        auto CreateTransition(const AltinaEngine::Rhi::FRhiTransitionDesc& desc)
+            -> AltinaEngine::Rhi::FRhiTransitionRef override {
+            auto semaphore = CreateSemaphore(true, 0ULL);
+            if (!semaphore) {
+                return {};
+            }
+            auto transition = MakeResource<FTestTransition>(desc, Move(semaphore));
+            transition->SetSignalValue(1ULL);
+            return transition;
+        }
+
+        auto CreateCommandPool(const AltinaEngine::Rhi::FRhiCommandPoolDesc& /*desc*/)
+            -> AltinaEngine::Rhi::FRhiCommandPoolRef override {
+            return {};
+        }
+        auto CreateCommandList(const AltinaEngine::Rhi::FRhiCommandListDesc& desc)
+            -> AltinaEngine::Rhi::FRhiCommandListRef override {
+            return MakeResource<FTestCommandList>(desc);
+        }
+        auto CreateCommandContext(const AltinaEngine::Rhi::FRhiCommandContextDesc& desc)
+            -> AltinaEngine::Rhi::FRhiCommandContextRef override {
+            AltinaEngine::Rhi::FRhiCommandListDesc listDesc{};
+            listDesc.mQueueType   = desc.mQueueType;
+            listDesc.mListType    = desc.mListType;
+            auto      commandList = MakeResource<FTestCommandList>(listDesc);
+            auto      context     = MakeResource<FTestCommandContext>(desc, Move(commandList));
+            const u32 index       = static_cast<u32>(desc.mQueueType);
+            if (index < 3U) {
+                mContexts[index] = context.Get();
+            }
+            return context;
+        }
+
+        FTestQueue* GetTestQueue(AltinaEngine::Rhi::ERhiQueueType type) const {
+            auto queue = GetQueue(type);
+            return queue ? static_cast<FTestQueue*>(queue.Get()) : nullptr;
+        }
+
+        FTestCommandContext* GetTestContext(AltinaEngine::Rhi::ERhiQueueType type) const {
+            const u32 index = static_cast<u32>(type);
+            return (index < 3U) ? mContexts[index] : nullptr;
+        }
+
+    private:
+        FTestCommandContext* mContexts[3] = {};
+    };
 } // namespace
+
+TEST_CASE("FrameGraphExecutor.CrossQueueTransition_SubmitOrder") {
+    FTestDevice device(true, true);
+    FFrameGraph graph(device);
+    graph.BeginFrame(1);
+
+    FRhiTextureDesc texDesc{};
+    texDesc.mWidth   = 4U;
+    texDesc.mHeight  = 4U;
+    texDesc.mFormat  = ERhiFormat::R8G8B8A8Unorm;
+    auto externalTex = device.CreateTexture(texDesc);
+    REQUIRE(externalTex);
+    const auto texRef = graph.ImportTexture(externalTex.Get(), ERhiResourceState::Common);
+
+    struct FPassData {
+        FFrameGraphTextureRef mTex;
+    };
+
+    FFrameGraphPassDesc passA{};
+    passA.mName  = "CrossQueueA";
+    passA.mType  = EFrameGraphPassType::Compute;
+    passA.mQueue = EFrameGraphQueue::Compute;
+
+    graph.AddPass<FPassData>(
+        passA,
+        [&](FFrameGraphPassBuilder& builder, FPassData& data) {
+            data.mTex = builder.Write(texRef, ERhiResourceState::UnorderedAccess);
+        },
+        [](AltinaEngine::Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& /*res*/,
+            const FPassData& /*data*/) { ctx.RHIDispatch(1U, 1U, 1U); });
+
+    FFrameGraphPassDesc passB{};
+    passB.mName  = "CrossQueueB";
+    passB.mType  = EFrameGraphPassType::Compute;
+    passB.mQueue = EFrameGraphQueue::Graphics;
+
+    graph.AddPass<FPassData>(
+        passB,
+        [&](FFrameGraphPassBuilder& builder, FPassData& data) {
+            data.mTex = builder.Read(texRef, ERhiResourceState::ShaderResource);
+        },
+        [](AltinaEngine::Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& /*res*/,
+            const FPassData& /*data*/) { ctx.RHIDispatch(1U, 1U, 1U); });
+
+    graph.Compile();
+    FFrameGraphExecutor executor(device);
+    executor.Execute(graph);
+
+    auto* computeQueue  = device.GetTestQueue(AltinaEngine::Rhi::ERhiQueueType::Compute);
+    auto* graphicsQueue = device.GetTestQueue(AltinaEngine::Rhi::ERhiQueueType::Graphics);
+    REQUIRE(computeQueue != nullptr);
+    REQUIRE(graphicsQueue != nullptr);
+
+    const auto& computeSubmits  = computeQueue->GetSubmits();
+    const auto& graphicsSubmits = graphicsQueue->GetSubmits();
+    REQUIRE(!computeSubmits.IsEmpty());
+    REQUIRE(!graphicsSubmits.IsEmpty());
+
+    bool                              foundSignal = false;
+    AltinaEngine::Rhi::FRhiSemaphore* signaled    = nullptr;
+    for (const auto& submit : computeSubmits) {
+        if (!submit.mSignals.IsEmpty()) {
+            foundSignal = true;
+            signaled    = submit.mSignals[0].mSemaphore;
+            break;
+        }
+    }
+    REQUIRE(foundSignal);
+    REQUIRE(signaled != nullptr);
+
+    bool foundWait = false;
+    for (const auto& submit : graphicsSubmits) {
+        if (!submit.mWaits.IsEmpty()) {
+            foundWait = (submit.mWaits[0].mSemaphore == signaled);
+            if (foundWait) {
+                break;
+            }
+        }
+    }
+    REQUIRE(foundWait);
+
+    auto* gfxContext = device.GetTestContext(AltinaEngine::Rhi::ERhiQueueType::Graphics);
+    REQUIRE(gfxContext != nullptr);
+    const auto& events = gfxContext->GetEvents();
+    REQUIRE(!events.IsEmpty());
+    bool seenAcquire              = false;
+    bool seenDispatchAfterAcquire = false;
+    for (const auto evt : events) {
+        if (evt == ETestEvent::EndTransition) {
+            seenAcquire = true;
+        } else if (evt == ETestEvent::Dispatch && seenAcquire) {
+            seenDispatchAfterAcquire = true;
+            break;
+        }
+    }
+    REQUIRE(seenDispatchAfterAcquire);
+}
+
+TEST_CASE("FrameGraphExecutor.QueueFallback_WhenAsyncUnsupported") {
+    FTestDevice device(false, false);
+    FFrameGraph graph(device);
+    graph.BeginFrame(1);
+
+    FFrameGraphPassDesc pass{};
+    pass.mName  = "FallbackPass";
+    pass.mType  = EFrameGraphPassType::Compute;
+    pass.mQueue = EFrameGraphQueue::Compute;
+
+    struct FPassData {};
+
+    graph.AddPass<FPassData>(
+        pass,
+        [&](FFrameGraphPassBuilder& builder, FPassData& /*data*/) {
+            FFrameGraphTextureDesc desc{};
+            desc.mDesc.mWidth  = 4U;
+            desc.mDesc.mHeight = 4U;
+            desc.mDesc.mFormat = ERhiFormat::R8G8B8A8Unorm;
+            auto tex           = builder.CreateTexture(desc);
+            builder.Read(tex, ERhiResourceState::ShaderResource);
+        },
+        [](AltinaEngine::Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& /*res*/,
+            const FPassData& /*data*/) { ctx.RHIDispatch(1U, 1U, 1U); });
+
+    graph.Compile();
+    FFrameGraphExecutor executor(device);
+    executor.Execute(graph);
+
+    auto* computeQueue  = device.GetTestQueue(AltinaEngine::Rhi::ERhiQueueType::Compute);
+    auto* graphicsQueue = device.GetTestQueue(AltinaEngine::Rhi::ERhiQueueType::Graphics);
+    REQUIRE(computeQueue != nullptr);
+    REQUIRE(graphicsQueue != nullptr);
+
+    REQUIRE(computeQueue->GetSubmits().IsEmpty());
+    REQUIRE(!graphicsQueue->GetSubmits().IsEmpty());
+}
 
 TEST_CASE("FrameGraph.BasicPassResources") {
     FRhiMockContext context;

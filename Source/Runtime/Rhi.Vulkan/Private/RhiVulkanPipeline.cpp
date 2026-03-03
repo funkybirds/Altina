@@ -131,9 +131,17 @@ namespace AltinaEngine::Rhi {
     }
 
     struct FRhiVulkanBindGroupLayout::FState {
-        VkDevice              mDevice = VK_NULL_HANDLE;
-        VkDescriptorSetLayout mLayout = VK_NULL_HANDLE;
-        bool                  mOwns   = true;
+        struct FBindingMapEntry {
+            u32             mSourceBinding = 0U;
+            ERhiBindingType mType          = ERhiBindingType::StorageBuffer;
+            bool            mDynamicOffset = false;
+            u32             mVkBinding     = 0U;
+        };
+
+        VkDevice                                   mDevice = VK_NULL_HANDLE;
+        VkDescriptorSetLayout                      mLayout = VK_NULL_HANDLE;
+        bool                                       mOwns   = true;
+        Core::Container::TVector<FBindingMapEntry> mBindingMap;
     };
 
     FRhiVulkanBindGroupLayout::FRhiVulkanBindGroupLayout(
@@ -144,15 +152,67 @@ namespace AltinaEngine::Rhi {
 
         Core::Container::TVector<VkDescriptorSetLayoutBinding> bindings;
         bindings.Reserve(desc.mEntries.Size());
+        mState->mBindingMap.Reserve(desc.mEntries.Size());
+
+        auto isVkBindingUsed = [&](u32 vkBinding) -> bool {
+            for (const auto& existing : bindings) {
+                if (existing.binding == vkBinding) {
+                    return true;
+                }
+            }
+            return false;
+        };
 
         for (const auto& entry : desc.mEntries) {
-            VkDescriptorSetLayoutBinding binding{};
-            binding.binding            = entry.mBinding;
-            binding.descriptorType     = ToVkDescriptorType(entry.mType, entry.mHasDynamicOffset);
-            binding.descriptorCount    = entry.mArrayCount;
-            binding.stageFlags         = ToVkStageFlags(entry.mVisibility);
-            binding.pImmutableSamplers = nullptr;
-            bindings.PushBack(binding);
+            const VkDescriptorType descriptorType =
+                ToVkDescriptorType(entry.mType, entry.mHasDynamicOffset);
+            const VkShaderStageFlags stageFlags = ToVkStageFlags(entry.mVisibility);
+            bool                     resolved   = false;
+
+            for (const auto& mapped : mState->mBindingMap) {
+                if (mapped.mSourceBinding != entry.mBinding || mapped.mType != entry.mType) {
+                    continue;
+                }
+                for (auto& existing : bindings) {
+                    if (existing.binding != mapped.mVkBinding) {
+                        continue;
+                    }
+                    existing.stageFlags |= stageFlags;
+                    if (entry.mArrayCount > existing.descriptorCount) {
+                        existing.descriptorCount = entry.mArrayCount;
+                    }
+                    resolved = true;
+                    break;
+                }
+                if (resolved) {
+                    break;
+                }
+            }
+
+            if (!resolved) {
+                u32 vkBinding = entry.mBinding;
+                if (isVkBindingUsed(vkBinding)) {
+                    vkBinding = 0U;
+                    while (isVkBindingUsed(vkBinding)) {
+                        ++vkBinding;
+                    }
+                }
+
+                VkDescriptorSetLayoutBinding binding{};
+                binding.binding            = vkBinding;
+                binding.descriptorType     = descriptorType;
+                binding.descriptorCount    = entry.mArrayCount;
+                binding.stageFlags         = stageFlags;
+                binding.pImmutableSamplers = nullptr;
+                bindings.PushBack(binding);
+
+                FState::FBindingMapEntry mapped{};
+                mapped.mSourceBinding = entry.mBinding;
+                mapped.mType          = entry.mType;
+                mapped.mDynamicOffset = entry.mHasDynamicOffset;
+                mapped.mVkBinding     = vkBinding;
+                mState->mBindingMap.PushBack(mapped);
+            }
         }
 
         VkDescriptorSetLayoutCreateInfo info{};
@@ -187,6 +247,21 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiVulkanBindGroupLayout::GetNativeLayout() const noexcept -> VkDescriptorSetLayout {
         return (mState != nullptr) ? mState->mLayout : VK_NULL_HANDLE;
+    }
+
+    auto FRhiVulkanBindGroupLayout::ResolveBinding(u32 sourceBinding, ERhiBindingType type,
+        u32& outVkBinding, bool& outDynamicOffset) const noexcept -> bool {
+        if (mState == nullptr) {
+            return false;
+        }
+        for (const auto& mapped : mState->mBindingMap) {
+            if (mapped.mSourceBinding == sourceBinding && mapped.mType == type) {
+                outVkBinding     = mapped.mVkBinding;
+                outDynamicOffset = mapped.mDynamicOffset;
+                return true;
+            }
+        }
+        return false;
     }
 
     struct FRhiVulkanBindGroup::FState {
@@ -262,25 +337,23 @@ namespace AltinaEngine::Rhi {
         bufferInfos.Reserve(desc.mEntries.Size());
         imageInfos.Reserve(desc.mEntries.Size());
 
-        auto isDynamicBinding = [&](u32 binding) -> bool {
-            for (const auto& layoutEntry : layoutDesc.mEntries) {
-                if (layoutEntry.mBinding == binding) {
-                    return layoutEntry.mHasDynamicOffset;
-                }
-            }
-            return false;
-        };
-
         for (const auto& entry : desc.mEntries) {
+            u32  dstBinding    = entry.mBinding;
+            bool dynamicOffset = false;
+            if (!vkLayout
+                || !vkLayout->ResolveBinding(
+                    entry.mBinding, entry.mType, dstBinding, dynamicOffset)) {
+                continue;
+            }
+
             VkWriteDescriptorSet write{};
             write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             write.dstSet          = mState->mSet;
-            write.dstBinding      = entry.mBinding;
+            write.dstBinding      = dstBinding;
             write.dstArrayElement = entry.mArrayIndex;
             write.descriptorCount = 1;
-            write.descriptorType  = ToVkDescriptorType(entry.mType,
-                 (entry.mType == ERhiBindingType::ConstantBuffer)
-                     && isDynamicBinding(entry.mBinding));
+            write.descriptorType  = ToVkDescriptorType(
+                entry.mType, (entry.mType == ERhiBindingType::ConstantBuffer) && dynamicOffset);
 
             if (entry.mType == ERhiBindingType::ConstantBuffer
                 || entry.mType == ERhiBindingType::SampledBuffer

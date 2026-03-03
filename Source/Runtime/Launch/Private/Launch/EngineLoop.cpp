@@ -28,6 +28,7 @@
 #include "Utility/Filesystem/PathUtils.h"
 #include "Threading/RenderingThread.h"
 #include "FrameGraph/FrameGraph.h"
+#include "FrameGraph/FrameGraphExecutor.h"
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiCommandContext.h"
 #include "Rhi/RhiQueue.h"
@@ -62,6 +63,7 @@
     #endif
     #include "Application/Windows/WindowsApplication.h"
     #include "RhiD3D11/RhiD3D11Context.h"
+    #include "RhiVulkan/RhiVulkanContext.h"
 #elif AE_PLATFORM_MACOS
     #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
         #include <mach-o/dyld.h>
@@ -440,38 +442,8 @@ namespace AltinaEngine::Launch {
         }
 
         void ExecuteFrameGraph(Rhi::FRhiDevice& device, RenderCore::FFrameGraph& graph) {
-            Rhi::FRhiCommandContextDesc ctxDesc{};
-            ctxDesc.mQueueType  = Rhi::ERhiQueueType::Graphics;
-            auto commandContext = device.CreateCommandContext(ctxDesc);
-            if (!commandContext) {
-                return;
-            }
-
-            auto* ops = dynamic_cast<Rhi::IRhiCmdContextOps*>(commandContext.Get());
-            if (ops == nullptr) {
-                return;
-            }
-
-            Rhi::FRhiCmdContextAdapter adapter(*commandContext.Get(), *ops);
-            adapter.Begin();
-            graph.Execute(adapter);
-            adapter.End();
-
-            auto* commandList = commandContext->GetCommandList();
-            if (commandList == nullptr) {
-                return;
-            }
-
-            auto queue = device.GetQueue(Rhi::ERhiQueueType::Graphics);
-            if (!queue) {
-                return;
-            }
-
-            Rhi::FRhiCommandList* commandLists[] = { commandList };
-            Rhi::FRhiSubmitInfo   submit{};
-            submit.mCommandLists     = commandLists;
-            submit.mCommandListCount = 1U;
-            queue->Submit(submit);
+            RenderCore::FFrameGraphExecutor executor(device);
+            executor.Execute(graph);
         }
 
         void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
@@ -926,11 +898,68 @@ namespace AltinaEngine::Launch {
         }
 
 #if AE_PLATFORM_WIN
-        mRhiContext = MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiD3D11Context>();
+        const auto& config      = Core::Utility::EngineConfig::GetGlobalConfig();
+        const bool  preferD3D11 = config.GetBool(TEXT("Rhi/PreferD3D11"));
+        const auto  requestedRhi =
+            preferD3D11 ? Rhi::ERhiBackend::DirectX11 : Rhi::ERhiBackend::Vulkan;
+
+        auto backendName = [](Rhi::ERhiBackend backend) -> const TChar* {
+            switch (backend) {
+                case Rhi::ERhiBackend::Vulkan:
+                    return TEXT("Vulkan");
+                case Rhi::ERhiBackend::DirectX11:
+                    return TEXT("DirectX11");
+                default:
+                    return TEXT("Unknown");
+            }
+        };
+
+        auto tryInitializeBackend = [&](Rhi::ERhiBackend backend) -> bool {
+            switch (backend) {
+                case Rhi::ERhiBackend::Vulkan:
+                    mRhiContext = MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiVulkanContext>();
+                    break;
+                case Rhi::ERhiBackend::DirectX11:
+                    mRhiContext = MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiD3D11Context>();
+                    break;
+                default:
+                    mRhiContext.Reset();
+                    return false;
+            }
+
+            if (!mRhiContext) {
+                return false;
+            }
+
+            Rhi::FRhiInitDesc initDesc{};
+            initDesc.mAppName.Assign(TEXT("AltinaEngine"));
+            initDesc.mBackend          = backend;
+            initDesc.mEnableDebugLayer = true;
+
+            Rhi::FRhiDeviceDesc deviceDesc{};
+            deviceDesc.mEnableDebugLayer    = initDesc.mEnableDebugLayer;
+            deviceDesc.mEnableGpuValidation = initDesc.mEnableGpuValidation;
+
+            mRhiDevice = Rhi::RHIInit(*mRhiContext, initDesc, deviceDesc);
+            return mRhiDevice != nullptr;
+        };
+
+        if (!tryInitializeBackend(requestedRhi)) {
+            const auto fallbackRhi = (requestedRhi == Rhi::ERhiBackend::Vulkan)
+                ? Rhi::ERhiBackend::DirectX11
+                : Rhi::ERhiBackend::Vulkan;
+
+            LogWarning(TEXT("RHI backend '{}' init failed. Fallback to '{}'."),
+                backendName(requestedRhi), backendName(fallbackRhi));
+            if (!tryInitializeBackend(fallbackRhi)) {
+                LogError(
+                    TEXT("FEngineLoop Init failed: RHIInit failed for '{}' and fallback '{}'."),
+                    backendName(requestedRhi), backendName(fallbackRhi));
+                return false;
+            }
+        }
 #else
         mRhiContext = MakeUniqueAs<Rhi::FRhiContext, Rhi::FRhiMockContext>();
-#endif
-
         if (!mRhiContext) {
             LogError(TEXT("FEngineLoop Init failed: RHI context allocation failed."));
             return false;
@@ -938,10 +967,6 @@ namespace AltinaEngine::Launch {
 
         Rhi::FRhiInitDesc initDesc{};
         initDesc.mAppName.Assign(TEXT("AltinaEngine"));
-#if AE_PLATFORM_WIN
-        initDesc.mBackend          = Rhi::ERhiBackend::DirectX11;
-        initDesc.mEnableDebugLayer = true;
-#endif
 
         Rhi::FRhiDeviceDesc deviceDesc{};
         deviceDesc.mEnableDebugLayer    = initDesc.mEnableDebugLayer;
@@ -952,6 +977,7 @@ namespace AltinaEngine::Launch {
             LogError(TEXT("FEngineLoop Init failed: RHIInit failed."));
             return false;
         }
+#endif
 
         Rendering::InitCommonRendererResource();
 

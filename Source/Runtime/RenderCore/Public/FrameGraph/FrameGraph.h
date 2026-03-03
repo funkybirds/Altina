@@ -104,6 +104,7 @@ namespace AltinaEngine::RenderCore {
     };
 
     class FFrameGraph;
+    class FFrameGraphExecutor;
 
     class AE_RENDER_CORE_API FFrameGraphPassResources {
     public:
@@ -116,6 +117,7 @@ namespace AltinaEngine::RenderCore {
 
     private:
         friend class FFrameGraph;
+        friend class FFrameGraphExecutor;
         explicit FFrameGraphPassResources(const FFrameGraph& graph) : mGraph(&graph) {}
 
         const FFrameGraph* mGraph = nullptr;
@@ -256,6 +258,7 @@ namespace AltinaEngine::RenderCore {
     private:
         friend class FFrameGraphPassResources;
         friend class FFrameGraphPassBuilder;
+        friend class FFrameGraphExecutor;
 
         enum class EFrameGraphResourceType : u8 {
             Texture,

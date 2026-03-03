@@ -204,6 +204,9 @@ namespace AltinaEngine::Rhi {
         bool                                    mOwnsImage   = true;
         Vulkan::Detail::FVulkanMemoryAllocator* mAllocator   = nullptr;
         Vulkan::Detail::FVulkanMemoryAllocation mAlloc{};
+        FRhiSemaphore*                          mPendingUploadSemaphore = nullptr;
+        u64                                     mPendingUploadValue     = 0ULL;
+        bool                                    mHasPendingUpload       = false;
     };
 
     FRhiVulkanTexture::FRhiVulkanTexture(const FRhiTextureDesc& desc, VkDevice device)
@@ -321,6 +324,40 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiVulkanTexture::GetDefaultView() const noexcept -> VkImageView {
         return (mState != nullptr) ? mState->mDefaultView : VK_NULL_HANDLE;
+    }
+
+    void FRhiVulkanTexture::SetPendingUpload(FRhiSemaphore* semaphore, u64 value) noexcept {
+        if (!mState) {
+            return;
+        }
+        mState->mPendingUploadSemaphore = semaphore;
+        mState->mPendingUploadValue     = value;
+        mState->mHasPendingUpload       = (semaphore != nullptr);
+    }
+
+    auto FRhiVulkanTexture::HasPendingUpload() const noexcept -> bool {
+        return mState != nullptr && mState->mHasPendingUpload;
+    }
+
+    auto FRhiVulkanTexture::GetPendingUpload(
+        FRhiSemaphore*& outSemaphore, u64& outValue) const noexcept -> bool {
+        if (!mState || !mState->mHasPendingUpload || mState->mPendingUploadSemaphore == nullptr) {
+            outSemaphore = nullptr;
+            outValue     = 0ULL;
+            return false;
+        }
+        outSemaphore = mState->mPendingUploadSemaphore;
+        outValue     = mState->mPendingUploadValue;
+        return true;
+    }
+
+    void FRhiVulkanTexture::ClearPendingUpload() noexcept {
+        if (!mState) {
+            return;
+        }
+        mState->mPendingUploadSemaphore = nullptr;
+        mState->mPendingUploadValue     = 0ULL;
+        mState->mHasPendingUpload       = false;
     }
 
     struct FRhiVulkanSampler::FState {

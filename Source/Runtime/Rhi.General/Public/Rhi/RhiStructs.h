@@ -454,6 +454,7 @@ namespace AltinaEngine::Rhi {
         ERhiQueueType             mSrcQueue        = ERhiQueueType::Graphics;
         ERhiQueueType             mDstQueue        = ERhiQueueType::Graphics;
         u32                       mFlags           = 0U;
+        FRhiTransition*           mTransition      = nullptr;
     };
 
     struct FRhiRenderPassColorAttachment {

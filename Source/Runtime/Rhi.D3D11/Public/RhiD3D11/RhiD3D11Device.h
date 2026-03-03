@@ -49,6 +49,7 @@ namespace AltinaEngine::Rhi {
 
         auto CreateFence(u64 initialValue) -> FRhiFenceRef override;
         auto CreateSemaphore(bool timeline, u64 initialValue) -> FRhiSemaphoreRef override;
+        auto CreateTransition(const FRhiTransitionDesc& desc) -> FRhiTransitionRef override;
 
         auto CreateCommandPool(const FRhiCommandPoolDesc& desc) -> FRhiCommandPoolRef override;
         auto CreateCommandList(const FRhiCommandListDesc& desc) -> FRhiCommandListRef override;

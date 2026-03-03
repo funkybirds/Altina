@@ -2,6 +2,7 @@
 #include "RhiVulkan/RhiVulkanCommandList.h"
 #include "RhiVulkan/RhiVulkanViewport.h"
 #include "RhiVulkan/RhiVulkanDevice.h"
+#include "RhiVulkan/RhiVulkanResources.h"
 
 #include "Jobs/JobSystem.h"
 
@@ -175,6 +176,43 @@ namespace AltinaEngine::Rhi {
         work.mType  = FSubmitWork::EType::Submit;
         work.mQueue = mQueue;
 
+        auto addWait = [&](FRhiSemaphore* semaphore, u64 value) {
+            if (!semaphore) {
+                return;
+            }
+            auto* vkSem = static_cast<FRhiVulkanSemaphore*>(semaphore);
+            if (!vkSem) {
+                return;
+            }
+            VkSemaphore native = vkSem->GetNativeSemaphore();
+            if (native == VK_NULL_HANDLE) {
+                return;
+            }
+            const bool isTimeline = vkSem->IsTimeline();
+            for (usize i = 0; i < work.mWaitSemaphores.Size(); ++i) {
+                if (work.mWaitSemaphores[i] != native) {
+                    continue;
+                }
+                if (!isTimeline) {
+                    return;
+                }
+                const u64 existingValue =
+                    (i < work.mWaitValues.Size()) ? work.mWaitValues[i] : 0ULL;
+                if (existingValue >= value) {
+                    return;
+                }
+                if (i < work.mWaitValues.Size()) {
+                    work.mWaitValues[i] = value;
+                }
+                return;
+            }
+            work.mWaitSemaphores.PushBack(native);
+            work.mWaitStages.PushBack(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+            if (isTimeline) {
+                work.mWaitValues.PushBack(value);
+            }
+        };
+
         if (info.mCommandLists && info.mCommandListCount > 0U) {
             work.mCommandBuffers.Reserve(info.mCommandListCount);
             for (u32 i = 0; i < info.mCommandListCount; ++i) {
@@ -182,6 +220,19 @@ namespace AltinaEngine::Rhi {
                 auto* vkList = static_cast<FRhiVulkanCommandList*>(list);
                 if (vkList && vkList->GetNativeCommandBuffer()) {
                     work.mCommandBuffers.PushBack(vkList->GetNativeCommandBuffer());
+                }
+                if (vkList) {
+                    for (auto* texture : vkList->GetTouchedTextures()) {
+                        if (!texture || !texture->HasPendingUpload()) {
+                            continue;
+                        }
+                        FRhiSemaphore* pendingSemaphore = nullptr;
+                        u64            pendingValue     = 0ULL;
+                        if (texture->GetPendingUpload(pendingSemaphore, pendingValue)) {
+                            addWait(pendingSemaphore, pendingValue);
+                            texture->ClearPendingUpload();
+                        }
+                    }
                 }
             }
         }
@@ -240,6 +291,13 @@ namespace AltinaEngine::Rhi {
 
         if (pendingRenderComplete != VK_NULL_HANDLE) {
             work.mSignalSemaphores.PushBack(pendingRenderComplete);
+        }
+
+        if (!work.mWaitValues.IsEmpty() && work.mWaitValues.Size() < work.mWaitSemaphores.Size()) {
+            const usize missing = work.mWaitSemaphores.Size() - work.mWaitValues.Size();
+            for (usize i = 0; i < missing; ++i) {
+                work.mWaitValues.PushBack(0ULL);
+            }
         }
 
         if (info.mFence) {

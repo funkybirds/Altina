@@ -8,6 +8,7 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
     namespace Container = Core::Container;
 
     struct FVulkanDeviceEnabledFeatures {
+        bool mShaderDrawParameters  = false;
         bool mSync2                 = false;
         bool mDynamicRendering      = false;
         bool mTimelineSemaphore     = false;
@@ -20,7 +21,8 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         VkPhysicalDeviceFeatures2                       mFeatures2{};
         VkPhysicalDeviceVulkan13Features                mFeatures13{};
         VkPhysicalDeviceVulkan12Features                mFeatures12{};
-        VkPhysicalDeviceDescriptorIndexingFeatures      mDescIndex{};
+        VkPhysicalDeviceVulkan11Features                mFeatures11{};
+        VkPhysicalDeviceShaderDrawParametersFeatures    mShaderDrawParams{};
         VkPhysicalDeviceTimelineSemaphoreFeatures       mTimeline{};
         VkPhysicalDeviceSynchronization2Features        mSync2{};
         VkPhysicalDeviceDynamicRenderingFeatures        mDynRendering{};

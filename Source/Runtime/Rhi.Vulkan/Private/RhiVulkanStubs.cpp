@@ -159,6 +159,10 @@ namespace AltinaEngine::Rhi {
         (void)initialValue;
         return {};
     }
+    auto FRhiVulkanDevice::CreateTransition(const FRhiTransitionDesc& desc) -> FRhiTransitionRef {
+        (void)desc;
+        return {};
+    }
 
     auto FRhiVulkanDevice::CreateCommandPool(const FRhiCommandPoolDesc& desc)
         -> FRhiCommandPoolRef {
@@ -243,6 +247,14 @@ namespace AltinaEngine::Rhi {
     auto FRhiVulkanBindGroupLayout::GetNativeLayout() const noexcept -> VkDescriptorSetLayout {
         return VK_NULL_HANDLE;
     }
+    auto FRhiVulkanBindGroupLayout::ResolveBinding(u32 sourceBinding, ERhiBindingType type,
+        u32& outVkBinding, bool& outDynamicOffset) const noexcept -> bool {
+        (void)sourceBinding;
+        (void)type;
+        (void)outVkBinding;
+        (void)outDynamicOffset;
+        return false;
+    }
 
     FRhiVulkanBindGroup::FRhiVulkanBindGroup(
         const FRhiBindGroupDesc& desc, VkDevice device, VkDescriptorSet set)
@@ -322,6 +334,18 @@ namespace AltinaEngine::Rhi {
     auto FRhiVulkanTexture::GetDefaultView() const noexcept -> VkImageView {
         return VK_NULL_HANDLE;
     }
+    void FRhiVulkanTexture::SetPendingUpload(FRhiSemaphore* semaphore, u64 value) noexcept {
+        (void)semaphore;
+        (void)value;
+    }
+    auto FRhiVulkanTexture::HasPendingUpload() const noexcept -> bool { return false; }
+    auto FRhiVulkanTexture::GetPendingUpload(
+        FRhiSemaphore*& outSemaphore, u64& outValue) const noexcept -> bool {
+        outSemaphore = nullptr;
+        outValue     = 0ULL;
+        return false;
+    }
+    void FRhiVulkanTexture::ClearPendingUpload() noexcept {}
 
     FRhiVulkanSampler::FRhiVulkanSampler(const FRhiSamplerDesc& desc, VkDevice device)
         : FRhiSampler(desc) {

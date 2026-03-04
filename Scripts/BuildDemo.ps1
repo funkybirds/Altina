@@ -92,6 +92,9 @@ try {
 
         Write-Host "[CMake] Building AltinaEngineDemoMinimal via preset '$Preset'"
         Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoMinimal")
+
+        Write-Host "[CMake] Restaging Minimal runtime DLLs"
+        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "AltinaEngineDemoMinimalStageRuntime")
     }
 
     if ($Demo -eq "SpaceshipGame" -or $Demo -eq "All") {
@@ -100,6 +103,9 @@ try {
 
         Write-Host "[CMake] Building SpaceshipGame via preset '$Preset'"
         Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "SpaceshipGame")
+
+        Write-Host "[CMake] Restaging SpaceshipGame runtime DLLs"
+        Invoke-WithVisualStudioEnv @("cmake", "--build", "--preset", $Preset, "--target", "SpaceshipGameStageRuntime")
     }
 }
 finally {

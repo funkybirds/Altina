@@ -28,3 +28,5 @@ echo "[CMake] Building AltinaEngineDemoMinimal via preset '${PRESET}'"
 echo "[CMake] Cleaning Demo/Minimal output folders (Binaries/Shipping)"
 cmake --build --preset "${PRESET}" --target AltinaEngineDemoMinimalPreClean
 cmake --build --preset "${PRESET}" --target AltinaEngineDemoMinimal
+echo "[CMake] Restaging Minimal runtime DLLs"
+cmake --build --preset "${PRESET}" --target AltinaEngineDemoMinimalStageRuntime

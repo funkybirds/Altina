@@ -41,6 +41,14 @@ if(NOT EXISTS "${DEMO_BIN_DIR}")
     message(FATAL_ERROR "StageDemoShippingRuntime.cmake: DEMO_BIN_DIR does not exist: '${DEMO_BIN_DIR}'")
 endif()
 
+# Multiple demo targets can trigger this script in parallel (exe/shader/asset/runtime
+# staging). Serialize per demo to avoid racing on Shipping folder recreation.
+set(_stage_lock "${DEMO_BIN_DIR}/.stage_shipping_runtime.lock")
+file(LOCK "${_stage_lock}" GUARD PROCESS TIMEOUT 180 RESULT_VARIABLE _lock_result)
+if(NOT _lock_result EQUAL 0)
+    message(FATAL_ERROR "StageDemoShippingRuntime: failed to acquire lock '${_stage_lock}' (code=${_lock_result})")
+endif()
+
 file(REMOVE_RECURSE "${DEMO_SHIP_DIR}")
 file(MAKE_DIRECTORY "${DEMO_SHIP_DIR}")
 
@@ -66,13 +74,31 @@ foreach(_rel IN LISTS _bin_entries)
     set(_dst "${DEMO_DATA_DIR}/${_rel}")
 
     if(IS_DIRECTORY "${_src}")
-        execute_process(COMMAND "${CMAKE_COMMAND}" -E make_directory "${_dst}")
+        execute_process(
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${_dst}"
+            RESULT_VARIABLE _mkdir_result
+        )
+        if(NOT _mkdir_result EQUAL 0)
+            message(FATAL_ERROR "StageDemoShippingRuntime: failed to create directory '${_dst}' (code=${_mkdir_result})")
+        endif()
     else()
         cmake_path(GET _dst PARENT_PATH _dst_parent)
         if(NOT _dst_parent STREQUAL "")
-            execute_process(COMMAND "${CMAKE_COMMAND}" -E make_directory "${_dst_parent}")
+            execute_process(
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${_dst_parent}"
+                RESULT_VARIABLE _mkdir_result
+            )
+            if(NOT _mkdir_result EQUAL 0)
+                message(FATAL_ERROR "StageDemoShippingRuntime: failed to create directory '${_dst_parent}' (code=${_mkdir_result})")
+            endif()
         endif()
-        execute_process(COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_src}" "${_dst}")
+        execute_process(
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_src}" "${_dst}"
+            RESULT_VARIABLE _copy_result
+        )
+        if(NOT _copy_result EQUAL 0)
+            message(FATAL_ERROR "StageDemoShippingRuntime: failed to copy '${_src}' -> '${_dst}' (code=${_copy_result})")
+        endif()
     endif()
 endforeach()
 

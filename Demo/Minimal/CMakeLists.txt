@@ -117,6 +117,34 @@ if(WIN32)
         COMMAND_EXPAND_LISTS
         COMMENT "Staging Minimal demo runtime DLLs"
     )
+
+    set(DemoStageRuntimeTarget ${TargetName}StageRuntime)
+    add_custom_target(${DemoStageRuntimeTarget}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:${TargetName}>
+            ${DemoBinaryDir}
+        COMMAND_EXPAND_LISTS
+        DEPENDS ${TargetName}
+        COMMENT "Restaging Minimal demo runtime DLLs"
+        VERBATIM
+    )
+    set_property(TARGET ${DemoStageRuntimeTarget} PROPERTY FOLDER "Demo/Minimal")
+
+    if(AE_DEMO_ENABLE_SHIPPING)
+        add_custom_command(
+            TARGET ${DemoStageRuntimeTarget}
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND}
+                -DDEMO_BIN_DIR:PATH=${DemoBinaryDir}
+                -DDEMO_SHIP_DIR:PATH=${DemoShippingDir}
+                -DDEMO_EXE_NAME:STRING=$<TARGET_FILE_NAME:${TargetName}>
+                -DDEMO_LAUNCHER_EXE:FILEPATH=$<TARGET_FILE:AltinaEngineDemoLauncher>
+                -P ${AE_DEMO_STAGE_SHIPPING_SCRIPT}
+            COMMENT "Staging Minimal demo Shipping folder (runtime restage)"
+            VERBATIM
+        )
+    endif()
 endif()
 
 if(AE_DEMO_ENABLE_SHIPPING)

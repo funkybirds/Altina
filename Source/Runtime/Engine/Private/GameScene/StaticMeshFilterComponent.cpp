@@ -10,11 +10,7 @@ namespace AltinaEngine::GameScene {
     } // namespace
 
     FStaticMeshFilterComponent::FAssetToStaticMeshConverter
-        FStaticMeshFilterComponent::AssetToStaticMeshConverter = {};
-
-    FStaticMeshFilterComponent::~FStaticMeshFilterComponent() {
-        ReleaseStaticMeshGpuResources(mStaticMesh);
-    }
+         FStaticMeshFilterComponent::AssetToStaticMeshConverter = {};
 
     auto FStaticMeshFilterComponent::GetStaticMesh() noexcept -> Geometry::FStaticMeshData& {
         ResolveStaticMesh();

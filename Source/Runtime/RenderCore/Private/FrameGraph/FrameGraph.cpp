@@ -5,11 +5,14 @@
 #include "Rhi/RhiResourceView.h"
 #include "Logging/Log.h"
 #include "Utility/String/CodeConvert.h"
+#include "Utility/Assert.h"
 
 #include <cstring>
 #include <string>
 
 namespace AltinaEngine::RenderCore {
+    using Core::Utility::DebugAssert;
+
     namespace {
         struct FCompiledResourceState {
             bool                   mInitialized = false;
@@ -173,6 +176,11 @@ namespace AltinaEngine::RenderCore {
                 continue;
             }
             texture.mTexture = mDevice->CreateTexture(texture.mDesc.mDesc);
+            DebugAssert(static_cast<bool>(texture.mTexture), TEXT("RenderCore.FrameGraph"),
+                "CreateTexture failed: debugName='{}', width={}, height={}, format={}, bindFlags={}.",
+                texture.mDesc.mDesc.mDebugName.ToView(), texture.mDesc.mDesc.mWidth,
+                texture.mDesc.mDesc.mHeight, static_cast<u32>(texture.mDesc.mDesc.mFormat),
+                static_cast<u32>(texture.mDesc.mDesc.mBindFlags));
         }
 
         for (auto& buffer : mBuffers) {
@@ -180,6 +188,12 @@ namespace AltinaEngine::RenderCore {
                 continue;
             }
             buffer.mBuffer = mDevice->CreateBuffer(buffer.mDesc.mDesc);
+            DebugAssert(static_cast<bool>(buffer.mBuffer), TEXT("RenderCore.FrameGraph"),
+                "CreateBuffer failed: debugName='{}', sizeBytes={}, usage={}, bindFlags={}, cpuAccess={}.",
+                buffer.mDesc.mDesc.mDebugName.ToView(), buffer.mDesc.mDesc.mSizeBytes,
+                static_cast<u32>(buffer.mDesc.mDesc.mUsage),
+                static_cast<u32>(buffer.mDesc.mDesc.mBindFlags),
+                static_cast<u32>(buffer.mDesc.mDesc.mCpuAccess));
         }
 
         for (auto& SRV : mSRVs) {
@@ -191,7 +205,14 @@ namespace AltinaEngine::RenderCore {
                 desc.mBuffer  = ResolveBuffer(FFrameGraphBufferRef{ SRV.mResourceId });
                 desc.mTexture = nullptr;
             }
+            DebugAssert((desc.mTexture != nullptr) || (desc.mBuffer != nullptr),
+                TEXT("RenderCore.FrameGraph"),
+                "CreateSRV failed precondition: resource is null (isTexture={}, resourceId={}).",
+                SRV.mIsTexture ? 1U : 0U, SRV.mResourceId);
             SRV.mView = mDevice->CreateShaderResourceView(desc);
+            DebugAssert(static_cast<bool>(SRV.mView), TEXT("RenderCore.FrameGraph"),
+                "CreateSRV failed: isTexture={}, resourceId={}, debugName='{}'.",
+                SRV.mIsTexture ? 1U : 0U, SRV.mResourceId, desc.mDebugName.ToView());
         }
 
         for (auto& UAV : mUAVs) {
@@ -203,19 +224,38 @@ namespace AltinaEngine::RenderCore {
                 desc.mBuffer  = ResolveBuffer(FFrameGraphBufferRef{ UAV.mResourceId });
                 desc.mTexture = nullptr;
             }
+            DebugAssert((desc.mTexture != nullptr) || (desc.mBuffer != nullptr),
+                TEXT("RenderCore.FrameGraph"),
+                "CreateUAV failed precondition: resource is null (isTexture={}, resourceId={}).",
+                UAV.mIsTexture ? 1U : 0U, UAV.mResourceId);
             UAV.mView = mDevice->CreateUnorderedAccessView(desc);
+            DebugAssert(static_cast<bool>(UAV.mView), TEXT("RenderCore.FrameGraph"),
+                "CreateUAV failed: isTexture={}, resourceId={}, debugName='{}'.",
+                UAV.mIsTexture ? 1U : 0U, UAV.mResourceId, desc.mDebugName.ToView());
         }
 
         for (auto& RTV : mRTVs) {
             auto desc     = RTV.mDesc;
             desc.mTexture = ResolveTexture(FFrameGraphTextureRef{ RTV.mResourceId });
-            RTV.mView     = mDevice->CreateRenderTargetView(desc);
+            DebugAssert(desc.mTexture != nullptr, TEXT("RenderCore.FrameGraph"),
+                "CreateRTV failed precondition: texture is null (resourceId={}, debugName='{}').",
+                RTV.mResourceId, desc.mDebugName.ToView());
+            RTV.mView = mDevice->CreateRenderTargetView(desc);
+            DebugAssert(static_cast<bool>(RTV.mView), TEXT("RenderCore.FrameGraph"),
+                "CreateRTV failed: resourceId={}, debugName='{}', format={}.", RTV.mResourceId,
+                desc.mDebugName.ToView(), static_cast<u32>(desc.mFormat));
         }
 
         for (auto& DSV : mDSVs) {
             auto desc     = DSV.mDesc;
             desc.mTexture = ResolveTexture(FFrameGraphTextureRef{ DSV.mResourceId });
-            DSV.mView     = mDevice->CreateDepthStencilView(desc);
+            DebugAssert(desc.mTexture != nullptr, TEXT("RenderCore.FrameGraph"),
+                "CreateDSV failed precondition: texture is null (resourceId={}, debugName='{}').",
+                DSV.mResourceId, desc.mDebugName.ToView());
+            DSV.mView = mDevice->CreateDepthStencilView(desc);
+            DebugAssert(static_cast<bool>(DSV.mView), TEXT("RenderCore.FrameGraph"),
+                "CreateDSV failed: resourceId={}, debugName='{}', format={}.", DSV.mResourceId,
+                desc.mDebugName.ToView(), static_cast<u32>(desc.mFormat));
         }
 
         mCompiledBeginTransitions.Clear();

@@ -272,6 +272,11 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiTextureRef                               IblBlackCube;
             Rhi::FRhiTextureRef                               IblBlack2D;
 
+            // Persistent CSM shadow map to avoid per-frame large texture churn.
+            Rhi::FRhiTextureRef                               ShadowMapCSM;
+            u32                                               ShadowMapCSMSize   = 0U;
+            u32                                               ShadowMapCSMLayers = 0U;
+
             // Skybox (FSQ -> SceneColorHDR).
             Rhi::FRhiBindGroupLayoutRef                       SkyBoxLayout;
             Rhi::FRhiPipelineLayoutRef                        SkyBoxPipelineLayout;
@@ -1086,6 +1091,9 @@ namespace AltinaEngine::Rendering {
 
         resources.IblBlackCube.Reset();
         resources.IblBlack2D.Reset();
+        resources.ShadowMapCSM.Reset();
+        resources.ShadowMapCSMSize   = 0U;
+        resources.ShadowMapCSMLayers = 0U;
 
         resources.PerFrameLayout.Reset();
         resources.PerDrawLayout.Reset();
@@ -1120,9 +1128,13 @@ namespace AltinaEngine::Rendering {
         EnsureVertexLayout(resources);
         EnsureLayouts(device, resources);
         if (!EnsureLightingPipeline(device, resources)) {
+            Assert(false, TEXT("BasicDeferredRenderer"),
+                "PrepareForRendering failed: lighting pipeline is unavailable.");
             return;
         }
         if (!EnsureSsaoPipeline(device, resources)) {
+            Assert(false, TEXT("BasicDeferredRenderer"),
+                "PrepareForRendering failed: SSAO pipeline is unavailable.");
             return;
         }
 
@@ -1238,20 +1250,28 @@ namespace AltinaEngine::Rendering {
         }
     }
     void FBasicDeferredRenderer::Render(RenderCore::FFrameGraph& graph) {
+        LogInfo(TEXT("Deferred Render Enter {}"), 1);
         const auto* view         = mViewContext.View;
         auto*       outputTarget = mViewContext.OutputTarget;
         const auto* drawList     = mViewContext.DrawList;
         if (view == nullptr || outputTarget == nullptr) {
+            Assert(false, TEXT("BasicDeferredRenderer"),
+                "Render skipped: view/output target is null (view={}, outputTarget={}).",
+                static_cast<int>(view ? 1 : 0), static_cast<int>(outputTarget ? 1 : 0));
             return;
         }
 
         if (!view->IsValid()) {
+            Assert(false, TEXT("BasicDeferredRenderer"), "Render skipped: view is invalid.");
             return;
         }
 
         const u32 width  = view->RenderTargetExtent.Width;
         const u32 height = view->RenderTargetExtent.Height;
         if (width == 0U || height == 0U) {
+            Assert(false, TEXT("BasicDeferredRenderer"),
+                "Render skipped: render extent is invalid {}x{}.", static_cast<u32>(width),
+                static_cast<u32>(height));
             return;
         }
 
@@ -1666,6 +1686,44 @@ namespace AltinaEngine::Rendering {
         RenderCore::FFrameGraphTextureRef shadowMap;
 
         if (csmData.CascadeCount > 0U) {
+            auto* device = Rhi::RHIGetDevice();
+            Assert(device != nullptr, TEXT("BasicDeferredRenderer"),
+                "Render failed: RHI device is null while preparing CSM shadow map.");
+
+            const u32  shadowSize   = csmSettings.ShadowMapSize;
+            const u32  shadowLayers = csmData.CascadeCount;
+
+            const bool bNeedRecreateShadowMap = (!resources.ShadowMapCSM)
+                || (resources.ShadowMapCSMSize != shadowSize)
+                || (resources.ShadowMapCSMLayers != shadowLayers);
+            if (bNeedRecreateShadowMap) {
+                resources.ShadowMapCSM.Reset();
+
+                Rhi::FRhiTextureDesc shadowDesc{};
+                shadowDesc.mDebugName.Assign(TEXT("ShadowMap.CSM"));
+                shadowDesc.mWidth       = shadowSize;
+                shadowDesc.mHeight      = shadowSize;
+                shadowDesc.mArrayLayers = shadowLayers;
+                shadowDesc.mDimension = (shadowLayers > 1U) ? Rhi::ERhiTextureDimension::Tex2DArray
+                                                            : Rhi::ERhiTextureDimension::Tex2D;
+                shadowDesc.mFormat    = Rhi::ERhiFormat::D32Float;
+                shadowDesc.mBindFlags = Rhi::ERhiTextureBindFlags::DepthStencil
+                    | Rhi::ERhiTextureBindFlags::ShaderResource;
+
+                resources.ShadowMapCSM = device->CreateTexture(shadowDesc);
+                Assert(static_cast<bool>(resources.ShadowMapCSM), TEXT("BasicDeferredRenderer"),
+                    "Render failed: CreateTexture(ShadowMap.CSM) returned null (size={}, layers={}).",
+                    shadowSize, shadowLayers);
+
+                resources.ShadowMapCSMSize   = shadowSize;
+                resources.ShadowMapCSMLayers = shadowLayers;
+            }
+
+            shadowMap =
+                graph.ImportTexture(resources.ShadowMapCSM.Get(), Rhi::ERhiResourceState::Common);
+            Assert(shadowMap.IsValid(), TEXT("BasicDeferredRenderer"),
+                "Render failed: ImportTexture(ShadowMap.CSM) returned invalid ref.");
+
             RenderCore::FFrameGraphPassDesc shadowPassDesc{};
             shadowPassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
             shadowPassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
@@ -1673,7 +1731,6 @@ namespace AltinaEngine::Rendering {
             FBasePassPipelineData shadowPipelineData = pipelineData;
             shadowPipelineData.DefaultPassDesc       = &resources.DefaultShadowPassDesc;
 
-            const u32 shadowSize = csmSettings.ShadowMapSize;
             for (u32 cascade = 0U; cascade < csmData.CascadeCount; ++cascade) {
                 struct FShadowPassData {
                     RenderCore::FFrameGraphTextureRef Shadow;
@@ -1701,21 +1758,6 @@ namespace AltinaEngine::Rendering {
                 graph.AddPass<FShadowPassData>(
                     shadowPassDesc,
                     [&](RenderCore::FFrameGraphPassBuilder& builder, FShadowPassData& data) {
-                        if (!shadowMap.IsValid()) {
-                            RenderCore::FFrameGraphTextureDesc shadowDesc{};
-                            shadowDesc.mDesc.mDebugName.Assign(TEXT("ShadowMap.CSM"));
-                            shadowDesc.mDesc.mWidth       = shadowSize;
-                            shadowDesc.mDesc.mHeight      = shadowSize;
-                            shadowDesc.mDesc.mArrayLayers = csmData.CascadeCount;
-                            shadowDesc.mDesc.mDimension   = (csmData.CascadeCount > 1U)
-                                  ? Rhi::ERhiTextureDimension::Tex2DArray
-                                  : Rhi::ERhiTextureDimension::Tex2D;
-                            shadowDesc.mDesc.mFormat      = Rhi::ERhiFormat::D32Float;
-                            shadowDesc.mDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::DepthStencil
-                                | Rhi::ERhiTextureBindFlags::ShaderResource;
-                            shadowMap = builder.CreateTexture(shadowDesc);
-                        }
-
                         data.Shadow = builder.Write(shadowMap, Rhi::ERhiResourceState::DepthWrite);
 
                         if (shadowDrawList != nullptr) {
@@ -2187,6 +2229,11 @@ namespace AltinaEngine::Rendering {
                 // LogInfo(TEXT("FG Pass: BasicDeferred.DeferredLighting"));
                 auto& shared = GetSharedResources();
                 if (!shared.LightingPipeline || !shared.LightingLayout || !shared.OutputSampler) {
+                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                        "DeferredLighting skipped: shared pipeline/layout/sampler missing (pipeline={}, layout={}, sampler={}).",
+                        static_cast<u32>(static_cast<bool>(shared.LightingPipeline)),
+                        static_cast<u32>(static_cast<bool>(shared.LightingLayout)),
+                        static_cast<u32>(static_cast<bool>(shared.OutputSampler)));
                     return;
                 }
 
@@ -2197,15 +2244,25 @@ namespace AltinaEngine::Rendering {
                 auto* shadowTex = res.GetTexture(data.Shadow);
                 auto* ssaoTex   = res.GetTexture(data.Ssao);
                 if (!texA || !texB || !texC || !depthTex || !shadowTex || !ssaoTex) {
+                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                        "DeferredLighting skipped: missing input textures (A={}, B={}, C={}, Depth={}, Shadow={}, Ssao={}).",
+                        static_cast<u32>(texA != nullptr), static_cast<u32>(texB != nullptr),
+                        static_cast<u32>(texC != nullptr), static_cast<u32>(depthTex != nullptr),
+                        static_cast<u32>(shadowTex != nullptr),
+                        static_cast<u32>(ssaoTex != nullptr));
                     return;
                 }
 
                 auto* device = Rhi::RHIGetDevice();
                 if (!device) {
+                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                        "DeferredLighting skipped: RHI device is null.");
                     return;
                 }
 
                 if (perFrameBuffer == nullptr) {
+                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                        "DeferredLighting skipped: per-frame constant buffer is null.");
                     return;
                 }
 
@@ -2398,16 +2455,27 @@ namespace AltinaEngine::Rendering {
                             if (!shared.SkyBoxPipeline || !shared.SkyBoxLayout
                                 || !shared.OutputSampler || perFrameBuffer == nullptr
                                 || skyCube == nullptr) {
+                                DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                                    "SkyBox skipped: shared/resource missing (pipeline={}, layout={}, sampler={}, perFrameBuffer={}, skyCube={}).",
+                                    static_cast<u32>(static_cast<bool>(shared.SkyBoxPipeline)),
+                                    static_cast<u32>(static_cast<bool>(shared.SkyBoxLayout)),
+                                    static_cast<u32>(static_cast<bool>(shared.OutputSampler)),
+                                    static_cast<u32>(perFrameBuffer != nullptr),
+                                    static_cast<u32>(skyCube != nullptr));
                                 return;
                             }
 
                             auto* depthTex = res.GetTexture(data.Depth);
                             if (depthTex == nullptr) {
+                                DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                                    "SkyBox skipped: depth texture is null (depthRef={}).",
+                                    data.Depth.mId);
                                 return;
                             }
 
                             auto* device = Rhi::RHIGetDevice();
-                            DebugAssert(device, TEXT("BasicDeferredRenderer"), "Device lost");
+                            DebugAssert(
+                                device != nullptr, TEXT("BasicDeferredRenderer"), "Device lost");
 
                             Rhi::FRhiBindGroupDesc groupDesc{};
                             groupDesc.mLayout = shared.SkyBoxLayout.Get();
@@ -2440,6 +2508,8 @@ namespace AltinaEngine::Rendering {
 
                             auto bindGroup = device->CreateBindGroup(groupDesc);
                             if (!bindGroup) {
+                                DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                                    "SkyBox skipped: CreateBindGroup failed.");
                                 return;
                             }
 

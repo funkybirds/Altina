@@ -919,6 +919,22 @@ namespace AltinaEngine::Rhi {
             return;
         }
         mState->mUploadManager.EndFrame();
+
+        // Vulkan backend currently does not track a GPU-completed serial like D3D11 queries.
+        // Drain queued resource destruction at frame end only after queue-idle waits are
+        // serialized through the submit thread. Do not call vkDeviceWaitIdle() here, otherwise
+        // validation reports queue threading hazards against concurrent
+        // vkQueueSubmit/vkQueuePresent.
+        if (const auto graphicsQueue = GetQueue(ERhiQueueType::Graphics)) {
+            graphicsQueue->WaitIdle();
+        }
+        if (const auto computeQueue = GetQueue(ERhiQueueType::Compute)) {
+            computeQueue->WaitIdle();
+        }
+        if (const auto copyQueue = GetQueue(ERhiQueueType::Copy)) {
+            copyQueue->WaitIdle();
+        }
+        ProcessResourceDeleteQueue(~0ULL);
     }
 
 } // namespace AltinaEngine::Rhi

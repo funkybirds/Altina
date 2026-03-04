@@ -36,6 +36,7 @@
 #include "Rhi/RhiStructs.h"
 #include "Rhi/Command/RhiCmdContextAdapter.h"
 #include "Reflection/Reflection.h"
+#include "Utility/Assert.h"
 
 #include <cstdint>
 #include <cstring>
@@ -78,6 +79,8 @@ using AltinaEngine::Core::Container::MakeUnique;
 using AltinaEngine::Core::Container::MakeUniqueAs;
 using AltinaEngine::Core::Container::TVector;
 using AltinaEngine::Core::Logging::LogWarningCat;
+using AltinaEngine::Core::Utility::Assert;
+using AltinaEngine::Core::Utility::DebugAssert;
 
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
@@ -491,9 +494,19 @@ namespace AltinaEngine::Launch {
             const TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
             Rendering::ERendererType rendererType, const Asset::FAssetRegistry* assetRegistry,
             Asset::FAssetManager* assetManager) {
+            DebugAssert(defaultViewport != nullptr, TEXT("Launch.EngineLoop"),
+                "SendSceneRenderingRequest: default viewport is null.");
             if (scene.Views.IsEmpty()) {
+                DebugAssert(false, TEXT("Launch.EngineLoop"),
+                    "SendSceneRenderingRequest: scene has no views.");
                 return;
             }
+            DebugAssert(drawLists.Size() == scene.Views.Size(), TEXT("Launch.EngineLoop"),
+                "SendSceneRenderingRequest: draw list/view size mismatch (drawLists={}, views={}).",
+                static_cast<u32>(drawLists.Size()), static_cast<u32>(scene.Views.Size()));
+            DebugAssert(shadowDrawLists.Size() == scene.Views.Size(), TEXT("Launch.EngineLoop"),
+                "SendSceneRenderingRequest: shadow draw list/view size mismatch (shadowDrawLists={}, views={}).",
+                static_cast<u32>(shadowDrawLists.Size()), static_cast<u32>(scene.Views.Size()));
 
             // Cache skybox/IBL GPU resources on the render thread to avoid re-uploading.
             auto&             cache                = GetSceneRenderCaches();
@@ -709,11 +722,19 @@ namespace AltinaEngine::Launch {
             for (usize i = 0; i < viewCount; ++i) {
                 auto& view = scene.Views[i];
                 if (!view.View.IsValid()) {
+                    DebugAssert(false, TEXT("Launch.EngineLoop"),
+                        "SendSceneRenderingRequest: scene view {} is invalid.",
+                        static_cast<u32>(i));
                     continue;
                 }
 
                 auto* outputTarget = ResolveViewOutputTarget(view, defaultViewport);
                 if (outputTarget == nullptr) {
+                    LogWarningCat(TEXT("Launch.EngineLoop"),
+                        "SendSceneRenderingRequest: skip view {} because output target is null (targetType={}, viewViewport={}, fallbackViewport={}).",
+                        static_cast<u32>(i), static_cast<u32>(view.Target.Type),
+                        static_cast<int>(view.Target.Viewport != nullptr),
+                        static_cast<int>(defaultViewport != nullptr));
                     continue;
                 }
 
@@ -1213,6 +1234,10 @@ namespace AltinaEngine::Launch {
                         }
                     }
                 }
+                DebugAssert(!renderScene.Views.IsEmpty(), TEXT("Launch.EngineLoop"),
+                    "Draw: no active scene views generated (width={}, height={}, frame={}).",
+                    static_cast<u32>(width), static_cast<u32>(height),
+                    static_cast<u64>(frameIndex));
             }
         }
 
@@ -1242,18 +1267,26 @@ namespace AltinaEngine::Launch {
                 renderScene = Move(renderScene), drawLists = Move(drawLists),
                 shadowDrawLists = Move(shadowDrawLists), rendererType, assetRegistry,
                 assetManager]() mutable -> void {
+                Assert(static_cast<bool>(device), TEXT("Launch.EngineLoop"),
+                     "RenderFrame: RHI device is null at frame {}.", static_cast<u64>(frameIndex));
                 if (!device)
                     return;
 
                 device->BeginFrame(frameIndex);
                 Core::Console::LatchRenderThreadCVars();
 
+                DebugAssert(static_cast<bool>(viewport), TEXT("Launch.EngineLoop"),
+                     "RenderFrame: viewport is null at frame {}.", static_cast<u64>(frameIndex));
                 if (viewport && width > 0U && height > 0U) {
                     if (shouldResize) {
                         viewport->Resize(width, height);
                     }
 
+                    DebugAssert(!renderScene.Views.IsEmpty(), TEXT("Launch.EngineLoop"),
+                         "RenderFrame: scene view list is empty at frame {}.",
+                         static_cast<u64>(frameIndex));
                     if (!renderScene.Views.IsEmpty()) {
+                        LogInfo(TEXT("Sending Rendering Request {}"), frameIndex);
                         SendSceneRenderingRequest(*device, viewport.Get(), renderScene, drawLists,
                              shadowDrawLists, rendererType, assetRegistry, assetManager);
                     }
@@ -1298,17 +1331,25 @@ namespace AltinaEngine::Launch {
                     }
 
                     const auto queue = device->GetQueue(Rhi::ERhiQueueType::Graphics);
+                    DebugAssert(static_cast<bool>(queue), TEXT("Launch.EngineLoop"),
+                         "RenderFrame: graphics queue is null at frame {}.",
+                         static_cast<u64>(frameIndex));
                     if (queue) {
                         Rhi::FRhiPresentInfo presentInfo{};
                         presentInfo.mViewport     = viewport.Get();
                         presentInfo.mSyncInterval = 1U;
                         queue->Present(presentInfo);
                     }
+                } else {
+                    DebugAssert(false, TEXT("Launch.EngineLoop"),
+                         "RenderFrame: skipped because viewport/extent is invalid (viewport={}, width={}, height={}, frame={}).",
+                         static_cast<int>(viewport ? 1 : 0), static_cast<u32>(width),
+                         static_cast<u32>(height), static_cast<u64>(frameIndex));
                 }
 
                 device->EndFrame();
 
-                // LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
+                LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
             });
         if (handle.IsValid()) {
             mPendingRenderFrames.Push(handle);

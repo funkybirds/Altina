@@ -10,6 +10,7 @@
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiPipeline.h"
+#include "Utility/Assert.h"
 #include "View/ViewData.h"
 
 #include <mutex>
@@ -26,6 +27,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
 } // namespace AltinaEngine::Rendering::PostProcess::Builtin
 
 namespace AltinaEngine::Rendering {
+    using Core::Utility::Assert;
+    using Core::Utility::DebugAssert;
+
     namespace {
         struct FEffectEntry {
             FPostProcessAddToGraphFn Fn = nullptr;
@@ -69,10 +73,14 @@ namespace AltinaEngine::Rendering {
         void AddPresent(RenderCore::FFrameGraph& graph, const RenderCore::View::FViewData& view,
             const FPostProcessBuildContext& ctx, const FPostProcessIO& io) {
             if (!ctx.BackBuffer.IsValid()) {
+                DebugAssert(
+                    false, TEXT("PostProcess"), "AddPresent skipped: backbuffer is invalid.");
                 return;
             }
 
             if (!PostProcess::Detail::EnsurePostProcessSharedResources()) {
+                DebugAssert(false, TEXT("PostProcess"),
+                    "AddPresent skipped: shared post-process resources are not ready.");
                 return;
             }
 
@@ -124,18 +132,27 @@ namespace AltinaEngine::Rendering {
                     const RenderCore::FFrameGraphPassResources& res,
                     const FPassData&                            data) -> void {
                     if (!data.bHasInput) {
+                        DebugAssert(false, TEXT("PostProcess"),
+                            "AddPresent pass skipped draw: no SceneColor input.");
                         return;
                     }
 
                     auto& shared = PostProcess::Detail::GetPostProcessSharedResources();
                     if (!shared.BlitPipeline || !shared.Layout || !shared.LinearSampler
                         || !shared.BlitConstantsBuffer) {
+                        DebugAssert(false, TEXT("PostProcess"),
+                            "AddPresent pass skipped draw: missing shared Blit resources.");
                         return;
                     }
 
                     auto* inTex  = res.GetTexture(data.In);
                     auto* device = Rhi::RHIGetDevice();
                     if (!inTex || device == nullptr) {
+                        DebugAssert(false, TEXT("PostProcess"),
+                            "AddPresent pass skipped draw: input texture/device is null (inRef={}, outRef={}, hasInput={}, inTex={}, device={}).",
+                            data.In.mId, data.Out.mId, data.bHasInput ? 1U : 0U,
+                            static_cast<u32>(inTex != nullptr),
+                            static_cast<u32>(device != nullptr));
                         return;
                     }
 
@@ -165,6 +182,8 @@ namespace AltinaEngine::Rendering {
 
                     auto bindGroup = device->CreateBindGroup(groupDesc);
                     if (!bindGroup) {
+                        Assert(false, TEXT("PostProcess"),
+                            "AddPresent pass failed: CreateBindGroup returned null.");
                         return;
                     }
 

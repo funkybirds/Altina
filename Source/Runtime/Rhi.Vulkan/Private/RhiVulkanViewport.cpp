@@ -75,7 +75,12 @@ namespace AltinaEngine::Rhi {
             }
         };
 
-        constexpr u64      kAcquireTimeoutNs = 1000000000ULL; // 1 second
+        // Use an infinite timeout to avoid transient 1-second acquire timeouts starving rendering.
+        constexpr u64                kAcquireTimeoutNs = ~0ULL;
+
+        [[nodiscard]] constexpr auto IsSwapchainOutOfDate(VkResult result) noexcept -> bool {
+            return result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR;
+        }
 
         [[nodiscard]] auto PickPresentMode(VkPhysicalDevice physical, VkSurfaceKHR surface,
             bool allowTearing) -> VkPresentModeKHR {
@@ -570,41 +575,77 @@ namespace AltinaEngine::Rhi {
         }
 
         if (!mState->mAcquired) {
-            const usize ringIndex =
-                static_cast<usize>(mState->mFrameIndex % mState->mAcquireSemaphores.Size());
-            VkFence fence = mState->mAcquireFences[ringIndex];
-            if (fence != VK_NULL_HANDLE) {
-                vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, kAcquireTimeoutNs);
-                vkResetFences(mState->mDevice, 1, &fence);
-            }
-            VkResult res = VK_ERROR_UNKNOWN;
-            {
-                // Serialize swapchain API usage with submit/present thread.
-                FQueueApiScopedLock lock;
-                res = vkAcquireNextImageKHR(mState->mDevice, mState->mSwapchain, kAcquireTimeoutNs,
-                    VK_NULL_HANDLE, fence, &mState->mImageIndex);
-            }
-            if (res != VK_SUCCESS) {
-                return nullptr;
-            }
-            if (fence != VK_NULL_HANDLE) {
-                const VkResult waitRes =
-                    vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, kAcquireTimeoutNs);
-                if (waitRes != VK_SUCCESS) {
+            auto AcquireSwapchainImage = [this]() noexcept -> VkResult {
+                if (mState->mAcquireSemaphores.IsEmpty() || mState->mAcquireFences.IsEmpty()) {
+                    return VK_ERROR_INITIALIZATION_FAILED;
+                }
+
+                const usize ringIndex =
+                    static_cast<usize>(mState->mFrameIndex % mState->mAcquireSemaphores.Size());
+                VkFence fence = mState->mAcquireFences[ringIndex];
+                if (fence != VK_NULL_HANDLE) {
+                    const VkResult waitBeforeAcquire =
+                        vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, kAcquireTimeoutNs);
+                    if (waitBeforeAcquire != VK_SUCCESS) {
+                        return waitBeforeAcquire;
+                    }
+                    const VkResult resetBeforeAcquire = vkResetFences(mState->mDevice, 1, &fence);
+                    if (resetBeforeAcquire != VK_SUCCESS) {
+                        return resetBeforeAcquire;
+                    }
+                }
+
+                VkResult acquireResult = VK_ERROR_UNKNOWN;
+                {
+                    // Serialize swapchain API usage with submit/present thread.
+                    FQueueApiScopedLock lock;
+                    acquireResult = vkAcquireNextImageKHR(mState->mDevice, mState->mSwapchain,
+                        kAcquireTimeoutNs, VK_NULL_HANDLE, fence, &mState->mImageIndex);
+                }
+                if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR) {
+                    return acquireResult;
+                }
+                if (fence != VK_NULL_HANDLE) {
+                    const VkResult waitResult =
+                        vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, kAcquireTimeoutNs);
+                    if (waitResult != VK_SUCCESS) {
+                        return waitResult;
+                    }
+                }
+
+                VkSemaphore renderComplete = (mState->mImageIndex < static_cast<u32>(
+                                                  mState->mRenderCompleteSemaphores.Size()))
+                    ? mState->mRenderCompleteSemaphores[mState->mImageIndex]
+                    : VK_NULL_HANDLE;
+                if (mState->mOwner) {
+                    // Acquire synchronization is completed on CPU fence wait above.
+                    mState->mOwner->NotifyViewportAcquired(VK_NULL_HANDLE, renderComplete);
+                }
+
+                mState->mAcquired = true;
+                return acquireResult;
+            };
+
+            VkResult acquireResult = AcquireSwapchainImage();
+            if (IsSwapchainOutOfDate(acquireResult)) {
+                auto*      self = const_cast<FRhiVulkanViewport*>(this);
+                const auto desc = self->GetDesc();
+                LogWarningCat(TEXT("RHI.Vulkan"),
+                    "GetBackBuffer: swapchain out-of-date during acquire (result={}), recreate and retry.",
+                    static_cast<int>(acquireResult));
+                self->Resize(desc.mWidth, desc.mHeight);
+                if (!mState || !mState->mSwapchain || mState->mImages.IsEmpty()) {
                     return nullptr;
                 }
+                acquireResult = AcquireSwapchainImage();
             }
 
-            VkSemaphore renderComplete =
-                (mState->mImageIndex < static_cast<u32>(mState->mRenderCompleteSemaphores.Size()))
-                ? mState->mRenderCompleteSemaphores[mState->mImageIndex]
-                : VK_NULL_HANDLE;
-            if (mState->mOwner) {
-                // Acquire synchronization is completed on CPU fence wait above.
-                mState->mOwner->NotifyViewportAcquired(VK_NULL_HANDLE, renderComplete);
+            if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR) {
+                LogWarningCat(TEXT("RHI.Vulkan"),
+                    "GetBackBuffer: vkAcquireNextImageKHR failed (result={}).",
+                    static_cast<int>(acquireResult));
+                return nullptr;
             }
-
-            mState->mAcquired = true;
         }
 
         if (mState->mImageIndex >= static_cast<u32>(mState->mBackBuffers.Size())) {

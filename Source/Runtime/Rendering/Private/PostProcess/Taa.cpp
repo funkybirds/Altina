@@ -12,9 +12,12 @@
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiTexture.h"
+#include "Utility/Assert.h"
 #include "View/ViewData.h"
 
 namespace AltinaEngine::Rendering::PostProcess::Builtin {
+    using Core::Utility::DebugAssert;
+
     namespace {
         using Detail::FTaaConstants;
 
@@ -63,10 +66,14 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
     void AddTaa(RenderCore::FFrameGraph& graph, const RenderCore::View::FViewData& view,
         const FPostProcessNode& node, const FPostProcessBuildContext& ctx, FPostProcessIO& io) {
         if (!io.SceneColor.IsValid() || !io.Depth.IsValid()) {
+            DebugAssert(false, TEXT("PostProcess.TAA"),
+                "AddTaa skipped: SceneColor or Depth input is invalid.");
             return;
         }
 
         if (ctx.ViewKey == 0ULL) {
+            DebugAssert(false, TEXT("PostProcess.TAA"),
+                "AddTaa skipped: ViewKey is 0, temporal history cannot be tracked.");
             static bool sLoggedOnce = false;
             if (!sLoggedOnce) {
                 sLoggedOnce = true;
@@ -76,6 +83,8 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
         }
 
         if (!Detail::EnsurePostProcessSharedResources()) {
+            DebugAssert(false, TEXT("PostProcess.TAA"),
+                "AddTaa skipped: shared post-process resources are not ready.");
             static bool sLoggedOnce = false;
             if (!sLoggedOnce) {
                 sLoggedOnce = true;
@@ -88,17 +97,23 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
         auto& shared = Detail::GetPostProcessSharedResources();
         if (!shared.TaaPipeline || !shared.TaaLayout || !shared.LinearSampler
             || !shared.TaaConstantsBuffer) {
+            DebugAssert(false, TEXT("PostProcess.TAA"),
+                "AddTaa skipped: missing TAA pipeline/layout/sampler/constants buffer.");
             return;
         }
 
         auto* device = Rhi::RHIGetDevice();
         if (!device) {
+            DebugAssert(false, TEXT("PostProcess.TAA"), "AddTaa skipped: RHI device is null.");
             return;
         }
 
         const u32 width  = view.RenderTargetExtent.Width;
         const u32 height = view.RenderTargetExtent.Height;
         if (width == 0U || height == 0U) {
+            DebugAssert(false, TEXT("PostProcess.TAA"),
+                "AddTaa skipped: invalid render extent {}x{}.", static_cast<u32>(width),
+                static_cast<u32>(height));
             return;
         }
 
@@ -110,6 +125,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
         const auto historyRead  = TemporalAA::Detail::GetHistoryReadTexture(ctx.ViewKey);
         const auto historyWrite = TemporalAA::Detail::GetHistoryWriteTexture(ctx.ViewKey);
         if (!historyRead || !historyWrite) {
+            DebugAssert(false, TEXT("PostProcess.TAA"),
+                "AddTaa skipped: history textures are unavailable for ViewKey={}.",
+                static_cast<u64>(ctx.ViewKey));
             return;
         }
 

@@ -755,10 +755,12 @@ namespace AltinaEngine::Rhi {
             return;
         }
         VkViewport vp{};
-        vp.x        = viewport.mX;
-        vp.y        = viewport.mY;
+        vp.x = viewport.mX;
+        // Vulkan uses clip-space Y convention different from D3D-style shader assumptions used by
+        // the engine. Flip Y here so higher-level rendering code can stay backend-agnostic.
+        vp.y        = viewport.mY + viewport.mHeight;
         vp.width    = viewport.mWidth;
-        vp.height   = viewport.mHeight;
+        vp.height   = -viewport.mHeight;
         vp.minDepth = viewport.mMinDepth;
         vp.maxDepth = viewport.mMaxDepth;
         vkCmdSetViewport(mState->mCmd, 0, 1, &vp);

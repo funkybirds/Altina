@@ -325,6 +325,14 @@ namespace AltinaEngine::Rendering {
             return IsVulkanBackend() ? (2000U + binding) : binding;
         }
 
+        [[nodiscard]] auto GetPerDrawConstantBinding() noexcept -> u32 {
+            // Auto-binding maps AE_PER_DRAW_CBUFFER to:
+            // Vulkan: b0, space1
+            // D3D11: b4
+            // TODO: (Require Refactor, Manual) just work-around
+            return IsVulkanBackend() ? 0U : 4U;
+        }
+
         auto BuildMaterialBindGroupLayoutDesc(const RenderCore::FMaterialLayout& materialLayout,
             TVector<Rhi::FRhiBindGroupLayoutEntry>& outEntries) -> u64 {
             outEntries.Clear();
@@ -574,12 +582,12 @@ namespace AltinaEngine::Rendering {
 
             if (!resources.PerDrawLayout) {
                 Rhi::FRhiBindGroupLayoutEntry entry{};
-                entry.mBinding    = 0U;
+                entry.mBinding    = GetPerDrawConstantBinding();
                 entry.mType       = Rhi::ERhiBindingType::ConstantBuffer;
                 entry.mVisibility = Rhi::ERhiShaderStageFlags::All;
 
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex = 1U;
+                layoutDesc.mSetIndex = IsVulkanBackend() ? 1U : 0U;
                 layoutDesc.mEntries.PushBack(entry);
                 layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
                 resources.PerDrawLayout = device.CreateBindGroupLayout(layoutDesc);
@@ -882,7 +890,7 @@ namespace AltinaEngine::Rendering {
                 materialLayoutRef = it->second;
             } else {
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex   = 2U;
+                layoutDesc.mSetIndex   = IsVulkanBackend() ? 2U : 0U;
                 layoutDesc.mEntries    = layoutEntries;
                 layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
                 materialLayoutRef      = data->Device->CreateBindGroupLayout(layoutDesc);
@@ -1239,7 +1247,7 @@ namespace AltinaEngine::Rendering {
             groupDesc.mLayout = resources.PerDrawLayout.Get();
 
             Rhi::FRhiBindGroupEntry entry{};
-            entry.mBinding = 0U;
+            entry.mBinding = GetPerDrawConstantBinding();
             entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
             entry.mBuffer  = mPerDrawBuffer.Get();
             entry.mOffset  = 0ULL;
@@ -1417,8 +1425,8 @@ namespace AltinaEngine::Rendering {
         FDrawListBindings drawBindings{};
         drawBindings.PerFrame            = mPerFrameGroup.Get();
         drawBindings.PerFrameSetIndex    = 0U;
-        drawBindings.PerDrawSetIndex     = 1U;
-        drawBindings.PerMaterialSetIndex = 2U;
+        drawBindings.PerDrawSetIndex     = IsVulkanBackend() ? 1U : 0U;
+        drawBindings.PerMaterialSetIndex = IsVulkanBackend() ? 2U : 0U;
 
         FBasePassPipelineData pipelineData{};
         pipelineData.Device          = Rhi::RHIGetDevice();

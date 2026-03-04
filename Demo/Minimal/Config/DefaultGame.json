@@ -1,4 +1,7 @@
 {
+    "Rhi":{
+        "PreferD3D11":true
+    },
     "Graphics":{
         "PreferredApis":["DX11","Vulkan"],
         "DebugMode":true

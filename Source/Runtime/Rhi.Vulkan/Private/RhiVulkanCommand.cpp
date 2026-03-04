@@ -478,6 +478,7 @@ namespace AltinaEngine::Rhi {
 
     FRhiVulkanCommandContext::~FRhiVulkanCommandContext() {
         if (mState) {
+            FRhiVulkanBindGroup::NotifyContextDestroyed(this);
             mState->mDescriptorAllocator.Shutdown();
         }
         delete mState;

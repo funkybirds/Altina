@@ -43,6 +43,8 @@ namespace AltinaEngine::Rhi {
         FRhiVulkanBindGroup(const FRhiBindGroupDesc& desc, VkDevice device, VkDescriptorSet set);
         ~FRhiVulkanBindGroup() override;
 
+        static void        NotifyContextDestroyed(const void* contextToken) noexcept;
+
         [[nodiscard]] auto GetDescriptorSet() const noexcept -> VkDescriptorSet;
         [[nodiscard]] auto FindDescriptorSet(const void* contextToken) const noexcept
             -> VkDescriptorSet;
@@ -51,6 +53,8 @@ namespace AltinaEngine::Rhi {
         void UpdateDescriptorSet(VkDescriptorSet set) noexcept;
 
     private:
+        void InvalidateDescriptorSetContext(const void* contextToken) noexcept;
+
         struct FState;
         FState* mState = nullptr;
     };

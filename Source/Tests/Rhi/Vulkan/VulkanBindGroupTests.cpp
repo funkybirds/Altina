@@ -50,3 +50,25 @@ TEST_CASE("Rhi.Vulkan.BindGroup.ContextDescriptorMap") {
     REQUIRE(bindGroup.FindDescriptorSet(contextB) == setB);
     REQUIRE(bindGroup.FindDescriptorSet(contextA) == setA2);
 }
+
+TEST_CASE("Rhi.Vulkan.BindGroup.ContextInvalidation") {
+    FRhiBindGroupDesc      desc{};
+    FRhiVulkanBindGroup    bindGroup(desc, VK_NULL_HANDLE, VK_NULL_HANDLE);
+
+    void*                  contextA = reinterpret_cast<void*>(static_cast<usize>(11));
+    void*                  contextB = reinterpret_cast<void*>(static_cast<usize>(12));
+
+    const VkDescriptorPool poolA = MakeFakeDescriptorPool(21ULL);
+    const VkDescriptorSet  setA  = MakeFakeDescriptorSet(201ULL);
+    const VkDescriptorPool poolB = MakeFakeDescriptorPool(22ULL);
+    const VkDescriptorSet  setB  = MakeFakeDescriptorSet(202ULL);
+
+    bindGroup.RegisterDescriptorSet(contextA, poolA, setA);
+    bindGroup.RegisterDescriptorSet(contextB, poolB, setB);
+    REQUIRE(bindGroup.FindDescriptorSet(contextA) == setA);
+    REQUIRE(bindGroup.FindDescriptorSet(contextB) == setB);
+
+    FRhiVulkanBindGroup::NotifyContextDestroyed(contextA);
+    REQUIRE(bindGroup.FindDescriptorSet(contextA) == VK_NULL_HANDLE);
+    REQUIRE(bindGroup.FindDescriptorSet(contextB) == setB);
+}

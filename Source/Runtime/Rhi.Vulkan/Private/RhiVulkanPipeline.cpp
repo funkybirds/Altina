@@ -67,6 +67,57 @@ namespace AltinaEngine::Rhi {
                     return 4U;
             }
         }
+
+        struct FBindGroupRegistryState {
+            Core::Threading::FMutex                        mMutex;
+            Core::Container::TVector<FRhiVulkanBindGroup*> mBindGroups;
+        };
+
+        auto GetBindGroupRegistryState() noexcept -> FBindGroupRegistryState& {
+            static FBindGroupRegistryState state;
+            return state;
+        }
+
+        void RegisterBindGroupInstance(FRhiVulkanBindGroup* bindGroup) noexcept {
+            if (bindGroup == nullptr) {
+                return;
+            }
+            auto&                        registry = GetBindGroupRegistryState();
+            Core::Threading::FScopedLock lock(registry.mMutex);
+            for (auto* existing : registry.mBindGroups) {
+                if (existing == bindGroup) {
+                    return;
+                }
+            }
+            registry.mBindGroups.PushBack(bindGroup);
+        }
+
+        void UnregisterBindGroupInstance(FRhiVulkanBindGroup* bindGroup) noexcept {
+            if (bindGroup == nullptr) {
+                return;
+            }
+            auto&                        registry = GetBindGroupRegistryState();
+            Core::Threading::FScopedLock lock(registry.mMutex);
+            auto&                        bindGroups = registry.mBindGroups;
+            for (usize i = 0; i < bindGroups.Size(); ++i) {
+                if (bindGroups[i] != bindGroup) {
+                    continue;
+                }
+                const usize lastIndex = bindGroups.Size() - 1;
+                if (i != lastIndex) {
+                    bindGroups[i] = bindGroups[lastIndex];
+                }
+                bindGroups.PopBack();
+                return;
+            }
+        }
+
+        auto SnapshotBindGroupInstances() noexcept
+            -> Core::Container::TVector<FRhiVulkanBindGroup*> {
+            auto&                        registry = GetBindGroupRegistryState();
+            Core::Threading::FScopedLock lock(registry.mMutex);
+            return registry.mBindGroups;
+        }
     } // namespace
 
     struct FRhiVulkanPipelineLayout::FState {
@@ -286,9 +337,11 @@ namespace AltinaEngine::Rhi {
         (void)set;
         mState          = new FState{};
         mState->mDevice = device;
+        RegisterBindGroupInstance(this);
     }
 
     FRhiVulkanBindGroup::~FRhiVulkanBindGroup() {
+        UnregisterBindGroupInstance(this);
         if (!mState) {
             return;
         }
@@ -303,6 +356,20 @@ namespace AltinaEngine::Rhi {
         }
         delete mState;
         mState = nullptr;
+    }
+
+    void FRhiVulkanBindGroup::NotifyContextDestroyed(const void* contextToken) noexcept {
+        if (contextToken == nullptr) {
+            return;
+        }
+
+        auto bindGroups = SnapshotBindGroupInstances();
+        for (auto* bindGroup : bindGroups) {
+            if (bindGroup == nullptr) {
+                continue;
+            }
+            bindGroup->InvalidateDescriptorSetContext(contextToken);
+        }
     }
 
     auto FRhiVulkanBindGroup::GetDescriptorSet() const noexcept -> VkDescriptorSet {
@@ -348,6 +415,29 @@ namespace AltinaEngine::Rhi {
         contextSet.mPool         = pool;
         contextSet.mSet          = set;
         mState->mContextSets.PushBack(contextSet);
+    }
+
+    void FRhiVulkanBindGroup::InvalidateDescriptorSetContext(const void* contextToken) noexcept {
+        if (mState == nullptr || contextToken == nullptr) {
+            return;
+        }
+
+        Core::Threading::FScopedLock lock(mState->mMutex);
+        auto&                        contextSets = mState->mContextSets;
+        usize                        writeIndex  = 0;
+        for (usize readIndex = 0; readIndex < contextSets.Size(); ++readIndex) {
+            const auto& contextSet = contextSets[readIndex];
+            if (contextSet.mContextToken == contextToken) {
+                continue;
+            }
+            if (writeIndex != readIndex) {
+                contextSets[writeIndex] = contextSet;
+            }
+            ++writeIndex;
+        }
+        if (writeIndex < contextSets.Size()) {
+            contextSets.Resize(writeIndex);
+        }
     }
 
     void FRhiVulkanBindGroup::UpdateDescriptorSet(VkDescriptorSet set) noexcept {

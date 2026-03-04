@@ -1065,6 +1065,51 @@ namespace AltinaEngine::Rendering {
         return resources.Registry.RegisterShader(key, Move(shader));
     }
 
+    void FBasicDeferredRenderer::ShutdownSharedResources() noexcept {
+        auto& resources = GetSharedResources();
+        resources.OutputPipeline.Reset();
+        resources.OutputPipelineLayout.Reset();
+        resources.OutputLayout.Reset();
+        resources.OutputSampler.Reset();
+
+        resources.LightingPipeline.Reset();
+        resources.LightingPipelineLayout.Reset();
+        resources.LightingLayout.Reset();
+
+        resources.SsaoPipeline.Reset();
+        resources.SsaoPipelineLayout.Reset();
+        resources.SsaoLayout.Reset();
+
+        resources.SkyBoxPipeline.Reset();
+        resources.SkyBoxPipelineLayout.Reset();
+        resources.SkyBoxLayout.Reset();
+
+        resources.IblBlackCube.Reset();
+        resources.IblBlack2D.Reset();
+
+        resources.PerFrameLayout.Reset();
+        resources.PerDrawLayout.Reset();
+
+        resources.BasePipelines.clear();
+        resources.ShadowPipelines.clear();
+        resources.MaterialLayouts.clear();
+        resources.BasePipelineLayouts.clear();
+        resources.DefaultTemplate.Reset();
+        resources.DefaultPassDesc       = {};
+        resources.DefaultShadowPassDesc = {};
+
+        resources.OutputVSKey   = {};
+        resources.OutputPSKey   = {};
+        resources.LightingVSKey = {};
+        resources.LightingPSKey = {};
+        resources.SsaoVSKey     = {};
+        resources.SsaoPSKey     = {};
+        resources.SkyBoxVSKey   = {};
+        resources.SkyBoxPSKey   = {};
+
+        resources.Registry.Clear();
+    }
+
     void FBasicDeferredRenderer::SetDeferredLightingDebugLambert(bool bEnabled) noexcept {
         gDeferredLightingDebugShadingMode = bEnabled ? 1U : 0U;
     }

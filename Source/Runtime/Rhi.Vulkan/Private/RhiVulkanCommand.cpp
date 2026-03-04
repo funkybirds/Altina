@@ -14,6 +14,7 @@
 #include "Utility/Assert.h"
 
 #include "RhiVulkanInternal.h"
+#include "RhiVulkanDebugUtils.h"
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
@@ -311,6 +312,9 @@ namespace AltinaEngine::Rhi {
                 info.flags |= VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
             }
             vkCreateCommandPool(device, &info, nullptr, &mState->mPool);
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mPool,
+                VK_OBJECT_TYPE_COMMAND_POOL, desc.mDebugName.ToView(),
+                TEXT("RhiVulkan.CommandPool"), TEXT("VkCommandPool"));
         }
     }
 
@@ -389,6 +393,9 @@ namespace AltinaEngine::Rhi {
             info.level              = mState->mLevel;
             info.commandBufferCount = 1;
             vkAllocateCommandBuffers(mState->mDevice, &info, &mState->mBuffer);
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mBuffer,
+                VK_OBJECT_TYPE_COMMAND_BUFFER, GetDesc().mDebugName.ToView(),
+                TEXT("RhiVulkan.CommandList"), TEXT("VkCommandBuffer"));
         } else {
             vkResetCommandBuffer(mState->mBuffer, 0);
         }

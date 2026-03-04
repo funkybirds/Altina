@@ -10,6 +10,7 @@
 #include "Rendering/BasicDeferredRenderer.h"
 #include "Rendering/BasicForwardRenderer.h"
 #include "Rendering/CommonRendererResource.h"
+#include "Rendering/PostProcess/PostProcess.h"
 #include "Rendering/PostProcess/PostProcessSettings.h"
 #include "Rendering/TemporalAA/TemporalAA.h"
 #include "Rendering/RenderingSettings.h"
@@ -446,6 +447,45 @@ namespace AltinaEngine::Launch {
             executor.Execute(graph);
         }
 
+        struct FSceneRenderCaches {
+            Asset::FAssetHandle                                SkyCubeAsset{};
+            GameScene::FSkyCubeComponent::FSkyCubeRhiResources SkyCubeRhi{};
+            bool                                               HasSkyCubeRhi = false;
+
+            Asset::FAssetHandle                                SkyIrradianceAsset{};
+            GameScene::FSkyCubeComponent::FSkyCubeRhiResources SkyIrradianceRhi{};
+            bool                                               HasSkyIrradianceRhi = false;
+
+            Asset::FAssetHandle                                SkySpecularAsset{};
+            GameScene::FSkyCubeComponent::FSkyCubeRhiResources SkySpecularRhi{};
+            bool                                               HasSkySpecularRhi = false;
+
+            Asset::FAssetHandle                                BrdfLutAsset{};
+            Rhi::FRhiTextureRef                                BrdfLutTexture{};
+            bool                                               HasBrdfLutTexture = false;
+        };
+
+        auto GetSceneRenderCaches() -> FSceneRenderCaches& {
+            static FSceneRenderCaches caches{};
+            return caches;
+        }
+
+        void ClearSceneRenderCaches() {
+            auto& caches               = GetSceneRenderCaches();
+            caches.SkyCubeAsset        = {};
+            caches.SkyCubeRhi          = {};
+            caches.HasSkyCubeRhi       = false;
+            caches.SkyIrradianceAsset  = {};
+            caches.SkyIrradianceRhi    = {};
+            caches.HasSkyIrradianceRhi = false;
+            caches.SkySpecularAsset    = {};
+            caches.SkySpecularRhi      = {};
+            caches.HasSkySpecularRhi   = false;
+            caches.BrdfLutAsset        = {};
+            caches.BrdfLutTexture.Reset();
+            caches.HasBrdfLutTexture = false;
+        }
+
         void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
             Engine::FRenderScene& scene, const TVector<RenderCore::Render::FDrawList>& drawLists,
             const TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
@@ -455,26 +495,23 @@ namespace AltinaEngine::Launch {
                 return;
             }
 
-            // Cache skybox GPU resources on the render thread to avoid re-uploading every frame.
-            static Asset::FAssetHandle                                sSkyCubeAsset{};
-            static GameScene::FSkyCubeComponent::FSkyCubeRhiResources sSkyCubeRhi{};
-            static bool                                               sHasSkyCubeRhi = false;
+            // Cache skybox/IBL GPU resources on the render thread to avoid re-uploading.
+            auto&             cache                = GetSceneRenderCaches();
+            auto&             sSkyCubeAsset        = cache.SkyCubeAsset;
+            auto&             sSkyCubeRhi          = cache.SkyCubeRhi;
+            bool&             sHasSkyCubeRhi       = cache.HasSkyCubeRhi;
+            auto&             sSkyIrradianceAsset  = cache.SkyIrradianceAsset;
+            auto&             sSkyIrradianceRhi    = cache.SkyIrradianceRhi;
+            bool&             sHasSkyIrradianceRhi = cache.HasSkyIrradianceRhi;
+            auto&             sSkySpecularAsset    = cache.SkySpecularAsset;
+            auto&             sSkySpecularRhi      = cache.SkySpecularRhi;
+            bool&             sHasSkySpecularRhi   = cache.HasSkySpecularRhi;
+            auto&             sBrdfLutAsset        = cache.BrdfLutAsset;
+            auto&             sBrdfLutTexture      = cache.BrdfLutTexture;
+            bool&             sHasBrdfLutTexture   = cache.HasBrdfLutTexture;
 
-            // Cache IBL GPU resources (derived from the active sky cubemap).
-            static Asset::FAssetHandle                                sSkyIrradianceAsset{};
-            static GameScene::FSkyCubeComponent::FSkyCubeRhiResources sSkyIrradianceRhi{};
-            static bool                                               sHasSkyIrradianceRhi = false;
-
-            static Asset::FAssetHandle                                sSkySpecularAsset{};
-            static GameScene::FSkyCubeComponent::FSkyCubeRhiResources sSkySpecularRhi{};
-            static bool                                               sHasSkySpecularRhi = false;
-
-            static Asset::FAssetHandle                                sBrdfLutAsset{};
-            static Rhi::FRhiTextureRef                                sBrdfLutTexture{};
-            static bool                                               sHasBrdfLutTexture = false;
-
-            Rhi::FRhiTexture*                                         skyCubeTexture = nullptr;
-            bool                                                      bHasSkyCube    = false;
+            Rhi::FRhiTexture* skyCubeTexture = nullptr;
+            bool              bHasSkyCube    = false;
             if (scene.bHasSkyCube && scene.SkyCubeAsset.IsValid()) {
                 bHasSkyCube = true;
                 if (!GameScene::FSkyCubeComponent::AssetToSkyCubeConverter) {
@@ -1283,10 +1320,6 @@ namespace AltinaEngine::Launch {
         mIsRunning = false;
 
         FlushRenderFrames();
-        if (mRenderingThread) {
-            mRenderingThread->Stop();
-            mRenderingThread.Reset();
-        }
 
         if (mDebugGui) {
             mDebugGui.Reset();
@@ -1313,9 +1346,27 @@ namespace AltinaEngine::Launch {
             mMainViewport->SetDeleteQueue(nullptr);
             mMainViewport.Reset();
         }
+
+        // Release world-owned render resources (meshes/material instances/components) before
+        // tearing down the RHI device.
+        mEngineRuntime.GetWorldManager().Clear();
+        mRenderCallback = {};
+
+        if (mRenderingThread) {
+            mRenderingThread->Stop();
+            mRenderingThread.Reset();
+        }
+
+        ClearSceneRenderCaches();
+        Rendering::TemporalAA::ShutdownTemporalAA();
+        Rendering::ShutdownPostProcess();
+        Rendering::FBasicDeferredRenderer::ShutdownSharedResources();
+        RenderCore::ShutdownMaterialFallbacks();
+
         if (mRhiDevice) {
             mRhiDevice->FlushResourceDeleteQueue();
         }
+
         mRhiDevice.Reset();
         if (mRhiContext) {
             Rhi::RHIExit(*mRhiContext);

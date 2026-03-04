@@ -20,30 +20,37 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        usize writeIndex = 0;
-        for (usize index = 0; index < mEntries.Size(); ++index) {
-            const auto& entry = mEntries[index];
+        TVector<FEntry> survivors;
+        survivors.Reserve(mEntries.Size());
+
+        const usize initialCount = mEntries.Size();
+        for (usize index = 0; index < initialCount; ++index) {
+            const FEntry entry = mEntries[index];
             if ((entry.mResource != nullptr) && entry.mSerial <= completedSerial) {
                 entry.mResource->DestroySelf();
                 continue;
             }
-
-            if (writeIndex != index) {
-                mEntries[writeIndex] = entry;
-            }
-            ++writeIndex;
+            survivors.PushBack(entry);
         }
 
-        mEntries.Resize(writeIndex);
+        for (usize index = initialCount; index < mEntries.Size(); ++index) {
+            survivors.PushBack(mEntries[index]);
+        }
+
+        mEntries = Move(survivors);
     }
 
     void FRhiResourceDeleteQueue::Flush() {
-        for (auto& entry : mEntries) {
-            if (entry.mResource != nullptr) {
-                entry.mResource->DestroySelf();
+        while (!mEntries.IsEmpty()) {
+            TVector<FEntry> batch = Move(mEntries);
+            mEntries.Clear();
+
+            for (const auto& entry : batch) {
+                if (entry.mResource != nullptr) {
+                    entry.mResource->DestroySelf();
+                }
             }
         }
-        mEntries.Clear();
     }
 
     auto FRhiResourceDeleteQueue::GetPendingCount() const noexcept -> u32 {

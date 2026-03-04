@@ -89,8 +89,13 @@ namespace AltinaEngine::RenderCore {
             Rhi::FRhiTextureRef GrayTex;       // (0.6,0.6,0.6,1)
         };
 
-        auto EnsureDefaultMaterialFallbacks() -> FDefaultMaterialFallbacks& {
+        auto GetDefaultMaterialFallbacksState() -> FDefaultMaterialFallbacks& {
             static FDefaultMaterialFallbacks s;
+            return s;
+        }
+
+        auto EnsureDefaultMaterialFallbacks() -> FDefaultMaterialFallbacks& {
+            auto& s = GetDefaultMaterialFallbacksState();
             if (s.bReady) {
                 return s;
             }
@@ -147,6 +152,16 @@ namespace AltinaEngine::RenderCore {
             return s;
         }
     } // namespace
+
+    void ShutdownMaterialFallbacks() noexcept {
+        auto& s = GetDefaultMaterialFallbacksState();
+        s.WhiteTex.Reset();
+        s.BlackTex.Reset();
+        s.NormalFlatTex.Reset();
+        s.GrayTex.Reset();
+        s.Sampler.Reset();
+        s.bReady = false;
+    }
 
     auto HashMaterialParamName(FStringView name) noexcept -> FMaterialParamId {
         if (name.IsEmpty()) {

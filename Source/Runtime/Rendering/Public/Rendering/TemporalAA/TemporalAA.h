@@ -25,4 +25,7 @@ namespace AltinaEngine::Rendering::TemporalAA {
      */
     AE_RENDERING_API void FinalizeViewForFrame(
         u64 viewKey, const RenderCore::View::FViewData& view, bool bEnableJitter, u32 sampleCount);
+
+    // Release persistent temporal history textures/state.
+    AE_RENDERING_API void ShutdownTemporalAA() noexcept;
 } // namespace AltinaEngine::Rendering::TemporalAA

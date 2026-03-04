@@ -108,6 +108,11 @@ namespace AltinaEngine::Rendering::TemporalAA::Detail {
         const auto& s = GetOrCreateViewState(viewKey);
         return HistoryWrite(s);
     }
+
+    void ClearAllViewStates() noexcept {
+        auto& map = GetStateMap();
+        map.clear();
+    }
 } // namespace AltinaEngine::Rendering::TemporalAA::Detail
 
 namespace AltinaEngine::Rendering::TemporalAA {
@@ -173,4 +178,6 @@ namespace AltinaEngine::Rendering::TemporalAA {
             state.TemporalSampleIndex = 0U;
         }
     }
+
+    void ShutdownTemporalAA() noexcept { Detail::ClearAllViewStates(); }
 } // namespace AltinaEngine::Rendering::TemporalAA

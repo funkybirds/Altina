@@ -1,4 +1,5 @@
 #include "RhiVulkanMemoryAllocator.h"
+#include "RhiVulkanDebugUtils.h"
 
 namespace AltinaEngine::Rhi::Vulkan::Detail {
     FVulkanMemoryAllocator::~FVulkanMemoryAllocator() { Shutdown(); }
@@ -75,8 +76,8 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         return pool;
     }
 
-    auto FVulkanMemoryAllocator::AllocateFromPool(
-        FPool& pool, const VkMemoryRequirements& requirements) -> FVulkanMemoryAllocation {
+    auto FVulkanMemoryAllocator::AllocateFromPool(FPool& pool, u32 poolIndex,
+        const VkMemoryRequirements& requirements) -> FVulkanMemoryAllocation {
         FVulkanMemoryAllocation allocation{};
         if (pool.mMemory == VK_NULL_HANDLE) {
             return allocation;
@@ -92,7 +93,7 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         allocation.mSize            = subAlloc.mSize;
         allocation.mMemoryTypeIndex = pool.mMemoryTypeIndex;
         allocation.mSubAllocation   = subAlloc;
-        allocation.mPool            = &pool;
+        allocation.mPoolIndex       = poolIndex;
         if (pool.mMappedPtr) {
             allocation.mMappedPtr = static_cast<u8*>(pool.mMappedPtr) + allocation.mOffset;
         }
@@ -116,11 +117,12 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
 
         const bool hostVisible = (flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 
-        for (auto& pool : mPools) {
+        for (u32 i = 0; i < static_cast<u32>(mPools.Size()); ++i) {
+            auto& pool = mPools[static_cast<usize>(i)];
             if (pool.mMemoryTypeIndex != memoryTypeIndex || pool.mHostVisible != hostVisible) {
                 continue;
             }
-            auto alloc = AllocateFromPool(pool, requirements);
+            auto alloc = AllocateFromPool(pool, i, requirements);
             if (alloc.IsValid()) {
                 return alloc;
             }
@@ -133,7 +135,16 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         }
 
         mPools.PushBack(pool);
-        return AllocateFromPool(mPools.Back(), requirements);
+        const u32 newPoolIndex = static_cast<u32>(mPools.Size() - 1U);
+        FString   poolDebugName;
+        poolDebugName.Append(TEXT("RhiVulkan.MemoryPool.Type"));
+        poolDebugName.Append(FString::ToString(memoryTypeIndex));
+        poolDebugName.Append(TEXT(".Index"));
+        poolDebugName.Append(FString::ToString(newPoolIndex));
+        Vulkan::Detail::SetVkObjectDebugName(mDevice, mPools.Back().mMemory,
+            VK_OBJECT_TYPE_DEVICE_MEMORY, poolDebugName.ToView(), TEXT("RhiVulkan.MemoryPool"),
+            TEXT("VkDeviceMemory"));
+        return AllocateFromPool(mPools.Back(), newPoolIndex, requirements);
     }
 
     void FVulkanMemoryAllocator::Free(FVulkanMemoryAllocation& allocation) {
@@ -143,9 +154,11 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         }
 
         FScopedLock lock(mMutex);
-        auto*       pool = static_cast<FPool*>(allocation.mPool);
-        if (pool != nullptr) {
-            pool->mAllocator.Free(allocation.mSubAllocation);
+        if (allocation.mPoolIndex < static_cast<u32>(mPools.Size())) {
+            auto& pool = mPools[static_cast<usize>(allocation.mPoolIndex)];
+            if (pool.mMemory == allocation.mMemory) {
+                (void)pool.mAllocator.Free(allocation.mSubAllocation);
+            }
         }
         if (mStats.mTotalUsedBytes >= allocation.mSize) {
             mStats.mTotalUsedBytes -= allocation.mSize;

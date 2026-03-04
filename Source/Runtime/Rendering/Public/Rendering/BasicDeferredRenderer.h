@@ -27,6 +27,7 @@ namespace AltinaEngine::Rendering {
             const RenderCore::FShaderRegistry::FShaderKey&                             ps) noexcept;
         [[nodiscard]] static auto RegisterShader(
             const RenderCore::FShaderRegistry::FShaderKey& key, Rhi::FRhiShaderRef shader) -> bool;
+        static void ShutdownSharedResources() noexcept;
 
         // Debug: use Lambert (diffuse-only) shading in PSDeferredLighting instead of PBR.
         static void SetDeferredLightingDebugLambert(bool bEnabled) noexcept;

@@ -2,11 +2,15 @@
 
 #include "RhiVulkan/RhiVulkanDevice.h"
 #include "RhiVulkanInternal.h"
+#include "RhiVulkanDebugUtils.h"
 #include "RhiVulkanMemoryAllocator.h"
 
 #include "Rhi/RhiInit.h"
 
 namespace AltinaEngine::Rhi {
+    namespace Container = Core::Container;
+    using Container::FString;
+
     namespace {
         [[nodiscard]] auto GetAllocator() noexcept -> Vulkan::Detail::FVulkanMemoryAllocator* {
             auto* device = static_cast<FRhiVulkanDevice*>(RHIGetDevice());
@@ -140,6 +144,9 @@ namespace AltinaEngine::Rhi {
             mState->mBuffer = VK_NULL_HANDLE;
             return;
         }
+        Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mBuffer,
+            VK_OBJECT_TYPE_BUFFER, desc.mDebugName.ToView(), TEXT("RhiVulkan.Buffer"),
+            TEXT("VkBuffer"));
 
         VkMemoryRequirements req{};
         vkGetBufferMemoryRequirements(mState->mDevice, mState->mBuffer, &req);
@@ -251,6 +258,8 @@ namespace AltinaEngine::Rhi {
             mState->mImage = VK_NULL_HANDLE;
             return;
         }
+        Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mImage, VK_OBJECT_TYPE_IMAGE,
+            desc.mDebugName.ToView(), TEXT("RhiVulkan.Texture"), TEXT("VkImage"));
 
         VkMemoryRequirements req{};
         vkGetImageMemoryRequirements(mState->mDevice, mState->mImage, &req);
@@ -314,6 +323,10 @@ namespace AltinaEngine::Rhi {
                 vkDestroyImage(mState->mDevice, mState->mImage, nullptr);
                 mState->mImage = VK_NULL_HANDLE;
             }
+        } else {
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mDefaultView,
+                VK_OBJECT_TYPE_IMAGE_VIEW, desc.mDebugName.ToView(), TEXT("RhiVulkan.Texture"),
+                TEXT("DefaultVkImageView"));
         }
     }
 
@@ -326,6 +339,11 @@ namespace AltinaEngine::Rhi {
         mState->mDefaultView = view;
         mState->mOwnsImage   = ownsImage;
         mState->mAllocator   = GetAllocator();
+        Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mImage, VK_OBJECT_TYPE_IMAGE,
+            desc.mDebugName.ToView(), TEXT("RhiVulkan.ExternalTexture"), TEXT("VkImage"));
+        Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mDefaultView,
+            VK_OBJECT_TYPE_IMAGE_VIEW, desc.mDebugName.ToView(), TEXT("RhiVulkan.ExternalTexture"),
+            TEXT("DefaultVkImageView"));
     }
 
     FRhiVulkanTexture::~FRhiVulkanTexture() {
@@ -430,6 +448,10 @@ namespace AltinaEngine::Rhi {
 
         if (vkCreateSampler(mState->mDevice, &info, nullptr, &mState->mSampler) != VK_SUCCESS) {
             mState->mSampler = VK_NULL_HANDLE;
+        } else {
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mSampler,
+                VK_OBJECT_TYPE_SAMPLER, desc.mDebugName.ToView(), TEXT("RhiVulkan.Sampler"),
+                TEXT("VkSampler"));
         }
     }
 
@@ -467,6 +489,10 @@ namespace AltinaEngine::Rhi {
         info.pCode    = reinterpret_cast<const u32*>(desc.mBytecode.Data());
         if (vkCreateShaderModule(mState->mDevice, &info, nullptr, &mState->mModule) != VK_SUCCESS) {
             mState->mModule = VK_NULL_HANDLE;
+        } else {
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mModule,
+                VK_OBJECT_TYPE_SHADER_MODULE, desc.mDebugName.ToView(), TEXT("RhiVulkan.Shader"),
+                TEXT("VkShaderModule"));
         }
     }
 
@@ -518,6 +544,16 @@ namespace AltinaEngine::Rhi {
 
         if (vkCreateImageView(mState->mDevice, &view, nullptr, &mState->mView) != VK_SUCCESS) {
             mState->mView = VK_NULL_HANDLE;
+        } else {
+            FString debugName;
+            if (!desc.mDebugName.IsEmptyString()) {
+                debugName.Assign(desc.mDebugName);
+            } else if (desc.mTexture != nullptr) {
+                debugName.Assign(desc.mTexture->GetDebugName());
+            }
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mView,
+                VK_OBJECT_TYPE_IMAGE_VIEW, debugName.ToView(), TEXT("RhiVulkan.SRV"),
+                TEXT("VkImageView"));
         }
     }
 
@@ -569,6 +605,16 @@ namespace AltinaEngine::Rhi {
 
         if (vkCreateImageView(mState->mDevice, &view, nullptr, &mState->mView) != VK_SUCCESS) {
             mState->mView = VK_NULL_HANDLE;
+        } else {
+            FString debugName;
+            if (!desc.mDebugName.IsEmptyString()) {
+                debugName.Assign(desc.mDebugName);
+            } else if (desc.mTexture != nullptr) {
+                debugName.Assign(desc.mTexture->GetDebugName());
+            }
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mView,
+                VK_OBJECT_TYPE_IMAGE_VIEW, debugName.ToView(), TEXT("RhiVulkan.UAV"),
+                TEXT("VkImageView"));
         }
     }
 
@@ -620,6 +666,16 @@ namespace AltinaEngine::Rhi {
 
         if (vkCreateImageView(mState->mDevice, &view, nullptr, &mState->mView) != VK_SUCCESS) {
             mState->mView = VK_NULL_HANDLE;
+        } else {
+            FString debugName;
+            if (!desc.mDebugName.IsEmptyString()) {
+                debugName.Assign(desc.mDebugName);
+            } else if (desc.mTexture != nullptr) {
+                debugName.Assign(desc.mTexture->GetDebugName());
+            }
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mView,
+                VK_OBJECT_TYPE_IMAGE_VIEW, debugName.ToView(), TEXT("RhiVulkan.RTV"),
+                TEXT("VkImageView"));
         }
     }
 
@@ -671,6 +727,16 @@ namespace AltinaEngine::Rhi {
 
         if (vkCreateImageView(mState->mDevice, &view, nullptr, &mState->mView) != VK_SUCCESS) {
             mState->mView = VK_NULL_HANDLE;
+        } else {
+            FString debugName;
+            if (!desc.mDebugName.IsEmptyString()) {
+                debugName.Assign(desc.mDebugName);
+            } else if (desc.mTexture != nullptr) {
+                debugName.Assign(desc.mTexture->GetDebugName());
+            }
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mView,
+                VK_OBJECT_TYPE_IMAGE_VIEW, debugName.ToView(), TEXT("RhiVulkan.DSV"),
+                TEXT("VkImageView"));
         }
     }
 

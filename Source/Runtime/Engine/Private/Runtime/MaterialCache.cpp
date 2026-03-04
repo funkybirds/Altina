@@ -54,6 +54,19 @@ namespace AltinaEngine::Engine {
     }
 
     void FMaterialCache::Clear() {
+        auto releaseMaterial = [](const Container::TShared<Render::FMaterial>& material) {
+            if (!material) {
+                return;
+            }
+            material->ReleaseResource();
+            material->WaitForRelease();
+        };
+
+        releaseMaterial(mFallbackMaterial);
+        for (auto& entry : mMaterialCache) {
+            releaseMaterial(entry.second);
+        }
+
         mFallbackMaterial.Reset();
         mMaterialCache.clear();
     }

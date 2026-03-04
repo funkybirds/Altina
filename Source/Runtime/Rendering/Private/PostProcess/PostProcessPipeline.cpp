@@ -258,4 +258,14 @@ namespace AltinaEngine::Rendering {
         // Always add the final Present pass.
         AddPresent(graph, view, ctx, io);
     }
+
+    void ShutdownPostProcess() noexcept {
+        auto&            s = GetRegistryState();
+        std::scoped_lock lock(s.Mutex);
+        s.Effects.clear();
+        s.MissingLoggedOnce.clear();
+        s.bBuiltinsRegistered = false;
+
+        PostProcess::Detail::ShutdownPostProcessSharedResources();
+    }
 } // namespace AltinaEngine::Rendering

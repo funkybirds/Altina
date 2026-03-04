@@ -85,6 +85,27 @@ TEST_CASE("AllocatorPolicy.Buddy.Coalesce") {
     REQUIRE_EQ(aligned.mOrder, 2U);
 }
 
+TEST_CASE("AllocatorPolicy.Buddy.InvalidFreeRejected") {
+    FBuddyAllocatorPolicy buddy(1024ULL, 64ULL);
+
+    const auto            alloc = buddy.Allocate(128ULL, 1ULL);
+    REQUIRE(alloc.IsValid());
+
+    auto invalidOrder = alloc;
+    invalidOrder.mOrder += 32U;
+    REQUIRE(!buddy.Free(invalidOrder));
+
+    auto invalidSize = alloc;
+    invalidSize.mSize += 64ULL;
+    REQUIRE(!buddy.Free(invalidSize));
+
+    auto invalidOffset = alloc;
+    invalidOffset.mOffset += 1ULL;
+    REQUIRE(!buddy.Free(invalidOffset));
+
+    REQUIRE(buddy.Free(alloc));
+}
+
 TEST_CASE("AllocatorExecutor.MemoryBackingWrite") {
     u8                                                             buffer[64] = {};
     FMemoryBufferBacking                                           backing(buffer, 64ULL);

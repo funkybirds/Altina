@@ -119,4 +119,5 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
 
     // Compiles shaders + creates pipelines/layouts/buffers lazily.
     [[nodiscard]] auto EnsurePostProcessSharedResources() -> bool;
+    void               ShutdownPostProcessSharedResources() noexcept;
 } // namespace AltinaEngine::Rendering::PostProcess::Detail

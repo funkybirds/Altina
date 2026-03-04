@@ -2,11 +2,13 @@
 
 #include "RhiVulkanInternal.h"
 #include "Container/HashMap.h"
+#include "Container/String.h"
 #include "Container/Vector.h"
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
+    using Container::FString;
     using Container::THashMap;
     using Container::TVector;
 
@@ -31,6 +33,9 @@ namespace AltinaEngine::Rhi {
             VkDescriptorSetLayout         mSetLayout = VK_NULL_HANDLE;
             TVector<VkDescriptorPool>     mPools;
             TVector<VkDescriptorPoolSize> mPoolSizes;
+            FString                       mDebugName;
+            u32                           mNextPoolIndex = 0U;
+            u32                           mNextSetIndex  = 0U;
         };
 
         auto     GetOrCreateBucket(u64 layoutHash, VkDescriptorSetLayout setLayout,

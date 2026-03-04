@@ -168,6 +168,19 @@ namespace AltinaEngine::RenderCore::Geometry {
 
             return true;
         }
+
+        void ReleaseGpuResources() noexcept {
+            auto release = [](FRenderResource& resource) {
+                resource.ReleaseResource();
+                resource.WaitForRelease();
+            };
+
+            release(PositionBuffer);
+            release(TangentBuffer);
+            release(UV0Buffer);
+            release(UV1Buffer);
+            release(IndexBuffer);
+        }
     };
 
     struct AE_RENDER_CORE_API FStaticMeshData {

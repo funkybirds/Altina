@@ -1,4 +1,5 @@
 #include "RhiVulkanDescriptorAllocator.h"
+#include "RhiVulkanDebugUtils.h"
 
 namespace AltinaEngine::Rhi {
     namespace {
@@ -62,6 +63,11 @@ namespace AltinaEngine::Rhi {
 
         FLayoutBucket bucket{};
         bucket.mSetLayout = setLayout;
+        if (!layoutDesc.mDebugName.IsEmptyString()) {
+            bucket.mDebugName.Assign(layoutDesc.mDebugName);
+        } else {
+            bucket.mDebugName.Assign(TEXT("RhiVulkan.BindGroupLayout"));
+        }
         BuildPoolSizes(layoutDesc, bucket.mPoolSizes);
         buckets.PushBack(bucket);
         return &buckets.Back();
@@ -84,6 +90,13 @@ namespace AltinaEngine::Rhi {
         if (vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &pool) != VK_SUCCESS) {
             return VK_NULL_HANDLE;
         }
+
+        FString poolDebugName;
+        poolDebugName.Append(bucket.mDebugName);
+        poolDebugName.Append(TEXT(".DescriptorPool."));
+        poolDebugName.Append(FString::ToString(bucket.mNextPoolIndex++));
+        Vulkan::Detail::SetVkObjectDebugName(mDevice, pool, VK_OBJECT_TYPE_DESCRIPTOR_POOL,
+            poolDebugName.ToView(), TEXT("RhiVulkan.DescriptorPool"), TEXT("VkDescriptorPool"));
 
         bucket.mPools.PushBack(pool);
         return pool;
@@ -109,6 +122,13 @@ namespace AltinaEngine::Rhi {
             allocInfo.pSetLayouts        = &setLayout;
             if (vkAllocateDescriptorSets(mDevice, &allocInfo, &out.mSet) == VK_SUCCESS) {
                 out.mPool = pool;
+                FString setDebugName;
+                setDebugName.Append(bucket->mDebugName);
+                setDebugName.Append(TEXT(".DescriptorSet."));
+                setDebugName.Append(FString::ToString(bucket->mNextSetIndex++));
+                Vulkan::Detail::SetVkObjectDebugName(mDevice, out.mSet,
+                    VK_OBJECT_TYPE_DESCRIPTOR_SET, setDebugName.ToView(),
+                    TEXT("RhiVulkan.DescriptorSet"), TEXT("VkDescriptorSet"));
                 return true;
             }
             return false;

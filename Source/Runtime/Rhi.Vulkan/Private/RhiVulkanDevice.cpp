@@ -14,6 +14,7 @@
 #include "Types/CheckedCast.h"
 
 #include "RhiVulkanInternal.h"
+#include "RhiVulkanDebugUtils.h"
 #include "RhiVulkanMemoryAllocator.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
 #include "Utility/Assert.h"
@@ -251,6 +252,9 @@ namespace AltinaEngine::Rhi {
             poolInfo.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT
                 | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
             vkCreateCommandPool(mState->mDevice, &poolInfo, nullptr, &state.mPool);
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, state.mPool,
+                        VK_OBJECT_TYPE_COMMAND_POOL, TEXT("RhiVulkan.UploadQueue"),
+                        TEXT("RhiVulkan.UploadQueue"), TEXT("VkCommandPool"));
             state.mTimeline  = CreateSemaphore(true, 0ULL);
             state.mNextValue = 0ULL;
         };
@@ -271,12 +275,6 @@ namespace AltinaEngine::Rhi {
 
     FRhiVulkanDevice::~FRhiVulkanDevice() {
         if (mState) {
-            FlushResourceDeleteQueue();
-
-            mState->mUploadManager.EndFrame();
-            mState->mUploadManager.Reset();
-            mState->mStagingManager.Shutdown();
-
             mState->mSubmitter.Stop();
 
             if (mState->mDevice) {
@@ -284,6 +282,16 @@ namespace AltinaEngine::Rhi {
                 // that may still be referenced by in-flight submissions (semaphores, pools, etc.).
                 vkDeviceWaitIdle(mState->mDevice);
             }
+
+            // First pass: drain resources retired during normal runtime.
+            FlushResourceDeleteQueue();
+
+            // Manager teardown may release retained FRhiBufferRef/FRhiTextureRef and enqueue
+            // them into the delete queue. Drain again after each phase.
+            mState->mUploadManager.EndFrame();
+            mState->mUploadManager.Reset();
+            mState->mStagingManager.Shutdown();
+            FlushResourceDeleteQueue();
 
             for (auto& upload : mState->mUploadQueues) {
                 if (upload.mPool != VK_NULL_HANDLE && mState->mDevice) {
@@ -295,6 +303,9 @@ namespace AltinaEngine::Rhi {
                 upload.mTimeline  = {};
                 upload.mNextValue = 0ULL;
             }
+
+            // Upload queue timeline semaphores are FRhiResource objects and are released above.
+            FlushResourceDeleteQueue();
 
             mState->mAllocator.Shutdown();
 
@@ -602,6 +613,9 @@ namespace AltinaEngine::Rhi {
                 }
                 return;
             }
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, pool, VK_OBJECT_TYPE_COMMAND_POOL,
+                TEXT("RhiVulkan.BlockingUpload"), TEXT("RhiVulkan.BlockingUpload"),
+                TEXT("VkCommandPool"));
 
             VkCommandBufferAllocateInfo allocInfo{};
             allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -616,6 +630,9 @@ namespace AltinaEngine::Rhi {
                 }
                 return;
             }
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, cmd,
+                VK_OBJECT_TYPE_COMMAND_BUFFER, TEXT("RhiVulkan.BlockingUpload"),
+                TEXT("RhiVulkan.BlockingUpload"), TEXT("VkCommandBuffer"));
 
             VkCommandBufferBeginInfo begin{};
             begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -754,6 +771,9 @@ namespace AltinaEngine::Rhi {
                 }
                 return;
             }
+            Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, cmd,
+                VK_OBJECT_TYPE_COMMAND_BUFFER, TEXT("RhiVulkan.AsyncUpload"),
+                TEXT("RhiVulkan.AsyncUpload"), TEXT("VkCommandBuffer"));
         }
 
         VkCommandBufferBeginInfo begin{};

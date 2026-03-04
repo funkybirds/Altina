@@ -23,7 +23,7 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         void*              mMappedPtr       = nullptr;
 
         FBuddyAllocation   mSubAllocation{};
-        void*              mPool = nullptr;
+        u32                mPoolIndex = static_cast<u32>(-1);
 
         [[nodiscard]] auto IsValid() const noexcept -> bool {
             return mMemory != VK_NULL_HANDLE && mSize != 0ULL;
@@ -61,7 +61,7 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         };
 
         auto FindMemoryType(u32 typeBits, VkMemoryPropertyFlags flags) const noexcept -> u32;
-        auto AllocateFromPool(FPool& pool, const VkMemoryRequirements& requirements)
+        auto AllocateFromPool(FPool& pool, u32 poolIndex, const VkMemoryRequirements& requirements)
             -> FVulkanMemoryAllocation;
         auto             CreatePool(u32 memoryTypeIndex, u64 sizeBytes, bool hostVisible) -> FPool;
 

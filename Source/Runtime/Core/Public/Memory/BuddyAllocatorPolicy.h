@@ -91,6 +91,16 @@ namespace AltinaEngine::Core::Memory {
             if (!allocation.IsValid() || allocation.mOrder > mMaxOrder) {
                 return false;
             }
+            const u64 blockSize = BlockSize(allocation.mOrder);
+            if (blockSize == 0ULL || allocation.mSize != blockSize || mTotalSize == 0ULL) {
+                return false;
+            }
+            if (allocation.mOffset >= mTotalSize || (allocation.mOffset + blockSize) > mTotalSize) {
+                return false;
+            }
+            if ((allocation.mOffset & (blockSize - 1ULL)) != 0ULL) {
+                return false;
+            }
 
             u64 offset = allocation.mOffset;
             u32 order  = allocation.mOrder;

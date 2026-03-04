@@ -738,4 +738,45 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         }
         return true;
     }
+
+    void ShutdownPostProcessSharedResources() noexcept {
+        auto& res = GetPostProcessSharedResources();
+
+        res.BlitPipeline.Reset();
+        res.TonemapPipeline.Reset();
+        res.FxaaPipeline.Reset();
+        res.BloomPrefilterPipeline.Reset();
+        res.BloomDownsamplePipeline.Reset();
+        res.BloomDownsampleWeightedPipeline.Reset();
+        res.BloomBlurHPipeline.Reset();
+        res.BloomBlurVPipeline.Reset();
+        res.BloomUpsampleAddPipeline.Reset();
+        res.BloomApplyAddPipeline.Reset();
+        res.TaaPipeline.Reset();
+
+        res.BlitConstantsBuffer.Reset();
+        res.TonemapConstantsBuffer.Reset();
+        res.FxaaConstantsBuffer.Reset();
+        res.BloomConstantsBuffer.Reset();
+        res.TaaConstantsBuffer.Reset();
+
+        res.LinearSampler.Reset();
+        res.PipelineLayout.Reset();
+        res.TaaPipelineLayout.Reset();
+        res.Layout.Reset();
+        res.TaaLayout.Reset();
+
+        res.FullscreenVS.Reset();
+        res.BlitPS.Reset();
+        res.TonemapPS.Reset();
+        res.FxaaPS.Reset();
+        res.BloomPrefilterPS.Reset();
+        res.BloomDownsamplePS.Reset();
+        res.BloomDownsampleWeightedPS.Reset();
+        res.BloomBlurHPS.Reset();
+        res.BloomBlurVPS.Reset();
+        res.BloomUpsamplePS.Reset();
+        res.BloomApplyPS.Reset();
+        res.TaaPS.Reset();
+    }
 } // namespace AltinaEngine::Rendering::PostProcess::Detail

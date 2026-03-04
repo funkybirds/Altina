@@ -1,8 +1,20 @@
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 
 namespace AltinaEngine::GameScene {
+    namespace {
+        void ReleaseStaticMeshGpuResources(Geometry::FStaticMeshData& mesh) noexcept {
+            for (auto& lod : mesh.Lods) {
+                lod.ReleaseGpuResources();
+            }
+        }
+    } // namespace
+
     FStaticMeshFilterComponent::FAssetToStaticMeshConverter
-         FStaticMeshFilterComponent::AssetToStaticMeshConverter = {};
+        FStaticMeshFilterComponent::AssetToStaticMeshConverter = {};
+
+    FStaticMeshFilterComponent::~FStaticMeshFilterComponent() {
+        ReleaseStaticMeshGpuResources(mStaticMesh);
+    }
 
     auto FStaticMeshFilterComponent::GetStaticMesh() noexcept -> Geometry::FStaticMeshData& {
         ResolveStaticMesh();
@@ -16,6 +28,7 @@ namespace AltinaEngine::GameScene {
     }
 
     void FStaticMeshFilterComponent::SetStaticMeshAsset(Asset::FAssetHandle handle) noexcept {
+        ReleaseStaticMeshGpuResources(mStaticMesh);
         mMeshAsset          = Move(handle);
         mProceduralOverride = false;
         mMeshResolved       = false;
@@ -25,6 +38,7 @@ namespace AltinaEngine::GameScene {
 
     void FStaticMeshFilterComponent::SetStaticMeshData(
         Geometry::FStaticMeshData&& InMesh) noexcept {
+        ReleaseStaticMeshGpuResources(mStaticMesh);
         mProceduralOverride = true;
         mMeshAsset          = {};
         mResolvedAsset      = {};
@@ -49,6 +63,7 @@ namespace AltinaEngine::GameScene {
     }
 
     void FStaticMeshFilterComponent::ClearStaticMeshData() noexcept {
+        ReleaseStaticMeshGpuResources(mStaticMesh);
         mProceduralOverride = false;
         mMeshAsset          = {};
         mResolvedAsset      = {};
@@ -75,7 +90,8 @@ namespace AltinaEngine::GameScene {
         }
 
         mMeshResolved = true;
-        mStaticMesh   = {};
+        ReleaseStaticMeshGpuResources(mStaticMesh);
+        mStaticMesh = {};
 
         if (!mMeshAsset.IsValid()) {
             return;

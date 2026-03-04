@@ -80,4 +80,7 @@ namespace AltinaEngine::Rendering {
     AE_RENDERING_API void BuildPostProcess(RenderCore::FFrameGraph& graph,
         const RenderCore::View::FViewData& view, const FPostProcessStack& stack, FPostProcessIO& io,
         const FPostProcessBuildContext& ctx);
+
+    // Releases static post-process shared resources and registry state.
+    AE_RENDERING_API void ShutdownPostProcess() noexcept;
 } // namespace AltinaEngine::Rendering

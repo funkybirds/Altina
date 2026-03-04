@@ -86,4 +86,7 @@ namespace AltinaEngine::RenderCore {
         bool mDirtyBindings = false;
     };
 
+    // Release process-static fallback sampler/textures allocated by material code paths.
+    AE_RENDER_CORE_API void ShutdownMaterialFallbacks() noexcept;
+
 } // namespace AltinaEngine::RenderCore

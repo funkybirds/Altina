@@ -22,6 +22,7 @@ namespace AltinaEngine::GameScene {
     public:
         using FAssetToStaticMeshConverter =
             Container::TFunction<Geometry::FStaticMeshData(const Asset::FAssetHandle&)>;
+        ~FStaticMeshFilterComponent() override;
 
         [[nodiscard]] auto GetStaticMesh() noexcept -> Geometry::FStaticMeshData&;
         [[nodiscard]] auto GetStaticMesh() const noexcept -> const Geometry::FStaticMeshData&;

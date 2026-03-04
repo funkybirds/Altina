@@ -444,8 +444,7 @@ namespace AltinaEngine::Rhi {
     }
 
     auto FRhiVulkanDevice::CreateBindGroup(const FRhiBindGroupDesc& desc) -> FRhiBindGroupRef {
-        // Descriptor set allocation is handled inside bind group; device is required for update
-        // calls.
+        // Descriptor set allocation is deferred to command-context-local descriptor allocators.
         return MakeResource<FRhiVulkanBindGroup>(
             desc, mState ? mState->mDevice : VK_NULL_HANDLE, VK_NULL_HANDLE);
     }
@@ -540,13 +539,18 @@ namespace AltinaEngine::Rhi {
         }
 
         const bool    timelineSupported = IsFeatureSupported(ERhiFeature::TimelineSemaphore);
-        ERhiQueueType uploadQueue       = ERhiQueueType::Graphics;
+        // Temporary safety fallback: the async timeline upload path is unstable in tests.
+        // Keep uploads on the blocking path until queue-ownership and timeline submission are
+        // fully validated.
+        const bool    useAsyncTimelineUpload = false;
+        ERhiQueueType uploadQueue            = ERhiQueueType::Graphics;
         if (mState->mTransferQueue != VK_NULL_HANDLE) {
             uploadQueue = ERhiQueueType::Copy;
         }
 
         auto& uploadState = mState->mUploadQueues[ToQueueIndex(uploadQueue)];
-        if (!timelineSupported || uploadState.mPool == VK_NULL_HANDLE || !uploadState.mTimeline) {
+        if (!useAsyncTimelineUpload || !timelineSupported || uploadState.mPool == VK_NULL_HANDLE
+            || !uploadState.mTimeline) {
             // Fallback: block on graphics queue if timeline is unavailable.
             VkCommandPoolCreateInfo poolInfo{};
             poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;

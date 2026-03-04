@@ -3,6 +3,7 @@
 #include "DebugGui/DebugGuiAPI.h"
 
 #include "Container/Function.h"
+#include "Container/SmartPtr.h"
 #include "Container/String.h"
 #include "Container/StringView.h"
 #include "Math/Vector.h"
@@ -21,6 +22,8 @@ namespace AltinaEngine::DebugGui {
     namespace Container = Core::Container;
     using Container::FStringView;
     using Container::TFunction;
+    using Container::TOwner;
+    using Container::TPolymorphicDeleter;
 
     using Core::Math::FVector2f;
 
@@ -210,7 +213,10 @@ namespace AltinaEngine::DebugGui {
         [[nodiscard]] virtual auto GetLastFrameStats() const noexcept -> FDebugGuiFrameStats = 0;
     };
 
+    using FDebugGuiSystemOwner = TOwner<IDebugGuiSystem, TPolymorphicDeleter<IDebugGuiSystem>>;
+
     // Factory helpers (to avoid exposing concrete types in other module headers).
+    AE_DEBUGGUI_API auto CreateDebugGuiSystemOwner() -> FDebugGuiSystemOwner;
     AE_DEBUGGUI_API auto CreateDebugGuiSystem() -> IDebugGuiSystem*;
     AE_DEBUGGUI_API void DestroyDebugGuiSystem(IDebugGuiSystem* sys);
 } // namespace AltinaEngine::DebugGui

@@ -402,7 +402,7 @@ namespace AltinaEngine::Rhi {
             texDesc.mDebugName = GetDesc().mDebugName;
             texDesc.mDebugName.Append(TEXT(" BackBuffer"));
         }
-
+        // TODO: (Require Refactor) `new` operator here!
         auto* texture = new FRhiD3D11Texture(
             texDesc, backBuffer.Detach(), rtv.Detach(), nullptr, nullptr, nullptr);
         mState->mBackBuffer = FRhiTextureRef::Adopt(texture);

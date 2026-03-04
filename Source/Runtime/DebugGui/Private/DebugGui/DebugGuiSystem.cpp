@@ -2479,6 +2479,10 @@ namespace AltinaEngine::DebugGui {
         };
     } // namespace
 
+    auto CreateDebugGuiSystemOwner() -> FDebugGuiSystemOwner {
+        return MakeUniqueAs<IDebugGuiSystem, FDebugGuiSystem>();
+    }
+
     auto CreateDebugGuiSystem() -> IDebugGuiSystem* {
         auto owner = MakeUniqueAs<IDebugGuiSystem, FDebugGuiSystem>();
         return owner.Release();

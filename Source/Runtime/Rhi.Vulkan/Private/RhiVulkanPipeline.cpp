@@ -5,6 +5,7 @@
 #include "RhiVulkanInternal.h"
 
 #include "Rhi/RhiInit.h"
+#include "Threading/Mutex.h"
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
@@ -51,6 +52,10 @@ namespace AltinaEngine::Rhi {
             switch (format) {
                 case VK_FORMAT_R32_SFLOAT:
                     return 4U;
+                case VK_FORMAT_R32G32_SFLOAT:
+                    return 8U;
+                case VK_FORMAT_R32G32B32_SFLOAT:
+                    return 12U;
                 case VK_FORMAT_R8G8B8A8_UNORM:
                 case VK_FORMAT_R8G8B8A8_SRGB:
                 case VK_FORMAT_B8G8R8A8_UNORM:
@@ -264,9 +269,15 @@ namespace AltinaEngine::Rhi {
     }
 
     struct FRhiVulkanBindGroup::FState {
-        VkDevice         mDevice = VK_NULL_HANDLE;
-        VkDescriptorPool mPool   = VK_NULL_HANDLE;
-        VkDescriptorSet  mSet    = VK_NULL_HANDLE;
+        struct FContextSet {
+            const void*      mContextToken = nullptr;
+            VkDescriptorPool mPool         = VK_NULL_HANDLE;
+            VkDescriptorSet  mSet          = VK_NULL_HANDLE;
+        };
+
+        VkDevice                              mDevice = VK_NULL_HANDLE;
+        Core::Threading::FMutex               mMutex;
+        Core::Container::TVector<FContextSet> mContextSets;
     };
 
     FRhiVulkanBindGroup::FRhiVulkanBindGroup(
@@ -275,56 +286,78 @@ namespace AltinaEngine::Rhi {
         (void)set;
         mState          = new FState{};
         mState->mDevice = device;
+    }
 
-        auto* vkLayout = static_cast<FRhiVulkanBindGroupLayout*>(desc.mLayout);
-        if (!vkLayout || !device) {
+    FRhiVulkanBindGroup::~FRhiVulkanBindGroup() {
+        if (!mState) {
             return;
         }
-
-        // Create a small dedicated descriptor pool for this set.
-        const auto&                                    layoutDesc = desc.mLayout->GetDesc();
-
-        Core::Container::TVector<VkDescriptorPoolSize> poolSizes;
-        poolSizes.Reserve(layoutDesc.mEntries.Size());
-
-        auto addPoolSize = [&](VkDescriptorType type, u32 count) -> void {
-            for (auto& ps : poolSizes) {
-                if (ps.type == type) {
-                    ps.descriptorCount += count;
-                    return;
+        if (mState->mDevice) {
+            Core::Threading::FScopedLock lock(mState->mMutex);
+            for (const auto& contextSet : mState->mContextSets) {
+                if (contextSet.mPool != VK_NULL_HANDLE && contextSet.mSet != VK_NULL_HANDLE) {
+                    vkFreeDescriptorSets(mState->mDevice, contextSet.mPool, 1, &contextSet.mSet);
                 }
             }
-            VkDescriptorPoolSize size{};
-            size.type            = type;
-            size.descriptorCount = count;
-            poolSizes.PushBack(size);
-        };
-
-        for (const auto& entry : layoutDesc.mEntries) {
-            addPoolSize(
-                ToVkDescriptorType(entry.mType, entry.mHasDynamicOffset), entry.mArrayCount);
+            mState->mContextSets.Clear();
         }
+        delete mState;
+        mState = nullptr;
+    }
 
-        VkDescriptorPoolCreateInfo poolInfo{};
-        poolInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.maxSets       = 1;
-        poolInfo.poolSizeCount = static_cast<u32>(poolSizes.Size());
-        poolInfo.pPoolSizes    = poolSizes.IsEmpty() ? nullptr : poolSizes.Data();
+    auto FRhiVulkanBindGroup::GetDescriptorSet() const noexcept -> VkDescriptorSet {
+        if (mState == nullptr) {
+            return VK_NULL_HANDLE;
+        }
+        Core::Threading::FScopedLock lock(const_cast<Core::Threading::FMutex&>(mState->mMutex));
+        if (mState->mContextSets.IsEmpty()) {
+            return VK_NULL_HANDLE;
+        }
+        return mState->mContextSets[0].mSet;
+    }
 
-        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &mState->mPool) != VK_SUCCESS) {
-            mState->mPool = VK_NULL_HANDLE;
+    auto FRhiVulkanBindGroup::FindDescriptorSet(const void* contextToken) const noexcept
+        -> VkDescriptorSet {
+        if (mState == nullptr || contextToken == nullptr) {
+            return VK_NULL_HANDLE;
+        }
+        Core::Threading::FScopedLock lock(const_cast<Core::Threading::FMutex&>(mState->mMutex));
+        for (const auto& contextSet : mState->mContextSets) {
+            if (contextSet.mContextToken == contextToken) {
+                return contextSet.mSet;
+            }
+        }
+        return VK_NULL_HANDLE;
+    }
+
+    void FRhiVulkanBindGroup::RegisterDescriptorSet(
+        const void* contextToken, VkDescriptorPool pool, VkDescriptorSet set) noexcept {
+        if (mState == nullptr || contextToken == nullptr || set == VK_NULL_HANDLE) {
+            return;
+        }
+        Core::Threading::FScopedLock lock(mState->mMutex);
+        for (auto& contextSet : mState->mContextSets) {
+            if (contextSet.mContextToken == contextToken) {
+                contextSet.mPool = pool;
+                contextSet.mSet  = set;
+                return;
+            }
+        }
+        FState::FContextSet contextSet{};
+        contextSet.mContextToken = contextToken;
+        contextSet.mPool         = pool;
+        contextSet.mSet          = set;
+        mState->mContextSets.PushBack(contextSet);
+    }
+
+    void FRhiVulkanBindGroup::UpdateDescriptorSet(VkDescriptorSet set) noexcept {
+        if (mState == nullptr || mState->mDevice == VK_NULL_HANDLE || set == VK_NULL_HANDLE) {
             return;
         }
 
-        VkDescriptorSetLayout       nativeLayout = vkLayout->GetNativeLayout();
-        VkDescriptorSetAllocateInfo alloc{};
-        alloc.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        alloc.descriptorPool     = mState->mPool;
-        alloc.descriptorSetCount = 1;
-        alloc.pSetLayouts        = &nativeLayout;
-
-        if (vkAllocateDescriptorSets(device, &alloc, &mState->mSet) != VK_SUCCESS) {
-            mState->mSet = VK_NULL_HANDLE;
+        const auto& desc     = GetDesc();
+        auto*       vkLayout = static_cast<FRhiVulkanBindGroupLayout*>(desc.mLayout);
+        if (vkLayout == nullptr) {
             return;
         }
 
@@ -339,15 +372,13 @@ namespace AltinaEngine::Rhi {
         for (const auto& entry : desc.mEntries) {
             u32  dstBinding    = entry.mBinding;
             bool dynamicOffset = false;
-            if (!vkLayout
-                || !vkLayout->ResolveBinding(
-                    entry.mBinding, entry.mType, dstBinding, dynamicOffset)) {
+            if (!vkLayout->ResolveBinding(entry.mBinding, entry.mType, dstBinding, dynamicOffset)) {
                 continue;
             }
 
             VkWriteDescriptorSet write{};
             write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet          = mState->mSet;
+            write.dstSet          = set;
             write.dstBinding      = dstBinding;
             write.dstArrayElement = entry.mArrayIndex;
             write.descriptorCount = 1;
@@ -365,7 +396,7 @@ namespace AltinaEngine::Rhi {
                 bi.buffer = vkBuffer->GetNativeBuffer();
                 bi.offset = static_cast<VkDeviceSize>(entry.mOffset);
                 bi.range =
-                    (entry.mSize == 0) ? VK_WHOLE_SIZE : static_cast<VkDeviceSize>(entry.mSize);
+                    (entry.mSize == 0ULL) ? VK_WHOLE_SIZE : static_cast<VkDeviceSize>(entry.mSize);
                 bufferInfos.PushBack(bi);
                 write.pBufferInfo = &bufferInfos.Back();
             } else if (entry.mType == ERhiBindingType::Sampler) {
@@ -399,23 +430,8 @@ namespace AltinaEngine::Rhi {
 
         if (!writes.IsEmpty()) {
             vkUpdateDescriptorSets(
-                device, static_cast<u32>(writes.Size()), writes.Data(), 0, nullptr);
+                mState->mDevice, static_cast<u32>(writes.Size()), writes.Data(), 0, nullptr);
         }
-    }
-
-    FRhiVulkanBindGroup::~FRhiVulkanBindGroup() {
-        if (!mState) {
-            return;
-        }
-        if (mState->mDevice && mState->mPool) {
-            vkDestroyDescriptorPool(mState->mDevice, mState->mPool, nullptr);
-        }
-        delete mState;
-        mState = nullptr;
-    }
-
-    auto FRhiVulkanBindGroup::GetDescriptorSet() const noexcept -> VkDescriptorSet {
-        return (mState != nullptr) ? mState->mSet : VK_NULL_HANDLE;
     }
 
     struct FRhiVulkanGraphicsPipeline::FState {
@@ -519,8 +535,11 @@ namespace AltinaEngine::Rhi {
 
         const auto& layoutDesc = GetGraphicsDesc().mVertexLayout;
         for (usize i = 0; i < layoutDesc.mAttributes.Size(); ++i) {
-            const auto&                       attr = layoutDesc.mAttributes[i];
-            const VkFormat                    fmt  = Vulkan::Detail::ToVkFormat(attr.mFormat);
+            const auto&    attr = layoutDesc.mAttributes[i];
+            const VkFormat fmt  = Vulkan::Detail::ToVkFormat(attr.mFormat);
+            if (fmt == VK_FORMAT_UNDEFINED) {
+                continue;
+            }
             VkVertexInputAttributeDescription a{};
             a.location = static_cast<u32>(i);
             a.binding  = attr.mInputSlot;

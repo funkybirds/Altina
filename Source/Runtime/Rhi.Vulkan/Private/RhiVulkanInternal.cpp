@@ -13,6 +13,10 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
                 return VK_FORMAT_B8G8R8A8_SRGB;
             case ERhiFormat::R16G16B16A16Float:
                 return VK_FORMAT_R16G16B16A16_SFLOAT;
+            case ERhiFormat::R32G32Float:
+                return VK_FORMAT_R32G32_SFLOAT;
+            case ERhiFormat::R32G32B32Float:
+                return VK_FORMAT_R32G32B32_SFLOAT;
             case ERhiFormat::R32Float:
                 return VK_FORMAT_R32_SFLOAT;
             case ERhiFormat::D24UnormS8Uint:

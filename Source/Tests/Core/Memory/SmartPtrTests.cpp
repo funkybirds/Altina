@@ -17,7 +17,9 @@ TEST_CASE("TOwner release and reset") {
     REQUIRE(!Owner);
     REQUIRE(RawPtr != nullptr);
 
-    delete RawPtr;
+    TAllocator<int> alloc;
+    TAllocatorTraits<TAllocator<int>>::Destroy(alloc, RawPtr);
+    TAllocatorTraits<TAllocator<int>>::Deallocate(alloc, RawPtr, 1);
 }
 
 TEST_CASE("TOwner move and swap semantics") {

@@ -5,6 +5,7 @@
 #include "RhiVulkan/RhiVulkanPipeline.h"
 #include "RhiVulkan/RhiVulkanResources.h"
 #include "RhiVulkan/RhiVulkanDevice.h"
+#include "RhiVulkanDescriptorAllocator.h"
 
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiPipelineLayout.h"
@@ -61,6 +62,18 @@ namespace AltinaEngine::Rhi {
             hash = HashCombine(hash, static_cast<u64>(depthFormat));
             hash = HashCombine(hash, static_cast<u64>(topology));
             return hash;
+        }
+
+        [[nodiscard]] auto HasStencilAspect(VkFormat format) noexcept -> bool {
+            switch (format) {
+                case VK_FORMAT_D16_UNORM_S8_UINT:
+                case VK_FORMAT_D24_UNORM_S8_UINT:
+                case VK_FORMAT_D32_SFLOAT_S8_UINT:
+                case VK_FORMAT_S8_UINT:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         auto GetRenderTargetViewHandle(FRhiRenderTargetView* view) noexcept -> VkImageView {
@@ -375,6 +388,7 @@ namespace AltinaEngine::Rhi {
         TVector<VkFormat>                  mColorFormats;
         VkFormat                           mDepthFormat = VK_FORMAT_UNDEFINED;
         FRhiVulkanDevice*                  mOwner       = nullptr;
+        FVulkanDescriptorAllocator         mDescriptorAllocator;
     };
 
     FRhiVulkanCommandContext::FRhiVulkanCommandContext(
@@ -384,6 +398,7 @@ namespace AltinaEngine::Rhi {
         if (mState) {
             mState->mDevice = device;
             mState->mOwner  = owner;
+            mState->mDescriptorAllocator.Init(device);
             if (owner) {
                 mState->mSupportsDynamicRendering     = owner->SupportsDynamicRendering();
                 mState->mSupportsSync2                = owner->SupportsSynchronization2();
@@ -399,6 +414,9 @@ namespace AltinaEngine::Rhi {
     }
 
     FRhiVulkanCommandContext::~FRhiVulkanCommandContext() {
+        if (mState) {
+            mState->mDescriptorAllocator.Shutdown();
+        }
         delete mState;
         mState = nullptr;
     }
@@ -866,14 +884,20 @@ namespace AltinaEngine::Rhi {
             mState->mRenderingInfo.pColorAttachments = mState->mColorAttachments.Data();
             mState->mRenderingInfo.pDepthAttachment =
                 hasDepth ? &mState->mDepthAttachment : nullptr;
+            mState->mRenderingInfo.pStencilAttachment =
+                (hasDepth && HasStencilAspect(mState->mDepthFormat)) ? &mState->mDepthAttachment
+                                                                     : nullptr;
 
             mState->mPipelineRenderingInfo       = {};
             mState->mPipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
             mState->mPipelineRenderingInfo.colorAttachmentCount =
                 static_cast<u32>(mState->mColorFormats.Size());
             mState->mPipelineRenderingInfo.pColorAttachmentFormats = mState->mColorFormats.Data();
-            mState->mPipelineRenderingInfo.depthAttachmentFormat   = mState->mDepthFormat;
-            mState->mPipelineRenderingInfo.stencilAttachmentFormat = mState->mDepthFormat;
+            mState->mPipelineRenderingInfo.depthAttachmentFormat =
+                hasDepth ? mState->mDepthFormat : VK_FORMAT_UNDEFINED;
+            mState->mPipelineRenderingInfo.stencilAttachmentFormat =
+                (hasDepth && HasStencilAspect(mState->mDepthFormat)) ? mState->mDepthFormat
+                                                                     : VK_FORMAT_UNDEFINED;
 
             vkCmdBeginRendering(mState->mCmd, &mState->mRenderingInfo);
         } else {
@@ -1285,7 +1309,25 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        VkDescriptorSet set = vkGroup->GetDescriptorSet();
+        VkDescriptorSet set = vkGroup->FindDescriptorSet(this);
+        if (set == VK_NULL_HANDLE) {
+            auto* groupLayout = group->GetDesc().mLayout;
+            auto* vkLayout    = static_cast<FRhiVulkanBindGroupLayout*>(groupLayout);
+            if (!groupLayout || !vkLayout) {
+                return;
+            }
+
+            const auto alloc =
+                mState->mDescriptorAllocator.Allocate(groupLayout->GetDesc().mLayoutHash,
+                    vkLayout->GetNativeLayout(), groupLayout->GetDesc());
+            if (alloc.mSet == VK_NULL_HANDLE) {
+                return;
+            }
+            vkGroup->UpdateDescriptorSet(alloc.mSet);
+            vkGroup->RegisterDescriptorSet(this, alloc.mPool, alloc.mSet);
+            set = alloc.mSet;
+        }
+
         vkCmdBindDescriptorSets(
             mState->mCmd, bindPoint, layout, setIndex, 1, &set, dynamicOffsetCount, dynamicOffsets);
     }

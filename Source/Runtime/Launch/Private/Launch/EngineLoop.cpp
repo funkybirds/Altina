@@ -815,11 +815,7 @@ namespace AltinaEngine::Launch {
         }
 
         if (!mDebugGui) {
-            using Core::Container::TPolymorphicDeleter;
-            using DebugGui::IDebugGuiSystem;
-            mDebugGui = TOwner<IDebugGuiSystem, TPolymorphicDeleter<IDebugGuiSystem>>(
-                DebugGui::CreateDebugGuiSystem(),
-                TPolymorphicDeleter<IDebugGuiSystem>(&DebugGui::DestroyDebugGuiSystem));
+            mDebugGui = DebugGui::CreateDebugGuiSystemOwner();
         }
 
 #if AE_PLATFORM_WIN

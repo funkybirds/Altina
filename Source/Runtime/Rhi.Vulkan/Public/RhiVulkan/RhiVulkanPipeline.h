@@ -44,6 +44,11 @@ namespace AltinaEngine::Rhi {
         ~FRhiVulkanBindGroup() override;
 
         [[nodiscard]] auto GetDescriptorSet() const noexcept -> VkDescriptorSet;
+        [[nodiscard]] auto FindDescriptorSet(const void* contextToken) const noexcept
+            -> VkDescriptorSet;
+        void RegisterDescriptorSet(
+            const void* contextToken, VkDescriptorPool pool, VkDescriptorSet set) noexcept;
+        void UpdateDescriptorSet(VkDescriptorSet set) noexcept;
 
     private:
         struct FState;

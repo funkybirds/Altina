@@ -83,18 +83,60 @@ float3 EvaluatePbrDirect(
 
 #ifndef AE_PBR_STANDARD_NO_CBUFFERS
 
-AE_PER_FRAME_CBUFFER(ViewConstants)
+#if defined(AE_SHADER_TARGET_VULKAN)
+    #define AE_PBR_REG_VIEW      register(b0, space0)
+    #define AE_PBR_REG_OBJECT    register(b0, space1)
+    #define AE_PBR_REG_MATERIAL  register(b0, space2)
+    #define AE_PBR_REG_T0        register(t0, space2)
+    #define AE_PBR_REG_T1        register(t1, space2)
+    #define AE_PBR_REG_T2        register(t2, space2)
+    #define AE_PBR_REG_T3        register(t3, space2)
+    #define AE_PBR_REG_T4        register(t4, space2)
+    #define AE_PBR_REG_T5        register(t5, space2)
+    #define AE_PBR_REG_T6        register(t6, space2)
+    #define AE_PBR_REG_T7        register(t7, space2)
+    #define AE_PBR_REG_S0        register(s0, space2)
+    #define AE_PBR_REG_S1        register(s1, space2)
+    #define AE_PBR_REG_S2        register(s2, space2)
+    #define AE_PBR_REG_S3        register(s3, space2)
+    #define AE_PBR_REG_S4        register(s4, space2)
+    #define AE_PBR_REG_S5        register(s5, space2)
+    #define AE_PBR_REG_S6        register(s6, space2)
+    #define AE_PBR_REG_S7        register(s7, space2)
+#else
+    #define AE_PBR_REG_VIEW      register(b0)
+    #define AE_PBR_REG_OBJECT    register(b4)
+    #define AE_PBR_REG_MATERIAL  register(b8)
+    #define AE_PBR_REG_T0        register(t32)
+    #define AE_PBR_REG_T1        register(t33)
+    #define AE_PBR_REG_T2        register(t34)
+    #define AE_PBR_REG_T3        register(t35)
+    #define AE_PBR_REG_T4        register(t36)
+    #define AE_PBR_REG_T5        register(t37)
+    #define AE_PBR_REG_T6        register(t38)
+    #define AE_PBR_REG_T7        register(t39)
+    #define AE_PBR_REG_S0        register(s8)
+    #define AE_PBR_REG_S1        register(s9)
+    #define AE_PBR_REG_S2        register(s10)
+    #define AE_PBR_REG_S3        register(s11)
+    #define AE_PBR_REG_S4        register(s12)
+    #define AE_PBR_REG_S5        register(s13)
+    #define AE_PBR_REG_S6        register(s14)
+    #define AE_PBR_REG_S7        register(s15)
+#endif
+
+cbuffer ViewConstants : AE_PBR_REG_VIEW
 {
     row_major float4x4 ViewProjection;
 };
 
-AE_PER_DRAW_CBUFFER(ObjectConstants)
+cbuffer ObjectConstants : AE_PBR_REG_OBJECT
 {
     row_major float4x4 World;
     row_major float4x4 NormalMatrix;
 };
 
-AE_PER_MATERIAL_CBUFFER(MaterialConstants)
+cbuffer MaterialConstants : AE_PBR_REG_MATERIAL
 {
     float4 BaseColor;
     float  Metallic;
@@ -107,22 +149,22 @@ AE_PER_MATERIAL_CBUFFER(MaterialConstants)
     float3 _MaterialPadding0;
 };
 
-Texture2D    BaseColorTex : register(t0);
-SamplerState BaseColorTexSampler : register(s0);
-Texture2D    NormalTex : register(t1);
-SamplerState NormalTexSampler : register(s1);
-Texture2D    MetallicTex : register(t2);
-SamplerState MetallicTexSampler : register(s2);
-Texture2D    RoughnessTex : register(t3);
-SamplerState RoughnessTexSampler : register(s3);
-Texture2D    EmissiveTex : register(t4);
-SamplerState EmissiveTexSampler : register(s4);
-Texture2D    OcclusionTex : register(t5);
-SamplerState OcclusionTexSampler : register(s5);
-Texture2D    SpecularTex : register(t6);
-SamplerState SpecularTexSampler : register(s6);
-Texture2D    DisplacementTex : register(t7);
-SamplerState DisplacementTexSampler : register(s7);
+Texture2D    BaseColorTex         : AE_PBR_REG_T0;
+SamplerState BaseColorTexSampler  : AE_PBR_REG_S0;
+Texture2D    NormalTex            : AE_PBR_REG_T1;
+SamplerState NormalTexSampler     : AE_PBR_REG_S1;
+Texture2D    MetallicTex          : AE_PBR_REG_T2;
+SamplerState MetallicTexSampler   : AE_PBR_REG_S2;
+Texture2D    RoughnessTex         : AE_PBR_REG_T3;
+SamplerState RoughnessTexSampler  : AE_PBR_REG_S3;
+Texture2D    EmissiveTex          : AE_PBR_REG_T4;
+SamplerState EmissiveTexSampler   : AE_PBR_REG_S4;
+Texture2D    OcclusionTex         : AE_PBR_REG_T5;
+SamplerState OcclusionTexSampler  : AE_PBR_REG_S5;
+Texture2D    SpecularTex          : AE_PBR_REG_T6;
+SamplerState SpecularTexSampler   : AE_PBR_REG_S6;
+Texture2D    DisplacementTex      : AE_PBR_REG_T7;
+SamplerState DisplacementTexSampler : AE_PBR_REG_S7;
 
 struct VSInput
 {

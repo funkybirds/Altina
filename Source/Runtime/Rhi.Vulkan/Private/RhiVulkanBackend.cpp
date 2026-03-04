@@ -5,9 +5,79 @@
 #include "RhiVulkan/RhiVulkanResources.h"
 
 #include "Jobs/JobSystem.h"
+#if AE_PLATFORM_WIN
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <Windows.h>
+#endif
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
+    namespace {
+        class FQueueApiLock final {
+        public:
+            void Lock() noexcept {
+#if AE_PLATFORM_WIN
+                if (mMutexHandle == nullptr) {
+                    mMutexHandle =
+                        ::CreateMutexW(nullptr, FALSE, L"AltinaEngine.Rhi.Vulkan.QueueApiMutex");
+                }
+                if (mMutexHandle != nullptr) {
+                    (void)::WaitForSingleObject(mMutexHandle, INFINITE);
+                }
+#else
+                mMutex.Lock();
+#endif
+            }
+
+            void Unlock() noexcept {
+#if AE_PLATFORM_WIN
+                if (mMutexHandle != nullptr) {
+                    (void)::ReleaseMutex(mMutexHandle);
+                }
+#else
+                mMutex.Unlock();
+#endif
+            }
+
+            ~FQueueApiLock() noexcept {
+#if AE_PLATFORM_WIN
+                if (mMutexHandle != nullptr) {
+                    (void)::CloseHandle(mMutexHandle);
+                    mMutexHandle = nullptr;
+                }
+#endif
+            }
+
+        private:
+#if AE_PLATFORM_WIN
+            HANDLE mMutexHandle = nullptr;
+#else
+            Core::Threading::FMutex mMutex;
+#endif
+        };
+
+        class FQueueApiScopedLock final {
+        public:
+            explicit FQueueApiScopedLock(FQueueApiLock& lock) noexcept : mLock(lock) {
+                mLock.Lock();
+            }
+            ~FQueueApiScopedLock() noexcept { mLock.Unlock(); }
+
+            FQueueApiScopedLock(const FQueueApiScopedLock&)                    = delete;
+            auto operator=(const FQueueApiScopedLock&) -> FQueueApiScopedLock& = delete;
+
+        private:
+            FQueueApiLock& mLock;
+        };
+
+        FQueueApiLock gQueueSubmitMutex;
+    } // namespace
+
     void FRhiVulkanCommandSubmitter::FSubmitQueue::Push(FSubmitWork&& work) {
         {
             FScopedLock lock(mMutex);
@@ -63,6 +133,7 @@ namespace AltinaEngine::Rhi {
             }
             if (work.mType == FSubmitWork::EType::WaitIdle) {
                 if (work.mQueue) {
+                    FQueueApiScopedLock lock(gQueueSubmitMutex);
                     vkQueueWaitIdle(work.mQueue);
                 }
                 if (work.mCompletion) {
@@ -79,6 +150,7 @@ namespace AltinaEngine::Rhi {
                 present.pImageIndices      = &work.mImageIndex;
                 present.waitSemaphoreCount = static_cast<u32>(work.mPresentWaitSemaphores.Size());
                 present.pWaitSemaphores    = work.mPresentWaitSemaphores.Data();
+                FQueueApiScopedLock lock(gQueueSubmitMutex);
                 vkQueuePresentKHR(work.mQueue, &present);
                 if (work.mCompletion) {
                     work.mCompletion->Signal();
@@ -112,7 +184,10 @@ namespace AltinaEngine::Rhi {
             submit.signalSemaphoreCount = static_cast<u32>(work.mSignalSemaphores.Size());
             submit.pSignalSemaphores    = work.mSignalSemaphores.Data();
 
-            vkQueueSubmit(work.mQueue, 1, &submit, work.mFence);
+            {
+                FQueueApiScopedLock lock(gQueueSubmitMutex);
+                vkQueueSubmit(work.mQueue, 1, &submit, work.mFence);
+            }
 
             if (work.mCompletion) {
                 work.mCompletion->Signal();
@@ -339,6 +414,10 @@ namespace AltinaEngine::Rhi {
         if (!viewport) {
             return;
         }
+        if (!viewport->IsImageAcquired()) {
+            // Skip invalid presents when swapchain image acquisition failed this frame.
+            return;
+        }
 
         FSubmitWork work;
         work.mType          = FSubmitWork::EType::Present;
@@ -350,5 +429,6 @@ namespace AltinaEngine::Rhi {
             work.mPresentWaitSemaphores.PushBack(waitSem);
         }
         mSubmitter->Enqueue(Move(work));
+        viewport->Present(info);
     }
 } // namespace AltinaEngine::Rhi

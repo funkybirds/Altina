@@ -10,6 +10,12 @@
 #include <string>
 
 namespace AltinaEngine::RenderCore {
+    namespace {
+        struct FCompiledResourceState {
+            bool                   mInitialized = false;
+            Rhi::ERhiResourceState mState       = Rhi::ERhiResourceState::Unknown;
+        };
+    } // namespace
 
     auto FFrameGraphPassResources::GetTexture(FFrameGraphTextureRef ref) const
         -> Rhi::FRhiTexture* {
@@ -212,22 +218,46 @@ namespace AltinaEngine::RenderCore {
             DSV.mView     = mDevice->CreateDepthStencilView(desc);
         }
 
+        mCompiledBeginTransitions.Clear();
+        mCompiledFinalTransitions.Clear();
+        TVector<FCompiledResourceState> textureStates;
+        TVector<FCompiledResourceState> bufferStates;
+        TVector<bool>                   externalBeginTransitionEmitted;
+        textureStates.Resize(mTextures.Size());
+        bufferStates.Resize(mBuffers.Size());
+        externalBeginTransitionEmitted.Resize(mTextures.Size());
+        for (usize i = 0; i < mTextures.Size(); ++i) {
+            textureStates[i].mInitialized     = true;
+            textureStates[i].mState           = mTextures[i].mDesc.mInitialState;
+            externalBeginTransitionEmitted[i] = false;
+        }
+        for (usize i = 0; i < mBuffers.Size(); ++i) {
+            bufferStates[i].mInitialized = true;
+            bufferStates[i].mState       = mBuffers[i].mDesc.mInitialState;
+        }
+
         for (auto& pass : mPasses) {
             pass.mCompiledColorAttachments.Clear();
             pass.mHasCompiledDepth = false;
+            pass.mCompiledPreTransitions.Clear();
 
             if (!pass.mRenderTargets.IsEmpty()) {
-                pass.mCompiledColorAttachments.Resize(pass.mRenderTargets.Size());
+                pass.mCompiledColorAttachments.Reserve(pass.mRenderTargets.Size());
                 for (usize i = 0; i < pass.mRenderTargets.Size(); ++i) {
-                    const auto& binding    = pass.mRenderTargets[i];
-                    auto&       attachment = pass.mCompiledColorAttachments[i];
-                    attachment.mView       = ResolveRTV(binding.mRTV);
+                    const auto& binding = pass.mRenderTargets[i];
+                    auto*       view    = ResolveRTV(binding.mRTV);
+                    if (view == nullptr) {
+                        continue;
+                    }
+                    auto& attachment       = pass.mCompiledColorAttachments.EmplaceBack();
+                    attachment.mView       = view;
                     attachment.mLoadOp     = binding.mLoadOp;
                     attachment.mStoreOp    = binding.mStoreOp;
                     attachment.mClearColor = binding.mClearColor;
                 }
             }
 
+            pass.mHasCompiledDepth = false;
             if (pass.mHasDepthStencil) {
                 const auto& binding         = pass.mDepthStencil;
                 auto&       depthAtt        = pass.mCompiledDepthAttachment;
@@ -237,8 +267,100 @@ namespace AltinaEngine::RenderCore {
                 depthAtt.mStencilLoadOp     = binding.mStencilLoadOp;
                 depthAtt.mStencilStoreOp    = binding.mStencilStoreOp;
                 depthAtt.mClearDepthStencil = binding.mClearDepthStencil;
-                pass.mHasCompiledDepth      = true;
+                pass.mHasCompiledDepth      = (depthAtt.mView != nullptr);
             }
+
+            for (const auto& access : pass.mAccesses) {
+                if (access.mType == EFrameGraphResourceType::Texture) {
+                    if (access.mResourceId == 0U) {
+                        continue;
+                    }
+                    const usize texIndex = static_cast<usize>(access.mResourceId - 1U);
+                    if (texIndex >= textureStates.Size()) {
+                        continue;
+                    }
+                    auto& state = textureStates[texIndex];
+                    if (!state.mInitialized) {
+                        state.mInitialized = true;
+                        state.mState       = access.mState;
+                        continue;
+                    }
+                    if (state.mState == access.mState) {
+                        continue;
+                    }
+                    auto* texture = ResolveTexture(FFrameGraphTextureRef{ access.mResourceId });
+                    if (texture == nullptr) {
+                        continue;
+                    }
+                    Rhi::FRhiTransitionInfo info{};
+                    info.mResource = texture;
+                    info.mBefore   = state.mState;
+                    info.mAfter    = access.mState;
+                    if (access.mHasRange) {
+                        info.mTextureRange = access.mRange;
+                    }
+                    const bool isFirstExternalTransition = mTextures[texIndex].mIsExternal
+                        && !externalBeginTransitionEmitted[texIndex];
+                    if (isFirstExternalTransition) {
+                        mCompiledBeginTransitions.PushBack(info);
+                        externalBeginTransitionEmitted[texIndex] = true;
+                    } else {
+                        pass.mCompiledPreTransitions.PushBack(info);
+                    }
+                    state.mState = access.mState;
+                    continue;
+                }
+
+                if (access.mResourceId == 0U) {
+                    continue;
+                }
+                const usize bufIndex = static_cast<usize>(access.mResourceId - 1U);
+                if (bufIndex >= bufferStates.Size()) {
+                    continue;
+                }
+                auto& state = bufferStates[bufIndex];
+                if (!state.mInitialized) {
+                    state.mInitialized = true;
+                    state.mState       = access.mState;
+                    continue;
+                }
+                if (state.mState == access.mState) {
+                    continue;
+                }
+                auto* buffer = ResolveBuffer(FFrameGraphBufferRef{ access.mResourceId });
+                if (buffer == nullptr) {
+                    continue;
+                }
+                Rhi::FRhiTransitionInfo info{};
+                info.mResource = buffer;
+                info.mBefore   = state.mState;
+                info.mAfter    = access.mState;
+                pass.mCompiledPreTransitions.PushBack(info);
+                state.mState = access.mState;
+            }
+        }
+
+        for (usize i = 0; i < mTextures.Size(); ++i) {
+            const auto& entry = mTextures[i];
+            if (!entry.mIsExternalOutput || entry.mFinalState == Rhi::ERhiResourceState::Unknown) {
+                continue;
+            }
+            if (i >= textureStates.Size()) {
+                continue;
+            }
+            const auto& state = textureStates[i];
+            if (!state.mInitialized || state.mState == entry.mFinalState) {
+                continue;
+            }
+            auto* texture = ResolveTexture(FFrameGraphTextureRef{ static_cast<u32>(i + 1U) });
+            if (texture == nullptr) {
+                continue;
+            }
+            Rhi::FRhiTransitionInfo info{};
+            info.mResource = texture;
+            info.mBefore   = state.mState;
+            info.mAfter    = entry.mFinalState;
+            mCompiledFinalTransitions.PushBack(info);
         }
 
         mCompiled = true;
@@ -265,10 +387,30 @@ namespace AltinaEngine::RenderCore {
                 ++passIndex;
             }
         }
-        // Require refactor: Lacking resource state transition
+        if (!mCompiledBeginTransitions.IsEmpty()) {
+            Rhi::FRhiTransitionCreateInfo transition{};
+            transition.mTransitions     = mCompiledBeginTransitions.Data();
+            transition.mTransitionCount = static_cast<u32>(mCompiledBeginTransitions.Size());
+            transition.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
+            transition.mDstQueue        = Rhi::ERhiQueueType::Graphics;
+            cmdContext.RHIBeginTransition(transition);
+        }
+
         for (auto& pass : mPasses) {
+            if (!pass.mCompiledPreTransitions.IsEmpty()) {
+                Rhi::FRhiTransitionCreateInfo transition{};
+                transition.mTransitions     = pass.mCompiledPreTransitions.Data();
+                transition.mTransitionCount = static_cast<u32>(pass.mCompiledPreTransitions.Size());
+                transition.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
+                transition.mDstQueue        = Rhi::ERhiQueueType::Graphics;
+                cmdContext.RHIBeginTransition(transition);
+            }
+
             const bool hasRenderPass = pass.mDesc.mType == EFrameGraphPassType::Raster
                 && (!pass.mCompiledColorAttachments.IsEmpty() || pass.mHasCompiledDepth);
+            if (pass.mDesc.mType == EFrameGraphPassType::Raster && !hasRenderPass) {
+                continue;
+            }
 
             if (hasRenderPass) {
                 Rhi::FRhiRenderPassDesc renderPassDesc;
@@ -294,6 +436,15 @@ namespace AltinaEngine::RenderCore {
                 cmdContext.RHIEndRenderPass();
             }
         }
+
+        if (!mCompiledFinalTransitions.IsEmpty()) {
+            Rhi::FRhiTransitionCreateInfo transition{};
+            transition.mTransitions     = mCompiledFinalTransitions.Data();
+            transition.mTransitionCount = static_cast<u32>(mCompiledFinalTransitions.Size());
+            transition.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
+            transition.mDstQueue        = Rhi::ERhiQueueType::Graphics;
+            cmdContext.RHIBeginTransition(transition);
+        }
     }
 
     FFrameGraphTextureRef FFrameGraph::ImportTexture(
@@ -302,6 +453,12 @@ namespace AltinaEngine::RenderCore {
         entry.mIsExternal         = true;
         entry.mExternal           = external;
         entry.mDesc.mInitialState = state;
+        if (state == Rhi::ERhiResourceState::Present) {
+            // Treat imported presentable textures (swapchain backbuffer) as implicit external
+            // outputs so FrameGraph always transitions them back to Present at frame end.
+            entry.mIsExternalOutput = true;
+            entry.mFinalState       = Rhi::ERhiResourceState::Present;
+        }
         mTextures.PushBack(entry);
         mCompiled = false;
         return FFrameGraphTextureRef{ static_cast<u32>(mTextures.Size()) };
@@ -341,6 +498,8 @@ namespace AltinaEngine::RenderCore {
         mUAVs.Clear();
         mRTVs.Clear();
         mDSVs.Clear();
+        mCompiledBeginTransitions.Clear();
+        mCompiledFinalTransitions.Clear();
         mCompiled = false;
     }
 
@@ -488,11 +647,29 @@ namespace AltinaEngine::RenderCore {
             pass.mRenderTargets.Reserve(RTVCount);
             for (u32 i = 0; i < RTVCount; ++i) {
                 pass.mRenderTargets.PushBack(RTVs[i]);
+                const auto rtvIndex = static_cast<usize>(RTVs[i].mRTV.mId - 1U);
+                if (RTVs[i].mRTV.IsValid() && rtvIndex < mRTVs.Size()) {
+                    FRdgResourceAccess access{};
+                    access.mType       = EFrameGraphResourceType::Texture;
+                    access.mResourceId = mRTVs[rtvIndex].mResourceId;
+                    access.mState      = Rhi::ERhiResourceState::RenderTarget;
+                    access.mIsWrite    = true;
+                    pass.mAccesses.PushBack(access);
+                }
             }
         }
         pass.mHasDepthStencil = (DSV != nullptr);
         if (DSV) {
-            pass.mDepthStencil = *DSV;
+            pass.mDepthStencil  = *DSV;
+            const auto dsvIndex = static_cast<usize>(DSV->mDSV.mId - 1U);
+            if (DSV->mDSV.IsValid() && dsvIndex < mDSVs.Size()) {
+                FRdgResourceAccess access{};
+                access.mType       = EFrameGraphResourceType::Texture;
+                access.mResourceId = mDSVs[dsvIndex].mResourceId;
+                access.mState      = Rhi::ERhiResourceState::DepthWrite;
+                access.mIsWrite    = true;
+                pass.mAccesses.PushBack(access);
+            }
         }
         mCompiled = false;
     }

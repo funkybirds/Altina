@@ -230,28 +230,28 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
 
                 // t0
                 Rhi::FRhiBindGroupEntry t0{};
-                t0.mBinding = 0U;
+                t0.mBinding = Detail::MapSampledTextureBinding(0U);
                 t0.mType    = Rhi::ERhiBindingType::SampledTexture;
                 t0.mTexture = currentTex;
                 groupDesc.mEntries.PushBack(t0);
 
                 // t1
                 Rhi::FRhiBindGroupEntry t1{};
-                t1.mBinding = 1U;
+                t1.mBinding = Detail::MapSampledTextureBinding(1U);
                 t1.mType    = Rhi::ERhiBindingType::SampledTexture;
                 t1.mTexture = historyTex;
                 groupDesc.mEntries.PushBack(t1);
 
                 // t2
                 Rhi::FRhiBindGroupEntry t2{};
-                t2.mBinding = 2U;
+                t2.mBinding = Detail::MapSampledTextureBinding(2U);
                 t2.mType    = Rhi::ERhiBindingType::SampledTexture;
                 t2.mTexture = depthTex;
                 groupDesc.mEntries.PushBack(t2);
 
                 // s0
                 Rhi::FRhiBindGroupEntry sampler{};
-                sampler.mBinding = 0U;
+                sampler.mBinding = Detail::MapSamplerBinding(0U);
                 sampler.mType    = Rhi::ERhiBindingType::Sampler;
                 sampler.mSampler = shared.LinearSampler.Get();
                 groupDesc.mEntries.PushBack(sampler);

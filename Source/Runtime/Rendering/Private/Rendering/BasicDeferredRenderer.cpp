@@ -278,6 +278,7 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiPipelineRef                              SkyBoxPipeline;
 
             THashMap<u64, Rhi::FRhiPipelineRef>               BasePipelines;
+            THashMap<u64, Rhi::FRhiPipelineRef>               ShadowPipelines;
             THashMap<u64, Rhi::FRhiBindGroupLayoutRef>        MaterialLayouts;
             THashMap<u64, Rhi::FRhiPipelineLayoutRef>         BasePipelineLayouts;
             Rhi::FRhiVertexLayoutDesc                         BaseVertexLayout;
@@ -305,6 +306,18 @@ namespace AltinaEngine::Rendering {
                 mix(entry.mHasDynamicOffset ? 1ULL : 0ULL);
             }
             return hash;
+        }
+
+        [[nodiscard]] auto IsVulkanBackend() noexcept -> bool {
+            return Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan;
+        }
+
+        [[nodiscard]] auto MapSampledTextureBinding(u32 binding) noexcept -> u32 {
+            return IsVulkanBackend() ? (1000U + binding) : binding;
+        }
+
+        [[nodiscard]] auto MapSamplerBinding(u32 binding) noexcept -> u32 {
+            return IsVulkanBackend() ? (2000U + binding) : binding;
         }
 
         auto BuildMaterialBindGroupLayoutDesc(const RenderCore::FMaterialLayout& materialLayout,
@@ -547,27 +560,21 @@ namespace AltinaEngine::Rendering {
                 entry.mType       = Rhi::ERhiBindingType::ConstantBuffer;
                 entry.mVisibility = Rhi::ERhiShaderStageFlags::All;
 
-                Rhi::FRhiBindGroupLayoutEntry samplerEntry{};
-                samplerEntry.mBinding    = 0U;
-                samplerEntry.mType       = Rhi::ERhiBindingType::Sampler;
-                samplerEntry.mVisibility = Rhi::ERhiShaderStageFlags::All;
-
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
                 layoutDesc.mSetIndex = 0U;
                 layoutDesc.mEntries.PushBack(entry);
-                layoutDesc.mEntries.PushBack(samplerEntry);
                 layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
                 resources.PerFrameLayout = device.CreateBindGroupLayout(layoutDesc);
             }
 
             if (!resources.PerDrawLayout) {
                 Rhi::FRhiBindGroupLayoutEntry entry{};
-                entry.mBinding    = 4U;
+                entry.mBinding    = 0U;
                 entry.mType       = Rhi::ERhiBindingType::ConstantBuffer;
                 entry.mVisibility = Rhi::ERhiShaderStageFlags::All;
 
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex = 0U;
+                layoutDesc.mSetIndex = 1U;
                 layoutDesc.mEntries.PushBack(entry);
                 layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
                 resources.PerDrawLayout = device.CreateBindGroupLayout(layoutDesc);
@@ -627,7 +634,7 @@ namespace AltinaEngine::Rendering {
                 // t0..t8
                 for (u32 binding = 0U; binding < 9U; ++binding) {
                     Rhi::FRhiBindGroupLayoutEntry texture{};
-                    texture.mBinding    = binding;
+                    texture.mBinding    = MapSampledTextureBinding(binding);
                     texture.mType       = Rhi::ERhiBindingType::SampledTexture;
                     texture.mVisibility = Rhi::ERhiShaderStageFlags::All;
                     layoutDesc.mEntries.PushBack(texture);
@@ -635,7 +642,7 @@ namespace AltinaEngine::Rendering {
 
                 // s0
                 Rhi::FRhiBindGroupLayoutEntry sampler{};
-                sampler.mBinding    = 0U;
+                sampler.mBinding    = MapSamplerBinding(0U);
                 sampler.mType       = Rhi::ERhiBindingType::Sampler;
                 sampler.mVisibility = Rhi::ERhiShaderStageFlags::All;
                 layoutDesc.mEntries.PushBack(sampler);
@@ -665,7 +672,7 @@ namespace AltinaEngine::Rendering {
                 // t0..t1
                 for (u32 binding = 0U; binding < 2U; ++binding) {
                     Rhi::FRhiBindGroupLayoutEntry texture{};
-                    texture.mBinding    = binding;
+                    texture.mBinding    = MapSampledTextureBinding(binding);
                     texture.mType       = Rhi::ERhiBindingType::SampledTexture;
                     texture.mVisibility = Rhi::ERhiShaderStageFlags::All;
                     layoutDesc.mEntries.PushBack(texture);
@@ -673,7 +680,7 @@ namespace AltinaEngine::Rendering {
 
                 // s0
                 Rhi::FRhiBindGroupLayoutEntry sampler{};
-                sampler.mBinding    = 0U;
+                sampler.mBinding    = MapSamplerBinding(0U);
                 sampler.mType       = Rhi::ERhiBindingType::Sampler;
                 sampler.mVisibility = Rhi::ERhiShaderStageFlags::All;
                 layoutDesc.mEntries.PushBack(sampler);
@@ -755,21 +762,21 @@ namespace AltinaEngine::Rendering {
 
                 // t0: scene depth
                 Rhi::FRhiBindGroupLayoutEntry depth{};
-                depth.mBinding    = 0U;
+                depth.mBinding    = MapSampledTextureBinding(0U);
                 depth.mType       = Rhi::ERhiBindingType::SampledTexture;
                 depth.mVisibility = Rhi::ERhiShaderStageFlags::All;
                 layoutDesc.mEntries.PushBack(depth);
 
                 // t1: sky cube
                 Rhi::FRhiBindGroupLayoutEntry sky{};
-                sky.mBinding    = 1U;
+                sky.mBinding    = MapSampledTextureBinding(1U);
                 sky.mType       = Rhi::ERhiBindingType::SampledTexture;
                 sky.mVisibility = Rhi::ERhiShaderStageFlags::All;
                 layoutDesc.mEntries.PushBack(sky);
 
                 // s0
                 Rhi::FRhiBindGroupLayoutEntry sampler{};
-                sampler.mBinding    = 0U;
+                sampler.mBinding    = MapSamplerBinding(0U);
                 sampler.mType       = Rhi::ERhiBindingType::Sampler;
                 sampler.mVisibility = Rhi::ERhiShaderStageFlags::All;
                 layoutDesc.mEntries.PushBack(sampler);
@@ -870,9 +877,9 @@ namespace AltinaEngine::Rendering {
                 materialLayoutRef = it->second;
             } else {
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex   = 0U;
+                layoutDesc.mSetIndex   = 2U;
                 layoutDesc.mEntries    = layoutEntries;
-                layoutDesc.mLayoutHash = materialLayoutHash;
+                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
                 materialLayoutRef      = data->Device->CreateBindGroupLayout(layoutDesc);
                 if (!materialLayoutRef) {
                     return nullptr;
@@ -916,16 +923,19 @@ namespace AltinaEngine::Rendering {
                 return it->second.Get();
             }
 
-            const auto vs = data->Registry->FindShader(resolvedPass->Shaders.Vertex);
-            const auto ps = data->Registry->FindShader(resolvedPass->Shaders.Pixel);
-            if (!vs || !ps) {
+            const auto         vs = data->Registry->FindShader(resolvedPass->Shaders.Vertex);
+            Rhi::FRhiShaderRef ps{};
+            if (resolvedPass->Shaders.Pixel.IsValid()) {
+                ps = data->Registry->FindShader(resolvedPass->Shaders.Pixel);
+            }
+            if (!vs) {
                 return nullptr;
             }
 
             Rhi::FRhiGraphicsPipelineDesc desc{};
             desc.mDebugName.Assign(TEXT("BasicDeferred.BasePassPipeline"));
             desc.mVertexShader   = vs.Get();
-            desc.mPixelShader    = ps.Get();
+            desc.mPixelShader    = ps ? ps.Get() : nullptr;
             desc.mPipelineLayout = pipelineLayout.Get();
             desc.mVertexLayout   = data->VertexLayout;
             desc.mRasterState    = resolvedPass->State.Raster;
@@ -956,7 +966,12 @@ namespace AltinaEngine::Rendering {
             // can't collide with BasePass pipelines.
             RenderCore::Render::FDrawBatch synthetic = batch;
             synthetic.BatchKey.PipelineKey           = 0x43534D534841444FULL; // "CSMSHADO"
-            return ResolveBasePassPipeline(synthetic, nullptr, userData);
+            auto shadowDesc                          = *data->DefaultPassDesc;
+            shadowDesc.Shaders.Pixel                 = {};
+            auto&                 resources          = GetSharedResources();
+            FBasePassPipelineData shadowData         = *data;
+            shadowData.PipelineCache                 = &resources.ShadowPipelines;
+            return ResolveBasePassPipeline(synthetic, &shadowDesc, &shadowData);
         }
 
         struct FBasePassBindingData {
@@ -1004,6 +1019,7 @@ namespace AltinaEngine::Rendering {
         resources.MaterialLayouts.clear();
         resources.BasePipelineLayouts.clear();
         resources.BasePipelines.clear();
+        resources.ShadowPipelines.clear();
         EnsureDefaultTemplate(resources);
     }
 
@@ -1118,14 +1134,6 @@ namespace AltinaEngine::Rendering {
             entry.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
             groupDesc.mEntries.PushBack(entry);
 
-            if (resources.OutputSampler) {
-                Rhi::FRhiBindGroupEntry samplerEntry{};
-                samplerEntry.mBinding = 0U;
-                samplerEntry.mType    = Rhi::ERhiBindingType::Sampler;
-                samplerEntry.mSampler = resources.OutputSampler.Get();
-                groupDesc.mEntries.PushBack(samplerEntry);
-            }
-
             mPerFrameGroup = device.CreateBindGroup(groupDesc);
         }
 
@@ -1154,14 +1162,6 @@ namespace AltinaEngine::Rendering {
                     entry.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
                     groupDesc.mEntries.PushBack(entry);
 
-                    if (resources.OutputSampler) {
-                        Rhi::FRhiBindGroupEntry samplerEntry{};
-                        samplerEntry.mBinding = 0U;
-                        samplerEntry.mType    = Rhi::ERhiBindingType::Sampler;
-                        samplerEntry.mSampler = resources.OutputSampler.Get();
-                        groupDesc.mEntries.PushBack(samplerEntry);
-                    }
-
                     mShadowPerFrameGroups[i] = device.CreateBindGroup(groupDesc);
                 }
             }
@@ -1182,7 +1182,7 @@ namespace AltinaEngine::Rendering {
             groupDesc.mLayout = resources.PerDrawLayout.Get();
 
             Rhi::FRhiBindGroupEntry entry{};
-            entry.mBinding = 4U;
+            entry.mBinding = 0U;
             entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
             entry.mBuffer  = mPerDrawBuffer.Get();
             entry.mOffset  = 0ULL;
@@ -1209,6 +1209,67 @@ namespace AltinaEngine::Rendering {
         if (width == 0U || height == 0U) {
             return;
         }
+
+        struct FImportedExternalTexture {
+            Rhi::FRhiTexture*                 Texture = nullptr;
+            RenderCore::FFrameGraphTextureRef Ref;
+        };
+        TVector<FImportedExternalTexture> importedExternalTextures;
+
+        auto                              findOrImportExternalTextureRef =
+            [&graph, &importedExternalTextures](
+                Rhi::FRhiTexture* texture) -> RenderCore::FFrameGraphTextureRef {
+            if (texture == nullptr) {
+                return {};
+            }
+            for (const auto& imported : importedExternalTextures) {
+                if (imported.Texture == texture) {
+                    return imported.Ref;
+                }
+            }
+
+            const auto ref = graph.ImportTexture(texture, Rhi::ERhiResourceState::Common);
+            importedExternalTextures.PushBack({ texture, ref });
+            return ref;
+        };
+
+        auto registerExternalTextureRead =
+            [&findOrImportExternalTextureRef](RenderCore::FFrameGraphPassBuilder& builder,
+                Rhi::FRhiTexture*                                                 texture,
+                Rhi::ERhiResourceState state) -> RenderCore::FFrameGraphTextureRef {
+            const auto ref = findOrImportExternalTextureRef(texture);
+            if (!ref.IsValid()) {
+                return {};
+            }
+            return builder.Read(ref, state);
+        };
+
+        auto registerMaterialTextureReads =
+            [&registerExternalTextureRead](RenderCore::FFrameGraphPassBuilder& builder,
+                const RenderCore::FMaterial* material, RenderCore::EMaterialPass pass) -> void {
+            if (material == nullptr) {
+                return;
+            }
+
+            const auto* layout = material->FindLayout(pass);
+            if (layout == nullptr) {
+                return;
+            }
+
+            const auto& parameters = material->GetParameters();
+            for (const auto paramId : layout->TextureNameHashes) {
+                const auto* textureParam = parameters.FindTextureParam(paramId);
+                if (textureParam == nullptr || !textureParam->SRV) {
+                    continue;
+                }
+                auto* texture = textureParam->SRV->GetTexture();
+                if (texture == nullptr) {
+                    continue;
+                }
+                registerExternalTextureRead(
+                    builder, texture, Rhi::ERhiResourceState::ShaderResource);
+            }
+        };
 
         if (mPerFrameBuffer) {
             FPerFrameConstants constants{};
@@ -1291,8 +1352,8 @@ namespace AltinaEngine::Rendering {
         FDrawListBindings drawBindings{};
         drawBindings.PerFrame            = mPerFrameGroup.Get();
         drawBindings.PerFrameSetIndex    = 0U;
-        drawBindings.PerDrawSetIndex     = 0U;
-        drawBindings.PerMaterialSetIndex = 0U;
+        drawBindings.PerDrawSetIndex     = 1U;
+        drawBindings.PerMaterialSetIndex = 2U;
 
         FBasePassPipelineData pipelineData{};
         pipelineData.Device          = Rhi::RHIGetDevice();
@@ -1352,6 +1413,12 @@ namespace AltinaEngine::Rendering {
                 data.GBufferB = builder.Write(data.GBufferB, Rhi::ERhiResourceState::RenderTarget);
                 data.GBufferC = builder.Write(data.GBufferC, Rhi::ERhiResourceState::RenderTarget);
                 data.Depth    = builder.Write(data.Depth, Rhi::ERhiResourceState::DepthWrite);
+
+                if (drawList != nullptr) {
+                    for (const auto& batch : drawList->Batches) {
+                        registerMaterialTextureReads(builder, batch.Material, batch.Pass);
+                    }
+                }
 
                 Rhi::FRhiTextureViewRange viewRange{};
                 viewRange.mMipCount        = 1U;
@@ -1605,6 +1672,12 @@ namespace AltinaEngine::Rendering {
                         }
 
                         data.Shadow = builder.Write(shadowMap, Rhi::ERhiResourceState::DepthWrite);
+
+                        if (shadowDrawList != nullptr) {
+                            for (const auto& batch : shadowDrawList->Batches) {
+                                registerMaterialTextureReads(builder, batch.Material, batch.Pass);
+                            }
+                        }
 
                         Rhi::FRhiTextureViewRange range{};
                         range.mBaseMip         = 0U;
@@ -1897,19 +1970,19 @@ namespace AltinaEngine::Rendering {
                     groupDesc.mEntries.PushBack(ssaoCb);
 
                     Rhi::FRhiBindGroupEntry eNormal{};
-                    eNormal.mBinding = 0U;
+                    eNormal.mBinding = MapSampledTextureBinding(0U);
                     eNormal.mType    = Rhi::ERhiBindingType::SampledTexture;
                     eNormal.mTexture = normalTex;
                     groupDesc.mEntries.PushBack(eNormal);
 
                     Rhi::FRhiBindGroupEntry eDepth{};
-                    eDepth.mBinding = 1U;
+                    eDepth.mBinding = MapSampledTextureBinding(1U);
                     eDepth.mType    = Rhi::ERhiBindingType::SampledTexture;
                     eDepth.mTexture = depthTex;
                     groupDesc.mEntries.PushBack(eDepth);
 
                     Rhi::FRhiBindGroupEntry sampler{};
-                    sampler.mBinding = 0U;
+                    sampler.mBinding = MapSamplerBinding(0U);
                     sampler.mType    = Rhi::ERhiBindingType::Sampler;
                     sampler.mSampler = shared.OutputSampler.Get();
                     groupDesc.mEntries.PushBack(sampler);
@@ -1997,6 +2070,27 @@ namespace AltinaEngine::Rendering {
                     shadowMap = builder.CreateTexture(shadowDesc);
                     builder.Read(shadowMap, Rhi::ERhiResourceState::ShaderResource);
                     data.Shadow = shadowMap;
+                }
+
+                if (mViewContext.SkyIrradianceCube != nullptr) {
+                    registerExternalTextureRead(builder, mViewContext.SkyIrradianceCube,
+                        Rhi::ERhiResourceState::ShaderResource);
+                }
+                if (mViewContext.SkySpecularCube != nullptr) {
+                    registerExternalTextureRead(builder, mViewContext.SkySpecularCube,
+                        Rhi::ERhiResourceState::ShaderResource);
+                }
+                if (mViewContext.BrdfLutTexture != nullptr) {
+                    registerExternalTextureRead(builder, mViewContext.BrdfLutTexture,
+                        Rhi::ERhiResourceState::ShaderResource);
+                }
+                if (resources.IblBlackCube) {
+                    registerExternalTextureRead(builder, resources.IblBlackCube.Get(),
+                        Rhi::ERhiResourceState::ShaderResource);
+                }
+                if (resources.IblBlack2D) {
+                    registerExternalTextureRead(builder, resources.IblBlack2D.Get(),
+                        Rhi::ERhiResourceState::ShaderResource);
                 }
 
                 data.GBufferA = gbufferA;
@@ -2111,31 +2205,31 @@ namespace AltinaEngine::Rendering {
                 groupDesc.mEntries.PushBack(iblCb);
 
                 Rhi::FRhiBindGroupEntry eA{};
-                eA.mBinding = 0U;
+                eA.mBinding = MapSampledTextureBinding(0U);
                 eA.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eA.mTexture = texA;
                 groupDesc.mEntries.PushBack(eA);
 
                 Rhi::FRhiBindGroupEntry eB{};
-                eB.mBinding = 1U;
+                eB.mBinding = MapSampledTextureBinding(1U);
                 eB.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eB.mTexture = texB;
                 groupDesc.mEntries.PushBack(eB);
 
                 Rhi::FRhiBindGroupEntry eC{};
-                eC.mBinding = 2U;
+                eC.mBinding = MapSampledTextureBinding(2U);
                 eC.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eC.mTexture = texC;
                 groupDesc.mEntries.PushBack(eC);
 
                 Rhi::FRhiBindGroupEntry eDepth{};
-                eDepth.mBinding = 3U;
+                eDepth.mBinding = MapSampledTextureBinding(3U);
                 eDepth.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eDepth.mTexture = depthTex;
                 groupDesc.mEntries.PushBack(eDepth);
 
                 Rhi::FRhiBindGroupEntry eShadow{};
-                eShadow.mBinding = 4U;
+                eShadow.mBinding = MapSampledTextureBinding(4U);
                 eShadow.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eShadow.mTexture = shadowTex;
                 groupDesc.mEntries.PushBack(eShadow);
@@ -2146,32 +2240,32 @@ namespace AltinaEngine::Rendering {
                 auto* lutTex  = bEnableIbl ? brdfLut : shared.IblBlack2D.Get();
 
                 Rhi::FRhiBindGroupEntry eIrr{};
-                eIrr.mBinding = 5U;
+                eIrr.mBinding = MapSampledTextureBinding(5U);
                 eIrr.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eIrr.mTexture = irrTex;
                 groupDesc.mEntries.PushBack(eIrr);
 
                 Rhi::FRhiBindGroupEntry eSpec{};
-                eSpec.mBinding = 6U;
+                eSpec.mBinding = MapSampledTextureBinding(6U);
                 eSpec.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eSpec.mTexture = specTex;
                 groupDesc.mEntries.PushBack(eSpec);
 
                 Rhi::FRhiBindGroupEntry eLut{};
-                eLut.mBinding = 7U;
+                eLut.mBinding = MapSampledTextureBinding(7U);
                 eLut.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eLut.mTexture = lutTex;
                 groupDesc.mEntries.PushBack(eLut);
 
                 // SSAO (t8).
                 Rhi::FRhiBindGroupEntry eSsao{};
-                eSsao.mBinding = 8U;
+                eSsao.mBinding = MapSampledTextureBinding(8U);
                 eSsao.mType    = Rhi::ERhiBindingType::SampledTexture;
                 eSsao.mTexture = ssaoTex;
                 groupDesc.mEntries.PushBack(eSsao);
 
                 Rhi::FRhiBindGroupEntry sampler{};
-                sampler.mBinding = 0U;
+                sampler.mBinding = MapSamplerBinding(0U);
                 sampler.mType    = Rhi::ERhiBindingType::Sampler;
                 sampler.mSampler = shared.OutputSampler.Get();
                 groupDesc.mEntries.PushBack(sampler);
@@ -2228,6 +2322,8 @@ namespace AltinaEngine::Rendering {
                         [&](RenderCore::FFrameGraphPassBuilder& builder, FSkyBoxPassData& data) {
                             builder.Read(sceneDepth, Rhi::ERhiResourceState::ShaderResource);
                             data.Depth = sceneDepth;
+                            registerExternalTextureRead(
+                                builder, skyCube, Rhi::ERhiResourceState::ShaderResource);
 
                             data.Output =
                                 builder.Write(sceneColorHDR, Rhi::ERhiResourceState::RenderTarget);
@@ -2280,19 +2376,19 @@ namespace AltinaEngine::Rendering {
                             groupDesc.mEntries.PushBack(cb);
 
                             Rhi::FRhiBindGroupEntry depth{};
-                            depth.mBinding = 0U;
+                            depth.mBinding = MapSampledTextureBinding(0U);
                             depth.mType    = Rhi::ERhiBindingType::SampledTexture;
                             depth.mTexture = depthTex;
                             groupDesc.mEntries.PushBack(depth);
 
                             Rhi::FRhiBindGroupEntry sky{};
-                            sky.mBinding = 1U;
+                            sky.mBinding = MapSampledTextureBinding(1U);
                             sky.mType    = Rhi::ERhiBindingType::SampledTexture;
                             sky.mTexture = skyCube;
                             groupDesc.mEntries.PushBack(sky);
 
                             Rhi::FRhiBindGroupEntry sampler{};
-                            sampler.mBinding = 0U;
+                            sampler.mBinding = MapSamplerBinding(0U);
                             sampler.mType    = Rhi::ERhiBindingType::Sampler;
                             sampler.mSampler = shared.OutputSampler.Get();
                             groupDesc.mEntries.PushBack(sampler);

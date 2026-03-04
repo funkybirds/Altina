@@ -197,11 +197,12 @@ namespace AltinaEngine::Rhi {
     }
 
     struct FRhiVulkanTexture::FState {
-        VkDevice                                mDevice      = VK_NULL_HANDLE;
-        VkImage                                 mImage       = VK_NULL_HANDLE;
-        VkImageView                             mDefaultView = VK_NULL_HANDLE;
-        bool                                    mOwnsImage   = true;
-        Vulkan::Detail::FVulkanMemoryAllocator* mAllocator   = nullptr;
+        VkDevice                                mDevice        = VK_NULL_HANDLE;
+        VkImage                                 mImage         = VK_NULL_HANDLE;
+        VkImageView                             mDefaultView   = VK_NULL_HANDLE;
+        VkImageLayout                           mCurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        bool                                    mOwnsImage     = true;
+        Vulkan::Detail::FVulkanMemoryAllocator* mAllocator     = nullptr;
         Vulkan::Detail::FVulkanMemoryAllocation mAlloc{};
         FRhiSemaphore*                          mPendingUploadSemaphore = nullptr;
         u64                                     mPendingUploadValue     = 0ULL;
@@ -262,16 +263,35 @@ namespace AltinaEngine::Rhi {
         }
 
         if (!mState->mAllocator) {
+            if (mState->mImage != VK_NULL_HANDLE) {
+                vkDestroyImage(mState->mDevice, mState->mImage, nullptr);
+                mState->mImage = VK_NULL_HANDLE;
+            }
             return;
         }
 
         mState->mAlloc = mState->mAllocator->Allocate(req, flags, desc.mDebugName);
         if (!mState->mAlloc.IsValid()) {
+            if (mState->mImage != VK_NULL_HANDLE) {
+                vkDestroyImage(mState->mDevice, mState->mImage, nullptr);
+                mState->mImage = VK_NULL_HANDLE;
+            }
             return;
         }
 
-        vkBindImageMemory(
-            mState->mDevice, mState->mImage, mState->mAlloc.mMemory, mState->mAlloc.mOffset);
+        if (vkBindImageMemory(
+                mState->mDevice, mState->mImage, mState->mAlloc.mMemory, mState->mAlloc.mOffset)
+            != VK_SUCCESS) {
+            if (mState->mAllocator && mState->mAlloc.IsValid()) {
+                mState->mAllocator->Free(mState->mAlloc);
+                mState->mAlloc = {};
+            }
+            if (mState->mImage != VK_NULL_HANDLE) {
+                vkDestroyImage(mState->mDevice, mState->mImage, nullptr);
+                mState->mImage = VK_NULL_HANDLE;
+            }
+            return;
+        }
 
         VkImageViewCreateInfo view{};
         view.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -286,6 +306,14 @@ namespace AltinaEngine::Rhi {
         if (vkCreateImageView(mState->mDevice, &view, nullptr, &mState->mDefaultView)
             != VK_SUCCESS) {
             mState->mDefaultView = VK_NULL_HANDLE;
+            if (mState->mAllocator && mState->mAlloc.IsValid()) {
+                mState->mAllocator->Free(mState->mAlloc);
+                mState->mAlloc = {};
+            }
+            if (mState->mImage != VK_NULL_HANDLE) {
+                vkDestroyImage(mState->mDevice, mState->mImage, nullptr);
+                mState->mImage = VK_NULL_HANDLE;
+            }
         }
     }
 
@@ -323,6 +351,17 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiVulkanTexture::GetDefaultView() const noexcept -> VkImageView {
         return (mState != nullptr) ? mState->mDefaultView : VK_NULL_HANDLE;
+    }
+
+    auto FRhiVulkanTexture::GetCurrentLayout() const noexcept -> VkImageLayout {
+        return (mState != nullptr) ? mState->mCurrentLayout : VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+
+    void FRhiVulkanTexture::SetCurrentLayout(VkImageLayout layout) noexcept {
+        if (mState == nullptr) {
+            return;
+        }
+        mState->mCurrentLayout = layout;
     }
 
     void FRhiVulkanTexture::SetPendingUpload(FRhiSemaphore* semaphore, u64 value) noexcept {
@@ -460,7 +499,7 @@ namespace AltinaEngine::Rhi {
             return;
         }
         auto* vkTex = static_cast<FRhiVulkanTexture*>(desc.mTexture);
-        if (!vkTex) {
+        if (!vkTex || vkTex->GetNativeImage() == VK_NULL_HANDLE) {
             return;
         }
 
@@ -511,7 +550,7 @@ namespace AltinaEngine::Rhi {
             return;
         }
         auto* vkTex = static_cast<FRhiVulkanTexture*>(desc.mTexture);
-        if (!vkTex) {
+        if (!vkTex || vkTex->GetNativeImage() == VK_NULL_HANDLE) {
             return;
         }
 
@@ -562,7 +601,7 @@ namespace AltinaEngine::Rhi {
             return;
         }
         auto* vkTex = static_cast<FRhiVulkanTexture*>(desc.mTexture);
-        if (!vkTex) {
+        if (!vkTex || vkTex->GetNativeImage() == VK_NULL_HANDLE) {
             return;
         }
 
@@ -613,7 +652,7 @@ namespace AltinaEngine::Rhi {
             return;
         }
         auto* vkTex = static_cast<FRhiVulkanTexture*>(desc.mTexture);
-        if (!vkTex) {
+        if (!vkTex || vkTex->GetNativeImage() == VK_NULL_HANDLE) {
             return;
         }
 

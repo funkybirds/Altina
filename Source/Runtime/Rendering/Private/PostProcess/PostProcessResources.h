@@ -4,6 +4,7 @@
 #include "Container/StringView.h"
 #include "Math/Matrix.h"
 #include "Rhi/RhiRefs.h"
+#include "Rhi/RhiInit.h"
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Rhi {
@@ -11,6 +12,18 @@ namespace AltinaEngine::Rhi {
 }
 
 namespace AltinaEngine::Rendering::PostProcess::Detail {
+    [[nodiscard]] inline auto IsVulkanBackend() noexcept -> bool {
+        return Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan;
+    }
+
+    [[nodiscard]] inline auto MapSampledTextureBinding(u32 binding) noexcept -> u32 {
+        return IsVulkanBackend() ? (1000U + binding) : binding;
+    }
+
+    [[nodiscard]] inline auto MapSamplerBinding(u32 binding) noexcept -> u32 {
+        return IsVulkanBackend() ? (2000U + binding) : binding;
+    }
+
     // Constant buffer layouts (b0) for each post-process pass. Keep each struct size a multiple of
     // 16 bytes to match HLSL packing and avoid /WX padding warnings.
 

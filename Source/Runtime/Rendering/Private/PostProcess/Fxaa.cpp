@@ -172,14 +172,14 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
 
                 // t0
                 Rhi::FRhiBindGroupEntry tex{};
-                tex.mBinding = 0U;
+                tex.mBinding = Detail::MapSampledTextureBinding(0U);
                 tex.mType    = Rhi::ERhiBindingType::SampledTexture;
                 tex.mTexture = inTex;
                 groupDesc.mEntries.PushBack(tex);
 
                 // s0
                 Rhi::FRhiBindGroupEntry sampler{};
-                sampler.mBinding = 0U;
+                sampler.mBinding = Detail::MapSamplerBinding(0U);
                 sampler.mType    = Rhi::ERhiBindingType::Sampler;
                 sampler.mSampler = shared.LinearSampler.Get();
                 groupDesc.mEntries.PushBack(sampler);

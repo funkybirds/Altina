@@ -21,7 +21,7 @@ struct VSOutput
     float4 Color : COLOR0;
 };
 
-VSOutput VSMain(VSInput input)
+VSOutput DebugGuiVSMain(VSInput input)
 {
     VSOutput o;
     float2 ndc = input.Pos * gScale + gTranslate;
@@ -31,7 +31,7 @@ VSOutput VSMain(VSInput input)
     return o;
 }
 
-float4 PSMain(VSOutput input) : SV_Target0
+float4 DebugGuiPSMain(VSOutput input) : SV_Target0
 {
     float4 tex = gFontAtlas.Sample(gSampler, input.UV);
     float a = tex.a;

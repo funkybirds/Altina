@@ -1000,12 +1000,24 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
         }
 
+        if (request.mOptions.mTargetBackend == Rhi::ERhiBackend::Vulkan) {
+            AddArg(args, TEXT("-D"));
+            args.PushBack(FString(TEXT("AE_SHADER_TARGET_VULKAN=1")));
+        }
+
         AddArg(args, TEXT("-o"));
         args.PushBack(outputPath);
         AddArg(args, TEXT("-reflection-json"));
         args.PushBack(reflectionPath);
 
         TVector<u32> autoSpaces;
+        if (request.mOptions.mTargetBackend == Rhi::ERhiBackend::Vulkan) {
+            if (!autoBinding.mApplied) {
+                for (u32 i = 0; i < static_cast<u32>(EAutoBindingGroup::Count); ++i) {
+                    autoSpaces.PushBack(i);
+                }
+            }
+        }
         if (autoBinding.mApplied && request.mOptions.mTargetBackend == Rhi::ERhiBackend::Vulkan) {
             for (u32 i = 0; i < static_cast<u32>(EAutoBindingGroup::Count); ++i) {
                 if (autoBinding.mLayout.mGroupUsed[i]) {

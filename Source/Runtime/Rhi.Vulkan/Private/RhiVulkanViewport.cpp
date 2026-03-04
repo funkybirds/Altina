@@ -5,8 +5,10 @@
 #include "RhiVulkanInternal.h"
 
 #include "Rhi/RhiInit.h"
+#include "Rhi/RhiQueue.h"
 #include "Logging/Log.h"
 #include "Math/Common.h"
+#include "Threading/Mutex.h"
 
 #if AE_PLATFORM_WIN
     #ifndef WIN32_LEAN_AND_MEAN
@@ -28,6 +30,53 @@ namespace AltinaEngine::Rhi {
     using Container::TVector;
 
     namespace {
+#if AE_PLATFORM_WIN
+        [[nodiscard]] auto GetQueueApiMutexHandle() noexcept -> HANDLE {
+            static HANDLE sMutex =
+                ::CreateMutexW(nullptr, FALSE, L"AltinaEngine.Rhi.Vulkan.QueueApiMutex");
+            return sMutex;
+        }
+#else
+        [[nodiscard]] auto GetQueueApiMutex() noexcept -> Core::Threading::FMutex& {
+            static Core::Threading::FMutex sMutex;
+            return sMutex;
+        }
+#endif
+
+        class FQueueApiScopedLock final {
+        public:
+            FQueueApiScopedLock() noexcept { Lock(); }
+            ~FQueueApiScopedLock() noexcept { Unlock(); }
+
+            FQueueApiScopedLock(const FQueueApiScopedLock&)                    = delete;
+            auto operator=(const FQueueApiScopedLock&) -> FQueueApiScopedLock& = delete;
+
+        private:
+            void Lock() noexcept {
+#if AE_PLATFORM_WIN
+                HANDLE sMutex = GetQueueApiMutexHandle();
+                if (sMutex != nullptr) {
+                    (void)::WaitForSingleObject(sMutex, INFINITE);
+                }
+#else
+                GetQueueApiMutex().Lock();
+#endif
+            }
+
+            void Unlock() noexcept {
+#if AE_PLATFORM_WIN
+                HANDLE sMutex = GetQueueApiMutexHandle();
+                if (sMutex != nullptr) {
+                    (void)::ReleaseMutex(sMutex);
+                }
+#else
+                GetQueueApiMutex().Unlock();
+#endif
+            }
+        };
+
+        constexpr u64      kAcquireTimeoutNs = 1000000000ULL; // 1 second
+
         [[nodiscard]] auto PickPresentMode(VkPhysicalDevice physical, VkSurfaceKHR surface,
             bool allowTearing) -> VkPresentModeKHR {
             u32 count = 0;
@@ -64,6 +113,20 @@ namespace AltinaEngine::Rhi {
             }
             return sem;
         }
+
+        void WaitViewportGpuIdle(FRhiVulkanDevice* owner, VkQueue graphicsQueue) {
+            if (owner != nullptr) {
+                auto queue = owner->GetQueue(ERhiQueueType::Graphics);
+                if (queue) {
+                    queue->WaitIdle();
+                    return;
+                }
+            }
+            if (graphicsQueue != VK_NULL_HANDLE) {
+                FQueueApiScopedLock lock;
+                vkQueueWaitIdle(graphicsQueue);
+            }
+        }
     } // namespace
 
     struct FRhiVulkanViewport::FState {
@@ -83,6 +146,7 @@ namespace AltinaEngine::Rhi {
 
         TVector<VkSemaphore>    mAcquireSemaphores;
         TVector<VkSemaphore>    mRenderCompleteSemaphores;
+        TVector<VkFence>        mAcquireFences;
         u64                     mFrameIndex = 0ULL;
 
         u32                     mImageIndex = 0U;
@@ -235,9 +299,11 @@ namespace AltinaEngine::Rhi {
                 const usize old = s.mAcquireSemaphores.Size();
                 s.mAcquireSemaphores.Resize(imageCount);
                 s.mRenderCompleteSemaphores.Resize(imageCount);
+                s.mAcquireFences.Resize(imageCount);
                 for (usize i = old; i < imageCount; ++i) {
                     s.mAcquireSemaphores[i]        = VK_NULL_HANDLE;
                     s.mRenderCompleteSemaphores[i] = VK_NULL_HANDLE;
+                    s.mAcquireFences[i]            = VK_NULL_HANDLE;
                 }
             }
             for (usize i = 0; i < s.mAcquireSemaphores.Size(); ++i) {
@@ -246,6 +312,16 @@ namespace AltinaEngine::Rhi {
                 }
                 if (!s.mRenderCompleteSemaphores[i]) {
                     s.mRenderCompleteSemaphores[i] = CreateBinarySemaphore(s.mDevice);
+                }
+                if (!s.mAcquireFences[i]) {
+                    VkFenceCreateInfo fenceInfo{};
+                    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+                    // First reuse must not block.
+                    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+                    if (vkCreateFence(s.mDevice, &fenceInfo, nullptr, &s.mAcquireFences[i])
+                        != VK_SUCCESS) {
+                        s.mAcquireFences[i] = VK_NULL_HANDLE;
+                    }
                 }
             }
 
@@ -285,6 +361,8 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
+        WaitViewportGpuIdle(mState->mOwner, mState->mGraphicsQueue);
+
         mState->mBackBuffers.Clear();
         mState->mImages.Clear();
         if (mState->mDevice && mState->mSwapchain) {
@@ -303,6 +381,11 @@ namespace AltinaEngine::Rhi {
                     vkDestroySemaphore(mState->mDevice, sem, nullptr);
                 }
             }
+            for (VkFence fence : mState->mAcquireFences) {
+                if (fence) {
+                    vkDestroyFence(mState->mDevice, fence, nullptr);
+                }
+            }
         }
 
         if (mState->mInstance && mState->mSurface) {
@@ -319,6 +402,8 @@ namespace AltinaEngine::Rhi {
         if (!mState) {
             return;
         }
+
+        WaitViewportGpuIdle(mState->mOwner, mState->mGraphicsQueue);
 
         mState->mBackBuffers.Clear();
         mState->mImages.Clear();
@@ -450,9 +535,11 @@ namespace AltinaEngine::Rhi {
             const usize old = mState->mAcquireSemaphores.Size();
             mState->mAcquireSemaphores.Resize(imageCount);
             mState->mRenderCompleteSemaphores.Resize(imageCount);
+            mState->mAcquireFences.Resize(imageCount);
             for (usize i = old; i < imageCount; ++i) {
                 mState->mAcquireSemaphores[i]        = VK_NULL_HANDLE;
                 mState->mRenderCompleteSemaphores[i] = VK_NULL_HANDLE;
+                mState->mAcquireFences[i]            = VK_NULL_HANDLE;
             }
         }
         for (usize i = 0; i < mState->mAcquireSemaphores.Size(); ++i) {
@@ -461,6 +548,15 @@ namespace AltinaEngine::Rhi {
             }
             if (!mState->mRenderCompleteSemaphores[i]) {
                 mState->mRenderCompleteSemaphores[i] = CreateBinarySemaphore(mState->mDevice);
+            }
+            if (!mState->mAcquireFences[i]) {
+                VkFenceCreateInfo fenceInfo{};
+                fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+                fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+                if (vkCreateFence(mState->mDevice, &fenceInfo, nullptr, &mState->mAcquireFences[i])
+                    != VK_SUCCESS) {
+                    mState->mAcquireFences[i] = VK_NULL_HANDLE;
+                }
             }
         }
 
@@ -476,16 +572,36 @@ namespace AltinaEngine::Rhi {
         if (!mState->mAcquired) {
             const usize ringIndex =
                 static_cast<usize>(mState->mFrameIndex % mState->mAcquireSemaphores.Size());
-            VkSemaphore acquire = mState->mAcquireSemaphores[ringIndex];
-            VkResult    res = vkAcquireNextImageKHR(mState->mDevice, mState->mSwapchain, UINT64_MAX,
-                   acquire, VK_NULL_HANDLE, &mState->mImageIndex);
+            VkFence fence = mState->mAcquireFences[ringIndex];
+            if (fence != VK_NULL_HANDLE) {
+                vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, kAcquireTimeoutNs);
+                vkResetFences(mState->mDevice, 1, &fence);
+            }
+            VkResult res = VK_ERROR_UNKNOWN;
+            {
+                // Serialize swapchain API usage with submit/present thread.
+                FQueueApiScopedLock lock;
+                res = vkAcquireNextImageKHR(mState->mDevice, mState->mSwapchain, kAcquireTimeoutNs,
+                    VK_NULL_HANDLE, fence, &mState->mImageIndex);
+            }
             if (res != VK_SUCCESS) {
                 return nullptr;
             }
+            if (fence != VK_NULL_HANDLE) {
+                const VkResult waitRes =
+                    vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, kAcquireTimeoutNs);
+                if (waitRes != VK_SUCCESS) {
+                    return nullptr;
+                }
+            }
 
-            VkSemaphore renderComplete = mState->mRenderCompleteSemaphores[ringIndex];
+            VkSemaphore renderComplete =
+                (mState->mImageIndex < static_cast<u32>(mState->mRenderCompleteSemaphores.Size()))
+                ? mState->mRenderCompleteSemaphores[mState->mImageIndex]
+                : VK_NULL_HANDLE;
             if (mState->mOwner) {
-                mState->mOwner->NotifyViewportAcquired(acquire, renderComplete);
+                // Acquire synchronization is completed on CPU fence wait above.
+                mState->mOwner->NotifyViewportAcquired(VK_NULL_HANDLE, renderComplete);
             }
 
             mState->mAcquired = true;
@@ -507,26 +623,27 @@ namespace AltinaEngine::Rhi {
         mState->mAcquired = false;
     }
 
+    auto FRhiVulkanViewport::IsImageAcquired() const noexcept -> bool {
+        return (mState != nullptr) ? mState->mAcquired : false;
+    }
+
     auto FRhiVulkanViewport::GetNativeSwapchain() const noexcept -> VkSwapchainKHR {
         return (mState != nullptr) ? mState->mSwapchain : VK_NULL_HANDLE;
     }
 
     auto FRhiVulkanViewport::GetAcquireSemaphore() const noexcept -> VkSemaphore {
-        if (!mState || mState->mAcquireSemaphores.IsEmpty()) {
-            return VK_NULL_HANDLE;
-        }
-        const usize ringIndex =
-            static_cast<usize>(mState->mFrameIndex % mState->mAcquireSemaphores.Size());
-        return mState->mAcquireSemaphores[ringIndex];
+        (void)mState;
+        return VK_NULL_HANDLE;
     }
 
     auto FRhiVulkanViewport::GetRenderCompleteSemaphore() const noexcept -> VkSemaphore {
-        if (!mState || mState->mRenderCompleteSemaphores.IsEmpty()) {
+        if (!mState || mState->mRenderCompleteSemaphores.IsEmpty() || !mState->mAcquired) {
             return VK_NULL_HANDLE;
         }
-        const usize ringIndex =
-            static_cast<usize>(mState->mFrameIndex % mState->mRenderCompleteSemaphores.Size());
-        return mState->mRenderCompleteSemaphores[ringIndex];
+        if (mState->mImageIndex >= static_cast<u32>(mState->mRenderCompleteSemaphores.Size())) {
+            return VK_NULL_HANDLE;
+        }
+        return mState->mRenderCompleteSemaphores[mState->mImageIndex];
     }
 
     auto FRhiVulkanViewport::GetCurrentImageIndex() const noexcept -> u32 {

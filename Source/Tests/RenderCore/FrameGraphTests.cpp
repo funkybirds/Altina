@@ -117,6 +117,50 @@ namespace {
         void RHIDispatch(u32 /*groupCountX*/, u32 /*groupCountY*/, u32 /*groupCountZ*/) override {}
     };
 
+    class FTransitionTrackingCmdContext final : public AltinaEngine::Rhi::FRhiCmdContext {
+    public:
+        u32  mBeginTransitionCount = 0U;
+        u32  mDispatchCount        = 0U;
+        u32  mTransitionBeforePass = 0U;
+
+        void RHIUpdateDynamicBufferDiscard(AltinaEngine::Rhi::FRhiBuffer* /*buffer*/,
+            const void* /*data*/, u64 /*sizeBytes*/, u64 /*offsetBytes*/) override {}
+        void RHISetGraphicsPipeline(AltinaEngine::Rhi::FRhiPipeline* /*pipeline*/) override {}
+        void RHISetComputePipeline(AltinaEngine::Rhi::FRhiPipeline* /*pipeline*/) override {}
+        void RHISetPrimitiveTopology(
+            AltinaEngine::Rhi::ERhiPrimitiveTopology /*topology*/) override {}
+        void RHISetVertexBuffer(
+            u32 /*slot*/, const AltinaEngine::Rhi::FRhiVertexBufferView& /*view*/) override {}
+        void RHISetIndexBuffer(const AltinaEngine::Rhi::FRhiIndexBufferView& /*view*/) override {}
+        void RHISetViewport(const AltinaEngine::Rhi::FRhiViewportRect& /*viewport*/) override {}
+        void RHISetScissor(const AltinaEngine::Rhi::FRhiScissorRect& /*scissor*/) override {}
+        void RHISetRenderTargets(u32 /*colorTargetCount*/,
+            AltinaEngine::Rhi::FRhiTexture* const* /*colorTargets*/,
+            AltinaEngine::Rhi::FRhiTexture* /*depthTarget*/) override {}
+        void RHIBeginRenderPass(const AltinaEngine::Rhi::FRhiRenderPassDesc& /*desc*/) override {}
+        void RHIEndRenderPass() override {}
+        void RHIBeginTransition(
+            const AltinaEngine::Rhi::FRhiTransitionCreateInfo& /*info*/) override {
+            ++mBeginTransitionCount;
+            if (mDispatchCount == 0U) {
+                ++mTransitionBeforePass;
+            }
+        }
+        void RHIEndTransition(
+            const AltinaEngine::Rhi::FRhiTransitionCreateInfo& /*info*/) override {}
+        void RHIClearColor(AltinaEngine::Rhi::FRhiTexture* /*colorTarget*/,
+            const AltinaEngine::Rhi::FRhiClearColor& /*color*/) override {}
+        void RHISetBindGroup(u32 /*setIndex*/, AltinaEngine::Rhi::FRhiBindGroup* /*group*/,
+            const u32* /*dynamicOffsets*/, u32 /*dynamicOffsetCount*/) override {}
+        void RHIDraw(u32 /*vertexCount*/, u32 /*instanceCount*/, u32 /*firstVertex*/,
+            u32 /*firstInstance*/) override {}
+        void RHIDrawIndexed(u32 /*indexCount*/, u32 /*instanceCount*/, u32 /*firstIndex*/,
+            i32 /*vertexOffset*/, u32 /*firstInstance*/) override {}
+        void RHIDispatch(u32 /*groupCountX*/, u32 /*groupCountY*/, u32 /*groupCountZ*/) override {
+            ++mDispatchCount;
+        }
+    };
+
     enum class ETestEvent : u8 {
         BeginTransition = 0,
         EndTransition,
@@ -803,4 +847,60 @@ TEST_CASE("FrameGraph.ImportedTextureWriteAsRenderTarget") {
     REQUIRE(executed);
     REQUIRE(sameTexture);
     REQUIRE(hasValidRtv);
+}
+
+TEST_CASE("FrameGraph.AutoTransitionsBeforePass") {
+    FRhiMockContext context;
+    auto            device = CreateMockDevice(context);
+
+    FFrameGraph     graph(*device);
+    graph.BeginFrame(7);
+
+    struct FPassData {
+        FFrameGraphTextureRef Tex;
+    };
+    FFrameGraphTextureRef sharedTex{};
+
+    FFrameGraphPassDesc   passA{};
+    passA.mName  = "AutoTransitionA";
+    passA.mType  = EFrameGraphPassType::Compute;
+    passA.mQueue = EFrameGraphQueue::Graphics;
+    graph.AddPass<FPassData>(
+        passA,
+        [&](FFrameGraphPassBuilder& builder, FPassData& data) {
+            FFrameGraphTextureDesc texDesc{};
+            texDesc.mDesc.mWidth  = 4U;
+            texDesc.mDesc.mHeight = 4U;
+            texDesc.mDesc.mFormat = ERhiFormat::R8G8B8A8Unorm;
+            texDesc.mDesc.mBindFlags =
+                ERhiTextureBindFlags::ShaderResource | ERhiTextureBindFlags::UnorderedAccess;
+            data.Tex  = builder.CreateTexture(texDesc);
+            sharedTex = data.Tex;
+            data.Tex  = builder.Write(data.Tex, ERhiResourceState::UnorderedAccess);
+        },
+        [](AltinaEngine::Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& /*res*/,
+            const FPassData& /*data*/) { ctx.RHIDispatch(1U, 1U, 1U); });
+
+    FFrameGraphPassDesc passB{};
+    passB.mName  = "AutoTransitionB";
+    passB.mType  = EFrameGraphPassType::Compute;
+    passB.mQueue = EFrameGraphQueue::Graphics;
+    graph.AddPass<FPassData>(
+        passB,
+        [&](FFrameGraphPassBuilder& builder, FPassData& data) {
+            // Reuse resource from first pass and request a different state.
+            data.Tex = builder.Read(sharedTex, ERhiResourceState::ShaderResource);
+        },
+        [](AltinaEngine::Rhi::FRhiCmdContext& ctx, const FFrameGraphPassResources& /*res*/,
+            const FPassData& /*data*/) { ctx.RHIDispatch(1U, 1U, 1U); });
+
+    graph.Compile();
+
+    FTransitionTrackingCmdContext cmdContext;
+    graph.Execute(cmdContext);
+    graph.EndFrame();
+
+    // Expected at least one transition before the first dispatch.
+    REQUIRE(cmdContext.mBeginTransitionCount >= 1U);
+    REQUIRE(cmdContext.mTransitionBeforePass >= 1U);
 }

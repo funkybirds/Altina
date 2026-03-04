@@ -418,7 +418,9 @@ namespace AltinaEngine::Rhi {
                 ii.imageView   = vkTex->GetDefaultView();
                 ii.imageLayout = (entry.mType == ERhiBindingType::StorageTexture)
                     ? VK_IMAGE_LAYOUT_GENERAL
-                    : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    : (Vulkan::Detail::IsDepthFormat(entry.mTexture->GetDesc().mFormat)
+                              ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                              : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 imageInfos.PushBack(ii);
                 write.pImageInfo = &imageInfos.Back();
             } else {
@@ -512,20 +514,24 @@ namespace AltinaEngine::Rhi {
 
         auto* vs = static_cast<FRhiVulkanShader*>(mVertexShader.Get());
         auto* ps = static_cast<FRhiVulkanShader*>(mPixelShader.Get());
-        if (!vs || !ps) {
+        if (!vs) {
             return VK_NULL_HANDLE;
         }
 
         VkPipelineShaderStageCreateInfo stages[2]{};
+        u32                             stageCount = 1U;
         stages[0].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[0].stage  = VK_SHADER_STAGE_VERTEX_BIT;
         stages[0].module = vs->GetModule();
         stages[0].pName  = "main";
 
-        stages[1].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stages[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
-        stages[1].module = ps->GetModule();
-        stages[1].pName  = "main";
+        if (ps != nullptr) {
+            stages[1].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            stages[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+            stages[1].module = ps->GetModule();
+            stages[1].pName  = "main";
+            stageCount       = 2U;
+        }
 
         // Vertex input (best-effort): assign locations sequentially and compute per-binding
         // strides.
@@ -629,10 +635,20 @@ namespace AltinaEngine::Rhi {
         blendAttachment.colorWriteMask =
             static_cast<VkColorComponentFlags>(GetGraphicsDesc().mBlendState.mColorWriteMask);
 
+        const bool usingDynamicRendering = (renderPass == VK_NULL_HANDLE);
+        const u32  colorAttachmentCount  = (renderingInfo != nullptr)
+              ? renderingInfo->colorAttachmentCount
+              : (usingDynamicRendering ? 0U : 1U);
+        Core::Container::TVector<VkPipelineColorBlendAttachmentState> blendAttachments;
+        blendAttachments.Resize(colorAttachmentCount);
+        for (u32 i = 0; i < colorAttachmentCount; ++i) {
+            blendAttachments[i] = blendAttachment;
+        }
+
         VkPipelineColorBlendStateCreateInfo blend{};
         blend.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        blend.attachmentCount = 1;
-        blend.pAttachments    = &blendAttachment;
+        blend.attachmentCount = colorAttachmentCount;
+        blend.pAttachments    = (colorAttachmentCount > 0U) ? blendAttachments.Data() : nullptr;
 
         VkDynamicState dynStates[3]  = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
         u32            dynStateCount = 2U;
@@ -650,7 +666,7 @@ namespace AltinaEngine::Rhi {
 
         VkGraphicsPipelineCreateInfo info{};
         info.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        info.stageCount          = 2;
+        info.stageCount          = stageCount;
         info.pStages             = stages;
         info.pVertexInputState   = &vertexInput;
         info.pInputAssemblyState = &inputAsm;

@@ -277,7 +277,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 // t0
                 {
                     Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = 0U;
+                    entry.mBinding          = MapSampledTextureBinding(0U);
                     entry.mType             = Rhi::ERhiBindingType::SampledTexture;
                     entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
                     entry.mArrayCount       = 1U;
@@ -288,7 +288,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 // s0
                 {
                     Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = 0U;
+                    entry.mBinding          = MapSamplerBinding(0U);
                     entry.mType             = Rhi::ERhiBindingType::Sampler;
                     entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
                     entry.mArrayCount       = 1U;
@@ -325,7 +325,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 // t0..t2 (Current, History, Depth)
                 for (u32 binding = 0U; binding < 3U; ++binding) {
                     Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = binding;
+                    entry.mBinding          = MapSampledTextureBinding(binding);
                     entry.mType             = Rhi::ERhiBindingType::SampledTexture;
                     entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
                     entry.mArrayCount       = 1U;
@@ -336,7 +336,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 // s0 (linear)
                 {
                     Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = 0U;
+                    entry.mBinding          = MapSamplerBinding(0U);
                     entry.mType             = Rhi::ERhiBindingType::Sampler;
                     entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
                     entry.mArrayCount       = 1U;

@@ -387,6 +387,9 @@ namespace AltinaEngine::RenderCore {
 
             const bool hasRenderPass = pass.mDesc.mType == EFrameGraphPassType::Raster
                 && (!pass.mCompiledColorAttachments.IsEmpty() || pass.mHasCompiledDepth);
+            if (pass.mDesc.mType == EFrameGraphPassType::Raster && !hasRenderPass) {
+                continue;
+            }
 
             if (hasRenderPass) {
                 Rhi::FRhiRenderPassDesc renderPassDesc;

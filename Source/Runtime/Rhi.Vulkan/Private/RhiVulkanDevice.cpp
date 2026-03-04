@@ -279,6 +279,12 @@ namespace AltinaEngine::Rhi {
 
             mState->mSubmitter.Stop();
 
+            if (mState->mDevice) {
+                // Ensure all submitted GPU work is complete before destroying any Vulkan objects
+                // that may still be referenced by in-flight submissions (semaphores, pools, etc.).
+                vkDeviceWaitIdle(mState->mDevice);
+            }
+
             for (auto& upload : mState->mUploadQueues) {
                 if (upload.mPool != VK_NULL_HANDLE && mState->mDevice) {
                     vkDestroyCommandPool(mState->mDevice, upload.mPool, nullptr);
@@ -293,7 +299,6 @@ namespace AltinaEngine::Rhi {
             mState->mAllocator.Shutdown();
 
             if (mState->mDevice) {
-                vkDeviceWaitIdle(mState->mDevice);
                 vkDestroyDevice(mState->mDevice, nullptr);
                 mState->mDevice = VK_NULL_HANDLE;
             }
@@ -372,35 +377,68 @@ namespace AltinaEngine::Rhi {
     }
 
     auto FRhiVulkanDevice::CreateBuffer(const FRhiBufferDesc& desc) -> FRhiBufferRef {
-        return MakeResource<FRhiVulkanBuffer>(desc, mState ? mState->mDevice : VK_NULL_HANDLE);
+        auto buffer =
+            MakeResource<FRhiVulkanBuffer>(desc, mState ? mState->mDevice : VK_NULL_HANDLE);
+        auto* vkBuffer = static_cast<FRhiVulkanBuffer*>(buffer.Get());
+        if (vkBuffer == nullptr || vkBuffer->GetNativeBuffer() == VK_NULL_HANDLE) {
+            return {};
+        }
+        return buffer;
     }
 
     auto FRhiVulkanDevice::CreateTexture(const FRhiTextureDesc& desc) -> FRhiTextureRef {
-        return MakeResource<FRhiVulkanTexture>(desc, mState ? mState->mDevice : VK_NULL_HANDLE);
+        auto texture =
+            MakeResource<FRhiVulkanTexture>(desc, mState ? mState->mDevice : VK_NULL_HANDLE);
+        auto* vkTexture = static_cast<FRhiVulkanTexture*>(texture.Get());
+        if (vkTexture == nullptr || vkTexture->GetNativeImage() == VK_NULL_HANDLE
+            || vkTexture->GetDefaultView() == VK_NULL_HANDLE) {
+            return {};
+        }
+        return texture;
     }
 
     auto FRhiVulkanDevice::CreateShaderResourceView(const FRhiShaderResourceViewDesc& desc)
         -> FRhiShaderResourceViewRef {
-        return MakeResource<FRhiVulkanShaderResourceView>(
+        auto view = MakeResource<FRhiVulkanShaderResourceView>(
             desc, mState ? mState->mDevice : VK_NULL_HANDLE);
+        auto* vkView = static_cast<FRhiVulkanShaderResourceView*>(view.Get());
+        if (vkView == nullptr || vkView->GetImageView() == VK_NULL_HANDLE) {
+            return {};
+        }
+        return view;
     }
 
     auto FRhiVulkanDevice::CreateUnorderedAccessView(const FRhiUnorderedAccessViewDesc& desc)
         -> FRhiUnorderedAccessViewRef {
-        return MakeResource<FRhiVulkanUnorderedAccessView>(
+        auto view = MakeResource<FRhiVulkanUnorderedAccessView>(
             desc, mState ? mState->mDevice : VK_NULL_HANDLE);
+        auto* vkView = static_cast<FRhiVulkanUnorderedAccessView*>(view.Get());
+        if (vkView == nullptr || vkView->GetImageView() == VK_NULL_HANDLE) {
+            return {};
+        }
+        return view;
     }
 
     auto FRhiVulkanDevice::CreateRenderTargetView(const FRhiRenderTargetViewDesc& desc)
         -> FRhiRenderTargetViewRef {
-        return MakeResource<FRhiVulkanRenderTargetView>(
+        auto view = MakeResource<FRhiVulkanRenderTargetView>(
             desc, mState ? mState->mDevice : VK_NULL_HANDLE);
+        auto* vkView = static_cast<FRhiVulkanRenderTargetView*>(view.Get());
+        if (vkView == nullptr || vkView->GetImageView() == VK_NULL_HANDLE) {
+            return {};
+        }
+        return view;
     }
 
     auto FRhiVulkanDevice::CreateDepthStencilView(const FRhiDepthStencilViewDesc& desc)
         -> FRhiDepthStencilViewRef {
-        return MakeResource<FRhiVulkanDepthStencilView>(
+        auto view = MakeResource<FRhiVulkanDepthStencilView>(
             desc, mState ? mState->mDevice : VK_NULL_HANDLE);
+        auto* vkView = static_cast<FRhiVulkanDepthStencilView*>(view.Get());
+        if (vkView == nullptr || vkView->GetImageView() == VK_NULL_HANDLE) {
+            return {};
+        }
+        return view;
     }
 
     auto FRhiVulkanDevice::CreateViewport(const FRhiViewportDesc& desc) -> FRhiViewportRef {
@@ -648,17 +686,27 @@ namespace AltinaEngine::Rhi {
             fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
             vkCreateFence(mState->mDevice, &fenceInfo, nullptr, &fence);
 
-            VkSubmitInfo submit{};
-            submit.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            submit.commandBufferCount = 1;
-            submit.pCommandBuffers    = &cmd;
-            vkQueueSubmit(mState->mGraphicsQueue, 1, &submit, fence);
+            FSubmitWork work{};
+            work.mType  = FSubmitWork::EType::Submit;
+            work.mQueue = mState->mGraphicsQueue;
+            work.mCommandBuffers.PushBack(cmd);
+            work.mFence = fence;
+            FSubmitWork::FCompletion completion{};
+            work.mCompletion = &completion;
+            mState->mSubmitter.Enqueue(Move(work));
+            completion.Wait();
 
             if (fence) {
                 vkWaitForFences(mState->mDevice, 1, &fence, VK_TRUE, UINT64_MAX);
                 vkDestroyFence(mState->mDevice, fence, nullptr);
             } else {
-                vkQueueWaitIdle(mState->mGraphicsQueue);
+                FSubmitWork idleWork{};
+                idleWork.mType  = FSubmitWork::EType::WaitIdle;
+                idleWork.mQueue = mState->mGraphicsQueue;
+                FSubmitWork::FCompletion idleCompletion{};
+                idleWork.mCompletion = &idleCompletion;
+                mState->mSubmitter.Enqueue(Move(idleWork));
+                idleCompletion.Wait();
             }
 
             vkFreeCommandBuffers(mState->mDevice, pool, 1, &cmd);
@@ -770,23 +818,15 @@ namespace AltinaEngine::Rhi {
 
         vkEndCommandBuffer(cmd);
 
-        const u64                     signalValue = ++uploadState.mNextValue;
-
-        VkTimelineSemaphoreSubmitInfo timelineInfo{};
-        timelineInfo.sType                     = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-        timelineInfo.signalSemaphoreValueCount = 1;
-        timelineInfo.pSignalSemaphoreValues    = &signalValue;
-
-        VkSemaphore  signalSemaphore = vkTimeline->GetNativeSemaphore();
-        VkSubmitInfo submit{};
-        submit.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submit.pNext                = &timelineInfo;
-        submit.commandBufferCount   = 1;
-        submit.pCommandBuffers      = &cmd;
-        submit.signalSemaphoreCount = 1;
-        submit.pSignalSemaphores    = &signalSemaphore;
-
-        vkQueueSubmit(uploadState.mQueue, 1, &submit, VK_NULL_HANDLE);
+        const u64   signalValue     = ++uploadState.mNextValue;
+        VkSemaphore signalSemaphore = vkTimeline->GetNativeSemaphore();
+        FSubmitWork work{};
+        work.mType  = FSubmitWork::EType::Submit;
+        work.mQueue = uploadState.mQueue;
+        work.mCommandBuffers.PushBack(cmd);
+        work.mSignalSemaphores.PushBack(signalSemaphore);
+        work.mSignalValues.PushBack(signalValue);
+        mState->mSubmitter.Enqueue(Move(work));
 
         FState::FUploadCmd uploadCmd{};
         uploadCmd.mCmd         = cmd;

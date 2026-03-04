@@ -321,6 +321,7 @@ namespace AltinaEngine::RenderCore {
         struct FRdgPass {
             FFrameGraphPassDesc              mDesc;
             TVector<FRdgResourceAccess>      mAccesses;
+            TVector<Rhi::FRhiTransitionInfo> mCompiledPreTransitions;
             TVector<FRdgRenderTargetBinding> mRenderTargets;
             bool                             mHasDepthStencil = false;
             FRdgDepthStencilBinding          mDepthStencil;
@@ -338,6 +339,9 @@ namespace AltinaEngine::RenderCore {
             Rhi::FRhiRenderPassDepthStencilAttachment   mCompiledDepthAttachment;
             bool                                        mHasCompiledDepth = false;
         };
+
+        TVector<Rhi::FRhiTransitionInfo>         mCompiledBeginTransitions;
+        TVector<Rhi::FRhiTransitionInfo>         mCompiledFinalTransitions;
 
         template <typename PassData> static void DestroyPassData(void* data) {
             delete static_cast<PassData*>(data); // NOLINT

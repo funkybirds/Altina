@@ -67,9 +67,12 @@ namespace AltinaEngine::Rendering {
             const auto* passDesc =
                 (batch.Material != nullptr) ? batch.Material->FindPassDesc(batch.Pass) : nullptr;
             if (pipelineResolver != nullptr) {
-                if (auto* pipeline = pipelineResolver(batch, passDesc, pipelineUserData)) {
-                    ctx.RHISetGraphicsPipeline(pipeline);
+                auto* pipeline = pipelineResolver(batch, passDesc, pipelineUserData);
+                if (pipeline == nullptr) {
+                    // Never draw with a stale pipeline from a previous pass/batch.
+                    continue;
                 }
+                ctx.RHISetGraphicsPipeline(pipeline);
             }
 
             if (bindings.PerFrame != nullptr) {

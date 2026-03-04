@@ -33,6 +33,8 @@ namespace AltinaEngine::Rhi {
 
         [[nodiscard]] auto GetNativeImage() const noexcept -> VkImage;
         [[nodiscard]] auto GetDefaultView() const noexcept -> VkImageView;
+        [[nodiscard]] auto GetCurrentLayout() const noexcept -> VkImageLayout;
+        void               SetCurrentLayout(VkImageLayout layout) noexcept;
 
         void               SetPendingUpload(FRhiSemaphore* semaphore, u64 value) noexcept;
         [[nodiscard]] auto HasPendingUpload() const noexcept -> bool;

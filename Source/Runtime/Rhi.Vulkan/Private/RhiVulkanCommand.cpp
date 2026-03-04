@@ -76,6 +76,68 @@ namespace AltinaEngine::Rhi {
             }
         }
 
+        [[nodiscard]] auto GetSampledImageLayout(ERhiFormat format) noexcept -> VkImageLayout {
+            return Vulkan::Detail::IsDepthFormat(format)
+                ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        }
+
+        void TransitionTextureLayout(VkCommandBuffer cmd, FRhiVulkanTexture* texture,
+            VkImageLayout newLayout, bool supportsSync2) {
+            if (cmd == VK_NULL_HANDLE || texture == nullptr
+                || newLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
+                return;
+            }
+            const VkImageLayout oldLayout = texture->GetCurrentLayout();
+            if (oldLayout == newLayout) {
+                return;
+            }
+
+            const auto&             desc = texture->GetDesc();
+            VkImageSubresourceRange range{};
+            range.aspectMask     = Vulkan::Detail::ToVkAspectFlags(desc.mFormat);
+            range.baseMipLevel   = 0;
+            range.levelCount     = desc.mMipLevels;
+            range.baseArrayLayer = 0;
+            range.layerCount     = desc.mArrayLayers;
+
+            if (supportsSync2) {
+                VkImageMemoryBarrier2 barrier{};
+                barrier.sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                barrier.srcStageMask  = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                barrier.srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+                barrier.dstStageMask  = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+                barrier.oldLayout     = oldLayout;
+                barrier.newLayout     = newLayout;
+                barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.image               = texture->GetNativeImage();
+                barrier.subresourceRange    = range;
+
+                VkDependencyInfo dep{};
+                dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                dep.imageMemoryBarrierCount = 1;
+                dep.pImageMemoryBarriers    = &barrier;
+                vkCmdPipelineBarrier2(cmd, &dep);
+            } else {
+                VkImageMemoryBarrier barrier{};
+                barrier.sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+                barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+                barrier.oldLayout     = oldLayout;
+                barrier.newLayout     = newLayout;
+                barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.image               = texture->GetNativeImage();
+                barrier.subresourceRange    = range;
+
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                    VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
+            texture->SetCurrentLayout(newLayout);
+        }
+
         auto GetRenderTargetViewHandle(FRhiRenderTargetView* view) noexcept -> VkImageView {
             if (!view) {
                 return VK_NULL_HANDLE;
@@ -369,6 +431,7 @@ namespace AltinaEngine::Rhi {
         VkPipeline                         mBoundPipeline                = VK_NULL_HANDLE;
         bool                               mUseComputePipeline           = false;
         bool                               mInRenderPass                 = false;
+        bool                               mHasIssuedDrawInRenderPass    = false;
         bool                               mDynamicRendering             = false;
         bool                               mSupportsDynamicRendering     = false;
         bool                               mSupportsSync2                = false;
@@ -523,13 +586,14 @@ namespace AltinaEngine::Rhi {
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(mState->mCmd, &beginInfo);
 
-        mState->mGraphicsPipeline   = nullptr;
-        mState->mComputePipeline    = nullptr;
-        mState->mBoundPipeline      = VK_NULL_HANDLE;
-        mState->mUseComputePipeline = false;
-        mState->mInRenderPass       = false;
-        mState->mTopology           = ERhiPrimitiveTopology::TriangleList;
-        mState->mAttachmentHash     = 0ULL;
+        mState->mGraphicsPipeline          = nullptr;
+        mState->mComputePipeline           = nullptr;
+        mState->mBoundPipeline             = VK_NULL_HANDLE;
+        mState->mUseComputePipeline        = false;
+        mState->mInRenderPass              = false;
+        mState->mHasIssuedDrawInRenderPass = false;
+        mState->mTopology                  = ERhiPrimitiveTopology::TriangleList;
+        mState->mAttachmentHash            = 0ULL;
         if (mActiveSection) {
             mActiveSection->mState              = ERhiCommandSectionState::Active;
             mActiveSection->mExecution.mState   = ERhiCommandSectionState::Active;
@@ -594,7 +658,12 @@ namespace AltinaEngine::Rhi {
             if (pipelineHandle != VK_NULL_HANDLE && pipelineHandle != mState->mBoundPipeline) {
                 vkCmdBindPipeline(mState->mCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineHandle);
                 mState->mBoundPipeline = pipelineHandle;
+            } else if (pipelineHandle == VK_NULL_HANDLE) {
+                // Prevent stale graphics pipeline reuse on subsequent draw calls.
+                mState->mBoundPipeline = VK_NULL_HANDLE;
             }
+        } else {
+            mState->mBoundPipeline = VK_NULL_HANDLE;
         }
     }
 
@@ -796,6 +865,8 @@ namespace AltinaEngine::Rhi {
                 auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
                 if (vkTex) {
                     list->AddTouchedTexture(vkTex);
+                    TransitionTextureLayout(mState->mCmd, vkTex,
+                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, mState->mSupportsSync2);
                 }
             }
             const VkFormat format = Vulkan::Detail::ToVkFormat(texture->GetDesc().mFormat);
@@ -837,6 +908,9 @@ namespace AltinaEngine::Rhi {
                     auto* vkTex = static_cast<FRhiVulkanTexture*>(texture);
                     if (vkTex) {
                         list->AddTouchedTexture(vkTex);
+                        TransitionTextureLayout(mState->mCmd, vkTex,
+                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                            mState->mSupportsSync2);
                     }
                 }
                 mState->mDepthFormat = Vulkan::Detail::ToVkFormat(texture->GetDesc().mFormat);
@@ -871,6 +945,12 @@ namespace AltinaEngine::Rhi {
 
         mState->mAttachmentHash =
             HashAttachments(mState->mColorFormats, mState->mDepthFormat, mState->mTopology);
+
+        if (mState->mRenderExtent.width == 0 || mState->mRenderExtent.height == 0) {
+            // Invalid pass description (no valid attachments). Skip pass begin.
+            mState->mInRenderPass = false;
+            return;
+        }
 
         if (mState->mSupportsDynamicRendering) {
             mState->mDynamicRendering                = true;
@@ -921,7 +1001,9 @@ namespace AltinaEngine::Rhi {
             vkCmdBeginRenderPass(mState->mCmd, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
         }
 
-        mState->mInRenderPass = true;
+        mState->mInRenderPass              = true;
+        mState->mHasIssuedDrawInRenderPass = false;
+        mState->mBoundPipeline             = VK_NULL_HANDLE;
 
         if (mState->mGraphicsPipeline) {
             const VkPipeline pipelineHandle = mState->mGraphicsPipeline->GetOrCreatePipeline(
@@ -953,13 +1035,19 @@ namespace AltinaEngine::Rhi {
                 mState->mLegacyRenderPass = VK_NULL_HANDLE;
             }
         }
-        mState->mInRenderPass = false;
+        mState->mInRenderPass              = false;
+        mState->mHasIssuedDrawInRenderPass = false;
     }
 
     void FRhiVulkanCommandContext::RHIBeginTransition(const FRhiTransitionCreateInfo& info) {
         EnsureRecording();
         if (!mState || !mState->mCmd || info.mTransitionCount == 0U
             || info.mTransitions == nullptr) {
+            return;
+        }
+        Core::Utility::Assert(!mState->mInRenderPass, TEXT("RHI.Vulkan"),
+            "RHIBeginTransition must not be called inside an active render pass.");
+        if (mState->mInRenderPass) {
             return;
         }
         if (mState->mOwner == nullptr) {
@@ -1000,11 +1088,16 @@ namespace AltinaEngine::Rhi {
                     continue;
                 }
 
-                const auto& texDesc = vkTex->GetDesc();
-                const bool  isDepth = Vulkan::Detail::IsDepthFormat(texDesc.mFormat);
+                const auto&         texDesc = vkTex->GetDesc();
+                const bool          isDepth = Vulkan::Detail::IsDepthFormat(texDesc.mFormat);
 
-                const auto  before = Vulkan::Detail::MapResourceState(tr.mBefore, isDepth);
-                const auto  after  = Vulkan::Detail::MapResourceState(tr.mAfter, isDepth);
+                const auto          before = Vulkan::Detail::MapResourceState(tr.mBefore, isDepth);
+                const auto          after  = Vulkan::Detail::MapResourceState(tr.mAfter, isDepth);
+                const VkImageLayout trackedOldLayout = vkTex->GetCurrentLayout();
+                const VkImageLayout oldLayout = (trackedOldLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+                    ? trackedOldLayout
+                    : VK_IMAGE_LAYOUT_UNDEFINED;
+                const bool          oldLayoutUndefined = (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED);
 
                 VkImageSubresourceRange range{};
                 range.aspectMask     = Vulkan::Detail::ToVkAspectFlags(texDesc.mFormat);
@@ -1021,12 +1114,13 @@ namespace AltinaEngine::Rhi {
                     barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
                     barrier.image               = vkTex->GetNativeImage();
                     barrier.subresourceRange    = range;
-                    barrier.oldLayout           = before.mLayout;
+                    barrier.oldLayout           = oldLayout;
                     barrier.newLayout           = crossQueue ? before.mLayout : after.mLayout;
                     barrier.srcQueueFamilyIndex = srcFamily;
                     barrier.dstQueueFamilyIndex = dstFamily;
-                    barrier.srcStageMask        = before.mStages;
-                    barrier.srcAccessMask       = before.mAccess;
+                    barrier.srcStageMask =
+                        oldLayoutUndefined ? VK_PIPELINE_STAGE_2_NONE : before.mStages;
+                    barrier.srcAccessMask = oldLayoutUndefined ? 0 : before.mAccess;
                     barrier.dstStageMask  = crossQueue ? VK_PIPELINE_STAGE_2_NONE : after.mStages;
                     barrier.dstAccessMask = crossQueue ? 0 : after.mAccess;
 
@@ -1040,19 +1134,24 @@ namespace AltinaEngine::Rhi {
                     barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
                     barrier.image               = vkTex->GetNativeImage();
                     barrier.subresourceRange    = range;
-                    barrier.oldLayout           = before.mLayout;
+                    barrier.oldLayout           = oldLayout;
                     barrier.newLayout           = crossQueue ? before.mLayout : after.mLayout;
                     barrier.srcQueueFamilyIndex = srcFamily;
                     barrier.dstQueueFamilyIndex = dstFamily;
-                    barrier.srcAccessMask       = static_cast<VkAccessFlags>(before.mAccess);
+                    barrier.srcAccessMask =
+                        oldLayoutUndefined ? 0 : static_cast<VkAccessFlags>(before.mAccess);
                     barrier.dstAccessMask =
                         crossQueue ? 0 : static_cast<VkAccessFlags>(after.mAccess);
 
                     vkCmdPipelineBarrier(mState->mCmd,
-                        static_cast<VkPipelineStageFlags>(before.mStages),
+                        oldLayoutUndefined ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                                           : static_cast<VkPipelineStageFlags>(before.mStages),
                         crossQueue ? VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
                                    : static_cast<VkPipelineStageFlags>(after.mStages),
                         0, 0, nullptr, 0, nullptr, 1, &barrier);
+                }
+                if (!crossQueue) {
+                    vkTex->SetCurrentLayout(after.mLayout);
                 }
             } else if (auto* buffer = AltinaEngine::CheckedCast<FRhiBuffer*>(tr.mResource)) {
                 auto* vkBuf = static_cast<FRhiVulkanBuffer*>(buffer);
@@ -1109,6 +1208,11 @@ namespace AltinaEngine::Rhi {
             || info.mTransitions == nullptr) {
             return;
         }
+        Core::Utility::Assert(!mState->mInRenderPass, TEXT("RHI.Vulkan"),
+            "RHIEndTransition must not be called inside an active render pass.");
+        if (mState->mInRenderPass) {
+            return;
+        }
         if (mState->mOwner == nullptr) {
             return;
         }
@@ -1161,17 +1265,23 @@ namespace AltinaEngine::Rhi {
 
                 if (mState->mSupportsSync2) {
                     VkImageMemoryBarrier2 barrier{};
-                    barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-                    barrier.image               = vkTex->GetNativeImage();
-                    barrier.subresourceRange    = range;
-                    barrier.oldLayout           = before.mLayout;
-                    barrier.newLayout           = after.mLayout;
-                    barrier.srcQueueFamilyIndex = srcFamily;
-                    barrier.dstQueueFamilyIndex = dstFamily;
-                    barrier.srcStageMask        = VK_PIPELINE_STAGE_2_NONE;
-                    barrier.srcAccessMask       = 0;
-                    barrier.dstStageMask        = after.mStages;
-                    barrier.dstAccessMask       = after.mAccess;
+                    barrier.sType                        = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                    barrier.image                        = vkTex->GetNativeImage();
+                    barrier.subresourceRange             = range;
+                    const VkImageLayout trackedOldLayout = vkTex->GetCurrentLayout();
+                    const VkImageLayout oldLayout = (trackedOldLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+                        ? trackedOldLayout
+                        : VK_IMAGE_LAYOUT_UNDEFINED;
+                    const bool oldLayoutUndefined = (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED);
+                    barrier.oldLayout             = oldLayout;
+                    barrier.newLayout             = after.mLayout;
+                    barrier.srcQueueFamilyIndex   = srcFamily;
+                    barrier.dstQueueFamilyIndex   = dstFamily;
+                    barrier.srcStageMask =
+                        oldLayoutUndefined ? VK_PIPELINE_STAGE_2_NONE : before.mStages;
+                    barrier.srcAccessMask = oldLayoutUndefined ? 0 : before.mAccess;
+                    barrier.dstStageMask  = after.mStages;
+                    barrier.dstAccessMask = after.mAccess;
 
                     VkDependencyInfo dep{};
                     dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -1180,20 +1290,29 @@ namespace AltinaEngine::Rhi {
                     vkCmdPipelineBarrier2(mState->mCmd, &dep);
                 } else {
                     VkImageMemoryBarrier barrier{};
-                    barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                    barrier.image               = vkTex->GetNativeImage();
-                    barrier.subresourceRange    = range;
-                    barrier.oldLayout           = before.mLayout;
-                    barrier.newLayout           = after.mLayout;
-                    barrier.srcQueueFamilyIndex = srcFamily;
-                    barrier.dstQueueFamilyIndex = dstFamily;
-                    barrier.srcAccessMask       = 0;
-                    barrier.dstAccessMask       = static_cast<VkAccessFlags>(after.mAccess);
+                    barrier.sType                        = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                    barrier.image                        = vkTex->GetNativeImage();
+                    barrier.subresourceRange             = range;
+                    const VkImageLayout trackedOldLayout = vkTex->GetCurrentLayout();
+                    const VkImageLayout oldLayout = (trackedOldLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+                        ? trackedOldLayout
+                        : VK_IMAGE_LAYOUT_UNDEFINED;
+                    const bool oldLayoutUndefined = (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED);
+                    barrier.oldLayout             = oldLayout;
+                    barrier.newLayout             = after.mLayout;
+                    barrier.srcQueueFamilyIndex   = srcFamily;
+                    barrier.dstQueueFamilyIndex   = dstFamily;
+                    barrier.srcAccessMask =
+                        oldLayoutUndefined ? 0 : static_cast<VkAccessFlags>(before.mAccess);
+                    barrier.dstAccessMask = static_cast<VkAccessFlags>(after.mAccess);
 
-                    vkCmdPipelineBarrier(mState->mCmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    vkCmdPipelineBarrier(mState->mCmd,
+                        oldLayoutUndefined ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                                           : static_cast<VkPipelineStageFlags>(before.mStages),
                         static_cast<VkPipelineStageFlags>(after.mStages), 0, 0, nullptr, 0, nullptr,
                         1, &barrier);
                 }
+                vkTex->SetCurrentLayout(after.mLayout);
             } else if (auto* buffer = AltinaEngine::CheckedCast<FRhiBuffer*>(tr.mResource)) {
                 auto* vkBuf = static_cast<FRhiVulkanBuffer*>(buffer);
                 if (!vkBuf) {
@@ -1253,6 +1372,8 @@ namespace AltinaEngine::Rhi {
         if (list) {
             list->AddTouchedTexture(vkTex);
         }
+        TransitionTextureLayout(
+            mState->mCmd, vkTex, VK_IMAGE_LAYOUT_GENERAL, mState->mSupportsSync2);
 
         VkClearColorValue clear{};
         clear.float32[0] = color.mR;
@@ -1284,13 +1405,62 @@ namespace AltinaEngine::Rhi {
         }
         auto* list = GetExecutionCommandList();
         if (list) {
-            const auto& desc = group->GetDesc();
+            struct FPendingTextureTransition {
+                FRhiVulkanTexture* mTexture        = nullptr;
+                VkImageLayout      mExpectedLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            };
+            TVector<FPendingTextureTransition> pendingTransitions;
+            const auto&                        desc = group->GetDesc();
             for (const auto& entry : desc.mEntries) {
                 if (entry.mTexture != nullptr) {
                     auto* vkTex = static_cast<FRhiVulkanTexture*>(entry.mTexture);
                     if (vkTex) {
                         list->AddTouchedTexture(vkTex);
+                        const VkImageLayout expectedLayout =
+                            (entry.mType == ERhiBindingType::StorageTexture)
+                            ? VK_IMAGE_LAYOUT_GENERAL
+                            : GetSampledImageLayout(entry.mTexture->GetDesc().mFormat);
+                        if (vkTex->GetCurrentLayout() != expectedLayout) {
+                            FPendingTextureTransition pending{};
+                            pending.mTexture        = vkTex;
+                            pending.mExpectedLayout = expectedLayout;
+                            pendingTransitions.PushBack(pending);
+                        }
                     }
+                }
+            }
+
+            if (!pendingTransitions.IsEmpty()) {
+                if (mState->mInRenderPass) {
+                    // Vulkan forbids image layout transitions inside a dynamic rendering instance.
+                    // If this happens before the first draw, temporarily end rendering, transition,
+                    // and resume.
+                    const bool canSplitDynamicRendering =
+                        mState->mDynamicRendering && !mState->mHasIssuedDrawInRenderPass;
+                    Core::Utility::Assert(canSplitDynamicRendering, TEXT("RHI.Vulkan"),
+                        "Texture layout transition requested inside active render pass after draw."
+                        " Ensure transitions happen before draw calls.");
+                    if (canSplitDynamicRendering) {
+                        vkCmdEndRendering(mState->mCmd);
+                        mState->mInRenderPass = false;
+                    } else {
+                        pendingTransitions.Clear();
+                    }
+                }
+
+                for (const auto& pending : pendingTransitions) {
+                    if (pending.mTexture == nullptr
+                        || pending.mExpectedLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
+                        continue;
+                    }
+                    TransitionTextureLayout(mState->mCmd, pending.mTexture, pending.mExpectedLayout,
+                        mState->mSupportsSync2);
+                }
+
+                if (!pendingTransitions.IsEmpty() && mState->mDynamicRendering
+                    && !mState->mInRenderPass) {
+                    vkCmdBeginRendering(mState->mCmd, &mState->mRenderingInfo);
+                    mState->mInRenderPass = true;
                 }
             }
         }
@@ -1335,20 +1505,28 @@ namespace AltinaEngine::Rhi {
     void FRhiVulkanCommandContext::RHIDraw(
         u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
         EnsureRecording();
-        if (!mState || !mState->mCmd) {
+        if (!mState || !mState->mCmd || !mState->mInRenderPass
+            || mState->mBoundPipeline == VK_NULL_HANDLE) {
             return;
         }
         vkCmdDraw(mState->mCmd, vertexCount, instanceCount, firstVertex, firstInstance);
+        if (mState->mInRenderPass) {
+            mState->mHasIssuedDrawInRenderPass = true;
+        }
     }
 
     void FRhiVulkanCommandContext::RHIDrawIndexed(
         u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance) {
         EnsureRecording();
-        if (!mState || !mState->mCmd) {
+        if (!mState || !mState->mCmd || !mState->mInRenderPass
+            || mState->mBoundPipeline == VK_NULL_HANDLE) {
             return;
         }
         vkCmdDrawIndexed(
             mState->mCmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+        if (mState->mInRenderPass) {
+            mState->mHasIssuedDrawInRenderPass = true;
+        }
     }
 
     void FRhiVulkanCommandContext::RHIDispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) {

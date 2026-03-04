@@ -1225,8 +1225,39 @@ namespace AltinaEngine::Launch {
                         callback(*device, *viewport, width, height);
                     }
 
+                    bool renderedDebugGui = false;
                     if (debugGui) {
                         debugGui->RenderRenderThread(*device, *viewport);
+                        renderedDebugGui = true;
+                    }
+
+                    if (renderedDebugGui) {
+                        auto* backBuffer = viewport->GetBackBuffer();
+                        if (backBuffer != nullptr) {
+                            Rhi::FRhiCommandContextDesc ctxDesc{};
+                            ctxDesc.mQueueType = Rhi::ERhiQueueType::Graphics;
+                            ctxDesc.mDebugName.Assign(TEXT("Launch.BackBuffer.PresentTransition"));
+                            auto transitionContext = device->CreateCommandContext(ctxDesc);
+                            if (transitionContext) {
+                                auto* ops =
+                                    dynamic_cast<Rhi::IRhiCmdContextOps*>(transitionContext.Get());
+                                if (ops != nullptr) {
+                                    Rhi::FRhiCmdContextAdapter ctx(*transitionContext.Get(), *ops);
+                                    Rhi::FRhiTransitionInfo    toPresent{};
+                                    toPresent.mResource = backBuffer;
+                                    toPresent.mBefore   = Rhi::ERhiResourceState::RenderTarget;
+                                    toPresent.mAfter    = Rhi::ERhiResourceState::Present;
+
+                                    Rhi::FRhiTransitionCreateInfo transition{};
+                                    transition.mTransitions     = &toPresent;
+                                    transition.mTransitionCount = 1U;
+                                    transition.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
+                                    transition.mDstQueue        = Rhi::ERhiQueueType::Graphics;
+                                    ctx.RHIBeginTransition(transition);
+                                    transitionContext->RHIFlushContextDevice({});
+                                }
+                            }
+                        }
                     }
 
                     const auto queue = device->GetQueue(Rhi::ERhiQueueType::Graphics);

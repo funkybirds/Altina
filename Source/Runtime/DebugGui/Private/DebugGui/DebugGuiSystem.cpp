@@ -56,6 +56,14 @@ namespace AltinaEngine::DebugGui {
         using Core::Threading::FScopedLock;
         using Core::Utility::Filesystem::FPath;
 
+        [[nodiscard]] auto MapSampledTextureBinding(u32 binding) noexcept -> u32 {
+            return (Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan) ? (1000U + binding) : binding;
+        }
+
+        [[nodiscard]] auto MapSamplerBinding(u32 binding) noexcept -> u32 {
+            return (Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan) ? (2000U + binding) : binding;
+        }
+
         struct FDrawVertex {
             f32 X     = 0.0f;
             f32 Y     = 0.0f;
@@ -1365,14 +1373,38 @@ namespace AltinaEngine::DebugGui {
                 vp.mHeight = static_cast<f32>(h);
                 ctx.RHISetViewport(vp);
 
-                Rhi::FRhiRenderPassColorAttachment colorAtt{};
-                colorAtt.mView    = mBackBufferRtv.Get();
-                colorAtt.mLoadOp  = Rhi::ERhiLoadOp::Load;
-                colorAtt.mStoreOp = Rhi::ERhiStoreOp::Store;
+                Rhi::FRhiTransitionInfo toRenderTarget{};
+                toRenderTarget.mResource = backBuffer;
+                toRenderTarget.mBefore   = Rhi::ERhiResourceState::Present;
+                toRenderTarget.mAfter    = Rhi::ERhiResourceState::RenderTarget;
+                Rhi::FRhiTransitionCreateInfo toRenderTargetBatch{};
+                toRenderTargetBatch.mTransitions     = &toRenderTarget;
+                toRenderTargetBatch.mTransitionCount = 1U;
+                toRenderTargetBatch.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
+                toRenderTargetBatch.mDstQueue        = Rhi::ERhiQueueType::Graphics;
+                ctx.RHIBeginTransition(toRenderTargetBatch);
+
+                Rhi::FRhiRenderPassColorAttachment colorAtt[3]{};
+                colorAtt[0].mView        = mBackBufferRtv.Get();
+                colorAtt[0].mLoadOp      = Rhi::ERhiLoadOp::Load;
+                colorAtt[0].mStoreOp     = Rhi::ERhiStoreOp::Store;
+                u32 colorAttachmentCount = 1U;
+                if (Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan) {
+                    if (!EnsureAuxiliaryRtvs(device, w, h, bbDesc.mFormat)) {
+                        return;
+                    }
+                    colorAtt[1].mView    = mAuxColorRtv1.Get();
+                    colorAtt[1].mLoadOp  = Rhi::ERhiLoadOp::DontCare;
+                    colorAtt[1].mStoreOp = Rhi::ERhiStoreOp::DontCare;
+                    colorAtt[2].mView    = mAuxColorRtv2.Get();
+                    colorAtt[2].mLoadOp  = Rhi::ERhiLoadOp::DontCare;
+                    colorAtt[2].mStoreOp = Rhi::ERhiStoreOp::DontCare;
+                    colorAttachmentCount = 3U;
+                }
                 Rhi::FRhiRenderPassDesc rp{};
                 rp.mDebugName.Assign(TEXT("DebugGui.RenderPass"));
-                rp.mColorAttachmentCount = 1U;
-                rp.mColorAttachments     = &colorAtt;
+                rp.mColorAttachmentCount = colorAttachmentCount;
+                rp.mColorAttachments     = colorAtt;
                 ctx.RHIBeginRenderPass(rp);
 
                 Rhi::FRhiVertexBufferView vb{};
@@ -1414,6 +1446,18 @@ namespace AltinaEngine::DebugGui {
                 }
 
                 ctx.RHIEndRenderPass();
+
+                Rhi::FRhiTransitionInfo toPresent{};
+                toPresent.mResource = backBuffer;
+                toPresent.mBefore   = Rhi::ERhiResourceState::RenderTarget;
+                toPresent.mAfter    = Rhi::ERhiResourceState::Present;
+                Rhi::FRhiTransitionCreateInfo toPresentBatch{};
+                toPresentBatch.mTransitions     = &toPresent;
+                toPresentBatch.mTransitionCount = 1U;
+                toPresentBatch.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
+                toPresentBatch.mDstQueue        = Rhi::ERhiQueueType::Graphics;
+                ctx.RHIBeginTransition(toPresentBatch);
+
                 commandContext->RHIFlushContextDevice({});
             }
 
@@ -1427,6 +1471,8 @@ namespace AltinaEngine::DebugGui {
 
             bool EnsureResources(Rhi::FRhiDevice& device, const FFontAtlas& atlas);
             bool EnsureBackBufferRtv(Rhi::FRhiDevice& device, Rhi::FRhiTexture* backBuffer);
+            bool EnsureAuxiliaryRtvs(
+                Rhi::FRhiDevice& device, u32 width, u32 height, Rhi::ERhiFormat format);
             bool EnsureGeometryBuffers(Rhi::FRhiDevice& device, const FDrawData& drawData);
             void UpdateConstants(u32 w, u32 h);
             bool CompileShaders(Rhi::FRhiDevice& device);
@@ -1444,6 +1490,13 @@ namespace AltinaEngine::DebugGui {
 
             Rhi::FRhiTexture*              mBackBufferTex = nullptr;
             Rhi::FRhiRenderTargetViewRef   mBackBufferRtv;
+            Rhi::FRhiTextureRef            mAuxColorTex1;
+            Rhi::FRhiTextureRef            mAuxColorTex2;
+            Rhi::FRhiRenderTargetViewRef   mAuxColorRtv1;
+            Rhi::FRhiRenderTargetViewRef   mAuxColorRtv2;
+            u32                            mAuxWidth  = 0U;
+            u32                            mAuxHeight = 0U;
+            Rhi::ERhiFormat                mAuxFormat = Rhi::ERhiFormat::Unknown;
 
             Rhi::FRhiBufferRef             mVertexBuffer;
             Rhi::FRhiBufferRef             mIndexBuffer;
@@ -1515,7 +1568,7 @@ namespace AltinaEngine::DebugGui {
                 // t0
                 {
                     Rhi::FRhiBindGroupLayoutEntry e{};
-                    e.mBinding    = 0U;
+                    e.mBinding    = MapSampledTextureBinding(0U);
                     e.mType       = Rhi::ERhiBindingType::SampledTexture;
                     e.mVisibility = Rhi::ERhiShaderStageFlags::Pixel;
                     layout.mEntries.PushBack(e);
@@ -1523,7 +1576,7 @@ namespace AltinaEngine::DebugGui {
                 // s0
                 {
                     Rhi::FRhiBindGroupLayoutEntry e{};
-                    e.mBinding    = 0U;
+                    e.mBinding    = MapSamplerBinding(0U);
                     e.mType       = Rhi::ERhiBindingType::Sampler;
                     e.mVisibility = Rhi::ERhiShaderStageFlags::Pixel;
                     layout.mEntries.PushBack(e);
@@ -1577,14 +1630,14 @@ namespace AltinaEngine::DebugGui {
                 }
                 {
                     Rhi::FRhiBindGroupEntry e{};
-                    e.mBinding = 0U;
+                    e.mBinding = MapSampledTextureBinding(0U);
                     e.mType    = Rhi::ERhiBindingType::SampledTexture;
                     e.mTexture = mFontTexture.Get();
                     bg.mEntries.PushBack(e);
                 }
                 {
                     Rhi::FRhiBindGroupEntry e{};
-                    e.mBinding = 0U;
+                    e.mBinding = MapSamplerBinding(0U);
                     e.mType    = Rhi::ERhiBindingType::Sampler;
                     e.mSampler = mSampler.Get();
                     bg.mEntries.PushBack(e);
@@ -1667,6 +1720,53 @@ namespace AltinaEngine::DebugGui {
             rtv.mFormat    = backBuffer->GetDesc().mFormat;
             mBackBufferRtv = device.CreateRenderTargetView(rtv);
             return static_cast<bool>(mBackBufferRtv);
+        }
+
+        bool FDebugGuiRendererD3D11::EnsureAuxiliaryRtvs(
+            Rhi::FRhiDevice& device, u32 width, u32 height, Rhi::ERhiFormat format) {
+            if (width == 0U || height == 0U || format == Rhi::ERhiFormat::Unknown) {
+                return false;
+            }
+            const bool recreate =
+                (mAuxWidth != width) || (mAuxHeight != height) || (mAuxFormat != format);
+            if (recreate) {
+                mAuxColorRtv1.Reset();
+                mAuxColorRtv2.Reset();
+                mAuxColorTex1.Reset();
+                mAuxColorTex2.Reset();
+                mAuxWidth  = width;
+                mAuxHeight = height;
+                mAuxFormat = format;
+            }
+            if (mAuxColorRtv1 && mAuxColorRtv2) {
+                return true;
+            }
+
+            Rhi::FRhiTextureDesc texDesc{};
+            texDesc.mDebugName.Assign(TEXT("DebugGui.AuxColor"));
+            texDesc.mDimension   = Rhi::ERhiTextureDimension::Tex2D;
+            texDesc.mWidth       = width;
+            texDesc.mHeight      = height;
+            texDesc.mDepth       = 1U;
+            texDesc.mMipLevels   = 1U;
+            texDesc.mArrayLayers = 1U;
+            texDesc.mFormat      = format;
+            texDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::RenderTarget;
+            mAuxColorTex1        = device.CreateTexture(texDesc);
+            mAuxColorTex2        = device.CreateTexture(texDesc);
+            if (!mAuxColorTex1 || !mAuxColorTex2) {
+                return false;
+            }
+
+            Rhi::FRhiRenderTargetViewDesc rtvDesc{};
+            rtvDesc.mDebugName.Assign(TEXT("DebugGui.AuxColor.RTV"));
+            rtvDesc.mFormat = format;
+
+            rtvDesc.mTexture = mAuxColorTex1.Get();
+            mAuxColorRtv1    = device.CreateRenderTargetView(rtvDesc);
+            rtvDesc.mTexture = mAuxColorTex2.Get();
+            mAuxColorRtv2    = device.CreateRenderTargetView(rtvDesc);
+            return static_cast<bool>(mAuxColorRtv1) && static_cast<bool>(mAuxColorRtv2);
         }
 
         bool FDebugGuiRendererD3D11::EnsureGeometryBuffers(
@@ -1769,8 +1869,9 @@ namespace AltinaEngine::DebugGui {
                 return true;
             };
 
-            if (!CompileStage(TEXT("VSMain"), Shader::EShaderStage::Vertex, mVertexShader)
-                || !CompileStage(TEXT("PSMain"), Shader::EShaderStage::Pixel, mPixelShader)) {
+            if (!CompileStage(TEXT("DebugGuiVSMain"), Shader::EShaderStage::Vertex, mVertexShader)
+                || !CompileStage(
+                    TEXT("DebugGuiPSMain"), Shader::EShaderStage::Pixel, mPixelShader)) {
                 return false;
             }
             return true;

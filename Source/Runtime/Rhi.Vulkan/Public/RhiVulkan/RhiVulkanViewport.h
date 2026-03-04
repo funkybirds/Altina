@@ -13,6 +13,7 @@ namespace AltinaEngine::Rhi {
         void               Resize(u32 width, u32 height) override;
         [[nodiscard]] auto GetBackBuffer() const noexcept -> FRhiTexture* override;
         void               Present(const FRhiPresentInfo& info) override;
+        [[nodiscard]] auto IsImageAcquired() const noexcept -> bool;
 
         [[nodiscard]] auto GetNativeSwapchain() const noexcept -> VkSwapchainKHR;
         [[nodiscard]] auto GetAcquireSemaphore() const noexcept -> VkSemaphore;

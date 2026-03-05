@@ -2,7 +2,7 @@ set(TargetName AltinaEngineDemoMinimal)
 
 add_executable(${TargetName})
 
-option(AE_DEMO_ENABLE_SHIPPING "Stage Demo/<Name>/Shipping from Demo/<Name>/Binaries (copies runtime payload recursively; excludes debug artifacts)" OFF)
+set(AE_DEMO_ENABLE_SHIPPING OFF CACHE BOOL "Stage Demo/<Name>/Shipping from Demo/<Name>/Binaries (copies runtime payload recursively; excludes debug artifacts)" FORCE)
 
 set(Target_Private_Sources
     Source/Main.cpp
@@ -59,10 +59,9 @@ file(GLOB_RECURSE EngineShaderSources CONFIGURE_DEPENDS
 set(DemoPreCleanTarget ${TargetName}PreClean)
 add_custom_target(${DemoPreCleanTarget}
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${DemoBinaryDir}"
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${DemoShippingDir}"
     # Ensure the linker has a valid output directory even if other staging steps are up-to-date.
     COMMAND ${CMAKE_COMMAND} -E make_directory "${DemoBinaryDir}"
-    COMMENT "Cleaning Minimal demo output folders (Binaries/Shipping)"
+    COMMENT "Cleaning Minimal demo output folder (Binaries)"
     VERBATIM
 )
 set_property(TARGET ${DemoPreCleanTarget} PROPERTY FOLDER "Demo/Minimal")

@@ -1,6 +1,7 @@
 #include "RenderAsset/MeshAssetConversion.h"
 
 #include "Asset/AssetBinary.h"
+#include "Math/Common.h"
 #include "Math/Vector.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
 #include "Types/Traits.h"
@@ -102,6 +103,15 @@ namespace AltinaEngine::Rendering {
                     return false;
             }
         }
+
+        [[nodiscard]] auto NormalizeSafe3(f32 x, f32 y, f32 z) -> Core::Math::FVector3f {
+            const f32 lenSq = x * x + y * y + z * z;
+            if (lenSq <= 1e-12f) {
+                return Core::Math::FVector3f(0.0f, 0.0f, 1.0f);
+            }
+            const f32 invLen = 1.0f / Core::Math::Sqrt(lenSq);
+            return Core::Math::FVector3f(x * invLen, y * invLen, z * invLen);
+        }
     } // namespace
 
     auto ConvertMeshAssetToStaticMesh(
@@ -175,18 +185,12 @@ namespace AltinaEngine::Rendering {
         positions.Reserve(static_cast<usize>(desc.VertexCount));
 
         // NOTE:
-        // Our base-pass vertex shader currently consumes slot1 as `NORMAL` (float3). The runtime
-        // binding uses `lod.TangentBuffer` for slot1, so the xyz of this buffer must contain the
-        // *vertex normal*, not the tangent. Many imported meshes provide tangents, but if we feed
-        // tangents into the NORMAL semantic the shading will look "blocky"/wrong.
-        //
-        // Until we add a dedicated tangent stream + TBN normal mapping, store normals in the
-        // TangentBuffer's xyz and keep w=1.
-        const bool                                      hasNormals = normalAttr.Valid;
-        Core::Container::TVector<Core::Math::FVector4f> packedNormals;
-        if (hasNormals) {
-            packedNormals.Reserve(static_cast<usize>(desc.VertexCount));
-        }
+        // Base-pass VS consumes slot1 as NORMAL(float3). Keep slot1 stream as tightly packed
+        // float3 normals so Vulkan/D3D11 read identical vertex strides.
+        const bool                                      hasNormals  = normalAttr.Valid;
+        const bool                                      hasTangents = tangentAttr.Valid;
+        Core::Container::TVector<Core::Math::FVector3f> packedNormals;
+        packedNormals.Reserve(static_cast<usize>(desc.VertexCount));
 
         // NOTE:
         // Our base-pass pipeline always expects a TEXCOORD0 stream (input slot 2). If a mesh asset
@@ -216,14 +220,20 @@ namespace AltinaEngine::Rendering {
                 positions.PushBack(Core::Math::FVector3f(values[0], values[1], values[2]));
             }
 
-            if (hasNormals) {
-                f32 values[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-                if (!ReadFloats(vertex + normalAttr.Desc.AlignedOffset, normalAttr.Desc.Format,
-                        values, 3U)) {
-                    return false;
+            {
+                f32 values[4] = { 0.0f, 0.0f, 1.0f, 0.0f };
+                if (hasNormals) {
+                    if (!ReadFloats(vertex + normalAttr.Desc.AlignedOffset, normalAttr.Desc.Format,
+                            values, 3U)) {
+                        return false;
+                    }
+                } else if (hasTangents) {
+                    if (!ReadFloats(vertex + tangentAttr.Desc.AlignedOffset,
+                            tangentAttr.Desc.Format, values, 3U)) {
+                        return false;
+                    }
                 }
-                packedNormals.PushBack(
-                    Core::Math::FVector4f(values[0], values[1], values[2], 1.0f));
+                packedNormals.PushBack(NormalizeSafe3(values[0], values[1], values[2]));
             }
 
             if (hasUv0) {
@@ -250,9 +260,9 @@ namespace AltinaEngine::Rendering {
         RenderCore::Geometry::FStaticMeshLodData lod{};
         lod.ScreenSize = 1.0f;
         lod.SetPositions(positions.Data(), desc.VertexCount);
-        if (!packedNormals.IsEmpty()) {
-            lod.SetTangents(packedNormals.Data(), desc.VertexCount);
-        }
+        lod.TangentBuffer.SetData(packedNormals.Data(),
+            desc.VertexCount * static_cast<u32>(sizeof(Core::Math::FVector3f)),
+            static_cast<u32>(sizeof(Core::Math::FVector3f)));
         // Always provide UV0 (see note above).
         lod.SetUV0(uv0.Data(), desc.VertexCount);
         if (!uv1.IsEmpty()) {

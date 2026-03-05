@@ -366,8 +366,13 @@ namespace AltinaEngine::Rendering {
                 return layout;
             }
             layout.InitFromConstantBuffer(*materialCBuffer);
+            // Prefer PS texture bindings for material layout. VS bindings can alias the same
+            // backend binding index (notably D3D11 register flattening) and cause false
+            // conflicts; only fall back to VS when PS has no texture bindings.
             AddTextureBindings(layout, pixel);
-            AddTextureBindings(layout, vertex);
+            if (layout.TextureBindings.IsEmpty()) {
+                AddTextureBindings(layout, vertex);
+            }
             layout.SortTextureBindings();
             return layout;
         }

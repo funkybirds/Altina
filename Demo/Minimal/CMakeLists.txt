@@ -72,6 +72,43 @@ set_target_properties(${TargetName}
         FOLDER "Demo/Minimal"
 )
 
+# Explicitly stage all engine runtime modules to avoid stale DLLs when some modules are loaded
+# indirectly (and thus not discovered by TARGET_RUNTIME_DLLS dependency scanning).
+set(AE_DEMO_RUNTIME_ENGINE_TARGETS
+    AltinaEngineCore
+    AltinaEngineAsset
+    AltinaEngineApplication
+    AltinaEngineInput
+    AltinaEngineShader
+    AltinaEngineShaderCompiler
+    AltinaEngineRhiGeneral
+    AltinaEngineRhiD3D11
+    AltinaEngineRhiVulkan
+    AltinaEngineRenderCore
+    AltinaEngineRendering
+    AltinaEngineEngine
+    AltinaEngineDebugGui
+    AltinaEngineScripting
+    AltinaEngineScriptingCoreCLR
+    AltinaEngineGameplay
+    AltinaEngineImaging
+    AltinaEngineLaunch
+)
+
+set(DemoRuntimeEngineCopyCommands)
+set(DemoRuntimeEngineDepTargets)
+foreach(EngineRuntimeTarget IN LISTS AE_DEMO_RUNTIME_ENGINE_TARGETS)
+    if(TARGET ${EngineRuntimeTarget})
+        add_dependencies(${TargetName} ${EngineRuntimeTarget})
+        list(APPEND DemoRuntimeEngineDepTargets ${EngineRuntimeTarget})
+        list(APPEND DemoRuntimeEngineCopyCommands
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:${EngineRuntimeTarget}>
+                ${DemoBinaryDir}
+        )
+    endif()
+endforeach()
+
 add_custom_command(
     TARGET ${TargetName}
     POST_BUILD
@@ -110,6 +147,7 @@ if(WIN32)
         TARGET ${TargetName}
         POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}
+        ${DemoRuntimeEngineCopyCommands}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_RUNTIME_DLLS:${TargetName}>
             ${DemoBinaryDir}
@@ -120,11 +158,12 @@ if(WIN32)
     set(DemoStageRuntimeTarget ${TargetName}StageRuntime)
     add_custom_target(${DemoStageRuntimeTarget}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}
+        ${DemoRuntimeEngineCopyCommands}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_RUNTIME_DLLS:${TargetName}>
             ${DemoBinaryDir}
         COMMAND_EXPAND_LISTS
-        DEPENDS ${TargetName}
+        DEPENDS ${TargetName} ${DemoRuntimeEngineDepTargets}
         COMMENT "Restaging Minimal demo runtime DLLs"
         VERBATIM
     )

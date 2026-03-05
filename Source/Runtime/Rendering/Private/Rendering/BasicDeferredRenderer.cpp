@@ -2,6 +2,10 @@
 #include "Rendering/BasicDeferredRenderer.h"
 
 #include "Rendering/DrawListExecutor.h"
+#include "Deferred/DeferredTypes.h"
+#include "Deferred/DeferredScenePasses.h"
+#include "Deferred/DeferredSsaoPass.h"
+#include "Deferred/DeferredCsm.h"
 
 #include "FrameGraph/FrameGraph.h"
 #include "Lighting/LightTypes.h"
@@ -35,6 +39,7 @@
 #include "Utility/Assert.h"
 
 #include <algorithm>
+#include <deque>
 #include <limits>
 
 using AltinaEngine::Move;
@@ -55,70 +60,11 @@ namespace AltinaEngine::Rendering {
         using Container::TVector;
         using RenderCore::EMaterialPass;
 
-        constexpr u32 kMaxPointLights = 16U;
-
         // 0=PBR, 1=Lambert(debug). Written into the DeferredLighting cbuffer.
-        u32           gDeferredLightingDebugShadingMode = 0U;
-
-        // Shared per-frame constants.
-        //
-        // IMPORTANT: BasePass (VSBase) and ShadowDepth (VSShadowDepth) only read ViewProjection,
-        // so it must remain the first member.
-        struct FPerFrameConstants {
-            FMatrix4x4f ViewProjection;
-
-            FMatrix4x4f View;
-            FMatrix4x4f Proj;
-            FMatrix4x4f ViewProj;
-            FMatrix4x4f InvViewProj;
-
-            f32         ViewOriginWS[3] = { 0.0f, 0.0f, 0.0f };
-            u32         PointLightCount = 0U;
-
-            f32         DirLightDirectionWS[3] = { 0.0f, -1.0f, 0.0f };
-            f32         DirLightIntensity      = 0.0f;
-            f32         DirLightColor[3]       = { 1.0f, 1.0f, 1.0f };
-            u32         CSMCascadeCount        = 0U;
-
-            // Keep these as explicit members (not an array). See DeferredLighting.hlsl:
-            // Slang -> DXBC can mishandle row_major on matrix arrays, causing implicit transposes.
-            FMatrix4x4f CSM_LightViewProj0{};
-            FMatrix4x4f CSM_LightViewProj1{};
-            FMatrix4x4f CSM_LightViewProj2{};
-            FMatrix4x4f CSM_LightViewProj3{};
-            f32         CSM_SplitsVS[RenderCore::Shadow::kMaxCascades][4] = {};
-
-            f32         RenderTargetSize[2]    = { 0.0f, 0.0f };
-            f32         InvRenderTargetSize[2] = { 0.0f, 0.0f };
-
-            u32         bReverseZ           = 1U;
-            u32         DebugShadingMode    = 0U; // 0=PBR, 1=Lambert(debug)
-            f32         ShadowBias          = 0.0015f;
-            f32         _pad0               = 0.0f;
-            f32         ShadowMapInvSize[2] = { 0.0f, 0.0f };
-            f32         _pad1[2]            = { 0.0f, 0.0f };
-
-            struct FPointLight {
-                f32 PositionWS[3] = { 0.0f, 0.0f, 0.0f };
-                f32 Range         = 0.0f;
-                f32 Color[3]      = { 1.0f, 1.0f, 1.0f };
-                f32 Intensity     = 0.0f;
-            };
-            FPointLight PointLights[kMaxPointLights]{};
-        };
-
-        struct FPerDrawConstants {
-            FMatrix4x4f World;
-            FMatrix4x4f NormalMatrix;
-        };
-
-        // Matches `cbuffer IblConstants : register(b1)` in DeferredLighting.hlsl.
-        struct FIblConstants {
-            f32 EnvDiffuseIntensity  = 0.0f;
-            f32 EnvSpecularIntensity = 0.0f;
-            f32 SpecularMaxLod       = 0.0f;
-            f32 EnvSaturation        = 1.0f;
-        };
+        u32 gDeferredLightingDebugShadingMode = 0U;
+        using Deferred::FIblConstants;
+        using Deferred::FPerDrawConstants;
+        using Deferred::FPerFrameConstants;
 
         struct FWorldBoundsDebug {
             bool      bValid        = false;
@@ -244,34 +190,6 @@ namespace AltinaEngine::Rendering {
         auto GetSharedResources() -> FDeferredSharedResources& {
             static FDeferredSharedResources resources;
             return resources;
-        }
-
-        constexpr auto     kNameDeferredView  = TEXT("DeferredView");
-        constexpr auto     kNameIblConstants  = TEXT("IblConstants");
-        constexpr auto     kNameGBufferA      = TEXT("GBufferA");
-        constexpr auto     kNameGBufferB      = TEXT("GBufferB");
-        constexpr auto     kNameGBufferC      = TEXT("GBufferC");
-        constexpr auto     kNameSceneDepth    = TEXT("SceneDepth");
-        constexpr auto     kNameShadowMap     = TEXT("ShadowMap");
-        constexpr auto     kNameSkyIrrCube    = TEXT("SkyIrradianceCube");
-        constexpr auto     kNameSkySpecCube   = TEXT("SkySpecularCube");
-        constexpr auto     kNameBrdfLut       = TEXT("BrdfLut");
-        constexpr auto     kNameSsaoTex       = TEXT("SsaoTex");
-        constexpr auto     kNameLinearSampler = TEXT("LinearSampler");
-        constexpr auto     kNameSsaoConstants = TEXT("SsaoConstants");
-        constexpr auto     kNameSkyCube       = TEXT("SkyCube");
-
-        [[nodiscard]] auto RequireBinding(
-            const RenderCore::ShaderBinding::FBindingLookupTable& table, const TChar* name,
-            Rhi::ERhiBindingType type, const TChar* passTag) -> u32 {
-            const u32 nameHash = RenderCore::ShaderBinding::HashBindingName(FStringView(name));
-            u32       binding  = RenderCore::ShaderBinding::kInvalidBinding;
-            DebugAssert(
-                RenderCore::ShaderBinding::FindBindingByNameHash(table, nameHash, type, binding),
-                TEXT("BasicDeferredRenderer"),
-                "{}: failed to resolve binding from lookup table (name={}, hash={}, type={}).",
-                passTag, name, nameHash, static_cast<u32>(type));
-            return binding;
         }
 
         auto BuildLayoutHash(const TVector<Rhi::FRhiBindGroupLayoutEntry>& entries, u32 setIndex)
@@ -1009,6 +927,17 @@ namespace AltinaEngine::Rendering {
                 data->PerDrawBuffer, &constants, sizeof(constants), 0ULL);
             ctx.RHISetBindGroup(data->PerDrawSetIndex, data->PerDrawGroup, nullptr, 0U);
         }
+
+        struct FShadowCascadeExecuteContext {
+            const RenderCore::Render::FDrawList* ShadowDrawList = nullptr;
+            FDrawListBindings                    DrawBindings{};
+            FBasePassPipelineData                ShadowPipelineData{};
+            FBasePassBindingData                 BindingData{};
+            Rhi::FRhiBuffer*                     CascadePerFrameBuffers[4] = {};
+            Rhi::FRhiBindGroup*                  CascadePerFrameGroups[4]  = {};
+            Rhi::FRhiBuffer*                     FallbackPerFrameBuffer    = nullptr;
+            Rhi::FRhiBindGroup*                  FallbackPerFrameGroup     = nullptr;
+        };
     } // namespace
 
     auto FBasicDeferredRenderer::GetDefaultMaterialTemplate()
@@ -1616,268 +1545,99 @@ namespace AltinaEngine::Rendering {
                 }
             });
         // Shadow (Directional CSM).
-        const auto*                      lights         = mViewContext.Lights;
-        const auto*                      shadowDrawList = mViewContext.ShadowDrawList;
+        const auto*               lights         = mViewContext.Lights;
+        const auto*               shadowDrawList = mViewContext.ShadowDrawList;
 
-        RenderCore::Shadow::FCSMSettings csmSettings{};
-        {
-            // Defaults: tuned for demos with large far planes. Keep the CSM range reasonable for
-            // more stable results (less shimmering/aliasing).
-            u32 cascades = RenderCore::Shadow::kMaxCascades;
-            f32 lambda   = 0.65f;
-            f32 maxDist  = 250.0f;
-            u32 mapSize  = 2048U;
-            f32 recvBias = 0.0015f;
-
-            if (lights != nullptr && lights->bHasMainDirectionalLight) {
-                const auto& dl = lights->MainDirectionalLight;
-                cascades       = dl.ShadowCascadeCount;
-                lambda         = dl.ShadowSplitLambda;
-                maxDist        = dl.ShadowMaxDistance;
-                mapSize        = dl.ShadowMapSize;
-                recvBias       = dl.ShadowReceiverBias;
-            }
-
-            cascades = std::max(1U, std::min(cascades, RenderCore::Shadow::kMaxCascades));
-            if (lambda < 0.0f) {
-                lambda = 0.0f;
-            } else if (lambda > 1.0f) {
-                lambda = 1.0f;
-            }
-            if (maxDist < 0.0f) {
-                maxDist = 0.0f;
-            }
-            if (mapSize == 0U) {
-                mapSize = 2048U;
-            }
-            if (recvBias < 0.0f) {
-                recvBias = 0.0f;
-            }
-
-            csmSettings.CascadeCount  = cascades;
-            csmSettings.SplitLambda   = lambda;
-            csmSettings.MaxDistance   = maxDist;
-            csmSettings.ShadowMapSize = mapSize;
-            csmSettings.ReceiverBias  = recvBias;
-        }
-
-        RenderCore::Shadow::FCSMData csmData{};
-        if (lights != nullptr && lights->bHasMainDirectionalLight
-            && lights->MainDirectionalLight.bCastShadows && shadowDrawList != nullptr) {
-            RenderCore::Shadow::BuildDirectionalCSM(
-                *view, lights->MainDirectionalLight, csmSettings, csmData);
-        }
-
-        // Debug: verify that the scene world AABB is actually inside each cascade's light
-        // clip-space. This helps catch "shadow camera doesn't see the scene" issues quickly.
-        {
-            static bool sLoggedCsmCoverageOnce = false;
-            if (!sLoggedCsmCoverageOnce && csmData.CascadeCount > 0U && shadowDrawList != nullptr) {
-                sLoggedCsmCoverageOnce = true;
-
-                const auto bounds = ComputeDrawListWorldBounds(*shadowDrawList);
-                if (bounds.bValid) {
-                    const FVector3f bmin = bounds.MinWS;
-                    const FVector3f bmax = bounds.MaxWS;
-
-                    FVector4f       cornersWS[8] = {
-                        FVector4f(bmin[0], bmin[1], bmin[2], 1.0f),
-                        FVector4f(bmax[0], bmin[1], bmin[2], 1.0f),
-                        FVector4f(bmax[0], bmax[1], bmin[2], 1.0f),
-                        FVector4f(bmin[0], bmax[1], bmin[2], 1.0f),
-                        FVector4f(bmin[0], bmin[1], bmax[2], 1.0f),
-                        FVector4f(bmax[0], bmin[1], bmax[2], 1.0f),
-                        FVector4f(bmax[0], bmax[1], bmax[2], 1.0f),
-                        FVector4f(bmin[0], bmax[1], bmax[2], 1.0f),
-                    };
-
-                    for (u32 cascade = 0U; cascade < csmData.CascadeCount; ++cascade) {
-                        const auto& m = csmData.Cascades[cascade].LightViewProj;
-
-                        f32         minNdcX = std::numeric_limits<f32>::max();
-                        f32         minNdcY = std::numeric_limits<f32>::max();
-                        f32         minNdcZ = std::numeric_limits<f32>::max();
-                        f32         maxNdcX = -std::numeric_limits<f32>::max();
-                        f32         maxNdcY = -std::numeric_limits<f32>::max();
-                        f32         maxNdcZ = -std::numeric_limits<f32>::max();
-
-                        for (u32 i = 0U; i < 8U; ++i) {
-                            const auto clip = Core::Math::MatMul(m, cornersWS[i]);
-                            const f32  invW = (std::abs(clip[3]) > 1e-6f) ? (1.0f / clip[3]) : 1.0f;
-                            const f32  x    = clip[0] * invW;
-                            const f32  y    = clip[1] * invW;
-                            const f32  z    = clip[2] * invW;
-                            minNdcX         = std::min(minNdcX, x);
-                            minNdcY         = std::min(minNdcY, y);
-                            minNdcZ         = std::min(minNdcZ, z);
-                            maxNdcX         = std::max(maxNdcX, x);
-                            maxNdcY         = std::max(maxNdcY, y);
-                            maxNdcZ         = std::max(maxNdcZ, z);
-                        }
-
-                        // D3D NDC: x/y in [-1,1], z in [0,1].
-                        LogInfo(
-                            TEXT(
-                                "CSM Coverage Cascade{}: sceneAabbNdc x=[{}, {}] y=[{}, {}] z=[{}, {}]"),
-                            cascade, minNdcX, maxNdcX, minNdcY, maxNdcY, minNdcZ, maxNdcZ);
-                    }
-                } else {
-                    LogInfo(TEXT("CSM Coverage: scene bounds invalid (shadowDrawList batches={})"),
-                        bounds.BatchCount);
-                }
-            }
-        }
+        Deferred::FCsmBuildInputs csmInputs{};
+        csmInputs.View                        = view;
+        csmInputs.Lights                      = lights;
+        csmInputs.ShadowDrawList              = shadowDrawList;
+        const Deferred::FCsmBuildResult   csm = Deferred::BuildCsm(csmInputs);
 
         RenderCore::FFrameGraphTextureRef shadowMap;
-
-        if (csmData.CascadeCount > 0U) {
-            auto* device = Rhi::RHIGetDevice();
-            Assert(device != nullptr, TEXT("BasicDeferredRenderer"),
-                "Render failed: RHI device is null while preparing CSM shadow map.");
-
-            const u32  shadowSize   = csmSettings.ShadowMapSize;
-            const u32  shadowLayers = csmData.CascadeCount;
-
-            const bool bNeedRecreateShadowMap = (!resources.ShadowMapCSM)
-                || (resources.ShadowMapCSMSize != shadowSize)
-                || (resources.ShadowMapCSMLayers != shadowLayers);
-            if (bNeedRecreateShadowMap) {
-                resources.ShadowMapCSM.Reset();
-
-                Rhi::FRhiTextureDesc shadowDesc{};
-                shadowDesc.mDebugName.Assign(TEXT("ShadowMap.CSM"));
-                shadowDesc.mWidth       = shadowSize;
-                shadowDesc.mHeight      = shadowSize;
-                shadowDesc.mArrayLayers = shadowLayers;
-                shadowDesc.mDimension = (shadowLayers > 1U) ? Rhi::ERhiTextureDimension::Tex2DArray
-                                                            : Rhi::ERhiTextureDimension::Tex2D;
-                shadowDesc.mFormat    = Rhi::ERhiFormat::D32Float;
-                shadowDesc.mBindFlags = Rhi::ERhiTextureBindFlags::DepthStencil
-                    | Rhi::ERhiTextureBindFlags::ShaderResource;
-
-                resources.ShadowMapCSM = device->CreateTexture(shadowDesc);
-                Assert(static_cast<bool>(resources.ShadowMapCSM), TEXT("BasicDeferredRenderer"),
-                    "Render failed: CreateTexture(ShadowMap.CSM) returned null (size={}, layers={}).",
-                    shadowSize, shadowLayers);
-
-                resources.ShadowMapCSMSize   = shadowSize;
-                resources.ShadowMapCSMLayers = shadowLayers;
+        {
+            // FrameGraph executes after this function scope; keep one stable context per Render()
+            // call in the current frame to avoid dangling/overwritten user-data pointers.
+            static thread_local std::deque<FShadowCascadeExecuteContext> sShadowContexts;
+            sShadowContexts.emplace_back();
+            auto& executeCtx                              = sShadowContexts.back();
+            executeCtx.ShadowDrawList                     = shadowDrawList;
+            executeCtx.DrawBindings                       = drawBindings;
+            executeCtx.ShadowPipelineData                 = pipelineData;
+            executeCtx.ShadowPipelineData.DefaultPassDesc = &resources.DefaultShadowPassDesc;
+            executeCtx.BindingData                        = bindingData;
+            executeCtx.FallbackPerFrameBuffer             = mPerFrameBuffer.Get();
+            executeCtx.FallbackPerFrameGroup              = mPerFrameGroup.Get();
+            for (u32 i = 0U; i < 4U; ++i) {
+                executeCtx.CascadePerFrameBuffers[i] = mShadowPerFrameBuffers[i].Get();
+                executeCtx.CascadePerFrameGroups[i]  = mShadowPerFrameGroups[i].Get();
             }
 
-            shadowMap =
-                graph.ImportTexture(resources.ShadowMapCSM.Get(), Rhi::ERhiResourceState::Common);
-            Assert(shadowMap.IsValid(), TEXT("BasicDeferredRenderer"),
-                "Render failed: ImportTexture(ShadowMap.CSM) returned invalid ref.");
-
-            RenderCore::FFrameGraphPassDesc shadowPassDesc{};
-            shadowPassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
-            shadowPassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
-
-            FBasePassPipelineData shadowPipelineData = pipelineData;
-            shadowPipelineData.DefaultPassDesc       = &resources.DefaultShadowPassDesc;
-
-            for (u32 cascade = 0U; cascade < csmData.CascadeCount; ++cascade) {
-                struct FShadowPassData {
-                    RenderCore::FFrameGraphTextureRef Shadow;
-                    RenderCore::FFrameGraphDSVRef     ShadowDSV;
-                };
-
-                switch (cascade) {
-                    case 0U:
-                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade0";
-                        break;
-                    case 1U:
-                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade1";
-                        break;
-                    case 2U:
-                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade2";
-                        break;
-                    case 3U:
-                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade3";
-                        break;
-                    default:
-                        shadowPassDesc.mName = "BasicDeferred.ShadowCSM.Cascade";
-                        break;
+            Deferred::FCsmShadowPassInputs shadowInputs{};
+            shadowInputs.Graph                     = &graph;
+            shadowInputs.View                      = view;
+            shadowInputs.ShadowDrawList            = shadowDrawList;
+            shadowInputs.Csm                       = &csm;
+            shadowInputs.PersistentShadowMap       = &resources.ShadowMapCSM;
+            shadowInputs.PersistentShadowMapSize   = &resources.ShadowMapCSMSize;
+            shadowInputs.PersistentShadowMapLayers = &resources.ShadowMapCSMLayers;
+            shadowInputs.ExecuteCascadeFn          = [](Rhi::FRhiCmdContext& ctx, u32 cascadeIndex,
+                                                const FMatrix4x4f& lightViewProj, u32 shadowMapSize,
+                                                void* userData) -> void {
+                auto* executeData = static_cast<FShadowCascadeExecuteContext*>(userData);
+                if (executeData == nullptr) {
+                    return;
                 }
 
-                graph.AddPass<FShadowPassData>(
-                    shadowPassDesc,
-                    [&](RenderCore::FFrameGraphPassBuilder& builder, FShadowPassData& data) {
-                        data.Shadow = builder.Write(shadowMap, Rhi::ERhiResourceState::DepthWrite);
+                Rhi::FRhiBuffer*    perFrameBuffer = (cascadeIndex < 4U)
+                                ? executeData->CascadePerFrameBuffers[cascadeIndex]
+                                : executeData->FallbackPerFrameBuffer;
+                Rhi::FRhiBindGroup* perFrameGroup  = (cascadeIndex < 4U)
+                              ? executeData->CascadePerFrameGroups[cascadeIndex]
+                              : executeData->FallbackPerFrameGroup;
+                if (reinterpret_cast<usize>(perFrameBuffer) == static_cast<usize>(~0ULL)
+                    || reinterpret_cast<usize>(perFrameGroup) == static_cast<usize>(~0ULL)) {
+                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                                 "Shadow cascade execute has poisoned pointers (cascade={}, perFrameBuffer={}, perFrameGroup={}).",
+                                 cascadeIndex, reinterpret_cast<usize>(perFrameBuffer),
+                                 reinterpret_cast<usize>(perFrameGroup));
+                    return;
+                }
 
-                        if (shadowDrawList != nullptr) {
-                            for (const auto& batch : shadowDrawList->Batches) {
-                                registerMaterialTextureReads(builder, batch.Material, batch.Pass);
-                            }
-                        }
+                if (perFrameBuffer != nullptr) {
+                    FPerFrameConstants constants{};
+                    constants.ViewProjection = lightViewProj;
+                    ctx.RHIUpdateDynamicBufferDiscard(
+                        perFrameBuffer, &constants, sizeof(constants), 0ULL);
+                }
 
-                        Rhi::FRhiTextureViewRange range{};
-                        range.mBaseMip         = 0U;
-                        range.mMipCount        = 1U;
-                        range.mBaseArrayLayer  = cascade;
-                        range.mLayerCount      = 1U;
-                        range.mBaseDepthSlice  = 0U;
-                        range.mDepthSliceCount = 1U;
+                Rhi::FRhiViewportRect viewport{};
+                viewport.mX        = 0.0f;
+                viewport.mY        = 0.0f;
+                viewport.mWidth    = static_cast<f32>(shadowMapSize);
+                viewport.mHeight   = static_cast<f32>(shadowMapSize);
+                viewport.mMinDepth = 0.0f;
+                viewport.mMaxDepth = 1.0f;
+                ctx.RHISetViewport(viewport);
 
-                        Rhi::FRhiDepthStencilViewDesc dsvDesc{};
-                        dsvDesc.mDebugName.Assign(TEXT("ShadowMap.CSM.DSV"));
-                        dsvDesc.mFormat = Rhi::ERhiFormat::D32Float;
-                        dsvDesc.mRange  = range;
-                        data.ShadowDSV  = builder.CreateDSV(data.Shadow, dsvDesc);
+                Rhi::FRhiScissorRect scissor{};
+                scissor.mX      = 0;
+                scissor.mY      = 0;
+                scissor.mWidth  = shadowMapSize;
+                scissor.mHeight = shadowMapSize;
+                ctx.RHISetScissor(scissor);
 
-                        RenderCore::FRdgDepthStencilBinding ds{};
-                        ds.mDSV          = data.ShadowDSV;
-                        ds.mDepthLoadOp  = Rhi::ERhiLoadOp::Clear;
-                        ds.mDepthStoreOp = Rhi::ERhiStoreOp::Store;
-                        ds.mClearDepthStencil.mDepth =
-                            (view != nullptr && view->bReverseZ) ? 0.0f : 1.0f;
-                        builder.SetRenderTargets(nullptr, 0U, &ds);
-                    },
-                    [shadowDrawList, drawBindings, shadowPipelineData, bindingData, shadowSize,
-                        perFrameBuffer = (cascade < kShadowCascades)
-                            ? mShadowPerFrameBuffers[cascade].Get()
-                            : mPerFrameBuffer.Get(),
-                        perFrameGroup  = (cascade < kShadowCascades)
-                             ? mShadowPerFrameGroups[cascade].Get()
-                             : mPerFrameGroup.Get(),
-                        lightViewProj  = csmData.Cascades[cascade].LightViewProj](
-                        Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources&,
-                        const FShadowPassData&) -> void {
-                        if (perFrameBuffer) {
-                            FPerFrameConstants constants{};
-                            constants.ViewProjection = lightViewProj;
-                            ctx.RHIUpdateDynamicBufferDiscard(
-                                perFrameBuffer, &constants, sizeof(constants), 0ULL);
-                        }
+                if (executeData->ShadowDrawList != nullptr) {
+                    auto bindings     = executeData->DrawBindings;
+                    bindings.PerFrame = perFrameGroup;
+                    FDrawListExecutor::ExecuteBasePass(ctx, *executeData->ShadowDrawList, bindings,
+                                 ResolveShadowPassPipeline, &executeData->ShadowPipelineData, BindPerDraw,
+                                 &executeData->BindingData);
+                }
+            };
+            shadowInputs.ExecuteCascadeUserData = &executeCtx;
 
-                        Rhi::FRhiViewportRect viewport{};
-                        viewport.mX        = 0.0f;
-                        viewport.mY        = 0.0f;
-                        viewport.mWidth    = static_cast<f32>(shadowSize);
-                        viewport.mHeight   = static_cast<f32>(shadowSize);
-                        viewport.mMinDepth = 0.0f;
-                        viewport.mMaxDepth = 1.0f;
-                        ctx.RHISetViewport(viewport);
-
-                        Rhi::FRhiScissorRect scissor{};
-                        scissor.mX      = 0;
-                        scissor.mY      = 0;
-                        scissor.mWidth  = shadowSize;
-                        scissor.mHeight = shadowSize;
-                        ctx.RHISetScissor(scissor);
-
-                        if (shadowDrawList != nullptr) {
-                            // Use the cascade-specific per-frame group so each pass reads the
-                            // correct ViewProjection even on deferred contexts.
-                            auto bindings     = drawBindings;
-                            bindings.PerFrame = perFrameGroup;
-                            FDrawListExecutor::ExecuteBasePass(ctx, *shadowDrawList, bindings,
-                                ResolveShadowPassPipeline,
-                                const_cast<FBasePassPipelineData*>(&shadowPipelineData),
-                                BindPerDraw, const_cast<FBasePassBindingData*>(&bindingData));
-                        }
-                    });
-            }
+            Deferred::AddCsmShadowPasses(shadowInputs, shadowMap);
         }
 
         // Fill shared per-frame constants once (used by SSAO and deferred lighting).
@@ -1924,8 +1684,9 @@ namespace AltinaEngine::Rendering {
             // Point lights.
             perFrameConstants.PointLightCount = 0U;
             if (lights != nullptr && !lights->PointLights.IsEmpty()) {
-                const u32 count   = static_cast<u32>(lights->PointLights.Size());
-                const u32 clamped = (count > kMaxPointLights) ? kMaxPointLights : count;
+                const u32 count = static_cast<u32>(lights->PointLights.Size());
+                const u32 clamped =
+                    (count > Deferred::kMaxPointLights) ? Deferred::kMaxPointLights : count;
                 perFrameConstants.PointLightCount = clamped;
                 for (u32 i = 0U; i < clamped; ++i) {
                     const auto& src                                = lights->PointLights[i];
@@ -1940,648 +1701,108 @@ namespace AltinaEngine::Rendering {
                 }
             }
 
-            // CSM.
-            perFrameConstants.CSMCascadeCount = csmData.CascadeCount;
-            perFrameConstants.ShadowBias      = csmSettings.ReceiverBias;
-            if (csmSettings.ShadowMapSize > 0U) {
-                const f32 inv = 1.0f / static_cast<f32>(csmSettings.ShadowMapSize);
-                perFrameConstants.ShadowMapInvSize[0] = inv;
-                perFrameConstants.ShadowMapInvSize[1] = inv;
-            }
-
-            for (u32 i = 0U; i < RenderCore::Shadow::kMaxCascades; ++i) {
-                perFrameConstants.CSM_SplitsVS[i][0] = 0.0f;
-                perFrameConstants.CSM_SplitsVS[i][1] = 0.0f;
-                perFrameConstants.CSM_SplitsVS[i][2] = 0.0f;
-                perFrameConstants.CSM_SplitsVS[i][3] = 0.0f;
-            }
-
-            if (csmData.CascadeCount > 0U) {
-                for (u32 i = 0U; i < csmData.CascadeCount && i < RenderCore::Shadow::kMaxCascades;
-                    ++i) {
-                    perFrameConstants.CSM_SplitsVS[i][0] = csmData.Cascades[i].SplitVS[0];
-                    perFrameConstants.CSM_SplitsVS[i][1] = csmData.Cascades[i].SplitVS[1];
-                }
-
-                // Copy up to 4 cascades into explicit matrices.
-                perFrameConstants.CSM_LightViewProj0 = csmData.Cascades[0].LightViewProj;
-                if (csmData.CascadeCount > 1U) {
-                    perFrameConstants.CSM_LightViewProj1 = csmData.Cascades[1].LightViewProj;
-                }
-                if (csmData.CascadeCount > 2U) {
-                    perFrameConstants.CSM_LightViewProj2 = csmData.Cascades[2].LightViewProj;
-                }
-                if (csmData.CascadeCount > 3U) {
-                    perFrameConstants.CSM_LightViewProj3 = csmData.Cascades[3].LightViewProj;
-                }
-            }
+            Deferred::FillPerFrameCsmConstants(csm, perFrameConstants);
         }
 
         RenderCore::FFrameGraphTextureRef ssaoTexture;
 
-        // SSAO pass: produces an AO factor texture from GBuffer normal + depth (Reverse-Z aware).
-        if (gbufferB.IsValid() && sceneDepth.IsValid()) {
-            struct FSsaoPassData {
-                RenderCore::FFrameGraphTextureRef Output;
-                RenderCore::FFrameGraphRTVRef     OutputRTV;
-                RenderCore::FFrameGraphTextureRef GBufferB;
-                RenderCore::FFrameGraphTextureRef Depth;
-            };
+        {
+            auto& shared = GetSharedResources();
+            auto* device = Rhi::RHIGetDevice();
+            if (device != nullptr && EnsureSsaoPipeline(*device, shared) && shared.SsaoLayout
+                && shared.SsaoPipeline && shared.OutputSampler) {
+                Deferred::FDeferredSsaoPassInputs ssaoInputs{};
+                ssaoInputs.Graph                  = &graph;
+                ssaoInputs.ViewRect               = &viewRect;
+                ssaoInputs.PerFrameConstants      = &perFrameConstants;
+                ssaoInputs.Pipeline               = shared.SsaoPipeline.Get();
+                ssaoInputs.Layout                 = shared.SsaoLayout.Get();
+                ssaoInputs.Sampler                = shared.OutputSampler.Get();
+                ssaoInputs.Bindings               = &shared.SsaoBindings;
+                ssaoInputs.PerFrameBuffer         = mPerFrameBuffer.Get();
+                ssaoInputs.SsaoConstantsBuffer    = mSsaoConstantsBuffer.Get();
+                ssaoInputs.GBufferB               = gbufferB;
+                ssaoInputs.SceneDepth             = sceneDepth;
+                ssaoInputs.Width                  = width;
+                ssaoInputs.Height                 = height;
+                ssaoInputs.RuntimeSettings.Enable = (rSsaoEnable.GetRenderValue() != 0) ? 1U : 0U;
+                ssaoInputs.RuntimeSettings.SampleCount =
+                    static_cast<u32>(std::max(0, rSsaoSampleCount.GetRenderValue()));
+                ssaoInputs.RuntimeSettings.RadiusVS  = rSsaoRadiusVS.GetRenderValue();
+                ssaoInputs.RuntimeSettings.BiasNdc   = rSsaoBiasNdc.GetRenderValue();
+                ssaoInputs.RuntimeSettings.Power     = rSsaoPower.GetRenderValue();
+                ssaoInputs.RuntimeSettings.Intensity = rSsaoIntensity.GetRenderValue();
 
-            RenderCore::FFrameGraphPassDesc ssaoPassDesc{};
-            ssaoPassDesc.mName  = "BasicDeferred.SSAO";
-            ssaoPassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
-            ssaoPassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
-
-            graph.AddPass<FSsaoPassData>(
-                ssaoPassDesc,
-                [&](RenderCore::FFrameGraphPassBuilder& builder, FSsaoPassData& data) -> void {
-                    data.GBufferB = builder.Read(gbufferB, Rhi::ERhiResourceState::ShaderResource);
-                    data.Depth = builder.Read(sceneDepth, Rhi::ERhiResourceState::ShaderResource);
-
-                    RenderCore::FFrameGraphTextureDesc aoDesc{};
-                    aoDesc.mDesc.mDebugName.Assign(TEXT("SSAO"));
-                    aoDesc.mDesc.mWidth  = width;
-                    aoDesc.mDesc.mHeight = height;
-                    // R8Unorm is not available in current ERhiFormat list; use a single-channel
-                    // float RT.
-                    aoDesc.mDesc.mFormat    = Rhi::ERhiFormat::R32Float;
-                    aoDesc.mDesc.mBindFlags = Rhi::ERhiTextureBindFlags::RenderTarget
-                        | Rhi::ERhiTextureBindFlags::ShaderResource;
-
-                    data.Output = builder.CreateTexture(aoDesc);
-                    data.Output = builder.Write(data.Output, Rhi::ERhiResourceState::RenderTarget);
-
-                    Rhi::FRhiRenderTargetViewDesc rtvDesc{};
-                    rtvDesc.mDebugName.Assign(TEXT("SSAO.RTV"));
-                    rtvDesc.mFormat = Rhi::ERhiFormat::R32Float;
-                    data.OutputRTV  = builder.CreateRTV(data.Output, rtvDesc);
-
-                    RenderCore::FRdgRenderTargetBinding rt{};
-                    rt.mRTV        = data.OutputRTV;
-                    rt.mLoadOp     = Rhi::ERhiLoadOp::Clear;
-                    rt.mStoreOp    = Rhi::ERhiStoreOp::Store;
-                    rt.mClearColor = Rhi::FRhiClearColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-                    builder.SetRenderTargets(&rt, 1U, nullptr);
-
-                    ssaoTexture = data.Output;
-                },
-                [viewRect, sharedConstants = perFrameConstants,
-                    perFrameBuffer = mPerFrameBuffer.Get(),
-                    ssaoBuffer     = mSsaoConstantsBuffer.Get()](Rhi::FRhiCmdContext& ctx,
-                    const RenderCore::FFrameGraphPassResources&                   res,
-                    const FSsaoPassData&                                          data) -> void {
-                    auto& shared = GetSharedResources();
-                    if (!shared.SsaoPipeline || !shared.SsaoLayout || !shared.OutputSampler) {
-                        return;
-                    }
-
-                    auto* normalTex = res.GetTexture(data.GBufferB);
-                    auto* depthTex  = res.GetTexture(data.Depth);
-                    auto* outTex    = res.GetTexture(data.Output);
-                    if (!normalTex || !depthTex || !outTex) {
-                        return;
-                    }
-
-                    auto* device = Rhi::RHIGetDevice();
-                    if (!device) {
-                        return;
-                    }
-
-                    if (perFrameBuffer == nullptr || ssaoBuffer == nullptr) {
-                        return;
-                    }
-
-                    // Update per-frame constants (b0) so SSAO can reconstruct positions (Reverse-Z
-                    // aware).
-                    ctx.RHIUpdateDynamicBufferDiscard(
-                        perFrameBuffer, &sharedConstants, sizeof(sharedConstants), 0ULL);
-
-                    struct FSsaoConstants {
-                        u32 Enable      = 1U;
-                        u32 SampleCount = 12U;
-                        f32 RadiusVS    = 0.55f;
-                        f32 BiasNdc     = 0.0005f;
-                        f32 Power       = 1.6f;
-                        f32 Intensity   = 1.0f;
-                        f32 _pad0       = 0.0f;
-                        f32 _pad1       = 0.0f;
-                    };
-
-                    FSsaoConstants ssao{};
-                    ssao.Enable = (rSsaoEnable.GetRenderValue() != 0) ? 1U : 0U;
-                    ssao.SampleCount =
-                        static_cast<u32>(std::max(0, rSsaoSampleCount.GetRenderValue()));
-                    ssao.RadiusVS  = rSsaoRadiusVS.GetRenderValue();
-                    ssao.BiasNdc   = rSsaoBiasNdc.GetRenderValue();
-                    ssao.Power     = rSsaoPower.GetRenderValue();
-                    ssao.Intensity = rSsaoIntensity.GetRenderValue();
-
-                    ctx.RHIUpdateDynamicBufferDiscard(ssaoBuffer, &ssao, sizeof(ssao), 0ULL);
-
-                    const u32 ssaoPerFrameBinding  = RequireBinding(shared.SsaoBindings,
-                         kNameDeferredView, Rhi::ERhiBindingType::ConstantBuffer, TEXT("SSAO"));
-                    const u32 ssaoConstantsBinding = RequireBinding(shared.SsaoBindings,
-                        kNameSsaoConstants, Rhi::ERhiBindingType::ConstantBuffer, TEXT("SSAO"));
-                    const u32 ssaoNormalBinding = RequireBinding(shared.SsaoBindings, kNameGBufferB,
-                        Rhi::ERhiBindingType::SampledTexture, TEXT("SSAO"));
-                    const u32 ssaoDepthBinding  = RequireBinding(shared.SsaoBindings,
-                         kNameSceneDepth, Rhi::ERhiBindingType::SampledTexture, TEXT("SSAO"));
-                    const u32 ssaoSamplerBinding = RequireBinding(shared.SsaoBindings,
-                        kNameLinearSampler, Rhi::ERhiBindingType::Sampler, TEXT("SSAO"));
-
-                    RenderCore::ShaderBinding::FBindGroupBuilder builder(shared.SsaoLayout.Get());
-                    DebugAssert(builder.AddBuffer(ssaoPerFrameBinding, perFrameBuffer, 0ULL,
-                                    static_cast<u64>(sizeof(FPerFrameConstants))),
-                        TEXT("BasicDeferredRenderer"),
-                        "SSAO bind group: failed to add per-frame cbuffer (binding={}).",
-                        ssaoPerFrameBinding);
-                    DebugAssert(builder.AddBuffer(ssaoConstantsBinding, ssaoBuffer, 0ULL,
-                                    static_cast<u64>(sizeof(FSsaoConstants))),
-                        TEXT("BasicDeferredRenderer"),
-                        "SSAO bind group: failed to add constants cbuffer (binding={}).",
-                        ssaoConstantsBinding);
-                    DebugAssert(builder.AddTexture(ssaoNormalBinding, normalTex),
-                        TEXT("BasicDeferredRenderer"),
-                        "SSAO bind group: failed to add normal texture (binding={}).",
-                        ssaoNormalBinding);
-                    DebugAssert(builder.AddTexture(ssaoDepthBinding, depthTex),
-                        TEXT("BasicDeferredRenderer"),
-                        "SSAO bind group: failed to add depth texture (binding={}).",
-                        ssaoDepthBinding);
-                    DebugAssert(builder.AddSampler(ssaoSamplerBinding, shared.OutputSampler.Get()),
-                        TEXT("BasicDeferredRenderer"),
-                        "SSAO bind group: failed to add sampler (binding={}).", ssaoSamplerBinding);
-
-                    Rhi::FRhiBindGroupDesc groupDesc{};
-                    DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
-                        "SSAO bind group: builder/layout mismatch.");
-                    auto bindGroup = device->CreateBindGroup(groupDesc);
-                    Assert(!(!bindGroup), TEXT("BasicDeferredRenderer"),
-                        "Failed to create bind group");
-
-                    ctx.RHISetGraphicsPipeline(shared.SsaoPipeline.Get());
-
-                    Rhi::FRhiViewportRect viewport{};
-                    viewport.mX        = static_cast<f32>(viewRect.X);
-                    viewport.mY        = static_cast<f32>(viewRect.Y);
-                    viewport.mWidth    = static_cast<f32>(viewRect.Width);
-                    viewport.mHeight   = static_cast<f32>(viewRect.Height);
-                    viewport.mMinDepth = 0.0f;
-                    viewport.mMaxDepth = 1.0f;
-                    ctx.RHISetViewport(viewport);
-
-                    Rhi::FRhiScissorRect scissor{};
-                    scissor.mX      = viewRect.X;
-                    scissor.mY      = viewRect.Y;
-                    scissor.mWidth  = viewRect.Width;
-                    scissor.mHeight = viewRect.Height;
-                    ctx.RHISetScissor(scissor);
-
-                    ctx.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
-                    ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
-                    ctx.RHIDraw(3U, 1U, 0U, 0U);
-                });
+                Deferred::AddDeferredSsaoPass(ssaoInputs, ssaoTexture);
+            }
         }
 
         auto outputTexture = graph.ImportTexture(outputTarget, Rhi::ERhiResourceState::Present);
         RenderCore::FFrameGraphTextureRef sceneColorHDR;
 
-        struct FLightingPassData {
-            RenderCore::FFrameGraphTextureRef Output;
-            RenderCore::FFrameGraphRTVRef     OutputRTV;
-            RenderCore::FFrameGraphTextureRef GBufferA;
-            RenderCore::FFrameGraphTextureRef GBufferB;
-            RenderCore::FFrameGraphTextureRef GBufferC;
-            RenderCore::FFrameGraphTextureRef Depth;
-            RenderCore::FFrameGraphTextureRef Shadow;
-            RenderCore::FFrameGraphTextureRef Ssao;
-        };
+        auto*                             device = Rhi::RHIGetDevice();
+        if (device != nullptr) {
+            auto& shared = GetSharedResources();
+            EnsureLayouts(*device, shared);
 
-        RenderCore::FFrameGraphPassDesc lightingPassDesc{};
-        lightingPassDesc.mName  = "BasicDeferred.DeferredLighting";
-        lightingPassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
-        lightingPassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
+            if (EnsureLightingPipeline(*device, shared) && shared.LightingLayout
+                && shared.LightingPipeline && shared.OutputSampler) {
+                Deferred::FDeferredLightingPassInputs lightingInputs{};
+                lightingInputs.Graph                      = &graph;
+                lightingInputs.ViewRect                   = &viewRect;
+                lightingInputs.PerFrameConstants          = &perFrameConstants;
+                lightingInputs.Pipeline                   = shared.LightingPipeline.Get();
+                lightingInputs.Layout                     = shared.LightingLayout.Get();
+                lightingInputs.Sampler                    = shared.OutputSampler.Get();
+                lightingInputs.Bindings                   = &shared.LightingBindings;
+                lightingInputs.PerFrameBuffer             = mPerFrameBuffer.Get();
+                lightingInputs.IblConstantsBuffer         = mIblConstantsBuffer.Get();
+                lightingInputs.GBufferA                   = gbufferA;
+                lightingInputs.GBufferB                   = gbufferB;
+                lightingInputs.GBufferC                   = gbufferC;
+                lightingInputs.SceneDepth                 = sceneDepth;
+                lightingInputs.SsaoTexture                = ssaoTexture;
+                lightingInputs.ShadowMap                  = shadowMap;
+                lightingInputs.Width                      = width;
+                lightingInputs.Height                     = height;
+                lightingInputs.SkyIrradiance              = mViewContext.SkyIrradianceCube;
+                lightingInputs.SkySpecular                = mViewContext.SkySpecularCube;
+                lightingInputs.BrdfLut                    = mViewContext.BrdfLutTexture;
+                lightingInputs.IblBlackCube               = shared.IblBlackCube.Get();
+                lightingInputs.IblBlack2D                 = shared.IblBlack2D.Get();
+                lightingInputs.RuntimeSettings.bEnableIbl = (rIblEnable.GetRenderValue() != 0)
+                    && mViewContext.bHasSkyIbl && (mViewContext.SkyIrradianceCube != nullptr)
+                    && (mViewContext.SkySpecularCube != nullptr)
+                    && (mViewContext.BrdfLutTexture != nullptr);
+                lightingInputs.RuntimeSettings.IblDiffuseIntensity =
+                    rIblDiffuseIntensity.GetRenderValue();
+                lightingInputs.RuntimeSettings.IblSpecularIntensity =
+                    rIblSpecularIntensity.GetRenderValue();
+                lightingInputs.RuntimeSettings.IblSaturation  = rIblSaturation.GetRenderValue();
+                lightingInputs.RuntimeSettings.SpecularMaxLod = mViewContext.SkySpecularMaxLod;
 
-        graph.AddPass<FLightingPassData>(
-            lightingPassDesc,
-            [&](RenderCore::FFrameGraphPassBuilder& builder, FLightingPassData& data) {
-                if (gbufferA.IsValid()) {
-                    builder.Read(gbufferA, Rhi::ERhiResourceState::ShaderResource);
-                }
-                if (gbufferB.IsValid()) {
-                    builder.Read(gbufferB, Rhi::ERhiResourceState::ShaderResource);
-                }
-                if (gbufferC.IsValid()) {
-                    builder.Read(gbufferC, Rhi::ERhiResourceState::ShaderResource);
-                }
-                if (sceneDepth.IsValid()) {
-                    builder.Read(sceneDepth, Rhi::ERhiResourceState::ShaderResource);
-                }
+                Deferred::AddDeferredLightingPass(lightingInputs, sceneColorHDR);
+            } else {
+                DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                    "DeferredLighting skipped: shared pipeline/layout/sampler missing.");
+            }
 
-                if (ssaoTexture.IsValid()) {
-                    builder.Read(ssaoTexture, Rhi::ERhiResourceState::ShaderResource);
-                }
-
-                if (shadowMap.IsValid()) {
-                    builder.Read(shadowMap, Rhi::ERhiResourceState::ShaderResource);
-                    data.Shadow = shadowMap;
-                } else {
-                    // Dummy resource (not sampled when CSMCascadeCount == 0).
-                    RenderCore::FFrameGraphTextureDesc shadowDesc{};
-                    shadowDesc.mDesc.mDebugName.Assign(TEXT("ShadowMap.Dummy"));
-                    shadowDesc.mDesc.mWidth       = 1U;
-                    shadowDesc.mDesc.mHeight      = 1U;
-                    shadowDesc.mDesc.mArrayLayers = 1U;
-                    shadowDesc.mDesc.mFormat      = Rhi::ERhiFormat::D32Float;
-                    shadowDesc.mDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::DepthStencil
-                        | Rhi::ERhiTextureBindFlags::ShaderResource;
-                    shadowMap = builder.CreateTexture(shadowDesc);
-                    builder.Read(shadowMap, Rhi::ERhiResourceState::ShaderResource);
-                    data.Shadow = shadowMap;
-                }
-
-                if (mViewContext.SkyIrradianceCube != nullptr) {
-                    registerExternalTextureRead(builder, mViewContext.SkyIrradianceCube,
-                        Rhi::ERhiResourceState::ShaderResource);
-                }
-                if (mViewContext.SkySpecularCube != nullptr) {
-                    registerExternalTextureRead(builder, mViewContext.SkySpecularCube,
-                        Rhi::ERhiResourceState::ShaderResource);
-                }
-                if (mViewContext.BrdfLutTexture != nullptr) {
-                    registerExternalTextureRead(builder, mViewContext.BrdfLutTexture,
-                        Rhi::ERhiResourceState::ShaderResource);
-                }
-                if (resources.IblBlackCube) {
-                    registerExternalTextureRead(builder, resources.IblBlackCube.Get(),
-                        Rhi::ERhiResourceState::ShaderResource);
-                }
-                if (resources.IblBlack2D) {
-                    registerExternalTextureRead(builder, resources.IblBlack2D.Get(),
-                        Rhi::ERhiResourceState::ShaderResource);
-                }
-
-                data.GBufferA = gbufferA;
-                data.GBufferB = gbufferB;
-                data.GBufferC = gbufferC;
-                data.Depth    = sceneDepth;
-                data.Ssao     = ssaoTexture;
-
-                // Lighting output goes to an internal HDR texture; post-process will write
-                // backbuffer.
-                RenderCore::FFrameGraphTextureDesc hdrDesc{};
-                hdrDesc.mDesc.mDebugName.Assign(TEXT("SceneColorHDR"));
-                hdrDesc.mDesc.mWidth       = width;
-                hdrDesc.mDesc.mHeight      = height;
-                hdrDesc.mDesc.mArrayLayers = 1U;
-                hdrDesc.mDesc.mFormat      = Rhi::ERhiFormat::R16G16B16A16Float;
-                hdrDesc.mDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::RenderTarget
-                    | Rhi::ERhiTextureBindFlags::ShaderResource;
-                sceneColorHDR = builder.CreateTexture(hdrDesc);
-
-                data.Output = builder.Write(sceneColorHDR, Rhi::ERhiResourceState::RenderTarget);
-
-                Rhi::FRhiTextureViewRange viewRange{};
-                viewRange.mMipCount        = 1U;
-                viewRange.mLayerCount      = 1U;
-                viewRange.mDepthSliceCount = 1U;
-
-                Rhi::FRhiRenderTargetViewDesc rtvDesc{};
-                rtvDesc.mDebugName.Assign(TEXT("SceneColorHDR.RTV"));
-                rtvDesc.mFormat = hdrDesc.mDesc.mFormat;
-                rtvDesc.mRange  = viewRange;
-                data.OutputRTV  = builder.CreateRTV(data.Output, rtvDesc);
-
-                RenderCore::FRdgRenderTargetBinding rtvBinding{};
-                rtvBinding.mRTV        = data.OutputRTV;
-                rtvBinding.mLoadOp     = Rhi::ERhiLoadOp::Clear;
-                rtvBinding.mStoreOp    = Rhi::ERhiStoreOp::Store;
-                rtvBinding.mClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-                builder.SetRenderTargets(&rtvBinding, 1U, nullptr);
-            },
-            [viewRect, sharedConstants = perFrameConstants, perFrameBuffer = mPerFrameBuffer.Get(),
-                iblBuffer = mIblConstantsBuffer.Get(), bHasSkyIbl = mViewContext.bHasSkyIbl,
-                skyIrradiance = mViewContext.SkyIrradianceCube,
-                skySpecular = mViewContext.SkySpecularCube, brdfLut = mViewContext.BrdfLutTexture,
-                specularMaxLod = mViewContext.SkySpecularMaxLod](Rhi::FRhiCmdContext& ctx,
-                const RenderCore::FFrameGraphPassResources&                           res,
-                const FLightingPassData& data) -> void {
-                auto& shared = GetSharedResources();
-                if (!shared.LightingPipeline || !shared.LightingLayout || !shared.OutputSampler) {
-                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                        "DeferredLighting skipped: shared pipeline/layout/sampler missing (pipeline={}, layout={}, sampler={}).",
-                        static_cast<u32>(static_cast<bool>(shared.LightingPipeline)),
-                        static_cast<u32>(static_cast<bool>(shared.LightingLayout)),
-                        static_cast<u32>(static_cast<bool>(shared.OutputSampler)));
-                    return;
-                }
-
-                auto* texA      = res.GetTexture(data.GBufferA);
-                auto* texB      = res.GetTexture(data.GBufferB);
-                auto* texC      = res.GetTexture(data.GBufferC);
-                auto* depthTex  = res.GetTexture(data.Depth);
-                auto* shadowTex = res.GetTexture(data.Shadow);
-                auto* ssaoTex   = res.GetTexture(data.Ssao);
-                if (!texA || !texB || !texC || !depthTex || !shadowTex || !ssaoTex) {
-                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                        "DeferredLighting skipped: missing input textures (A={}, B={}, C={}, Depth={}, Shadow={}, Ssao={}).",
-                        static_cast<u32>(texA != nullptr), static_cast<u32>(texB != nullptr),
-                        static_cast<u32>(texC != nullptr), static_cast<u32>(depthTex != nullptr),
-                        static_cast<u32>(shadowTex != nullptr),
-                        static_cast<u32>(ssaoTex != nullptr));
-                    return;
-                }
-
-                auto* device = Rhi::RHIGetDevice();
-                if (!device) {
-                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                        "DeferredLighting skipped: RHI device is null.");
-                    return;
-                }
-
-                if (perFrameBuffer == nullptr) {
-                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                        "DeferredLighting skipped: per-frame constant buffer is null.");
-                    return;
-                }
-
-                // Fill per-frame constants (b0).
-                ctx.RHIUpdateDynamicBufferDiscard(
-                    perFrameBuffer, &sharedConstants, sizeof(sharedConstants), 0ULL);
-
-                // Fill IBL constants (b1). If IBL is not available, keep intensities at zero.
-                FIblConstants iblConstants{};
-                const bool    bEnableIbl = (rIblEnable.GetRenderValue() != 0) && bHasSkyIbl
-                    && (skyIrradiance != nullptr) && (skySpecular != nullptr)
-                    && (brdfLut != nullptr);
-                if (bEnableIbl) {
-                    iblConstants.EnvDiffuseIntensity  = rIblDiffuseIntensity.GetRenderValue();
-                    iblConstants.EnvSpecularIntensity = rIblSpecularIntensity.GetRenderValue();
-                    iblConstants.SpecularMaxLod       = specularMaxLod;
-                    iblConstants.EnvSaturation        = rIblSaturation.GetRenderValue();
-                }
-                if (iblBuffer != nullptr) {
-                    ctx.RHIUpdateDynamicBufferDiscard(
-                        iblBuffer, &iblConstants, sizeof(iblConstants), 0ULL);
-                }
-
-                auto*     irrTex  = bEnableIbl ? skyIrradiance : shared.IblBlackCube.Get();
-                auto*     specTex = bEnableIbl ? skySpecular : shared.IblBlackCube.Get();
-                auto*     lutTex  = bEnableIbl ? brdfLut : shared.IblBlack2D.Get();
-                const u32 lightingPerFrameBinding = RequireBinding(shared.LightingBindings,
-                    kNameDeferredView, Rhi::ERhiBindingType::ConstantBuffer, TEXT("Lighting"));
-                const u32 lightingIblBinding      = RequireBinding(shared.LightingBindings,
-                         kNameIblConstants, Rhi::ERhiBindingType::ConstantBuffer, TEXT("Lighting"));
-                const u32 lightingGBufferABinding = RequireBinding(shared.LightingBindings,
-                    kNameGBufferA, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
-                const u32 lightingGBufferBBinding = RequireBinding(shared.LightingBindings,
-                    kNameGBufferB, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
-                const u32 lightingGBufferCBinding = RequireBinding(shared.LightingBindings,
-                    kNameGBufferC, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
-                const u32 lightingDepthBinding    = RequireBinding(shared.LightingBindings,
-                       kNameSceneDepth, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
-                const u32 lightingShadowBinding   = RequireBinding(shared.LightingBindings,
-                      kNameShadowMap, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
-                const u32 lightingIrrBinding      = RequireBinding(shared.LightingBindings,
-                         kNameSkyIrrCube, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
-                const u32 lightingSpecBinding     = RequireBinding(shared.LightingBindings,
-                        kNameSkySpecCube, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
-                const u32 lightingBrdfBinding     = RequireBinding(shared.LightingBindings,
-                        kNameBrdfLut, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
-                const u32 lightingSsaoBinding     = RequireBinding(shared.LightingBindings,
-                        kNameSsaoTex, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
-                const u32 lightingSamplerBinding  = RequireBinding(shared.LightingBindings,
-                     kNameLinearSampler, Rhi::ERhiBindingType::Sampler, TEXT("Lighting"));
-
-                RenderCore::ShaderBinding::FBindGroupBuilder builder(shared.LightingLayout.Get());
-                DebugAssert(builder.AddBuffer(lightingPerFrameBinding, perFrameBuffer, 0ULL,
-                                static_cast<u64>(sizeof(FPerFrameConstants))),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add per-frame cbuffer (binding={}).",
-                    lightingPerFrameBinding);
-                DebugAssert(builder.AddBuffer(lightingIblBinding,
-                                (iblBuffer != nullptr) ? iblBuffer : perFrameBuffer, 0ULL,
-                                static_cast<u64>(sizeof(FIblConstants))),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add IBL cbuffer (binding={}).",
-                    lightingIblBinding);
-                DebugAssert(builder.AddTexture(lightingGBufferABinding, texA),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add GBufferA (binding={}).",
-                    lightingGBufferABinding);
-                DebugAssert(builder.AddTexture(lightingGBufferBBinding, texB),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add GBufferB (binding={}).",
-                    lightingGBufferBBinding);
-                DebugAssert(builder.AddTexture(lightingGBufferCBinding, texC),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add GBufferC (binding={}).",
-                    lightingGBufferCBinding);
-                DebugAssert(builder.AddTexture(lightingDepthBinding, depthTex),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add SceneDepth (binding={}).",
-                    lightingDepthBinding);
-                DebugAssert(builder.AddTexture(lightingShadowBinding, shadowTex),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add ShadowMap (binding={}).",
-                    lightingShadowBinding);
-                DebugAssert(builder.AddTexture(lightingIrrBinding, irrTex),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add SkyIrradianceCube (binding={}).",
-                    lightingIrrBinding);
-                DebugAssert(builder.AddTexture(lightingSpecBinding, specTex),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add SkySpecularCube (binding={}).",
-                    lightingSpecBinding);
-                DebugAssert(builder.AddTexture(lightingBrdfBinding, lutTex),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add BrdfLut (binding={}).",
-                    lightingBrdfBinding);
-                DebugAssert(builder.AddTexture(lightingSsaoBinding, ssaoTex),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add SsaoTex (binding={}).",
-                    lightingSsaoBinding);
-                DebugAssert(builder.AddSampler(lightingSamplerBinding, shared.OutputSampler.Get()),
-                    TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: failed to add sampler (binding={}).",
-                    lightingSamplerBinding);
-
-                Rhi::FRhiBindGroupDesc groupDesc{};
-                DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
-                    "Lighting bind group: builder/layout mismatch.");
-
-                auto bindGroup = device->CreateBindGroup(groupDesc);
-                Assert(!(!bindGroup), TEXT("BasicDeferredRenderer"), "Failed to create bind group");
-
-                ctx.RHISetGraphicsPipeline(shared.LightingPipeline.Get());
-
-                Rhi::FRhiViewportRect viewport{};
-                viewport.mX        = static_cast<f32>(viewRect.X);
-                viewport.mY        = static_cast<f32>(viewRect.Y);
-                viewport.mWidth    = static_cast<f32>(viewRect.Width);
-                viewport.mHeight   = static_cast<f32>(viewRect.Height);
-                viewport.mMinDepth = 0.0f;
-                viewport.mMaxDepth = 1.0f;
-                ctx.RHISetViewport(viewport);
-
-                Rhi::FRhiScissorRect scissor{};
-                scissor.mX      = viewRect.X;
-                scissor.mY      = viewRect.Y;
-                scissor.mWidth  = viewRect.Width;
-                scissor.mHeight = viewRect.Height;
-                ctx.RHISetScissor(scissor);
-
-                ctx.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
-                ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
-                ctx.RHIDraw(3U, 1U, 0U, 0U);
-            });
-
-        // Optional skybox pass: draw cube map into SceneColorHDR as background.
-        if (mViewContext.bHasSkyCube && (mViewContext.SkyCubeTexture != nullptr)
-            && sceneColorHDR.IsValid() && sceneDepth.IsValid()) {
-            auto* device = Rhi::RHIGetDevice();
-            if (device != nullptr) {
-                auto& shared = GetSharedResources();
-                EnsureLayouts(*device, shared);
-                if (EnsureSkyBoxPipeline(*device, shared) && shared.SkyBoxLayout
-                    && shared.SkyBoxPipeline) {
-                    struct FSkyBoxPassData {
-                        RenderCore::FFrameGraphTextureRef Depth;
-                        RenderCore::FFrameGraphTextureRef Output;
-                        RenderCore::FFrameGraphRTVRef     OutputRTV;
-                    };
-
-                    RenderCore::FFrameGraphPassDesc passDesc{};
-                    passDesc.mName  = "BasicDeferred.SkyBox";
-                    passDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
-                    passDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
-
-                    Rhi::FRhiTexture* skyCube = mViewContext.SkyCubeTexture;
-                    graph.AddPass<FSkyBoxPassData>(
-                        passDesc,
-                        [&](RenderCore::FFrameGraphPassBuilder& builder, FSkyBoxPassData& data) {
-                            builder.Read(sceneDepth, Rhi::ERhiResourceState::ShaderResource);
-                            data.Depth = sceneDepth;
-                            registerExternalTextureRead(
-                                builder, skyCube, Rhi::ERhiResourceState::ShaderResource);
-
-                            data.Output =
-                                builder.Write(sceneColorHDR, Rhi::ERhiResourceState::RenderTarget);
-
-                            Rhi::FRhiTextureViewRange viewRange{};
-                            viewRange.mMipCount        = 1U;
-                            viewRange.mLayerCount      = 1U;
-                            viewRange.mDepthSliceCount = 1U;
-
-                            Rhi::FRhiRenderTargetViewDesc rtvDesc{};
-                            rtvDesc.mDebugName.Assign(TEXT("SceneColorHDR.SkyBox.RTV"));
-                            rtvDesc.mFormat = Rhi::ERhiFormat::R16G16B16A16Float;
-                            rtvDesc.mRange  = viewRange;
-                            data.OutputRTV  = builder.CreateRTV(data.Output, rtvDesc);
-
-                            RenderCore::FRdgRenderTargetBinding rtvBinding{};
-                            rtvBinding.mRTV     = data.OutputRTV;
-                            rtvBinding.mLoadOp  = Rhi::ERhiLoadOp::Load;
-                            rtvBinding.mStoreOp = Rhi::ERhiStoreOp::Store;
-                            builder.SetRenderTargets(&rtvBinding, 1U, nullptr);
-                        },
-                        [viewRect, perFrameBuffer = mPerFrameBuffer.Get(), skyCube](
-                            Rhi::FRhiCmdContext&                        ctx,
-                            const RenderCore::FFrameGraphPassResources& res,
-                            const FSkyBoxPassData&                      data) -> void {
-                            auto& shared = GetSharedResources();
-                            if (!shared.SkyBoxPipeline || !shared.SkyBoxLayout
-                                || !shared.OutputSampler || perFrameBuffer == nullptr
-                                || skyCube == nullptr) {
-                                DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                                    "SkyBox skipped: shared/resource missing (pipeline={}, layout={}, sampler={}, perFrameBuffer={}, skyCube={}).",
-                                    static_cast<u32>(static_cast<bool>(shared.SkyBoxPipeline)),
-                                    static_cast<u32>(static_cast<bool>(shared.SkyBoxLayout)),
-                                    static_cast<u32>(static_cast<bool>(shared.OutputSampler)),
-                                    static_cast<u32>(perFrameBuffer != nullptr),
-                                    static_cast<u32>(skyCube != nullptr));
-                                return;
-                            }
-
-                            auto* depthTex = res.GetTexture(data.Depth);
-                            if (depthTex == nullptr) {
-                                DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                                    "SkyBox skipped: depth texture is null (depthRef={}).",
-                                    data.Depth.mId);
-                                return;
-                            }
-
-                            auto* device = Rhi::RHIGetDevice();
-                            DebugAssert(
-                                device != nullptr, TEXT("BasicDeferredRenderer"), "Device lost");
-                            const u32 skyPerFrameBinding =
-                                RequireBinding(shared.SkyBoxBindings, kNameDeferredView,
-                                    Rhi::ERhiBindingType::ConstantBuffer, TEXT("SkyBox"));
-                            const u32 skyDepthBinding =
-                                RequireBinding(shared.SkyBoxBindings, kNameSceneDepth,
-                                    Rhi::ERhiBindingType::SampledTexture, TEXT("SkyBox"));
-                            const u32 skyCubeBinding    = RequireBinding(shared.SkyBoxBindings,
-                                   kNameSkyCube, Rhi::ERhiBindingType::SampledTexture, TEXT("SkyBox"));
-                            const u32 skySamplerBinding = RequireBinding(shared.SkyBoxBindings,
-                                kNameLinearSampler, Rhi::ERhiBindingType::Sampler, TEXT("SkyBox"));
-
-                            RenderCore::ShaderBinding::FBindGroupBuilder builder(
-                                shared.SkyBoxLayout.Get());
-                            DebugAssert(builder.AddBuffer(skyPerFrameBinding, perFrameBuffer, 0ULL,
-                                            static_cast<u64>(sizeof(FPerFrameConstants))),
-                                TEXT("BasicDeferredRenderer"),
-                                "SkyBox bind group: failed to add per-frame cbuffer (binding={}).",
-                                skyPerFrameBinding);
-                            DebugAssert(builder.AddTexture(skyDepthBinding, depthTex),
-                                TEXT("BasicDeferredRenderer"),
-                                "SkyBox bind group: failed to add depth texture (binding={}).",
-                                skyDepthBinding);
-                            DebugAssert(builder.AddTexture(skyCubeBinding, skyCube),
-                                TEXT("BasicDeferredRenderer"),
-                                "SkyBox bind group: failed to add sky cube (binding={}).",
-                                skyCubeBinding);
-                            DebugAssert(
-                                builder.AddSampler(skySamplerBinding, shared.OutputSampler.Get()),
-                                TEXT("BasicDeferredRenderer"),
-                                "SkyBox bind group: failed to add sampler (binding={}).",
-                                skySamplerBinding);
-
-                            Rhi::FRhiBindGroupDesc groupDesc{};
-                            DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
-                                "SkyBox bind group: builder/layout mismatch.");
-
-                            auto bindGroup = device->CreateBindGroup(groupDesc);
-                            if (!bindGroup) {
-                                DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                                    "SkyBox skipped: CreateBindGroup failed.");
-                                return;
-                            }
-
-                            ctx.RHISetGraphicsPipeline(shared.SkyBoxPipeline.Get());
-
-                            Rhi::FRhiViewportRect viewport{};
-                            viewport.mX        = static_cast<f32>(viewRect.X);
-                            viewport.mY        = static_cast<f32>(viewRect.Y);
-                            viewport.mWidth    = static_cast<f32>(viewRect.Width);
-                            viewport.mHeight   = static_cast<f32>(viewRect.Height);
-                            viewport.mMinDepth = 0.0f;
-                            viewport.mMaxDepth = 1.0f;
-                            ctx.RHISetViewport(viewport);
-
-                            Rhi::FRhiScissorRect scissor{};
-                            scissor.mX      = viewRect.X;
-                            scissor.mY      = viewRect.Y;
-                            scissor.mWidth  = viewRect.Width;
-                            scissor.mHeight = viewRect.Height;
-                            ctx.RHISetScissor(scissor);
-
-                            ctx.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
-                            ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
-                            ctx.RHIDraw(3U, 1U, 0U, 0U);
-                        });
-                }
+            if (mViewContext.bHasSkyCube && (mViewContext.SkyCubeTexture != nullptr)
+                && sceneColorHDR.IsValid() && sceneDepth.IsValid() && shared.SkyBoxLayout
+                && EnsureSkyBoxPipeline(*device, shared) && shared.SkyBoxPipeline
+                && shared.OutputSampler) {
+                Deferred::FDeferredSkyBoxPassInputs skyboxInputs{};
+                skyboxInputs.Graph          = &graph;
+                skyboxInputs.ViewRect       = &viewRect;
+                skyboxInputs.Pipeline       = shared.SkyBoxPipeline.Get();
+                skyboxInputs.Layout         = shared.SkyBoxLayout.Get();
+                skyboxInputs.Sampler        = shared.OutputSampler.Get();
+                skyboxInputs.Bindings       = &shared.SkyBoxBindings;
+                skyboxInputs.PerFrameBuffer = mPerFrameBuffer.Get();
+                skyboxInputs.SkyCube        = mViewContext.SkyCubeTexture;
+                skyboxInputs.SceneDepth     = sceneDepth;
+                skyboxInputs.SceneColorHDR  = sceneColorHDR;
+                Deferred::AddDeferredSkyBoxPass(skyboxInputs);
             }
         }
 

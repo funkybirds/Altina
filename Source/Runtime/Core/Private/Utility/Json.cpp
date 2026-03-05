@@ -489,6 +489,15 @@ namespace AltinaEngine::Core::Utility::Json {
         return true;
     }
 
+    auto GetNumberAsU32(const FJsonValue* value, u32& out) -> bool {
+        double number = 0.0;
+        if (!GetNumberValue(value, number) || number < 0.0) {
+            return false;
+        }
+        out = static_cast<u32>(number);
+        return true;
+    }
+
     auto GetBoolValue(const FJsonValue* value, bool& out) -> bool {
         if (value == nullptr || value->Type != EJsonType::Bool) {
             return false;

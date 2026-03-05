@@ -67,6 +67,7 @@ namespace AltinaEngine::Core::Utility::Json {
         -> const FJsonValue*;
     AE_CORE_API auto GetStringValue(const FJsonValue* value, FNativeString& out) -> bool;
     AE_CORE_API auto GetNumberValue(const FJsonValue* value, double& out) -> bool;
+    AE_CORE_API auto GetNumberAsU32(const FJsonValue* value, u32& out) -> bool;
     AE_CORE_API auto GetBoolValue(const FJsonValue* value, bool& out) -> bool;
 
 } // namespace AltinaEngine::Core::Utility::Json

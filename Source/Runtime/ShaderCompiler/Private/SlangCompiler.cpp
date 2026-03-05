@@ -7,6 +7,7 @@
 #include "Platform/PlatformFileSystem.h"
 #include "Platform/PlatformProcess.h"
 #include "Logging/Log.h"
+#include "Utility/Json.h"
 
 #include <cctype>
 #include <cstdlib>
@@ -51,337 +52,20 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         constexpr const TChar* kSlangDisabledMessage =
             TEXT("Slang backend disabled. Define AE_SHADER_COMPILER_ENABLE_SLANG=1 to enable.");
 
-        enum class EJsonType : u8 {
-            Null = 0,
-            Bool,
-            Number,
-            String,
-            Object,
-            Array
-        };
-
-        struct FJsonValue;
-
-        struct FJsonPair {
-            FNativeString mKey;
-            FJsonValue*   mValue = nullptr;
-        };
-
-        struct FJsonValue {
-            EJsonType            mType   = EJsonType::Null;
-            bool                 mBool   = false;
-            double               mNumber = 0.0;
-            FNativeString        mString;
-            TVector<FJsonValue*> mArray;
-            TVector<FJsonPair>   mObject;
-        };
-
-        class FJsonReader {
-        public:
-            explicit FJsonReader(const FNativeString& text)
-                : mPtr(text.GetData()), mEnd(text.GetData() + text.Length()) {}
-
-            ~FJsonReader() {
-                for (auto* value : mOwnedValues) {
-                    delete value;
-                }
-            }
-
-            auto Parse(FJsonValue& outValue) -> bool {
-                SkipWhitespace();
-                if (!ParseValue(outValue)) {
-                    return false;
-                }
-                SkipWhitespace();
-                return true;
-            }
-
-            auto GetError() const -> const char* { return mError; }
-
-        private:
-            void SkipWhitespace() {
-                while (mPtr < mEnd && std::isspace(static_cast<unsigned char>(*mPtr))) {
-                    ++mPtr;
-                }
-            }
-
-            auto ParseValue(FJsonValue& outValue) -> bool {
-                SkipWhitespace();
-                if (mPtr >= mEnd) {
-                    mError = "Unexpected end of JSON.";
-                    return false;
-                }
-
-                const char ch = *mPtr;
-                if (ch == '"') {
-                    outValue.mType = EJsonType::String;
-                    return ParseString(outValue.mString);
-                }
-                if (ch == '{') {
-                    outValue.mType = EJsonType::Object;
-                    return ParseObject(outValue);
-                }
-                if (ch == '[') {
-                    outValue.mType = EJsonType::Array;
-                    return ParseArray(outValue);
-                }
-                if (ch == 't' || ch == 'f') {
-                    outValue.mType = EJsonType::Bool;
-                    return ParseBool(outValue.mBool);
-                }
-                if (ch == 'n') {
-                    outValue.mType = EJsonType::Null;
-                    return ParseNull();
-                }
-                if (ch == '-' || std::isdigit(static_cast<unsigned char>(ch))) {
-                    outValue.mType = EJsonType::Number;
-                    return ParseNumber(outValue.mNumber);
-                }
-
-                mError = "Invalid JSON token.";
-                return false;
-            }
-
-            auto ParseString(FNativeString& out) -> bool {
-                if (*mPtr != '"') {
-                    mError = "Expected string.";
-                    return false;
-                }
-                ++mPtr;
-                out.Clear();
-
-                while (mPtr < mEnd) {
-                    char ch = *mPtr++;
-                    if (ch == '"') {
-                        return true;
-                    }
-                    if (ch == '\\') {
-                        if (mPtr >= mEnd) {
-                            mError = "Invalid escape.";
-                            return false;
-                        }
-                        const char esc = *mPtr++;
-                        switch (esc) {
-                            case '"':
-                                out.Append("\"", 1);
-                                break;
-                            case '\\':
-                                out.Append("\\", 1);
-                                break;
-                            case '/':
-                                out.Append("/", 1);
-                                break;
-                            case 'b':
-                                out.Append("\b", 1);
-                                break;
-                            case 'f':
-                                out.Append("\f", 1);
-                                break;
-                            case 'n':
-                                out.Append("\n", 1);
-                                break;
-                            case 'r':
-                                out.Append("\r", 1);
-                                break;
-                            case 't':
-                                out.Append("\t", 1);
-                                break;
-                            case 'u':
-                                // Skip unicode escape for now; emit placeholder.
-                                if (mEnd - mPtr >= 4) {
-                                    mPtr += 4;
-                                } else {
-                                    mPtr = mEnd;
-                                }
-                                out.Append("?", 1);
-                                break;
-                            default:
-                                out.Append(&esc, 1);
-                                break;
-                        }
-                    } else {
-                        out.Append(&ch, 1);
-                    }
-                }
-
-                mError = "Unterminated string.";
-                return false;
-            }
-
-            auto ParseObject(FJsonValue& out) -> bool {
-                if (*mPtr != '{') {
-                    mError = "Expected object.";
-                    return false;
-                }
-                ++mPtr;
-                SkipWhitespace();
-
-                if (mPtr < mEnd && *mPtr == '}') {
-                    ++mPtr;
-                    return true;
-                }
-
-                while (mPtr < mEnd) {
-                    FNativeString key;
-                    if (!ParseString(key)) {
-                        return false;
-                    }
-                    SkipWhitespace();
-                    if (mPtr >= mEnd || *mPtr != ':') {
-                        mError = "Expected ':' in object.";
-                        return false;
-                    }
-                    ++mPtr;
-                    SkipWhitespace();
-                    auto* value = new FJsonValue();
-                    mOwnedValues.PushBack(value);
-                    if (!ParseValue(*value)) {
-                        return false;
-                    }
-                    FJsonPair pair;
-                    pair.mKey   = key;
-                    pair.mValue = value;
-                    out.mObject.PushBack(pair);
-                    SkipWhitespace();
-
-                    if (mPtr < mEnd && *mPtr == ',') {
-                        ++mPtr;
-                        SkipWhitespace();
-                        continue;
-                    }
-                    if (mPtr < mEnd && *mPtr == '}') {
-                        ++mPtr;
-                        return true;
-                    }
-                    mError = "Expected ',' or '}' in object.";
-                    return false;
-                }
-
-                mError = "Unterminated object.";
-                return false;
-            }
-
-            auto ParseArray(FJsonValue& out) -> bool {
-                if (*mPtr != '[') {
-                    mError = "Expected array.";
-                    return false;
-                }
-                ++mPtr;
-                SkipWhitespace();
-
-                if (mPtr < mEnd && *mPtr == ']') {
-                    ++mPtr;
-                    return true;
-                }
-
-                while (mPtr < mEnd) {
-                    auto* value = new FJsonValue();
-                    mOwnedValues.PushBack(value);
-                    if (!ParseValue(*value)) {
-                        return false;
-                    }
-                    out.mArray.PushBack(value);
-                    SkipWhitespace();
-
-                    if (mPtr < mEnd && *mPtr == ',') {
-                        ++mPtr;
-                        SkipWhitespace();
-                        continue;
-                    }
-                    if (mPtr < mEnd && *mPtr == ']') {
-                        ++mPtr;
-                        return true;
-                    }
-                    mError = "Expected ',' or ']' in array.";
-                    return false;
-                }
-
-                mError = "Unterminated array.";
-                return false;
-            }
-
-            auto ParseBool(bool& out) -> bool {
-                if ((mEnd - mPtr) >= 4 && std::strncmp(mPtr, "true", 4) == 0) {
-                    out = true;
-                    mPtr += 4;
-                    return true;
-                }
-                if ((mEnd - mPtr) >= 5 && std::strncmp(mPtr, "false", 5) == 0) {
-                    out = false;
-                    mPtr += 5;
-                    return true;
-                }
-                mError = "Invalid boolean.";
-                return false;
-            }
-
-            auto ParseNull() -> bool {
-                if ((mEnd - mPtr) >= 4 && std::strncmp(mPtr, "null", 4) == 0) {
-                    mPtr += 4;
-                    return true;
-                }
-                mError = "Invalid null.";
-                return false;
-            }
-
-            auto ParseNumber(double& out) -> bool {
-                char* endPtr = nullptr;
-                out          = std::strtod(mPtr, &endPtr);
-                if (endPtr == mPtr) {
-                    mError = "Invalid number.";
-                    return false;
-                }
-                mPtr = endPtr;
-                return true;
-            }
-
-        private:
-            const char*          mPtr   = nullptr;
-            const char*          mEnd   = nullptr;
-            const char*          mError = nullptr;
-            TVector<FJsonValue*> mOwnedValues;
-        };
-
-        auto FindObjectValue(const FJsonValue& object, const char* key) -> const FJsonValue* {
-            for (const auto& pair : object.mObject) {
-                if (pair.mKey.Length() == std::strlen(key)
-                    && std::strncmp(pair.mKey.GetData(), key, pair.mKey.Length()) == 0) {
-                    return pair.mValue;
-                }
-            }
-            return nullptr;
-        }
-
-        auto GetStringValue(const FJsonValue* value, FNativeString& out) -> bool {
-            if (value == nullptr || value->mType != EJsonType::String) {
-                return false;
-            }
-            out = value->mString;
-            return true;
-        }
-
-        auto GetNumberValue(const FJsonValue* value, double& out) -> bool {
-            if (value == nullptr || value->mType != EJsonType::Number) {
-                return false;
-            }
-            out = value->mNumber;
-            return true;
-        }
-
-        auto GetNumberAsU32(const FJsonValue* value, u32& out) -> bool {
-            double number = 0.0;
-            if (!GetNumberValue(value, number) || number < 0.0) {
-                return false;
-            }
-            out = static_cast<u32>(number);
-            return true;
-        }
+        namespace Json = Core::Utility::Json;
+        using Json::EJsonType;
+        using Json::FindObjectValue;
+        using Json::FJsonDocument;
+        using Json::FJsonValue;
+        using Json::GetNumberAsU32;
+        using Json::GetNumberValue;
+        using Json::GetStringValue;
 
         auto GetLayoutOffsetBytes(const FJsonValue* value, u32& out) -> bool {
             if (GetNumberAsU32(value, out)) {
                 return true;
             }
-            if (value == nullptr || value->mType != EJsonType::Object) {
+            if (value == nullptr || value->Type != EJsonType::Object) {
                 return false;
             }
             if (GetNumberAsU32(FindObjectValue(*value, "uniform"), out)) {
@@ -400,7 +84,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         auto GetLayoutSizeBytes(const FJsonValue* layout, u32& out) -> bool {
-            if (layout == nullptr || layout->mType != EJsonType::Object) {
+            if (layout == nullptr || layout->Type != EJsonType::Object) {
                 return false;
             }
             if (GetNumberAsU32(FindObjectValue(*layout, "size"), out)) {
@@ -410,7 +94,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 return true;
             }
             const auto* sizeObj = FindObjectValue(*layout, "size");
-            if (sizeObj != nullptr && sizeObj->mType == EJsonType::Object) {
+            if (sizeObj != nullptr && sizeObj->Type == EJsonType::Object) {
                 if (GetNumberAsU32(FindObjectValue(*sizeObj, "uniform"), out)) {
                     return true;
                 }
@@ -425,7 +109,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         auto GetBindingSizeBytes(const FJsonValue* binding, u32& out) -> bool {
-            if (binding == nullptr || binding->mType != EJsonType::Object) {
+            if (binding == nullptr || binding->Type != EJsonType::Object) {
                 return false;
             }
             if (GetNumberAsU32(FindObjectValue(*binding, "size"), out)) {
@@ -446,12 +130,12 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto ParseSlangFieldsArray(const FJsonValue* fields, const FString& prefix, u32 baseOffset,
             FShaderConstantBuffer& outCb) -> void {
-            if (fields == nullptr || fields->mType != EJsonType::Array) {
+            if (fields == nullptr || fields->Type != EJsonType::Array) {
                 return;
             }
 
-            for (const auto* field : fields->mArray) {
-                if (field == nullptr || field->mType != EJsonType::Object) {
+            for (const auto* field : fields->Array) {
+                if (field == nullptr || field->Type != EJsonType::Object) {
                     continue;
                 }
 
@@ -480,14 +164,14 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
                 const auto*   fieldType = FindObjectValue(*field, "type");
                 FNativeString kind;
-                if (fieldType != nullptr && fieldType->mType == EJsonType::Object) {
+                if (fieldType != nullptr && fieldType->Type == EJsonType::Object) {
                     GetStringValue(FindObjectValue(*fieldType, "kind"), kind);
                 }
 
                 u32 elementCount = 0U;
                 GetNumberAsU32(FindObjectValue(*field, "elementCount"), elementCount);
                 if (elementCount == 0U && fieldType != nullptr
-                    && fieldType->mType == EJsonType::Object) {
+                    && fieldType->Type == EJsonType::Object) {
                     GetNumberAsU32(FindObjectValue(*fieldType, "elementCount"), elementCount);
                 }
 
@@ -525,7 +209,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto ParseSlangTypeFieldsFromTypeObject(const FJsonValue* typeObj, const FString& prefix,
             u32 baseOffset, FShaderConstantBuffer& outCb) -> void {
-            if (typeObj == nullptr || typeObj->mType != EJsonType::Object) {
+            if (typeObj == nullptr || typeObj->Type != EJsonType::Object) {
                 return;
             }
             const auto* fields = FindObjectValue(*typeObj, "fields");
@@ -534,7 +218,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto ParseSlangTypeLayoutFields(const FJsonValue* layout, const FString& prefix,
             u32 baseOffset, FShaderConstantBuffer& outCb) -> void {
-            if (layout == nullptr || layout->mType != EJsonType::Object) {
+            if (layout == nullptr || layout->Type != EJsonType::Object) {
                 return;
             }
             const auto* fields = FindObjectValue(*layout, "fields");
@@ -656,7 +340,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
         }
 
         auto GetVertexValueTypeFromTypeObject(const FJsonValue* typeObj) -> EShaderVertexValueType {
-            if (typeObj == nullptr || typeObj->mType != EJsonType::Object) {
+            if (typeObj == nullptr || typeObj->Type != EJsonType::Object) {
                 return EShaderVertexValueType::Unknown;
             }
 
@@ -668,7 +352,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     || kindView == FNativeStringView("matrix")
                     || kindView == FNativeStringView("array")) {
                     const auto* elementType = FindObjectValue(*typeObj, "elementType");
-                    if (elementType != nullptr && elementType->mType == EJsonType::Object) {
+                    if (elementType != nullptr && elementType->Type == EJsonType::Object) {
                         scalarSource = elementType;
                     }
                 }
@@ -745,7 +429,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto AddVertexInputFromJsonParam(
             const FJsonValue& paramObj, TVector<FShaderVertexInput>& outInputs) -> void {
-            if (paramObj.mType != EJsonType::Object) {
+            if (paramObj.Type != EJsonType::Object) {
                 return;
             }
 
@@ -781,10 +465,15 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto ParseSlangReflectionJson(const FNativeString& text, FShaderReflection& outReflection,
             FString& diagnostics) -> bool {
-            FJsonValue  root;
-            FJsonReader reader(text);
-            if (!reader.Parse(root) || root.mType != EJsonType::Object) {
+            FJsonDocument document{};
+            if (!document.Parse(FNativeStringView(text.GetData(), text.Length()))) {
                 AppendDiagnosticLine(diagnostics, TEXT("Failed to parse Slang reflection JSON."));
+                return false;
+            }
+            const auto* root = document.GetRoot();
+            if (root == nullptr || root->Type != EJsonType::Object) {
+                AppendDiagnosticLine(
+                    diagnostics, TEXT("Failed to parse Slang reflection JSON root object."));
                 return false;
             }
 
@@ -792,13 +481,13 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             outReflection.mConstantBuffers.Clear();
             outReflection.mVertexInputs.Clear();
 
-            const auto* params = FindObjectValue(root, "parameters");
-            if (params != nullptr && params->mType == EJsonType::Array) {
-                outReflection.mResources.Reserve(params->mArray.Size());
-                outReflection.mConstantBuffers.Reserve(params->mArray.Size());
+            const auto* params = FindObjectValue(*root, "parameters");
+            if (params != nullptr && params->Type == EJsonType::Array) {
+                outReflection.mResources.Reserve(params->Array.Size());
+                outReflection.mConstantBuffers.Reserve(params->Array.Size());
 
-                for (const auto* param : params->mArray) {
-                    if (param == nullptr || param->mType != EJsonType::Object) {
+                for (const auto* param : params->Array) {
+                    if (param == nullptr || param->Type != EJsonType::Object) {
                         continue;
                     }
 
@@ -810,7 +499,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     const auto* bindingObj   = FindObjectValue(*param, "binding");
                     u32         bindingIndex = 0;
                     u32         bindingSet   = 0;
-                    if (bindingObj != nullptr && bindingObj->mType == EJsonType::Object) {
+                    if (bindingObj != nullptr && bindingObj->Type == EJsonType::Object) {
                         double indexValue = 0.0;
                         if (GetNumberValue(FindObjectValue(*bindingObj, "index"), indexValue)) {
                             bindingIndex = static_cast<u32>(indexValue);
@@ -825,7 +514,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     FNativeString kind;
                     FNativeString baseShape;
                     FNativeString access;
-                    if (typeObj != nullptr && typeObj->mType == EJsonType::Object) {
+                    if (typeObj != nullptr && typeObj->Type == EJsonType::Object) {
                         GetStringValue(FindObjectValue(*typeObj, "kind"), kind);
                         GetStringValue(FindObjectValue(*typeObj, "baseShape"), baseShape);
                         GetStringValue(FindObjectValue(*typeObj, "access"), access);
@@ -851,23 +540,23 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
                         const auto* typeLayout = FindObjectValue(*param, "typeLayout");
                         const auto* layout     = typeLayout;
-                        if (typeLayout != nullptr && typeLayout->mType == EJsonType::Object) {
+                        if (typeLayout != nullptr && typeLayout->Type == EJsonType::Object) {
                             const auto* elementLayout =
                                 FindObjectValue(*typeLayout, "elementTypeLayout");
                             if (elementLayout != nullptr
-                                && elementLayout->mType == EJsonType::Object) {
+                                && elementLayout->Type == EJsonType::Object) {
                                 layout = elementLayout;
                             }
                         }
 
-                        if (layout != nullptr && layout->mType == EJsonType::Object) {
+                        if (layout != nullptr && layout->Type == EJsonType::Object) {
                             GetLayoutSizeBytes(layout, cbInfo.mSizeBytes);
                             ParseSlangTypeLayoutFields(layout, FString{}, 0U, cbInfo);
-                        } else if (typeObj != nullptr && typeObj->mType == EJsonType::Object) {
+                        } else if (typeObj != nullptr && typeObj->Type == EJsonType::Object) {
                             const auto* elementVarLayout =
                                 FindObjectValue(*typeObj, "elementVarLayout");
                             if (elementVarLayout != nullptr
-                                && elementVarLayout->mType == EJsonType::Object) {
+                                && elementVarLayout->Type == EJsonType::Object) {
                                 const auto* elementBinding =
                                     FindObjectValue(*elementVarLayout, "binding");
                                 GetBindingSizeBytes(elementBinding, cbInfo.mSizeBytes);
@@ -904,31 +593,30 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 }
             }
 
-            const auto* entryPoints = FindObjectValue(root, "entryPoints");
-            if (entryPoints != nullptr && entryPoints->mType == EJsonType::Array
-                && entryPoints->mArray.Size() > 0) {
-                const auto* entry = entryPoints->mArray[0];
-                if (entry != nullptr && entry->mType == EJsonType::Object) {
+            const auto* entryPoints = FindObjectValue(*root, "entryPoints");
+            if (entryPoints != nullptr && entryPoints->Type == EJsonType::Array
+                && entryPoints->Array.Size() > 0) {
+                const auto* entry = entryPoints->Array[0];
+                if (entry != nullptr && entry->Type == EJsonType::Object) {
                     const auto* entryParams = FindObjectValue(*entry, "parameters");
-                    if (entryParams != nullptr && entryParams->mType == EJsonType::Array) {
-                        for (const auto* param : entryParams->mArray) {
-                            if (param == nullptr || param->mType != EJsonType::Object) {
+                    if (entryParams != nullptr && entryParams->Type == EJsonType::Array) {
+                        for (const auto* param : entryParams->Array) {
+                            if (param == nullptr || param->Type != EJsonType::Object) {
                                 continue;
                             }
                             AddVertexInputFromJsonParam(*param, outReflection.mVertexInputs);
 
                             const auto* paramType = FindObjectValue(*param, "type");
-                            if (paramType != nullptr && paramType->mType == EJsonType::Object) {
+                            if (paramType != nullptr && paramType->Type == EJsonType::Object) {
                                 FNativeString kind;
                                 if (GetStringValue(FindObjectValue(*paramType, "kind"), kind)) {
                                     if (FNativeStringView(kind.GetData(), kind.Length())
                                         == FNativeStringView("struct")) {
                                         const auto* fields = FindObjectValue(*paramType, "fields");
-                                        if (fields != nullptr
-                                            && fields->mType == EJsonType::Array) {
-                                            for (const auto* field : fields->mArray) {
+                                        if (fields != nullptr && fields->Type == EJsonType::Array) {
+                                            for (const auto* field : fields->Array) {
                                                 if (field == nullptr
-                                                    || field->mType != EJsonType::Object) {
+                                                    || field->Type != EJsonType::Object) {
                                                     continue;
                                                 }
                                                 AddVertexInputFromJsonParam(
@@ -942,14 +630,14 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                     }
 
                     const auto* threadGroup = FindObjectValue(*entry, "threadGroupSize");
-                    if (threadGroup != nullptr && threadGroup->mType == EJsonType::Array
-                        && threadGroup->mArray.Size() >= 3) {
+                    if (threadGroup != nullptr && threadGroup->Type == EJsonType::Array
+                        && threadGroup->Array.Size() >= 3) {
                         double tgx = 1.0;
                         double tgy = 1.0;
                         double tgz = 1.0;
-                        GetNumberValue(threadGroup->mArray[0], tgx);
-                        GetNumberValue(threadGroup->mArray[1], tgy);
-                        GetNumberValue(threadGroup->mArray[2], tgz);
+                        GetNumberValue(threadGroup->Array[0], tgx);
+                        GetNumberValue(threadGroup->Array[1], tgy);
+                        GetNumberValue(threadGroup->Array[2], tgz);
                         outReflection.mThreadGroupSizeX = static_cast<u32>(tgx);
                         outReflection.mThreadGroupSizeY = static_cast<u32>(tgy);
                         outReflection.mThreadGroupSizeZ = static_cast<u32>(tgz);

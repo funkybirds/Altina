@@ -16,6 +16,11 @@ namespace AltinaEngine::RenderCore::Geometry {
                 outError->Assign(message);
             }
         }
+        void SetError(FString* outError, FStringView message) {
+            if (outError != nullptr) {
+                outError->Assign(message);
+            }
+        }
 
         auto IsSystemSemantic(FStringView semanticName) -> bool {
             if (semanticName.Length() < 3U) {
@@ -27,19 +32,106 @@ namespace AltinaEngine::RenderCore::Geometry {
                 && semanticName[2] == TEXT('_'));
         }
 
-        auto ToRhiFormat(Shader::EShaderVertexValueType valueType) -> Rhi::ERhiFormat {
+        auto IsFloatValueType(Shader::EShaderVertexValueType valueType) -> bool {
             switch (valueType) {
                 case Shader::EShaderVertexValueType::Float1:
-                    return Rhi::ERhiFormat::R32Float;
                 case Shader::EShaderVertexValueType::Float2:
-                    return Rhi::ERhiFormat::R32G32Float;
                 case Shader::EShaderVertexValueType::Float3:
-                    return Rhi::ERhiFormat::R32G32B32Float;
                 case Shader::EShaderVertexValueType::Float4:
-                case Shader::EShaderVertexValueType::Unknown:
+                    return true;
                 default:
-                    return Rhi::ERhiFormat::Unknown;
+                    return false;
             }
+        }
+
+        auto GetValueTypeComponentCount(Shader::EShaderVertexValueType valueType) -> u32 {
+            switch (valueType) {
+                case Shader::EShaderVertexValueType::Float1:
+                case Shader::EShaderVertexValueType::Int1:
+                case Shader::EShaderVertexValueType::UInt1:
+                    return 1U;
+                case Shader::EShaderVertexValueType::Float2:
+                case Shader::EShaderVertexValueType::Int2:
+                case Shader::EShaderVertexValueType::UInt2:
+                    return 2U;
+                case Shader::EShaderVertexValueType::Float3:
+                case Shader::EShaderVertexValueType::Int3:
+                case Shader::EShaderVertexValueType::UInt3:
+                    return 3U;
+                case Shader::EShaderVertexValueType::Float4:
+                case Shader::EShaderVertexValueType::Int4:
+                case Shader::EShaderVertexValueType::UInt4:
+                    return 4U;
+                default:
+                    return 0U;
+            }
+        }
+
+        auto GetFormatComponentCount(Rhi::ERhiFormat format) -> u32 {
+            switch (format) {
+                case Rhi::ERhiFormat::R32Float:
+                case Rhi::ERhiFormat::D32Float:
+                    return 1U;
+                case Rhi::ERhiFormat::R32G32Float:
+                    return 2U;
+                case Rhi::ERhiFormat::R32G32B32Float:
+                    return 3U;
+                case Rhi::ERhiFormat::R16G16B16A16Float:
+                case Rhi::ERhiFormat::R8G8B8A8Unorm:
+                case Rhi::ERhiFormat::R8G8B8A8UnormSrgb:
+                case Rhi::ERhiFormat::B8G8R8A8Unorm:
+                case Rhi::ERhiFormat::B8G8R8A8UnormSrgb:
+                    return 4U;
+                default:
+                    return 0U;
+            }
+        }
+
+        auto IsFloatFormat(Rhi::ERhiFormat format) -> bool {
+            switch (format) {
+                case Rhi::ERhiFormat::R32Float:
+                case Rhi::ERhiFormat::R32G32Float:
+                case Rhi::ERhiFormat::R32G32B32Float:
+                case Rhi::ERhiFormat::R16G16B16A16Float:
+                case Rhi::ERhiFormat::R8G8B8A8Unorm:
+                case Rhi::ERhiFormat::R8G8B8A8UnormSrgb:
+                case Rhi::ERhiFormat::B8G8R8A8Unorm:
+                case Rhi::ERhiFormat::B8G8R8A8UnormSrgb:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        auto IsVertexFormatCompatible(
+            Shader::EShaderVertexValueType valueType, Rhi::ERhiFormat format) -> bool {
+            if (format == Rhi::ERhiFormat::Unknown) {
+                return false;
+            }
+            if (valueType == Shader::EShaderVertexValueType::Unknown) {
+                return false;
+            }
+
+            const u32 requiredComponents = GetValueTypeComponentCount(valueType);
+            const u32 providedComponents = GetFormatComponentCount(format);
+            if (requiredComponents == 0U || providedComponents == 0U) {
+                return false;
+            }
+            if (IsFloatValueType(valueType)) {
+                if (!IsFloatFormat(format)) {
+                    return false;
+                }
+                if (requiredComponents == providedComponents) {
+                    return true;
+                }
+                // Common shader pattern: float4 input fed by RGB vertex stream.
+                if (requiredComponents == 4U && providedComponents == 3U) {
+                    return true;
+                }
+                return false;
+            }
+            // Integer-valued vertex inputs are not representable with current runtime formats.
+            return false;
         }
 
         auto BuildVertexLayoutHash(const Rhi::FRhiVertexLayoutDesc& layout) -> u64 {
@@ -100,7 +192,30 @@ namespace AltinaEngine::RenderCore::Geometry {
             input.mSemantic =
                 MakeVertexSemanticKey(attr.mSemanticName.ToView(), attr.mSemanticIndex);
             input.mSemanticName.Assign(attr.mSemanticName.ToView());
-            input.mFormat = attr.mFormat;
+            switch (attr.mFormat) {
+                case Rhi::ERhiFormat::R32Float:
+                    input.mValueType = Shader::EShaderVertexValueType::Float1;
+                    break;
+                case Rhi::ERhiFormat::R32G32Float:
+                    input.mValueType = Shader::EShaderVertexValueType::Float2;
+                    break;
+                case Rhi::ERhiFormat::R32G32B32Float:
+                    input.mValueType = Shader::EShaderVertexValueType::Float3;
+                    break;
+                case Rhi::ERhiFormat::R16G16B16A16Float:
+                case Rhi::ERhiFormat::R8G8B8A8Unorm:
+                case Rhi::ERhiFormat::R8G8B8A8UnormSrgb:
+                case Rhi::ERhiFormat::B8G8R8A8Unorm:
+                case Rhi::ERhiFormat::B8G8R8A8UnormSrgb:
+                    input.mValueType = Shader::EShaderVertexValueType::Float4;
+                    break;
+                default:
+                    input.mValueType = Shader::EShaderVertexValueType::Unknown;
+                    break;
+            }
+            if (input.mValueType == Shader::EShaderVertexValueType::Unknown) {
+                return false;
+            }
             outRequirement.mElements.PushBack(input);
         }
         return true;
@@ -133,29 +248,35 @@ namespace AltinaEngine::RenderCore::Geometry {
 
                 const auto semanticKey = MakeVertexSemanticKey(semanticName, input.mSemanticIndex);
                 const auto encodedKey  = EncodeVertexSemanticKey(semanticKey);
-                const auto format      = ToRhiFormat(input.mValueType);
-                const auto it          = semanticToIndex.find(encodedKey);
+                const auto valueType   = input.mValueType;
+                if (valueType == Shader::EShaderVertexValueType::Unknown) {
+                    FString message{};
+                    message.Append(
+                        TEXT("Shader reflection vertex input has unknown value type: semantic='"));
+                    message.Append(semanticName);
+                    message.Append(TEXT("' index="));
+                    message.Append(FString::ToString(input.mSemanticIndex));
+                    message.Append(TEXT(" shader='"));
+                    message.Append(shaderKey.Name.ToView());
+                    message.Append(TEXT("'."));
+                    SetError(outError, message.ToView());
+                    return false;
+                }
+                const auto it = semanticToIndex.find(encodedKey);
                 if (it == semanticToIndex.end()) {
                     FShaderVertexInputElement element{};
                     element.mSemantic = semanticKey;
                     element.mSemanticName.Assign(semanticName);
-                    element.mFormat             = format;
+                    element.mValueType          = valueType;
                     semanticToIndex[encodedKey] = outRequirement.mElements.Size();
                     outRequirement.mElements.PushBack(element);
                     continue;
                 }
 
                 auto& existing = outRequirement.mElements[it->second];
-                if (existing.mFormat == Rhi::ERhiFormat::Unknown) {
-                    existing.mFormat = format;
-                    continue;
-                }
-                if (format == Rhi::ERhiFormat::Unknown) {
-                    continue;
-                }
-                if (existing.mFormat != format) {
-                    SetError(
-                        outError, TEXT("Vertex input semantic format mismatch across shaders."));
+                if (existing.mValueType != valueType) {
+                    SetError(outError,
+                        TEXT("Vertex input semantic value type mismatch across shaders."));
                     return false;
                 }
             }
@@ -175,6 +296,8 @@ namespace AltinaEngine::RenderCore::Geometry {
         outResolved.mLayoutHash = 0ULL;
 
         THashMap<u64, usize> providedIndexBySemantic{};
+        THashMap<u32, u32>   inputSlotByFactorySlot{};
+        u32                  nextInputSlot = 0U;
         for (usize i = 0U; i < provided.mElements.Size(); ++i) {
             const auto key = EncodeVertexSemanticKey(provided.mElements[i].mSemantic);
             if (providedIndexBySemantic.find(key) != providedIndexBySemantic.end()) {
@@ -182,6 +305,10 @@ namespace AltinaEngine::RenderCore::Geometry {
                 return false;
             }
             providedIndexBySemantic[key] = i;
+            const u32 slotKey            = static_cast<u32>(provided.mElements[i].mSlot);
+            if (inputSlotByFactorySlot.find(slotKey) == inputSlotByFactorySlot.end()) {
+                inputSlotByFactorySlot[slotKey] = nextInputSlot++;
+            }
         }
 
         outResolved.mVertexLayout.mAttributes.Reserve(requirement.mElements.Size());
@@ -194,9 +321,9 @@ namespace AltinaEngine::RenderCore::Geometry {
             }
 
             const auto& source = provided.mElements[it->second];
-            if (required.mFormat != Rhi::ERhiFormat::Unknown
-                && source.mFormat != required.mFormat) {
-                SetError(outError, TEXT("VertexFactory semantic format mismatch."));
+            if (!IsVertexFormatCompatible(required.mValueType, source.mFormat)) {
+                SetError(outError,
+                    TEXT("VertexFactory semantic format is incompatible with shader value type."));
                 return false;
             }
             if (source.mFormat == Rhi::ERhiFormat::Unknown) {
@@ -212,9 +339,14 @@ namespace AltinaEngine::RenderCore::Geometry {
             } else {
                 outAttr.mSemanticName.Assign(TEXT("AUTO"));
             }
-            outAttr.mSemanticIndex     = source.mSemantic.mSemanticIndex;
-            outAttr.mFormat            = source.mFormat;
-            outAttr.mInputSlot         = source.mInputSlot;
+            outAttr.mSemanticIndex = source.mSemantic.mSemanticIndex;
+            outAttr.mFormat        = source.mFormat;
+            const auto slotIt      = inputSlotByFactorySlot.find(static_cast<u32>(source.mSlot));
+            if (slotIt == inputSlotByFactorySlot.end()) {
+                SetError(outError, TEXT("VertexFactory slot map resolve failed."));
+                return false;
+            }
+            outAttr.mInputSlot         = slotIt->second;
             outAttr.mAlignedByteOffset = source.mAlignedByteOffset;
             outAttr.mPerInstance       = source.mPerInstance;
             outAttr.mInstanceStepRate  = source.mInstanceStepRate;

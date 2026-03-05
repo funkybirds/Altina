@@ -6,8 +6,7 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::RenderCore::Geometry {
-    // CPU stream mapping for static mesh base pass:
-    // slot0 POSITION(float3), slot1 NORMAL(float3), slot2 TEXCOORD0(float2).
+    // CPU stream mapping for static mesh base pass.
     AE_RENDER_CORE_API auto BuildStaticMeshProvidedLayout(FVertexFactoryProvidedLayout& outLayout)
         -> bool;
 

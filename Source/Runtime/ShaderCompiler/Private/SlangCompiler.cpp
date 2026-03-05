@@ -660,13 +660,36 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 return EShaderVertexValueType::Unknown;
             }
 
+            const auto*   scalarSource = typeObj;
+            FNativeString kind;
+            if (GetStringValue(FindObjectValue(*typeObj, "kind"), kind)) {
+                const FNativeStringView kindView(kind.GetData(), kind.Length());
+                if (kindView == FNativeStringView("vector")
+                    || kindView == FNativeStringView("matrix")
+                    || kindView == FNativeStringView("array")) {
+                    const auto* elementType = FindObjectValue(*typeObj, "elementType");
+                    if (elementType != nullptr && elementType->mType == EJsonType::Object) {
+                        scalarSource = elementType;
+                    }
+                }
+            }
+
             FNativeString scalarType;
-            GetStringValue(FindObjectValue(*typeObj, "scalarType"), scalarType);
+            GetStringValue(FindObjectValue(*scalarSource, "scalarType"), scalarType);
             const FNativeStringView scalarView(scalarType.GetData(), scalarType.Length());
             const bool              isFloat =
                 (scalarView == FNativeStringView("float") || scalarView == FNativeStringView("half")
-                    || scalarView == FNativeStringView("double"));
-            if (!isFloat) {
+                    || scalarView == FNativeStringView("double")
+                    || scalarView == FNativeStringView("float16")
+                    || scalarView == FNativeStringView("float32")
+                    || scalarView == FNativeStringView("float64"));
+            const bool isInt  = (scalarView == FNativeStringView("int")
+                || scalarView == FNativeStringView("int32_t")
+                || scalarView == FNativeStringView("int32"));
+            const bool isUInt = (scalarView == FNativeStringView("uint")
+                || scalarView == FNativeStringView("uint32_t")
+                || scalarView == FNativeStringView("uint32"));
+            if (!isFloat && !isInt && !isUInt) {
                 return EShaderVertexValueType::Unknown;
             }
 
@@ -676,18 +699,45 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 GetNumberAsU32(FindObjectValue(*typeObj, "columnCount"), laneCount);
             }
             if (laneCount == 0U) {
+                GetNumberAsU32(FindObjectValue(*typeObj, "vectorSize"), laneCount);
+            }
+            if (laneCount == 0U) {
                 laneCount = 1U;
             }
 
             switch (laneCount) {
                 case 1U:
-                    return EShaderVertexValueType::Float1;
+                    if (isFloat) {
+                        return EShaderVertexValueType::Float1;
+                    }
+                    if (isInt) {
+                        return EShaderVertexValueType::Int1;
+                    }
+                    return EShaderVertexValueType::UInt1;
                 case 2U:
-                    return EShaderVertexValueType::Float2;
+                    if (isFloat) {
+                        return EShaderVertexValueType::Float2;
+                    }
+                    if (isInt) {
+                        return EShaderVertexValueType::Int2;
+                    }
+                    return EShaderVertexValueType::UInt2;
                 case 3U:
-                    return EShaderVertexValueType::Float3;
+                    if (isFloat) {
+                        return EShaderVertexValueType::Float3;
+                    }
+                    if (isInt) {
+                        return EShaderVertexValueType::Int3;
+                    }
+                    return EShaderVertexValueType::UInt3;
                 case 4U:
-                    return EShaderVertexValueType::Float4;
+                    if (isFloat) {
+                        return EShaderVertexValueType::Float4;
+                    }
+                    if (isInt) {
+                        return EShaderVertexValueType::Int4;
+                    }
+                    return EShaderVertexValueType::UInt4;
                 default:
                     return EShaderVertexValueType::Unknown;
             }

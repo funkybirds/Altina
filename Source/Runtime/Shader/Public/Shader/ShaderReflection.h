@@ -56,7 +56,15 @@ namespace AltinaEngine::Shader {
         Float1,
         Float2,
         Float3,
-        Float4
+        Float4,
+        Int1,
+        Int2,
+        Int3,
+        Int4,
+        UInt1,
+        UInt2,
+        UInt3,
+        UInt4
     };
 
     struct FShaderVertexInput {

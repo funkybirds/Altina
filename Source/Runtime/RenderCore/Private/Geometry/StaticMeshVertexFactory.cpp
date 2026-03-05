@@ -9,7 +9,7 @@ namespace AltinaEngine::RenderCore::Geometry {
         position.mSemantic = MakeVertexSemanticKey(TEXT("POSITION"), 0U);
         position.mSemanticName.Assign(TEXT("POSITION"));
         position.mFormat            = Rhi::ERhiFormat::R32G32B32Float;
-        position.mInputSlot         = 0U;
+        position.mSlot              = EVertexFactorySlot::Position;
         position.mAlignedByteOffset = 0U;
         position.mPerInstance       = false;
         position.mInstanceStepRate  = 0U;
@@ -19,7 +19,7 @@ namespace AltinaEngine::RenderCore::Geometry {
         normal.mSemantic = MakeVertexSemanticKey(TEXT("NORMAL"), 0U);
         normal.mSemanticName.Assign(TEXT("NORMAL"));
         normal.mFormat            = Rhi::ERhiFormat::R32G32B32Float;
-        normal.mInputSlot         = 1U;
+        normal.mSlot              = EVertexFactorySlot::Normal;
         normal.mAlignedByteOffset = 0U;
         normal.mPerInstance       = false;
         normal.mInstanceStepRate  = 0U;
@@ -29,7 +29,7 @@ namespace AltinaEngine::RenderCore::Geometry {
         texcoord.mSemantic = MakeVertexSemanticKey(TEXT("TEXCOORD"), 0U);
         texcoord.mSemanticName.Assign(TEXT("TEXCOORD"));
         texcoord.mFormat            = Rhi::ERhiFormat::R32G32Float;
-        texcoord.mInputSlot         = 2U;
+        texcoord.mSlot              = EVertexFactorySlot::UV0;
         texcoord.mAlignedByteOffset = 0U;
         texcoord.mPerInstance       = false;
         texcoord.mInstanceStepRate  = 0U;
@@ -45,6 +45,25 @@ namespace AltinaEngine::RenderCore::Geometry {
             return false;
         }
 
+        auto mapSlotToInputSlot = [](EVertexFactorySlot slot, u32& outInputSlot) -> bool {
+            switch (slot) {
+                case EVertexFactorySlot::Position:
+                    outInputSlot = 0U;
+                    return true;
+                case EVertexFactorySlot::Normal:
+                    outInputSlot = 1U;
+                    return true;
+                case EVertexFactorySlot::UV0:
+                    outInputSlot = 2U;
+                    return true;
+                case EVertexFactorySlot::UV1:
+                    outInputSlot = 3U;
+                    return true;
+                default:
+                    return false;
+            }
+        };
+
         outLayout.mAttributes.Reserve(provided.mElements.Size());
         for (const auto& element : provided.mElements) {
             Rhi::FRhiVertexAttributeDesc attr{};
@@ -57,9 +76,13 @@ namespace AltinaEngine::RenderCore::Geometry {
             } else {
                 return false;
             }
-            attr.mSemanticIndex     = element.mSemantic.mSemanticIndex;
-            attr.mFormat            = element.mFormat;
-            attr.mInputSlot         = element.mInputSlot;
+            attr.mSemanticIndex = element.mSemantic.mSemanticIndex;
+            attr.mFormat        = element.mFormat;
+            u32 inputSlot       = 0U;
+            if (!mapSlotToInputSlot(element.mSlot, inputSlot)) {
+                return false;
+            }
+            attr.mInputSlot         = inputSlot;
             attr.mAlignedByteOffset = element.mAlignedByteOffset;
             attr.mPerInstance       = element.mPerInstance;
             attr.mInstanceStepRate  = element.mInstanceStepRate;

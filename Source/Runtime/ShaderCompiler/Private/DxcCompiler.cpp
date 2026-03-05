@@ -351,18 +351,46 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
         auto MapVertexInputValueType(D3D_REGISTER_COMPONENT_TYPE componentType, u32 laneCount)
             -> EShaderVertexValueType {
-            if (componentType != D3D_REGISTER_COMPONENT_FLOAT32) {
-                return EShaderVertexValueType::Unknown;
-            }
-            switch (laneCount) {
-                case 1U:
-                    return EShaderVertexValueType::Float1;
-                case 2U:
-                    return EShaderVertexValueType::Float2;
-                case 3U:
-                    return EShaderVertexValueType::Float3;
-                case 4U:
-                    return EShaderVertexValueType::Float4;
+            switch (componentType) {
+                case D3D_REGISTER_COMPONENT_FLOAT32:
+                    switch (laneCount) {
+                        case 1U:
+                            return EShaderVertexValueType::Float1;
+                        case 2U:
+                            return EShaderVertexValueType::Float2;
+                        case 3U:
+                            return EShaderVertexValueType::Float3;
+                        case 4U:
+                            return EShaderVertexValueType::Float4;
+                        default:
+                            return EShaderVertexValueType::Unknown;
+                    }
+                case D3D_REGISTER_COMPONENT_SINT32:
+                    switch (laneCount) {
+                        case 1U:
+                            return EShaderVertexValueType::Int1;
+                        case 2U:
+                            return EShaderVertexValueType::Int2;
+                        case 3U:
+                            return EShaderVertexValueType::Int3;
+                        case 4U:
+                            return EShaderVertexValueType::Int4;
+                        default:
+                            return EShaderVertexValueType::Unknown;
+                    }
+                case D3D_REGISTER_COMPONENT_UINT32:
+                    switch (laneCount) {
+                        case 1U:
+                            return EShaderVertexValueType::UInt1;
+                        case 2U:
+                            return EShaderVertexValueType::UInt2;
+                        case 3U:
+                            return EShaderVertexValueType::UInt3;
+                        case 4U:
+                            return EShaderVertexValueType::UInt4;
+                        default:
+                            return EShaderVertexValueType::Unknown;
+                    }
                 default:
                     return EShaderVertexValueType::Unknown;
             }

@@ -6,6 +6,7 @@
 namespace {
     using AltinaEngine::RenderCore::Geometry::BuildStaticMeshLegacyVertexLayout;
     using AltinaEngine::RenderCore::Geometry::BuildStaticMeshProvidedLayout;
+    using AltinaEngine::RenderCore::Geometry::EVertexFactorySlot;
     using AltinaEngine::RenderCore::Geometry::FVertexFactoryProvidedLayout;
     using AltinaEngine::RenderCore::Geometry::MakeVertexSemanticKey;
     using AltinaEngine::Rhi::ERhiFormat;
@@ -20,19 +21,19 @@ TEST_CASE("RenderCore.StaticMeshVertexFactory.ProvidedLayout") {
     const auto& position = provided.mElements[0];
     REQUIRE(position.mSemantic == MakeVertexSemanticKey(TEXT("POSITION"), 0U));
     REQUIRE(position.mFormat == ERhiFormat::R32G32B32Float);
-    REQUIRE_EQ(position.mInputSlot, 0U);
+    REQUIRE(position.mSlot == EVertexFactorySlot::Position);
     REQUIRE_EQ(position.mAlignedByteOffset, 0U);
 
     const auto& normal = provided.mElements[1];
     REQUIRE(normal.mSemantic == MakeVertexSemanticKey(TEXT("NORMAL"), 0U));
     REQUIRE(normal.mFormat == ERhiFormat::R32G32B32Float);
-    REQUIRE_EQ(normal.mInputSlot, 1U);
+    REQUIRE(normal.mSlot == EVertexFactorySlot::Normal);
     REQUIRE_EQ(normal.mAlignedByteOffset, 0U);
 
     const auto& uv0 = provided.mElements[2];
     REQUIRE(uv0.mSemantic == MakeVertexSemanticKey(TEXT("TEXCOORD"), 0U));
     REQUIRE(uv0.mFormat == ERhiFormat::R32G32Float);
-    REQUIRE_EQ(uv0.mInputSlot, 2U);
+    REQUIRE(uv0.mSlot == EVertexFactorySlot::UV0);
     REQUIRE_EQ(uv0.mAlignedByteOffset, 0U);
 }
 

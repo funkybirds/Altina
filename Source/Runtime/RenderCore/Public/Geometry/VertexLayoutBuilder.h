@@ -6,6 +6,7 @@
 #include "Container/StringView.h"
 #include "Container/Vector.h"
 #include "Rhi/RhiStructs.h"
+#include "Shader/ShaderReflection.h"
 #include "Shader/ShaderRegistry.h"
 
 namespace AltinaEngine::RenderCore::Geometry {
@@ -23,9 +24,9 @@ namespace AltinaEngine::RenderCore::Geometry {
     };
 
     struct FShaderVertexInputElement {
-        FVertexSemanticKey mSemantic{};
-        FString            mSemanticName{};
-        Rhi::ERhiFormat    mFormat = Rhi::ERhiFormat::Unknown;
+        FVertexSemanticKey             mSemantic{};
+        FString                        mSemanticName{};
+        Shader::EShaderVertexValueType mValueType = Shader::EShaderVertexValueType::Unknown;
     };
 
     struct FShaderVertexInputRequirement {
@@ -34,11 +35,24 @@ namespace AltinaEngine::RenderCore::Geometry {
         void                               Reset() { mElements.Clear(); }
     };
 
+    enum class EVertexFactorySlot : u8 {
+        Position = 0,
+        Normal,
+        Tangent,
+        UV0,
+        UV1,
+        Color0,
+        Instance0,
+        Custom0,
+        Custom1,
+        Custom2
+    };
+
     struct FVertexFactoryInputElement {
         FVertexSemanticKey mSemantic{};
         FString            mSemanticName{};
         Rhi::ERhiFormat    mFormat            = Rhi::ERhiFormat::Unknown;
-        u32                mInputSlot         = 0U;
+        EVertexFactorySlot mSlot              = EVertexFactorySlot::Custom0;
         u32                mAlignedByteOffset = 0U;
         bool               mPerInstance       = false;
         u32                mInstanceStepRate  = 0U;

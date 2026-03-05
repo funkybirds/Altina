@@ -9,6 +9,7 @@ namespace {
     using AltinaEngine::RenderCore::FShaderRegistry;
     using AltinaEngine::RenderCore::Geometry::BuildShaderVertexInputRequirementFromShaderSet;
     using AltinaEngine::RenderCore::Geometry::BuildShaderVertexInputRequirementFromVertexLayout;
+    using AltinaEngine::RenderCore::Geometry::EVertexFactorySlot;
     using AltinaEngine::RenderCore::Geometry::FResolvedVertexLayout;
     using AltinaEngine::RenderCore::Geometry::FShaderVertexInputRequirement;
     using AltinaEngine::RenderCore::Geometry::FVertexFactoryInputElement;
@@ -70,19 +71,19 @@ TEST_CASE("RenderCore.VertexLayoutBuilder.ValidateAndBuild.Success") {
     provided.mElements.PushBack(FVertexFactoryInputElement{
         .mSemantic          = MakeVertexSemanticKey(TEXT("POSITION"), 0U),
         .mFormat            = ERhiFormat::R32G32B32Float,
-        .mInputSlot         = 0U,
+        .mSlot              = EVertexFactorySlot::Position,
         .mAlignedByteOffset = 0U,
     });
     provided.mElements.PushBack(FVertexFactoryInputElement{
         .mSemantic          = MakeVertexSemanticKey(TEXT("NORMAL"), 0U),
         .mFormat            = ERhiFormat::R32G32B32Float,
-        .mInputSlot         = 0U,
+        .mSlot              = EVertexFactorySlot::Normal,
         .mAlignedByteOffset = 12U,
     });
     provided.mElements.PushBack(FVertexFactoryInputElement{
         .mSemantic          = MakeVertexSemanticKey(TEXT("TEXCOORD"), 0U),
         .mFormat            = ERhiFormat::R32G32Float,
-        .mInputSlot         = 0U,
+        .mSlot              = EVertexFactorySlot::UV0,
         .mAlignedByteOffset = 24U,
     });
 
@@ -95,19 +96,19 @@ TEST_CASE("RenderCore.VertexLayoutBuilder.ValidateAndBuild.Success") {
 TEST_CASE("RenderCore.VertexLayoutBuilder.ValidateAndBuild.MissingSemantic") {
     FShaderVertexInputRequirement requirement{};
     requirement.mElements.PushBack({
-        .mSemantic = MakeVertexSemanticKey(TEXT("POSITION"), 0U),
-        .mFormat   = ERhiFormat::R32G32B32Float,
+        .mSemantic  = MakeVertexSemanticKey(TEXT("POSITION"), 0U),
+        .mValueType = EShaderVertexValueType::Float3,
     });
     requirement.mElements.PushBack({
-        .mSemantic = MakeVertexSemanticKey(TEXT("NORMAL"), 0U),
-        .mFormat   = ERhiFormat::R32G32B32Float,
+        .mSemantic  = MakeVertexSemanticKey(TEXT("NORMAL"), 0U),
+        .mValueType = EShaderVertexValueType::Float3,
     });
 
     FVertexFactoryProvidedLayout provided{};
     provided.mElements.PushBack({
         .mSemantic          = MakeVertexSemanticKey(TEXT("POSITION"), 0U),
         .mFormat            = ERhiFormat::R32G32B32Float,
-        .mInputSlot         = 0U,
+        .mSlot              = EVertexFactorySlot::Position,
         .mAlignedByteOffset = 0U,
     });
 
@@ -118,15 +119,15 @@ TEST_CASE("RenderCore.VertexLayoutBuilder.ValidateAndBuild.MissingSemantic") {
 TEST_CASE("RenderCore.VertexLayoutBuilder.ValidateAndBuild.FormatMismatch") {
     FShaderVertexInputRequirement requirement{};
     requirement.mElements.PushBack({
-        .mSemantic = MakeVertexSemanticKey(TEXT("TEXCOORD"), 0U),
-        .mFormat   = ERhiFormat::R32G32Float,
+        .mSemantic  = MakeVertexSemanticKey(TEXT("TEXCOORD"), 0U),
+        .mValueType = EShaderVertexValueType::Float2,
     });
 
     FVertexFactoryProvidedLayout provided{};
     provided.mElements.PushBack({
         .mSemantic          = MakeVertexSemanticKey(TEXT("TEXCOORD"), 0U),
         .mFormat            = ERhiFormat::R32G32B32Float,
-        .mInputSlot         = 0U,
+        .mSlot              = EVertexFactorySlot::UV0,
         .mAlignedByteOffset = 0U,
     });
 
@@ -137,21 +138,21 @@ TEST_CASE("RenderCore.VertexLayoutBuilder.ValidateAndBuild.FormatMismatch") {
 TEST_CASE("RenderCore.VertexLayoutBuilder.ValidateAndBuild.DuplicateProvidedSemantic") {
     FShaderVertexInputRequirement requirement{};
     requirement.mElements.PushBack({
-        .mSemantic = MakeVertexSemanticKey(TEXT("POSITION"), 0U),
-        .mFormat   = ERhiFormat::R32G32B32Float,
+        .mSemantic  = MakeVertexSemanticKey(TEXT("POSITION"), 0U),
+        .mValueType = EShaderVertexValueType::Float3,
     });
 
     FVertexFactoryProvidedLayout provided{};
     provided.mElements.PushBack({
         .mSemantic          = MakeVertexSemanticKey(TEXT("POSITION"), 0U),
         .mFormat            = ERhiFormat::R32G32B32Float,
-        .mInputSlot         = 0U,
+        .mSlot              = EVertexFactorySlot::Position,
         .mAlignedByteOffset = 0U,
     });
     provided.mElements.PushBack({
         .mSemantic          = MakeVertexSemanticKey(TEXT("POSITION"), 0U),
         .mFormat            = ERhiFormat::R32G32B32Float,
-        .mInputSlot         = 1U,
+        .mSlot              = EVertexFactorySlot::Normal,
         .mAlignedByteOffset = 0U,
     });
 

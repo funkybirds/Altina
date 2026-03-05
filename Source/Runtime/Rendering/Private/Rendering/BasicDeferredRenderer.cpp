@@ -755,16 +755,16 @@ namespace AltinaEngine::Rendering {
                 LogErrorCat(TEXT("BasicDeferredRenderer"),
                     "VertexLayout resolve failed: shader='{}' factory='{}' requirementBuilt={} "
                     "resolved={} requirementError='{}' resolveError='{}'.",
-                    shaderLabel, kFactoryName, requirementBuilt ? 1U : 0U, resolvedOk ? 1U : 0U,
-                    requirementError, resolveError);
+                    shaderLabel.ToView(), kFactoryName, requirementBuilt ? 1U : 0U,
+                    resolvedOk ? 1U : 0U, requirementError.ToView(), resolveError.ToView());
                 for (const auto& req : requirement.mElements) {
                     const auto semanticName = req.mSemanticName.IsEmptyString()
                         ? TEXT("<unknown>")
                         : req.mSemanticName.CStr();
                     LogErrorCat(TEXT("BasicDeferredRenderer"),
-                        "VertexLayout requirement: shader='{}' semantic='{}{}' format={} factory='{}'.",
+                        "VertexLayout requirement: shader='{}' semantic='{}{}' valueType={} factory='{}'.",
                         shaderLabel, semanticName, req.mSemantic.mSemanticIndex,
-                        static_cast<u32>(req.mFormat), kFactoryName);
+                        static_cast<u32>(req.mValueType), kFactoryName);
                 }
                 for (const auto& prov : provided.mElements) {
                     const auto semanticName = prov.mSemanticName.IsEmptyString()

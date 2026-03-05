@@ -7,6 +7,7 @@
 #include "Lighting/LightTypes.h"
 #include "Material/MaterialPass.h"
 #include "Shadow/CascadedShadowMapping.h"
+#include "Shader/ShaderBindingUtility.h"
 #include "View/ViewData.h"
 
 #include "Rendering/PostProcess/PostProcess.h"
@@ -197,6 +198,8 @@ namespace AltinaEngine::Rendering {
 
             Rhi::FRhiBindGroupLayoutRef                       PerFrameLayout;
             Rhi::FRhiBindGroupLayoutRef                       PerDrawLayout;
+            u32                                               PerFrameBinding = 0U;
+            u32                                               PerDrawBinding  = 0U;
             Rhi::FRhiBindGroupLayoutRef                       OutputLayout;
             Rhi::FRhiSamplerRef                               OutputSampler;
             Rhi::FRhiPipelineLayoutRef                        OutputPipelineLayout;
@@ -277,14 +280,6 @@ namespace AltinaEngine::Rendering {
 
         [[nodiscard]] auto MapSamplerBinding(u32 binding) noexcept -> u32 {
             return IsVulkanBackend() ? (2000U + binding) : binding;
-        }
-
-        [[nodiscard]] auto GetPerDrawConstantBinding() noexcept -> u32 {
-            // Auto-binding maps AE_PER_DRAW_CBUFFER to:
-            // Vulkan: b0, space1
-            // D3D11: b4
-            // TODO: (Require Refactor, Manual) just work-around
-            return IsVulkanBackend() ? 0U : 4U;
         }
 
         auto BuildMaterialBindGroupLayoutDesc(const RenderCore::FMaterialLayout& materialLayout,
@@ -521,51 +516,95 @@ namespace AltinaEngine::Rendering {
         }
 
         void EnsureLayouts(Rhi::FRhiDevice& device, FDeferredSharedResources& resources) {
-            if (!resources.PerFrameLayout) {
-                Rhi::FRhiBindGroupLayoutEntry entry{};
-                entry.mBinding    = 0U;
-                entry.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                entry.mVisibility = Rhi::ERhiShaderStageFlags::All;
+            TVector<RenderCore::FShaderRegistry::FShaderKey> basePassShaderKeys;
+            if (resources.DefaultPassDesc.Shaders.Vertex.IsValid()) {
+                basePassShaderKeys.PushBack(resources.DefaultPassDesc.Shaders.Vertex);
+            }
+            if (resources.DefaultPassDesc.Shaders.Pixel.IsValid()) {
+                basePassShaderKeys.PushBack(resources.DefaultPassDesc.Shaders.Pixel);
+            }
+            if (resources.DefaultShadowPassDesc.Shaders.Vertex.IsValid()) {
+                basePassShaderKeys.PushBack(resources.DefaultShadowPassDesc.Shaders.Vertex);
+            }
+            if (resources.DefaultShadowPassDesc.Shaders.Pixel.IsValid()) {
+                basePassShaderKeys.PushBack(resources.DefaultShadowPassDesc.Shaders.Pixel);
+            }
 
-                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex = 0U;
-                layoutDesc.mEntries.PushBack(entry);
-                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                resources.PerFrameLayout = device.CreateBindGroupLayout(layoutDesc);
+            if (!resources.PerFrameLayout) {
+                u32                       setIndex   = 0U;
+                u32                       binding    = 0U;
+                Rhi::ERhiShaderStageFlags visibility = Rhi::ERhiShaderStageFlags::All;
+                bool found = RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
+                    resources.Registry, basePassShaderKeys, TEXT("ViewConstants"), setIndex,
+                    binding, visibility);
+                if (!found) {
+                    found = RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
+                        resources.Registry, basePassShaderKeys, TEXT("DeferredView"), setIndex,
+                        binding, visibility);
+                }
+
+                DebugAssert(found, TEXT("BasicDeferredRenderer"),
+                    "Failed to resolve per-frame cbuffer binding from shader reflection.");
+                if (found) {
+                    Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+                    layoutDesc.mSetIndex = setIndex;
+
+                    Rhi::FRhiBindGroupLayoutEntry entry{};
+                    entry.mBinding    = binding;
+                    entry.mType       = Rhi::ERhiBindingType::ConstantBuffer;
+                    entry.mVisibility = visibility;
+                    layoutDesc.mEntries.PushBack(entry);
+                    layoutDesc.mLayoutHash =
+                        BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
+                    resources.PerFrameLayout  = device.CreateBindGroupLayout(layoutDesc);
+                    resources.PerFrameBinding = binding;
+                }
             }
 
             if (!resources.PerDrawLayout) {
-                Rhi::FRhiBindGroupLayoutEntry entry{};
-                entry.mBinding          = GetPerDrawConstantBinding();
-                entry.mType             = Rhi::ERhiBindingType::ConstantBuffer;
-                entry.mVisibility       = Rhi::ERhiShaderStageFlags::All;
-                entry.mHasDynamicOffset = IsVulkanBackend();
+                u32                       setIndex   = 0U;
+                u32                       binding    = 0U;
+                Rhi::ERhiShaderStageFlags visibility = Rhi::ERhiShaderStageFlags::All;
+                const bool found = RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
+                    resources.Registry, basePassShaderKeys, TEXT("ObjectConstants"), setIndex,
+                    binding, visibility);
+                DebugAssert(found, TEXT("BasicDeferredRenderer"),
+                    "Failed to resolve per-draw cbuffer binding from shader reflection.");
+                if (found) {
+                    Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+                    layoutDesc.mSetIndex = setIndex;
 
-                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex = IsVulkanBackend() ? 1U : 0U;
-                layoutDesc.mEntries.PushBack(entry);
-                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                resources.PerDrawLayout = device.CreateBindGroupLayout(layoutDesc);
+                    Rhi::FRhiBindGroupLayoutEntry entry{};
+                    entry.mBinding          = binding;
+                    entry.mType             = Rhi::ERhiBindingType::ConstantBuffer;
+                    entry.mVisibility       = visibility;
+                    entry.mHasDynamicOffset = IsVulkanBackend();
+                    layoutDesc.mEntries.PushBack(entry);
+                    layoutDesc.mLayoutHash =
+                        BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
+                    resources.PerDrawLayout  = device.CreateBindGroupLayout(layoutDesc);
+                    resources.PerDrawBinding = binding;
+                }
             }
 
             if (!resources.OutputLayout) {
-                Rhi::FRhiBindGroupLayoutEntry samplerEntry{};
-                samplerEntry.mBinding    = 0U;
-                samplerEntry.mType       = Rhi::ERhiBindingType::Sampler;
-                samplerEntry.mVisibility = Rhi::ERhiShaderStageFlags::All;
-
-                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex = 0U;
-                for (u32 binding = 0U; binding < 3U; ++binding) {
-                    Rhi::FRhiBindGroupLayoutEntry textureEntry{};
-                    textureEntry.mBinding    = binding;
-                    textureEntry.mType       = Rhi::ERhiBindingType::SampledTexture;
-                    textureEntry.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                    layoutDesc.mEntries.PushBack(textureEntry);
+                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
+                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
+                if (resources.OutputVSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.OutputVSKey);
                 }
-                layoutDesc.mEntries.PushBack(samplerEntry);
-                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                resources.OutputLayout = device.CreateBindGroupLayout(layoutDesc);
+                if (resources.OutputPSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.OutputPSKey);
+                }
+                if (!shaderKeys.IsEmpty()) {
+                    const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
+                        resources.Registry, shaderKeys, 0U, layoutDesc);
+                    DebugAssert(built, TEXT("BasicDeferredRenderer"),
+                        "Failed to build output bind group layout from shader reflection.");
+                    if (built) {
+                        resources.OutputLayout = device.CreateBindGroupLayout(layoutDesc);
+                    }
+                }
             }
 
             if (!resources.OutputSampler) {
@@ -582,79 +621,39 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.LightingLayout) {
-                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex = 0U;
-
-                // b0
-                Rhi::FRhiBindGroupLayoutEntry cbuffer{};
-                cbuffer.mBinding    = 0U;
-                cbuffer.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                cbuffer.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(cbuffer);
-
-                // b1 (IBL constants)
-                Rhi::FRhiBindGroupLayoutEntry iblCbuffer{};
-                iblCbuffer.mBinding    = 1U;
-                iblCbuffer.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                iblCbuffer.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(iblCbuffer);
-
-                // t0..t8
-                for (u32 binding = 0U; binding < 9U; ++binding) {
-                    Rhi::FRhiBindGroupLayoutEntry texture{};
-                    texture.mBinding    = MapSampledTextureBinding(binding);
-                    texture.mType       = Rhi::ERhiBindingType::SampledTexture;
-                    texture.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                    layoutDesc.mEntries.PushBack(texture);
+                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
+                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
+                if (resources.LightingVSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.LightingVSKey);
                 }
-
-                // s0
-                Rhi::FRhiBindGroupLayoutEntry sampler{};
-                sampler.mBinding    = MapSamplerBinding(0U);
-                sampler.mType       = Rhi::ERhiBindingType::Sampler;
-                sampler.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(sampler);
-
-                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                resources.LightingLayout = device.CreateBindGroupLayout(layoutDesc);
+                if (resources.LightingPSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.LightingPSKey);
+                }
+                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
+                    resources.Registry, shaderKeys, 0U, layoutDesc);
+                DebugAssert(built, TEXT("BasicDeferredRenderer"),
+                    "Failed to build lighting bind group layout from shader reflection.");
+                if (built) {
+                    resources.LightingLayout = device.CreateBindGroupLayout(layoutDesc);
+                }
             }
 
             if (!resources.SsaoLayout) {
-                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex = 0U;
-
-                // b0: per-frame constants (shared with deferred lighting).
-                Rhi::FRhiBindGroupLayoutEntry perFrame{};
-                perFrame.mBinding    = 0U;
-                perFrame.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                perFrame.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(perFrame);
-
-                // b1: SSAO parameters.
-                Rhi::FRhiBindGroupLayoutEntry ssaoCb{};
-                ssaoCb.mBinding    = 1U;
-                ssaoCb.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                ssaoCb.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(ssaoCb);
-
-                // t0..t1
-                for (u32 binding = 0U; binding < 2U; ++binding) {
-                    Rhi::FRhiBindGroupLayoutEntry texture{};
-                    texture.mBinding    = MapSampledTextureBinding(binding);
-                    texture.mType       = Rhi::ERhiBindingType::SampledTexture;
-                    texture.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                    layoutDesc.mEntries.PushBack(texture);
+                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
+                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
+                if (resources.SsaoVSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.SsaoVSKey);
                 }
-
-                // s0
-                Rhi::FRhiBindGroupLayoutEntry sampler{};
-                sampler.mBinding    = MapSamplerBinding(0U);
-                sampler.mType       = Rhi::ERhiBindingType::Sampler;
-                sampler.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(sampler);
-
-                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                resources.SsaoLayout   = device.CreateBindGroupLayout(layoutDesc);
+                if (resources.SsaoPSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.SsaoPSKey);
+                }
+                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
+                    resources.Registry, shaderKeys, 0U, layoutDesc);
+                DebugAssert(built, TEXT("BasicDeferredRenderer"),
+                    "Failed to build SSAO bind group layout from shader reflection.");
+                if (built) {
+                    resources.SsaoLayout = device.CreateBindGroupLayout(layoutDesc);
+                }
             }
 
             if (!resources.IblBlackCube || !resources.IblBlack2D) {
@@ -718,39 +717,21 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.SkyBoxLayout) {
-                Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                layoutDesc.mSetIndex = 0U;
-
-                // b0
-                Rhi::FRhiBindGroupLayoutEntry cbuffer{};
-                cbuffer.mBinding    = 0U;
-                cbuffer.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                cbuffer.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(cbuffer);
-
-                // t0: scene depth
-                Rhi::FRhiBindGroupLayoutEntry depth{};
-                depth.mBinding    = MapSampledTextureBinding(0U);
-                depth.mType       = Rhi::ERhiBindingType::SampledTexture;
-                depth.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(depth);
-
-                // t1: sky cube
-                Rhi::FRhiBindGroupLayoutEntry sky{};
-                sky.mBinding    = MapSampledTextureBinding(1U);
-                sky.mType       = Rhi::ERhiBindingType::SampledTexture;
-                sky.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(sky);
-
-                // s0
-                Rhi::FRhiBindGroupLayoutEntry sampler{};
-                sampler.mBinding    = MapSamplerBinding(0U);
-                sampler.mType       = Rhi::ERhiBindingType::Sampler;
-                sampler.mVisibility = Rhi::ERhiShaderStageFlags::All;
-                layoutDesc.mEntries.PushBack(sampler);
-
-                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                resources.SkyBoxLayout = device.CreateBindGroupLayout(layoutDesc);
+                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
+                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
+                if (resources.SkyBoxVSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.SkyBoxVSKey);
+                }
+                if (resources.SkyBoxPSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.SkyBoxPSKey);
+                }
+                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
+                    resources.Registry, shaderKeys, 0U, layoutDesc);
+                DebugAssert(built, TEXT("BasicDeferredRenderer"),
+                    "Failed to build skybox bind group layout from shader reflection.");
+                if (built) {
+                    resources.SkyBoxLayout = device.CreateBindGroupLayout(layoutDesc);
+                }
             }
 
             if (!resources.SkyBoxPipelineLayout) {
@@ -1080,6 +1061,8 @@ namespace AltinaEngine::Rendering {
 
         resources.PerFrameLayout.Reset();
         resources.PerDrawLayout.Reset();
+        resources.PerFrameBinding = 0U;
+        resources.PerDrawBinding  = 0U;
 
         resources.BasePipelines.clear();
         resources.ShadowPipelines.clear();
@@ -1167,7 +1150,7 @@ namespace AltinaEngine::Rendering {
             groupDesc.mLayout = resources.PerFrameLayout.Get();
 
             Rhi::FRhiBindGroupEntry entry{};
-            entry.mBinding = 0U;
+            entry.mBinding = resources.PerFrameBinding;
             entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
             entry.mBuffer  = mPerFrameBuffer.Get();
             entry.mOffset  = 0ULL;
@@ -1195,7 +1178,7 @@ namespace AltinaEngine::Rendering {
                     groupDesc.mLayout = resources.PerFrameLayout.Get();
 
                     Rhi::FRhiBindGroupEntry entry{};
-                    entry.mBinding = 0U;
+                    entry.mBinding = resources.PerFrameBinding;
                     entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
                     entry.mBuffer  = mShadowPerFrameBuffers[i].Get();
                     entry.mOffset  = 0ULL;
@@ -1238,7 +1221,7 @@ namespace AltinaEngine::Rendering {
             groupDesc.mLayout = resources.PerDrawLayout.Get();
 
             Rhi::FRhiBindGroupEntry entry{};
-            entry.mBinding = GetPerDrawConstantBinding();
+            entry.mBinding = resources.PerDrawBinding;
             entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
             entry.mBuffer  = mPerDrawBuffer.Get();
             entry.mOffset  = 0ULL;
@@ -1427,9 +1410,11 @@ namespace AltinaEngine::Rendering {
         auto&             resources = GetSharedResources();
 
         FDrawListBindings drawBindings{};
-        drawBindings.PerFrame            = mPerFrameGroup.Get();
-        drawBindings.PerFrameSetIndex    = 0U;
-        drawBindings.PerDrawSetIndex     = IsVulkanBackend() ? 1U : 0U;
+        drawBindings.PerFrame = mPerFrameGroup.Get();
+        drawBindings.PerFrameSetIndex =
+            resources.PerFrameLayout ? resources.PerFrameLayout->GetDesc().mSetIndex : 0U;
+        drawBindings.PerDrawSetIndex =
+            resources.PerDrawLayout ? resources.PerDrawLayout->GetDesc().mSetIndex : 0U;
         drawBindings.PerMaterialSetIndex = IsVulkanBackend() ? 2U : 0U;
 
         FBasePassPipelineData pipelineData{};

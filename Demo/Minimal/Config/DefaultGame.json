@@ -1,6 +1,6 @@
 {
     "Rhi":{
-        "PreferD3D11":true
+        "PreferD3D11":false
     },
     "Graphics":{
         "PreferredApis":["DX11","Vulkan"],

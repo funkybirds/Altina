@@ -515,9 +515,9 @@ namespace AltinaEngine::Rendering {
             passDesc.State.ApplyRasterState(rasterState);
         }
 
-        // Renderer default: cull front (can still be overridden by material raster overrides
-        // later).
-        passDesc.State.Raster.mCullMode = Rhi::ERhiRasterCullMode::Front;
+        // Renderer default: cull back. Front-cull here can hide the entire scene when winding
+        // conventions change across backends.
+        passDesc.State.Raster.mCullMode = Rhi::ERhiRasterCullMode::Back;
 
         templ->SetPassDesc(EMaterialPass::BasePass, Move(passDesc));
 

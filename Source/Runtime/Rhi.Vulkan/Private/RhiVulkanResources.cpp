@@ -103,6 +103,38 @@ namespace AltinaEngine::Rhi {
             }
             return out;
         }
+
+        [[nodiscard]] auto ComputeSubresourceCount(u32 base, u32 count, u32 total) noexcept -> u32 {
+            if (base >= total) {
+                return 1U;
+            }
+            if (count == 0U) {
+                return total - base;
+            }
+            const u32 remain = total - base;
+            return (count > remain) ? remain : count;
+        }
+
+        [[nodiscard]] auto BuildVkSubresourceRange(const FRhiTextureDesc& texDesc,
+            const FRhiTextureViewRange& viewRange, VkImageAspectFlags aspect) noexcept
+            -> VkImageSubresourceRange {
+            VkImageSubresourceRange range{};
+            range.aspectMask = aspect;
+
+            const u32 totalMips   = (texDesc.mMipLevels > 0U) ? texDesc.mMipLevels : 1U;
+            const u32 totalLayers = (texDesc.mArrayLayers > 0U) ? texDesc.mArrayLayers : 1U;
+
+            const u32 baseMip = (viewRange.mBaseMip < totalMips) ? viewRange.mBaseMip : 0U;
+            const u32 baseLayer =
+                (viewRange.mBaseArrayLayer < totalLayers) ? viewRange.mBaseArrayLayer : 0U;
+
+            range.baseMipLevel   = baseMip;
+            range.levelCount     = ComputeSubresourceCount(baseMip, viewRange.mMipCount, totalMips);
+            range.baseArrayLayer = baseLayer;
+            range.layerCount =
+                ComputeSubresourceCount(baseLayer, viewRange.mLayerCount, totalLayers);
+            return range;
+        }
     } // namespace
 
     struct FRhiVulkanBuffer::FState {
@@ -715,15 +747,12 @@ namespace AltinaEngine::Rhi {
         const auto&           texDesc = desc.mTexture->GetDesc();
 
         VkImageViewCreateInfo view{};
-        view.sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        view.image    = vkTex->GetNativeImage();
-        view.viewType = ToVkViewType(texDesc.mDimension, texDesc.mArrayLayers > 1);
-        view.format   = Vulkan::Detail::ToVkFormat(texDesc.mFormat);
-        view.subresourceRange.aspectMask     = Vulkan::Detail::ToVkAspectFlags(texDesc.mFormat);
-        view.subresourceRange.baseMipLevel   = 0;
-        view.subresourceRange.levelCount     = texDesc.mMipLevels;
-        view.subresourceRange.baseArrayLayer = 0;
-        view.subresourceRange.layerCount     = texDesc.mArrayLayers;
+        view.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        view.image            = vkTex->GetNativeImage();
+        view.viewType         = ToVkViewType(texDesc.mDimension, texDesc.mArrayLayers > 1);
+        view.format           = Vulkan::Detail::ToVkFormat(texDesc.mFormat);
+        view.subresourceRange = BuildVkSubresourceRange(
+            texDesc, desc.mRange, Vulkan::Detail::ToVkAspectFlags(texDesc.mFormat));
 
         if (vkCreateImageView(mState->mDevice, &view, nullptr, &mState->mView) != VK_SUCCESS) {
             mState->mView = VK_NULL_HANDLE;

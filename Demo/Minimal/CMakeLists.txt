@@ -2,7 +2,7 @@ set(TargetName AltinaEngineDemoMinimal)
 
 add_executable(${TargetName})
 
-option(AE_DEMO_ENABLE_SHIPPING "Stage Demo/<Name>/Shipping from Demo/<Name>/Binaries (copies runtime payload recursively; excludes debug artifacts)" ON)
+option(AE_DEMO_ENABLE_SHIPPING "Stage Demo/<Name>/Shipping from Demo/<Name>/Binaries (copies runtime payload recursively; excludes debug artifacts)" OFF)
 
 set(Target_Private_Sources
     Source/Main.cpp

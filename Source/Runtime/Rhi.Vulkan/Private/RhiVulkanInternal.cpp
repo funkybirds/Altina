@@ -120,8 +120,11 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
     }
 
     VkFrontFace ToVkFrontFace(ERhiRasterFrontFace face) noexcept {
-        return (face == ERhiRasterFrontFace::CW) ? VK_FRONT_FACE_CLOCKWISE
-                                                 : VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        // Vulkan viewport uses negative height in FRhiVulkanCommandContext::RHISetViewport to
+        // keep screen-space orientation consistent with other backends. Negative viewport height
+        // flips winding, so front-face must be inverted here to preserve culling semantics.
+        return (face == ERhiRasterFrontFace::CW) ? VK_FRONT_FACE_COUNTER_CLOCKWISE
+                                                 : VK_FRONT_FACE_CLOCKWISE;
     }
 
     VkCompareOp ToVkCompareOp(ERhiCompareOp op) noexcept {

@@ -27,7 +27,9 @@
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiTexture.h"
 
+#include "Math/Common.h"
 #include "Math/LinAlg/Common.h"
+#include "Math/LinAlg/RenderingMath.h"
 #include "Algorithm/Sort.h"
 #include "Utility/Assert.h"
 
@@ -116,33 +118,6 @@ namespace AltinaEngine::Rendering {
             f32 EnvSaturation        = 1.0f;
         };
 
-        [[nodiscard]] auto ComputeNormalMatrix(const FMatrix4x4f& world) noexcept -> FMatrix4x4f {
-            using Core::Math::FMatrix3x3f;
-
-            // Normal matrix = transpose(inverse(upper3x3(World))).
-            FMatrix3x3f upper{};
-            for (u32 r = 0U; r < 3U; ++r) {
-                for (u32 c = 0U; c < 3U; ++c) {
-                    upper(r, c) = world(r, c);
-                }
-            }
-
-            const f32         det         = Core::Math::LinAlg::Determinant(upper);
-            const bool        bInvertible = std::abs(det) > 1e-8f;
-
-            const FMatrix3x3f normal3 = bInvertible
-                ? Core::Math::Transpose(Core::Math::LinAlg::Inverse(upper))
-                : Core::Math::LinAlg::Identity<f32, 3U>();
-
-            FMatrix4x4f       normal4 = Core::Math::LinAlg::Identity<f32, 4U>();
-            for (u32 r = 0U; r < 3U; ++r) {
-                for (u32 c = 0U; c < 3U; ++c) {
-                    normal4(r, c) = normal3(r, c);
-                }
-            }
-            return normal4;
-        }
-
         struct FWorldBoundsDebug {
             bool      bValid        = false;
             FVector3f MinWS         = FVector3f(0.0f);
@@ -157,39 +132,8 @@ namespace AltinaEngine::Rendering {
             if (!localBounds.IsValid()) {
                 return false;
             }
-
-            const FVector3f& bmin = localBounds.Min;
-            const FVector3f& bmax = localBounds.Max;
-
-            FVector3f        minWS(std::numeric_limits<f32>::max());
-            FVector3f        maxWS(-std::numeric_limits<f32>::max());
-
-            const f32        xs[2] = { bmin[0], bmax[0] };
-            const f32        ys[2] = { bmin[1], bmax[1] };
-            const f32        zs[2] = { bmin[2], bmax[2] };
-
-            for (u32 xi = 0U; xi < 2U; ++xi) {
-                for (u32 yi = 0U; yi < 2U; ++yi) {
-                    for (u32 zi = 0U; zi < 2U; ++zi) {
-                        const auto p4 =
-                            Core::Math::MatMul(world, FVector4f(xs[xi], ys[yi], zs[zi], 1.0f));
-                        const f32 invW = (std::abs(p4[3]) > 1e-6f) ? (1.0f / p4[3]) : 1.0f;
-                        const f32 x    = p4[0] * invW;
-                        const f32 y    = p4[1] * invW;
-                        const f32 z    = p4[2] * invW;
-                        minWS[0]       = std::min(minWS[0], x);
-                        minWS[1]       = std::min(minWS[1], y);
-                        minWS[2]       = std::min(minWS[2], z);
-                        maxWS[0]       = std::max(maxWS[0], x);
-                        maxWS[1]       = std::max(maxWS[1], y);
-                        maxWS[2]       = std::max(maxWS[2], z);
-                    }
-                }
-            }
-
-            outMinWS = minWS;
-            outMaxWS = maxWS;
-            return true;
+            return Core::Math::LinAlg::TransformAabbToWorld(
+                world, localBounds.Max, localBounds.Min, outMinWS, outMaxWS);
         }
 
         [[nodiscard]] auto ComputeDrawListWorldBounds(const RenderCore::Render::FDrawList& list)
@@ -315,14 +259,6 @@ namespace AltinaEngine::Rendering {
 
         [[nodiscard]] auto IsVulkanBackend() noexcept -> bool {
             return Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan;
-        }
-
-        [[nodiscard]] constexpr auto AlignUpU32(u32 value, u32 alignment) noexcept -> u32 {
-            if (alignment == 0U) {
-                return value;
-            }
-            const u32 remainder = value % alignment;
-            return (remainder == 0U) ? value : (value + (alignment - remainder));
         }
 
         [[nodiscard]] constexpr auto GetVulkanPerDrawAlignment() noexcept -> u32 {
@@ -1031,7 +967,7 @@ namespace AltinaEngine::Rendering {
 
             FPerDrawConstants constants{};
             constants.World        = batch.Instances[0].World;
-            constants.NormalMatrix = ComputeNormalMatrix(constants.World);
+            constants.NormalMatrix = Core::Math::LinAlg::ComputeNormalMatrix(constants.World);
             if (data->bUseDynamicOffset) {
                 DebugAssert(data->PerDrawWriteIndex != nullptr, TEXT("BasicDeferredRenderer"),
                     "PerDraw dynamic cbuffer state is invalid: write index ptr is null.");
@@ -1272,7 +1208,7 @@ namespace AltinaEngine::Rendering {
         }
 
         if (IsVulkanBackend()) {
-            mPerDrawStrideBytes = AlignUpU32(
+            mPerDrawStrideBytes = Core::Math::AlignUp(
                 static_cast<u32>(sizeof(FPerDrawConstants)), GetVulkanPerDrawAlignment());
             mPerDrawCapacity = GetVulkanPerDrawCapacity();
         } else {

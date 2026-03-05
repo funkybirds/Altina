@@ -74,6 +74,15 @@ namespace AltinaEngine::Core::Math {
         return 63U - Platform::CountLeadingZeros64(value);
     }
 
+    template <CIntegral T>
+    [[nodiscard]] constexpr auto AlignUp(T value, T alignment) noexcept -> T {
+        if (alignment == 0) {
+            return value;
+        }
+        const T remainder = value % alignment;
+        return (remainder == 0) ? value : (value + (alignment - remainder));
+    }
+
     // Max / Min (scalar only, identical types)
     template <CScalar T, CScalar... Ts>
         requires(CSameAsAll<T, Ts...>)

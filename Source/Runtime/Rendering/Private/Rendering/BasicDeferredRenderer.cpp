@@ -21,6 +21,7 @@
 #include "Rendering/RenderingSettings.h"
 
 #include "Container/HashMap.h"
+#include "Container/Deque.h"
 #include "Container/SmartPtr.h"
 #include "Container/Vector.h"
 #include "Logging/Log.h"
@@ -40,8 +41,6 @@
 #include "Algorithm/Sort.h"
 #include "Utility/Assert.h"
 
-#include <algorithm>
-#include <deque>
 #include <limits>
 
 using AltinaEngine::Move;
@@ -58,6 +57,7 @@ namespace AltinaEngine::Rendering {
     namespace {
         namespace Container = Core::Container;
         using Container::FStringView;
+        using Container::TDeque;
         using Container::THashMap;
         using Container::TVector;
         using RenderCore::EMaterialPass;
@@ -115,12 +115,12 @@ namespace AltinaEngine::Rendering {
                         continue;
                     }
 
-                    minWS[0] = std::min(minWS[0], instMinWS[0]);
-                    minWS[1] = std::min(minWS[1], instMinWS[1]);
-                    minWS[2] = std::min(minWS[2], instMinWS[2]);
-                    maxWS[0] = std::max(maxWS[0], instMaxWS[0]);
-                    maxWS[1] = std::max(maxWS[1], instMaxWS[1]);
-                    maxWS[2] = std::max(maxWS[2], instMaxWS[2]);
+                    minWS[0] = Core::Math::Min(minWS[0], instMinWS[0]);
+                    minWS[1] = Core::Math::Min(minWS[1], instMinWS[1]);
+                    minWS[2] = Core::Math::Min(minWS[2], instMinWS[2]);
+                    maxWS[0] = Core::Math::Max(maxWS[0], instMaxWS[0]);
+                    maxWS[1] = Core::Math::Max(maxWS[1], instMaxWS[1]);
+                    maxWS[2] = Core::Math::Max(maxWS[2], instMaxWS[2]);
                     out.InstanceCount += 1U;
                 }
             }
@@ -1612,9 +1612,9 @@ namespace AltinaEngine::Rendering {
         {
             // FrameGraph executes after this function scope; keep one stable context per Render()
             // call in the current frame to avoid dangling/overwritten user-data pointers.
-            static thread_local std::deque<FShadowCascadeExecuteContext> sShadowContexts;
-            sShadowContexts.emplace_back();
-            auto& executeCtx                              = sShadowContexts.back();
+            static thread_local TDeque<FShadowCascadeExecuteContext> sShadowContexts;
+            sShadowContexts.PushBack(FShadowCascadeExecuteContext{});
+            auto& executeCtx                              = sShadowContexts.Back();
             executeCtx.ShadowDrawList                     = shadowDrawList;
             executeCtx.DrawBindings                       = drawBindings;
             executeCtx.ShadowPipelineData                 = pipelineData;
@@ -1781,7 +1781,7 @@ namespace AltinaEngine::Rendering {
                 ssaoInputs.Height                 = height;
                 ssaoInputs.RuntimeSettings.Enable = (rSsaoEnable.GetRenderValue() != 0) ? 1U : 0U;
                 ssaoInputs.RuntimeSettings.SampleCount =
-                    static_cast<u32>(std::max(0, rSsaoSampleCount.GetRenderValue()));
+                    static_cast<u32>(Core::Math::Max(0, rSsaoSampleCount.GetRenderValue()));
                 ssaoInputs.RuntimeSettings.RadiusVS  = rSsaoRadiusVS.GetRenderValue();
                 ssaoInputs.RuntimeSettings.BiasNdc   = rSsaoBiasNdc.GetRenderValue();
                 ssaoInputs.RuntimeSettings.Power     = rSsaoPower.GetRenderValue();

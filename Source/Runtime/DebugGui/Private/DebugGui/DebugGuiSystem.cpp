@@ -33,6 +33,7 @@
 
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "ShaderCompiler/ShaderRhiBindings.h"
+#include "Shader/ShaderBindingUtility.h"
 #include "Shader/ShaderTypes.h"
 
 #include "Utility/Filesystem/Path.h"
@@ -55,14 +56,6 @@ namespace AltinaEngine::DebugGui {
         using Core::Threading::FMutex;
         using Core::Threading::FScopedLock;
         using Core::Utility::Filesystem::FPath;
-
-        [[nodiscard]] auto MapSampledTextureBinding(u32 binding) noexcept -> u32 {
-            return (Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan) ? (1000U + binding) : binding;
-        }
-
-        [[nodiscard]] auto MapSamplerBinding(u32 binding) noexcept -> u32 {
-            return (Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan) ? (2000U + binding) : binding;
-        }
 
         struct FDrawVertex {
             f32 X     = 0.0f;
@@ -1218,24 +1211,6 @@ namespace AltinaEngine::DebugGui {
             FVector2f*                              mDragOffset        = nullptr;
         };
 
-        [[nodiscard]] auto BuildLayoutHash(
-            const TVector<Rhi::FRhiBindGroupLayoutEntry>& entries, u32 setIndex) -> u64 {
-            constexpr u64 kOffset = 1469598103934665603ULL;
-            constexpr u64 kPrime  = 1099511628211ULL;
-            u64           hash    = kOffset;
-            auto          mix     = [&](u64 value) { hash = (hash ^ value) * kPrime; };
-
-            mix(setIndex);
-            for (const auto& entry : entries) {
-                mix(entry.mBinding);
-                mix(static_cast<u64>(entry.mType));
-                mix(static_cast<u64>(entry.mVisibility));
-                mix(entry.mArrayCount);
-                mix(entry.mHasDynamicOffset ? 1ULL : 0ULL);
-            }
-            return hash;
-        }
-
         void UploadDynamicBuffer(Rhi::FRhiBuffer* buffer, const void* data, u64 sizeBytes) {
             if (buffer == nullptr || data == nullptr || sizeBytes == 0ULL) {
                 return;
@@ -1477,35 +1452,42 @@ namespace AltinaEngine::DebugGui {
             void UpdateConstants(u32 w, u32 h);
             bool CompileShaders(Rhi::FRhiDevice& device);
 
-            Rhi::FRhiTextureRef            mFontTexture;
-            Rhi::FRhiShaderResourceViewRef mFontSrv;
-            Rhi::FRhiSamplerRef            mSampler;
-            Rhi::FRhiBufferRef             mConstantsBuffer;
-            Rhi::FRhiBindGroupLayoutRef    mLayout;
-            Rhi::FRhiPipelineLayoutRef     mPipelineLayout;
-            Rhi::FRhiBindGroupRef          mBindGroup;
-            Rhi::FRhiShaderRef             mVertexShader;
-            Rhi::FRhiShaderRef             mPixelShader;
-            Rhi::FRhiPipelineRef           mPipeline;
+            Rhi::FRhiTextureRef                            mFontTexture;
+            Rhi::FRhiShaderResourceViewRef                 mFontSrv;
+            Rhi::FRhiSamplerRef                            mSampler;
+            Rhi::FRhiBufferRef                             mConstantsBuffer;
+            Rhi::FRhiBindGroupLayoutRef                    mLayout;
+            Rhi::FRhiPipelineLayoutRef                     mPipelineLayout;
+            Rhi::FRhiBindGroupRef                          mBindGroup;
+            Rhi::FRhiShaderRef                             mVertexShader;
+            Rhi::FRhiShaderRef                             mPixelShader;
+            Rhi::FRhiPipelineRef                           mPipeline;
+            RenderCore::ShaderBinding::FBindingLookupTable mBindingLookupTable;
 
-            Rhi::FRhiTexture*              mBackBufferTex = nullptr;
-            Rhi::FRhiRenderTargetViewRef   mBackBufferRtv;
-            Rhi::FRhiTextureRef            mAuxColorTex1;
-            Rhi::FRhiTextureRef            mAuxColorTex2;
-            Rhi::FRhiRenderTargetViewRef   mAuxColorRtv1;
-            Rhi::FRhiRenderTargetViewRef   mAuxColorRtv2;
-            u32                            mAuxWidth  = 0U;
-            u32                            mAuxHeight = 0U;
-            Rhi::ERhiFormat                mAuxFormat = Rhi::ERhiFormat::Unknown;
+            Rhi::FRhiTexture*                              mBackBufferTex = nullptr;
+            Rhi::FRhiRenderTargetViewRef                   mBackBufferRtv;
+            Rhi::FRhiTextureRef                            mAuxColorTex1;
+            Rhi::FRhiTextureRef                            mAuxColorTex2;
+            Rhi::FRhiRenderTargetViewRef                   mAuxColorRtv1;
+            Rhi::FRhiRenderTargetViewRef                   mAuxColorRtv2;
+            u32                                            mAuxWidth  = 0U;
+            u32                                            mAuxHeight = 0U;
+            Rhi::ERhiFormat                                mAuxFormat = Rhi::ERhiFormat::Unknown;
 
-            Rhi::FRhiBufferRef             mVertexBuffer;
-            Rhi::FRhiBufferRef             mIndexBuffer;
-            u64                            mVertexBufferSize = 0ULL;
-            u64                            mIndexBufferSize  = 0ULL;
+            Rhi::FRhiBufferRef                             mVertexBuffer;
+            Rhi::FRhiBufferRef                             mIndexBuffer;
+            u64                                            mVertexBufferSize = 0ULL;
+            u64                                            mIndexBufferSize  = 0ULL;
         };
 
         bool FDebugGuiRendererD3D11::EnsureResources(
             Rhi::FRhiDevice& device, const FFontAtlas& atlas) {
+            if (!mVertexShader || !mPixelShader) {
+                if (!CompileShaders(device)) {
+                    return false;
+                }
+            }
+
             if (!mFontTexture) {
                 Rhi::FRhiTextureDesc desc{};
                 desc.mDebugName.Assign(TEXT("DebugGui.FontAtlas"));
@@ -1555,37 +1537,23 @@ namespace AltinaEngine::DebugGui {
             if (!mLayout) {
                 Rhi::FRhiBindGroupLayoutDesc layout{};
                 layout.mDebugName.Assign(TEXT("DebugGui.Layout"));
-                layout.mSetIndex = 0U;
-
-                // b0
-                {
-                    Rhi::FRhiBindGroupLayoutEntry e{};
-                    e.mBinding    = 0U;
-                    e.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                    e.mVisibility = Rhi::ERhiShaderStageFlags::Vertex;
-                    layout.mEntries.PushBack(e);
+                TVector<Rhi::FRhiShader*> shaders;
+                shaders.PushBack(mVertexShader.Get());
+                shaders.PushBack(mPixelShader.Get());
+                if (!RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaders(
+                        shaders, 0U, layout)) {
+                    LogError(TEXT(
+                        "DebugGui: Failed to build bind-group layout from shader reflection."));
+                    return false;
                 }
-                // t0
-                {
-                    Rhi::FRhiBindGroupLayoutEntry e{};
-                    e.mBinding    = MapSampledTextureBinding(0U);
-                    e.mType       = Rhi::ERhiBindingType::SampledTexture;
-                    e.mVisibility = Rhi::ERhiShaderStageFlags::Pixel;
-                    layout.mEntries.PushBack(e);
-                }
-                // s0
-                {
-                    Rhi::FRhiBindGroupLayoutEntry e{};
-                    e.mBinding    = MapSamplerBinding(0U);
-                    e.mType       = Rhi::ERhiBindingType::Sampler;
-                    e.mVisibility = Rhi::ERhiShaderStageFlags::Pixel;
-                    layout.mEntries.PushBack(e);
-                }
-
-                layout.mLayoutHash = BuildLayoutHash(layout.mEntries, layout.mSetIndex);
-                mLayout            = device.CreateBindGroupLayout(layout);
+                mLayout = device.CreateBindGroupLayout(layout);
                 if (!mLayout) {
                     LogError(TEXT("DebugGui: Failed to create bind group layout."));
+                    return false;
+                }
+                if (!RenderCore::ShaderBinding::BuildBindingLookupTableFromShaders(
+                        shaders, layout.mSetIndex, mLayout.Get(), mBindingLookupTable)) {
+                    LogError(TEXT("DebugGui: Failed to build binding lookup table."));
                     return false;
                 }
             }
@@ -1616,41 +1584,54 @@ namespace AltinaEngine::DebugGui {
             }
 
             if (!mBindGroup) {
+                u32 constantsBinding = RenderCore::ShaderBinding::kInvalidBinding;
+                u32 fontBinding      = RenderCore::ShaderBinding::kInvalidBinding;
+                u32 samplerBinding   = RenderCore::ShaderBinding::kInvalidBinding;
+                if (!RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
+                        RenderCore::ShaderBinding::HashBindingName(TEXT("DebugGuiConstants")),
+                        Rhi::ERhiBindingType::ConstantBuffer, constantsBinding)
+                    || !RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
+                        RenderCore::ShaderBinding::HashBindingName(TEXT("gFontAtlas")),
+                        Rhi::ERhiBindingType::SampledTexture, fontBinding)
+                    || !RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
+                        RenderCore::ShaderBinding::HashBindingName(TEXT("gSampler")),
+                        Rhi::ERhiBindingType::Sampler, samplerBinding)) {
+                    LogError(
+                        TEXT("DebugGui: Failed to resolve bind-group bindings from reflection."));
+                    return false;
+                }
+
+                RenderCore::ShaderBinding::FBindGroupBuilder builder(mLayout.Get());
+                if (!builder.AddBuffer(constantsBinding, mConstantsBuffer.Get(), 0ULL,
+                        static_cast<u64>(sizeof(FConstants)))) {
+                    LogError(
+                        TEXT(
+                            "DebugGui: Failed to add constant-buffer bind-group entry (binding={})."),
+                        constantsBinding);
+                    return false;
+                }
+                if (!builder.AddTexture(fontBinding, mFontTexture.Get())) {
+                    LogError(
+                        TEXT("DebugGui: Failed to add font-texture bind-group entry (binding={})."),
+                        fontBinding);
+                    return false;
+                }
+                if (!builder.AddSampler(samplerBinding, mSampler.Get())) {
+                    LogError(TEXT("DebugGui: Failed to add sampler bind-group entry (binding={})."),
+                        samplerBinding);
+                    return false;
+                }
+
                 Rhi::FRhiBindGroupDesc bg{};
                 bg.mDebugName.Assign(TEXT("DebugGui.BindGroup"));
-                bg.mLayout = mLayout.Get();
-                {
-                    Rhi::FRhiBindGroupEntry e{};
-                    e.mBinding = 0U;
-                    e.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                    e.mBuffer  = mConstantsBuffer.Get();
-                    e.mOffset  = 0ULL;
-                    e.mSize    = sizeof(FConstants);
-                    bg.mEntries.PushBack(e);
-                }
-                {
-                    Rhi::FRhiBindGroupEntry e{};
-                    e.mBinding = MapSampledTextureBinding(0U);
-                    e.mType    = Rhi::ERhiBindingType::SampledTexture;
-                    e.mTexture = mFontTexture.Get();
-                    bg.mEntries.PushBack(e);
-                }
-                {
-                    Rhi::FRhiBindGroupEntry e{};
-                    e.mBinding = MapSamplerBinding(0U);
-                    e.mType    = Rhi::ERhiBindingType::Sampler;
-                    e.mSampler = mSampler.Get();
-                    bg.mEntries.PushBack(e);
+                if (!builder.Build(bg)) {
+                    LogError(
+                        TEXT("DebugGui: Failed to build bind group desc (layout/entry mismatch)."));
+                    return false;
                 }
                 mBindGroup = device.CreateBindGroup(bg);
                 if (!mBindGroup) {
                     LogError(TEXT("DebugGui: Failed to create bind group."));
-                    return false;
-                }
-            }
-
-            if (!mVertexShader || !mPixelShader) {
-                if (!CompileShaders(device)) {
                     return false;
                 }
             }

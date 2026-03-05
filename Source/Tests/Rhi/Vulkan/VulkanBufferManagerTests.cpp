@@ -21,6 +21,7 @@
 
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "ShaderCompiler/ShaderRhiBindings.h"
+#include "Shader/ShaderBindingUtility.h"
 #include "Utility/String/CodeConvert.h"
 
 #include <cstring>
@@ -393,16 +394,12 @@ TEST_CASE("Rhi.Vulkan.UpdateTextureSubresource.DispatchReadsCorrectTexel") {
         return;
     }
 
-    FRhiBindGroupDesc groupDesc{};
-    groupDesc.mLayout = layoutDesc.mBindGroupLayouts[texSet];
-    groupDesc.mEntries.PushBack(FRhiBindGroupEntry{ .mBinding = texBinding,
-        .mType                                                = ERhiBindingType::SampledTexture,
-        .mTexture                                             = texture.Get() });
-    groupDesc.mEntries.PushBack(FRhiBindGroupEntry{ .mBinding = outBinding,
-        .mType                                                = ERhiBindingType::StorageBuffer,
-        .mBuffer                                              = outBuffer.Get(),
-        .mOffset                                              = 0ULL,
-        .mSize                                                = 0ULL });
+    FRhiBindGroupDesc                            groupDesc{};
+    RenderCore::ShaderBinding::FBindGroupBuilder bindGroupBuilder(
+        layoutDesc.mBindGroupLayouts[texSet]);
+    REQUIRE(bindGroupBuilder.AddTexture(texBinding, texture.Get()));
+    REQUIRE(bindGroupBuilder.AddBuffer(outBinding, outBuffer.Get(), 0ULL, 0ULL));
+    REQUIRE(bindGroupBuilder.Build(groupDesc));
     auto group = device->CreateBindGroup(groupDesc);
     REQUIRE(group.Get() != nullptr);
     if (!group) {

@@ -51,6 +51,7 @@ target_link_libraries(${TargetName}
         AltinaEngine::Input
         AltinaEngine::Rhi::General
     PRIVATE
+        AltinaEngine::RenderCore
         AltinaEngine::ShaderCompiler
 )
 
@@ -95,4 +96,3 @@ set_target_properties(${TargetName}
 )
 
 ae_add_reflection_codegen(TARGET ${TargetName})
-

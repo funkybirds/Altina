@@ -10,8 +10,10 @@
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiResourceView.h"
 #include "Rhi/RhiSampler.h"
+#include "Shader/ShaderBindingUtility.h"
 #include "Logging/Log.h"
 #include "Types/Traits.h"
+#include "Utility/Assert.h"
 
 #include <algorithm>
 
@@ -20,6 +22,7 @@ namespace AltinaEngine::RenderCore {
     namespace {
         using Core::Platform::Generic::Memcpy;
         using Core::Platform::Generic::Memset;
+        using Core::Utility::DebugAssert;
 
         constexpr u32 kFnvOffset32 = 2166136261u;
         constexpr u32 kFnvPrime32  = 16777619u;
@@ -247,14 +250,50 @@ namespace AltinaEngine::RenderCore {
         std::sort(entries.begin(), entries.end(),
             [](const FEntry& a, const FEntry& b) { return a.mTextureBinding < b.mTextureBinding; });
 
+        TVector<FEntry> deduplicated;
+        deduplicated.Reserve(entries.Size());
+        for (const auto& entry : entries) {
+            if (deduplicated.IsEmpty()) {
+                deduplicated.PushBack(entry);
+                continue;
+            }
+
+            auto& last = deduplicated.Back();
+            if (last.mTextureBinding != entry.mTextureBinding) {
+                deduplicated.PushBack(entry);
+                continue;
+            }
+
+            // Merge duplicate entries emitted by cross-stage reflection for the same resource.
+            // Some shader pipelines may alias names to the same register; keep running and log.
+            if (last.mNameHash != entry.mNameHash) {
+                LogWarningCat(TEXT("RenderCore.Material"),
+                    "Material layout has conflicting texture names on same binding={} "
+                    "(nameHashA=0x{:08X}, nameHashB=0x{:08X}); keeping first.",
+                    entry.mTextureBinding, static_cast<u32>(last.mNameHash),
+                    static_cast<u32>(entry.mNameHash));
+            }
+
+            if (last.mSamplerBinding == kMaterialInvalidBinding) {
+                last.mSamplerBinding = entry.mSamplerBinding;
+            } else if (entry.mSamplerBinding != kMaterialInvalidBinding) {
+                if (last.mSamplerBinding != entry.mSamplerBinding) {
+                    LogWarningCat(TEXT("RenderCore.Material"),
+                        "Material layout has conflicting sampler bindings for texture binding={} "
+                        "(samplerA={}, samplerB={}); keeping first.",
+                        entry.mTextureBinding, last.mSamplerBinding, entry.mSamplerBinding);
+                }
+            }
+        }
+
         TextureNameHashes.Clear();
         TextureBindings.Clear();
         SamplerBindings.Clear();
-        TextureNameHashes.Reserve(entries.Size());
-        TextureBindings.Reserve(entries.Size());
-        SamplerBindings.Reserve(entries.Size());
+        TextureNameHashes.Reserve(deduplicated.Size());
+        TextureBindings.Reserve(deduplicated.Size());
+        SamplerBindings.Reserve(deduplicated.Size());
 
-        for (const auto& entry : entries) {
+        for (const auto& entry : deduplicated) {
             TextureNameHashes.PushBack(entry.mNameHash);
             TextureBindings.PushBack(entry.mTextureBinding);
             SamplerBindings.PushBack(entry.mSamplerBinding);
@@ -692,21 +731,34 @@ namespace AltinaEngine::RenderCore {
                 continue;
             }
 
-            Rhi::FRhiBindGroupDesc groupDesc{};
-            groupDesc.mLayout = layoutRef.Get();
+            ShaderBinding::FBindGroupBuilder groupBuilder(layoutRef.Get());
+            bool                             passValid = true;
+
+            auto                             logPassLayoutContext = [&]() {
+                LogErrorCat(TEXT("RenderCore.Material"),
+                                                "Material pass {} layout context: set={}, hasCBuffer={}, texCount={}, samplerCount={}.",
+                                                static_cast<u32>(pass), layoutDesc.mSetIndex,
+                                                static_cast<u32>(layout.PropertyBag.IsValid()),
+                                                static_cast<u32>(layout.TextureBindings.Size()),
+                                                static_cast<u32>(layout.SamplerBindings.Size()));
+            };
 
             if (layout.PropertyBag.IsValid() && mCBuffer) {
-                Rhi::FRhiBindGroupEntry cbufferEntry{};
-                cbufferEntry.mBinding = layout.PropertyBag.GetBinding();
-                cbufferEntry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                cbufferEntry.mBuffer  = mCBuffer.Get();
-                cbufferEntry.mOffset  = 0ULL;
-                cbufferEntry.mSize    = static_cast<u64>(layout.PropertyBag.GetSizeBytes());
-                groupDesc.mEntries.PushBack(cbufferEntry);
+                if (!groupBuilder.AddBuffer(layout.PropertyBag.GetBinding(), mCBuffer.Get(), 0ULL,
+                        static_cast<u64>(layout.PropertyBag.GetSizeBytes()))) {
+                    LogErrorCat(TEXT("RenderCore.Material"),
+                        "Material pass {}: failed to add cbuffer entry (binding={}); skipping pass.",
+                        static_cast<u32>(pass), layout.PropertyBag.GetBinding());
+                    logPassLayoutContext();
+                    passValid = false;
+                }
             }
 
             const usize texCount = layout.TextureBindings.Size();
             for (usize i = 0U; i < texCount; ++i) {
+                if (!passValid) {
+                    break;
+                }
                 const auto nameHash =
                     (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i] : 0U;
                 const auto* param =
@@ -722,12 +774,10 @@ namespace AltinaEngine::RenderCore {
                     (param && param->Sampler) ? static_cast<const void*>(param->Sampler.Get())
                                               : nullptr);
 
-                Rhi::FRhiBindGroupEntry texEntry{};
-                texEntry.mBinding = layout.TextureBindings[i];
-                texEntry.mType    = Rhi::ERhiBindingType::SampledTexture;
-                texEntry.mTexture = (param && param->SRV) ? param->SRV->GetTexture() : nullptr;
+                Rhi::FRhiTexture* texture =
+                    (param && param->SRV) ? param->SRV->GetTexture() : nullptr;
 
-                if (texEntry.mTexture == nullptr) {
+                if (texture == nullptr) {
                     // Bind safe fallbacks for missing textures so the shader doesn't sample null
                     // SRVs (which returns 0 and can collapse lighting to black).
                     auto&      fb            = EnsureDefaultMaterialFallbacks();
@@ -741,37 +791,61 @@ namespace AltinaEngine::RenderCore {
                     const auto hDisplacement = HashMaterialParamName(TEXT("DisplacementTex"));
 
                     if (nameHash == hBaseColor) {
-                        texEntry.mTexture = fb.WhiteTex.Get();
+                        texture = fb.WhiteTex.Get();
                     } else if (nameHash == hNormal) {
-                        texEntry.mTexture = fb.NormalFlatTex.Get();
+                        texture = fb.NormalFlatTex.Get();
                     } else if (nameHash == hRoughness) {
-                        texEntry.mTexture = fb.GrayTex.Get();
+                        texture = fb.GrayTex.Get();
                     } else if (nameHash == hOcclusion) {
-                        texEntry.mTexture = fb.WhiteTex.Get();
+                        texture = fb.WhiteTex.Get();
                     } else if (nameHash == hMetallic || nameHash == hEmissive
                         || nameHash == hSpecular || nameHash == hDisplacement) {
-                        texEntry.mTexture = fb.BlackTex.Get();
+                        texture = fb.BlackTex.Get();
                     } else {
                         // Unknown texture slot: default to white to avoid multiplying to black.
-                        texEntry.mTexture = fb.WhiteTex.Get();
+                        texture = fb.WhiteTex.Get();
                     }
                 }
-                groupDesc.mEntries.PushBack(texEntry);
+                if (!groupBuilder.AddTexture(layout.TextureBindings[i], texture)) {
+                    LogErrorCat(TEXT("RenderCore.Material"),
+                        "Material pass {}: failed to add texture entry (binding={}, texIndex={}, nameHash=0x{:08X}); skipping pass.",
+                        static_cast<u32>(pass), layout.TextureBindings[i], static_cast<u32>(i),
+                        static_cast<u32>(nameHash));
+                    logPassLayoutContext();
+                    passValid = false;
+                    break;
+                }
 
                 if (i < layout.SamplerBindings.Size()) {
                     const auto samplerBinding = layout.SamplerBindings[i];
                     if (samplerBinding != kMaterialInvalidBinding) {
-                        Rhi::FRhiBindGroupEntry samplerEntry{};
-                        samplerEntry.mBinding = samplerBinding;
-                        samplerEntry.mType    = Rhi::ERhiBindingType::Sampler;
-                        samplerEntry.mSampler = (param && param->Sampler)
+                        Rhi::FRhiSampler* sampler = (param && param->Sampler)
                             ? param->Sampler.Get()
                             : EnsureDefaultMaterialFallbacks().Sampler.Get();
-                        groupDesc.mEntries.PushBack(samplerEntry);
+                        if (!groupBuilder.AddSampler(samplerBinding, sampler)) {
+                            LogErrorCat(TEXT("RenderCore.Material"),
+                                "Material pass {}: failed to add sampler entry (binding={}, texIndex={}, nameHash=0x{:08X}); skipping pass.",
+                                static_cast<u32>(pass), samplerBinding, static_cast<u32>(i),
+                                static_cast<u32>(nameHash));
+                            logPassLayoutContext();
+                            passValid = false;
+                            break;
+                        }
                     }
                 }
             }
+            if (!passValid) {
+                continue;
+            }
 
+            Rhi::FRhiBindGroupDesc groupDesc{};
+            if (!groupBuilder.Build(groupDesc)) {
+                LogErrorCat(TEXT("RenderCore.Material"),
+                    "Material pass {}: bind-group build failed (layout mismatch); skipping pass.",
+                    static_cast<u32>(pass));
+                logPassLayoutContext();
+                continue;
+            }
             auto groupRef = device->CreateBindGroup(groupDesc);
             if (!groupRef) {
                 continue;

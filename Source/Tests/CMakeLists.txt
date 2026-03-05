@@ -96,6 +96,7 @@ if(AE_TEST_RHI_VULKAN_SOURCES)
         SOURCES ${AE_TEST_RHI_VULKAN_SOURCES}
         LIBS
             AltinaEngine::Rhi::Vulkan
+            AltinaEngine::RenderCore
             AltinaEngine::ShaderCompiler
     )
 endif()

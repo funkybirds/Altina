@@ -120,31 +120,11 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
             const Detail::FPostProcessSharedResources& shared, Rhi::FRhiTexture* inTex)
             -> Rhi::FRhiBindGroupRef {
             Rhi::FRhiBindGroupDesc groupDesc{};
-            groupDesc.mLayout = shared.Layout.Get();
-
-            // b0
-            Rhi::FRhiBindGroupEntry cb{};
-            cb.mBinding = 0U;
-            cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-            cb.mBuffer  = shared.BloomConstantsBuffer.Get();
-            cb.mOffset  = 0ULL;
-            cb.mSize    = static_cast<u64>(sizeof(FBloomConstants));
-            groupDesc.mEntries.PushBack(cb);
-
-            // t0
-            Rhi::FRhiBindGroupEntry tex{};
-            tex.mBinding = Detail::MapSampledTextureBinding(0U);
-            tex.mType    = Rhi::ERhiBindingType::SampledTexture;
-            tex.mTexture = inTex;
-            groupDesc.mEntries.PushBack(tex);
-
-            // s0
-            Rhi::FRhiBindGroupEntry sampler{};
-            sampler.mBinding = Detail::MapSamplerBinding(0U);
-            sampler.mType    = Rhi::ERhiBindingType::Sampler;
-            sampler.mSampler = shared.LinearSampler.Get();
-            groupDesc.mEntries.PushBack(sampler);
-
+            if (!Detail::BuildCommonBindGroupDesc(shared, Detail::kNameBloomConstants,
+                    shared.BloomConstantsBuffer.Get(), static_cast<u64>(sizeof(FBloomConstants)),
+                    inTex, groupDesc)) {
+                return {};
+            }
             return device.CreateBindGroup(groupDesc);
         }
 

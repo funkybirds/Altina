@@ -50,6 +50,7 @@ using AltinaEngine::Core::Container::FString;
 namespace AltinaEngine::Rendering {
     namespace {
         namespace Container = Core::Container;
+        using Container::FStringView;
         using Container::THashMap;
         using Container::TVector;
         using RenderCore::EMaterialPass;
@@ -207,11 +208,13 @@ namespace AltinaEngine::Rendering {
 
             // Deferred lighting (FSQ -> BackBuffer).
             Rhi::FRhiBindGroupLayoutRef                       LightingLayout;
+            RenderCore::ShaderBinding::FBindingLookupTable    LightingBindings;
             Rhi::FRhiPipelineLayoutRef                        LightingPipelineLayout;
             Rhi::FRhiPipelineRef                              LightingPipeline;
 
             // SSAO (FSQ -> AO texture).
             Rhi::FRhiBindGroupLayoutRef                       SsaoLayout;
+            RenderCore::ShaderBinding::FBindingLookupTable    SsaoBindings;
             Rhi::FRhiPipelineLayoutRef                        SsaoPipelineLayout;
             Rhi::FRhiPipelineRef                              SsaoPipeline;
 
@@ -226,6 +229,7 @@ namespace AltinaEngine::Rendering {
 
             // Skybox (FSQ -> SceneColorHDR).
             Rhi::FRhiBindGroupLayoutRef                       SkyBoxLayout;
+            RenderCore::ShaderBinding::FBindingLookupTable    SkyBoxBindings;
             Rhi::FRhiPipelineLayoutRef                        SkyBoxPipelineLayout;
             Rhi::FRhiPipelineRef                              SkyBoxPipeline;
 
@@ -240,6 +244,34 @@ namespace AltinaEngine::Rendering {
         auto GetSharedResources() -> FDeferredSharedResources& {
             static FDeferredSharedResources resources;
             return resources;
+        }
+
+        constexpr auto     kNameDeferredView  = TEXT("DeferredView");
+        constexpr auto     kNameIblConstants  = TEXT("IblConstants");
+        constexpr auto     kNameGBufferA      = TEXT("GBufferA");
+        constexpr auto     kNameGBufferB      = TEXT("GBufferB");
+        constexpr auto     kNameGBufferC      = TEXT("GBufferC");
+        constexpr auto     kNameSceneDepth    = TEXT("SceneDepth");
+        constexpr auto     kNameShadowMap     = TEXT("ShadowMap");
+        constexpr auto     kNameSkyIrrCube    = TEXT("SkyIrradianceCube");
+        constexpr auto     kNameSkySpecCube   = TEXT("SkySpecularCube");
+        constexpr auto     kNameBrdfLut       = TEXT("BrdfLut");
+        constexpr auto     kNameSsaoTex       = TEXT("SsaoTex");
+        constexpr auto     kNameLinearSampler = TEXT("LinearSampler");
+        constexpr auto     kNameSsaoConstants = TEXT("SsaoConstants");
+        constexpr auto     kNameSkyCube       = TEXT("SkyCube");
+
+        [[nodiscard]] auto RequireBinding(
+            const RenderCore::ShaderBinding::FBindingLookupTable& table, const TChar* name,
+            Rhi::ERhiBindingType type, const TChar* passTag) -> u32 {
+            const u32 nameHash = RenderCore::ShaderBinding::HashBindingName(FStringView(name));
+            u32       binding  = RenderCore::ShaderBinding::kInvalidBinding;
+            DebugAssert(
+                RenderCore::ShaderBinding::FindBindingByNameHash(table, nameHash, type, binding),
+                TEXT("BasicDeferredRenderer"),
+                "{}: failed to resolve binding from lookup table (name={}, hash={}, type={}).",
+                passTag, name, nameHash, static_cast<u32>(type));
+            return binding;
         }
 
         auto BuildLayoutHash(const TVector<Rhi::FRhiBindGroupLayoutEntry>& entries, u32 setIndex)
@@ -272,14 +304,6 @@ namespace AltinaEngine::Rendering {
         [[nodiscard]] constexpr auto GetVulkanPerDrawCapacity() noexcept -> u32 {
             // Covers base pass + 4 shadow cascades for typical scenes with headroom.
             return 16384U;
-        }
-
-        [[nodiscard]] auto MapSampledTextureBinding(u32 binding) noexcept -> u32 {
-            return IsVulkanBackend() ? (1000U + binding) : binding;
-        }
-
-        [[nodiscard]] auto MapSamplerBinding(u32 binding) noexcept -> u32 {
-            return IsVulkanBackend() ? (2000U + binding) : binding;
         }
 
         auto BuildMaterialBindGroupLayoutDesc(const RenderCore::FMaterialLayout& materialLayout,
@@ -635,6 +659,11 @@ namespace AltinaEngine::Rendering {
                     "Failed to build lighting bind group layout from shader reflection.");
                 if (built) {
                     resources.LightingLayout = device.CreateBindGroupLayout(layoutDesc);
+                    DebugAssert(RenderCore::ShaderBinding::BuildBindingLookupTable(
+                                    resources.Registry, shaderKeys, 0U,
+                                    resources.LightingLayout.Get(), resources.LightingBindings),
+                        TEXT("BasicDeferredRenderer"),
+                        "Failed to build lighting binding lookup table from shader reflection.");
                 }
             }
 
@@ -653,6 +682,11 @@ namespace AltinaEngine::Rendering {
                     "Failed to build SSAO bind group layout from shader reflection.");
                 if (built) {
                     resources.SsaoLayout = device.CreateBindGroupLayout(layoutDesc);
+                    DebugAssert(
+                        RenderCore::ShaderBinding::BuildBindingLookupTable(resources.Registry,
+                            shaderKeys, 0U, resources.SsaoLayout.Get(), resources.SsaoBindings),
+                        TEXT("BasicDeferredRenderer"),
+                        "Failed to build SSAO binding lookup table from shader reflection.");
                 }
             }
 
@@ -731,6 +765,11 @@ namespace AltinaEngine::Rendering {
                     "Failed to build skybox bind group layout from shader reflection.");
                 if (built) {
                     resources.SkyBoxLayout = device.CreateBindGroupLayout(layoutDesc);
+                    DebugAssert(
+                        RenderCore::ShaderBinding::BuildBindingLookupTable(resources.Registry,
+                            shaderKeys, 0U, resources.SkyBoxLayout.Get(), resources.SkyBoxBindings),
+                        TEXT("BasicDeferredRenderer"),
+                        "Failed to build skybox binding lookup table from shader reflection.");
                 }
             }
 
@@ -1044,14 +1083,17 @@ namespace AltinaEngine::Rendering {
         resources.LightingPipeline.Reset();
         resources.LightingPipelineLayout.Reset();
         resources.LightingLayout.Reset();
+        resources.LightingBindings.Reset();
 
         resources.SsaoPipeline.Reset();
         resources.SsaoPipelineLayout.Reset();
         resources.SsaoLayout.Reset();
+        resources.SsaoBindings.Reset();
 
         resources.SkyBoxPipeline.Reset();
         resources.SkyBoxPipelineLayout.Reset();
         resources.SkyBoxLayout.Reset();
+        resources.SkyBoxBindings.Reset();
 
         resources.IblBlackCube.Reset();
         resources.IblBlack2D.Reset();
@@ -1146,17 +1188,14 @@ namespace AltinaEngine::Rendering {
         }
 
         if (!mPerFrameGroup && mPerFrameBuffer && resources.PerFrameLayout) {
+            RenderCore::ShaderBinding::FBindGroupBuilder builder(resources.PerFrameLayout.Get());
+            DebugAssert(builder.AddBuffer(resources.PerFrameBinding, mPerFrameBuffer.Get(), 0ULL,
+                            static_cast<u64>(sizeof(FPerFrameConstants))),
+                TEXT("BasicDeferredRenderer"), "Failed to add per-frame binding (binding={}).",
+                resources.PerFrameBinding);
             Rhi::FRhiBindGroupDesc groupDesc{};
-            groupDesc.mLayout = resources.PerFrameLayout.Get();
-
-            Rhi::FRhiBindGroupEntry entry{};
-            entry.mBinding = resources.PerFrameBinding;
-            entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-            entry.mBuffer  = mPerFrameBuffer.Get();
-            entry.mOffset  = 0ULL;
-            entry.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
-            groupDesc.mEntries.PushBack(entry);
-
+            DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
+                "Failed to build per-frame bind group desc from layout.");
             mPerFrameGroup = device.CreateBindGroup(groupDesc);
         }
 
@@ -1174,17 +1213,17 @@ namespace AltinaEngine::Rendering {
                 }
 
                 if (!mShadowPerFrameGroups[i] && mShadowPerFrameBuffers[i]) {
+                    RenderCore::ShaderBinding::FBindGroupBuilder builder(
+                        resources.PerFrameLayout.Get());
+                    DebugAssert(builder.AddBuffer(resources.PerFrameBinding,
+                                    mShadowPerFrameBuffers[i].Get(), 0ULL,
+                                    static_cast<u64>(sizeof(FPerFrameConstants))),
+                        TEXT("BasicDeferredRenderer"),
+                        "Failed to add shadow per-frame binding (binding={}, cascade={}).",
+                        resources.PerFrameBinding, i);
                     Rhi::FRhiBindGroupDesc groupDesc{};
-                    groupDesc.mLayout = resources.PerFrameLayout.Get();
-
-                    Rhi::FRhiBindGroupEntry entry{};
-                    entry.mBinding = resources.PerFrameBinding;
-                    entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                    entry.mBuffer  = mShadowPerFrameBuffers[i].Get();
-                    entry.mOffset  = 0ULL;
-                    entry.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
-                    groupDesc.mEntries.PushBack(entry);
-
+                    DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
+                        "Failed to build shadow per-frame bind group desc from layout.");
                     mShadowPerFrameGroups[i] = device.CreateBindGroup(groupDesc);
                 }
             }
@@ -1217,17 +1256,14 @@ namespace AltinaEngine::Rendering {
         }
 
         if (!mPerDrawGroup && mPerDrawBuffer && resources.PerDrawLayout) {
+            RenderCore::ShaderBinding::FBindGroupBuilder builder(resources.PerDrawLayout.Get());
+            DebugAssert(builder.AddBuffer(resources.PerDrawBinding, mPerDrawBuffer.Get(), 0ULL,
+                            static_cast<u64>(sizeof(FPerDrawConstants))),
+                TEXT("BasicDeferredRenderer"), "Failed to add per-draw binding (binding={}).",
+                resources.PerDrawBinding);
             Rhi::FRhiBindGroupDesc groupDesc{};
-            groupDesc.mLayout = resources.PerDrawLayout.Get();
-
-            Rhi::FRhiBindGroupEntry entry{};
-            entry.mBinding = resources.PerDrawBinding;
-            entry.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-            entry.mBuffer  = mPerDrawBuffer.Get();
-            entry.mOffset  = 0ULL;
-            entry.mSize    = static_cast<u64>(sizeof(FPerDrawConstants));
-            groupDesc.mEntries.PushBack(entry);
-
+            DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
+                "Failed to build per-draw bind group desc from layout.");
             mPerDrawGroup = device.CreateBindGroup(groupDesc);
         }
     }
@@ -1557,7 +1593,6 @@ namespace AltinaEngine::Rendering {
             },
             [drawList, drawBindings, pipelineData, bindingData, viewRect](Rhi::FRhiCmdContext& ctx,
                 const RenderCore::FFrameGraphPassResources&, const FBasePassData&) -> void {
-                // LogInfo(TEXT("FG Pass: BasicDeferred.BasePass"));
                 Rhi::FRhiViewportRect viewport{};
                 viewport.mX        = static_cast<f32>(viewRect.X);
                 viewport.mY        = static_cast<f32>(viewRect.Y);
@@ -1808,8 +1843,6 @@ namespace AltinaEngine::Rendering {
                         lightViewProj  = csmData.Cascades[cascade].LightViewProj](
                         Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources&,
                         const FShadowPassData&) -> void {
-                        // LogInfo(TEXT("FG Pass: BasicDeferred.ShadowCSM"));
-
                         if (perFrameBuffer) {
                             FPerFrameConstants constants{};
                             constants.ViewProjection = lightViewProj;
@@ -2046,44 +2079,43 @@ namespace AltinaEngine::Rendering {
 
                     ctx.RHIUpdateDynamicBufferDiscard(ssaoBuffer, &ssao, sizeof(ssao), 0ULL);
 
-                    // Bind group (b0 + b1 + t0..t1 + s0).
+                    const u32 ssaoPerFrameBinding  = RequireBinding(shared.SsaoBindings,
+                         kNameDeferredView, Rhi::ERhiBindingType::ConstantBuffer, TEXT("SSAO"));
+                    const u32 ssaoConstantsBinding = RequireBinding(shared.SsaoBindings,
+                        kNameSsaoConstants, Rhi::ERhiBindingType::ConstantBuffer, TEXT("SSAO"));
+                    const u32 ssaoNormalBinding = RequireBinding(shared.SsaoBindings, kNameGBufferB,
+                        Rhi::ERhiBindingType::SampledTexture, TEXT("SSAO"));
+                    const u32 ssaoDepthBinding  = RequireBinding(shared.SsaoBindings,
+                         kNameSceneDepth, Rhi::ERhiBindingType::SampledTexture, TEXT("SSAO"));
+                    const u32 ssaoSamplerBinding = RequireBinding(shared.SsaoBindings,
+                        kNameLinearSampler, Rhi::ERhiBindingType::Sampler, TEXT("SSAO"));
+
+                    RenderCore::ShaderBinding::FBindGroupBuilder builder(shared.SsaoLayout.Get());
+                    DebugAssert(builder.AddBuffer(ssaoPerFrameBinding, perFrameBuffer, 0ULL,
+                                    static_cast<u64>(sizeof(FPerFrameConstants))),
+                        TEXT("BasicDeferredRenderer"),
+                        "SSAO bind group: failed to add per-frame cbuffer (binding={}).",
+                        ssaoPerFrameBinding);
+                    DebugAssert(builder.AddBuffer(ssaoConstantsBinding, ssaoBuffer, 0ULL,
+                                    static_cast<u64>(sizeof(FSsaoConstants))),
+                        TEXT("BasicDeferredRenderer"),
+                        "SSAO bind group: failed to add constants cbuffer (binding={}).",
+                        ssaoConstantsBinding);
+                    DebugAssert(builder.AddTexture(ssaoNormalBinding, normalTex),
+                        TEXT("BasicDeferredRenderer"),
+                        "SSAO bind group: failed to add normal texture (binding={}).",
+                        ssaoNormalBinding);
+                    DebugAssert(builder.AddTexture(ssaoDepthBinding, depthTex),
+                        TEXT("BasicDeferredRenderer"),
+                        "SSAO bind group: failed to add depth texture (binding={}).",
+                        ssaoDepthBinding);
+                    DebugAssert(builder.AddSampler(ssaoSamplerBinding, shared.OutputSampler.Get()),
+                        TEXT("BasicDeferredRenderer"),
+                        "SSAO bind group: failed to add sampler (binding={}).", ssaoSamplerBinding);
+
                     Rhi::FRhiBindGroupDesc groupDesc{};
-                    groupDesc.mLayout = shared.SsaoLayout.Get();
-
-                    Rhi::FRhiBindGroupEntry cb{};
-                    cb.mBinding = 0U;
-                    cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                    cb.mBuffer  = perFrameBuffer;
-                    cb.mOffset  = 0ULL;
-                    cb.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
-                    groupDesc.mEntries.PushBack(cb);
-
-                    Rhi::FRhiBindGroupEntry ssaoCb{};
-                    ssaoCb.mBinding = 1U;
-                    ssaoCb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                    ssaoCb.mBuffer  = ssaoBuffer;
-                    ssaoCb.mOffset  = 0ULL;
-                    ssaoCb.mSize    = static_cast<u64>(sizeof(FSsaoConstants));
-                    groupDesc.mEntries.PushBack(ssaoCb);
-
-                    Rhi::FRhiBindGroupEntry eNormal{};
-                    eNormal.mBinding = MapSampledTextureBinding(0U);
-                    eNormal.mType    = Rhi::ERhiBindingType::SampledTexture;
-                    eNormal.mTexture = normalTex;
-                    groupDesc.mEntries.PushBack(eNormal);
-
-                    Rhi::FRhiBindGroupEntry eDepth{};
-                    eDepth.mBinding = MapSampledTextureBinding(1U);
-                    eDepth.mType    = Rhi::ERhiBindingType::SampledTexture;
-                    eDepth.mTexture = depthTex;
-                    groupDesc.mEntries.PushBack(eDepth);
-
-                    Rhi::FRhiBindGroupEntry sampler{};
-                    sampler.mBinding = MapSamplerBinding(0U);
-                    sampler.mType    = Rhi::ERhiBindingType::Sampler;
-                    sampler.mSampler = shared.OutputSampler.Get();
-                    groupDesc.mEntries.PushBack(sampler);
-
+                    DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
+                        "SSAO bind group: builder/layout mismatch.");
                     auto bindGroup = device->CreateBindGroup(groupDesc);
                     Assert(!(!bindGroup), TEXT("BasicDeferredRenderer"),
                         "Failed to create bind group");
@@ -2236,7 +2268,6 @@ namespace AltinaEngine::Rendering {
                 specularMaxLod = mViewContext.SkySpecularMaxLod](Rhi::FRhiCmdContext& ctx,
                 const RenderCore::FFrameGraphPassResources&                           res,
                 const FLightingPassData& data) -> void {
-                // LogInfo(TEXT("FG Pass: BasicDeferred.DeferredLighting"));
                 auto& shared = GetSharedResources();
                 if (!shared.LightingPipeline || !shared.LightingLayout || !shared.OutputSampler) {
                     DebugAssert(false, TEXT("BasicDeferredRenderer"),
@@ -2296,91 +2327,90 @@ namespace AltinaEngine::Rendering {
                         iblBuffer, &iblConstants, sizeof(iblConstants), 0ULL);
                 }
 
-                // Bind group (b0 + b1 + t0..t8 + s0).
+                auto*     irrTex  = bEnableIbl ? skyIrradiance : shared.IblBlackCube.Get();
+                auto*     specTex = bEnableIbl ? skySpecular : shared.IblBlackCube.Get();
+                auto*     lutTex  = bEnableIbl ? brdfLut : shared.IblBlack2D.Get();
+                const u32 lightingPerFrameBinding = RequireBinding(shared.LightingBindings,
+                    kNameDeferredView, Rhi::ERhiBindingType::ConstantBuffer, TEXT("Lighting"));
+                const u32 lightingIblBinding      = RequireBinding(shared.LightingBindings,
+                         kNameIblConstants, Rhi::ERhiBindingType::ConstantBuffer, TEXT("Lighting"));
+                const u32 lightingGBufferABinding = RequireBinding(shared.LightingBindings,
+                    kNameGBufferA, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
+                const u32 lightingGBufferBBinding = RequireBinding(shared.LightingBindings,
+                    kNameGBufferB, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
+                const u32 lightingGBufferCBinding = RequireBinding(shared.LightingBindings,
+                    kNameGBufferC, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
+                const u32 lightingDepthBinding    = RequireBinding(shared.LightingBindings,
+                       kNameSceneDepth, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
+                const u32 lightingShadowBinding   = RequireBinding(shared.LightingBindings,
+                      kNameShadowMap, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
+                const u32 lightingIrrBinding      = RequireBinding(shared.LightingBindings,
+                         kNameSkyIrrCube, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
+                const u32 lightingSpecBinding     = RequireBinding(shared.LightingBindings,
+                        kNameSkySpecCube, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
+                const u32 lightingBrdfBinding     = RequireBinding(shared.LightingBindings,
+                        kNameBrdfLut, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
+                const u32 lightingSsaoBinding     = RequireBinding(shared.LightingBindings,
+                        kNameSsaoTex, Rhi::ERhiBindingType::SampledTexture, TEXT("Lighting"));
+                const u32 lightingSamplerBinding  = RequireBinding(shared.LightingBindings,
+                     kNameLinearSampler, Rhi::ERhiBindingType::Sampler, TEXT("Lighting"));
+
+                RenderCore::ShaderBinding::FBindGroupBuilder builder(shared.LightingLayout.Get());
+                DebugAssert(builder.AddBuffer(lightingPerFrameBinding, perFrameBuffer, 0ULL,
+                                static_cast<u64>(sizeof(FPerFrameConstants))),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add per-frame cbuffer (binding={}).",
+                    lightingPerFrameBinding);
+                DebugAssert(builder.AddBuffer(lightingIblBinding,
+                                (iblBuffer != nullptr) ? iblBuffer : perFrameBuffer, 0ULL,
+                                static_cast<u64>(sizeof(FIblConstants))),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add IBL cbuffer (binding={}).",
+                    lightingIblBinding);
+                DebugAssert(builder.AddTexture(lightingGBufferABinding, texA),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add GBufferA (binding={}).",
+                    lightingGBufferABinding);
+                DebugAssert(builder.AddTexture(lightingGBufferBBinding, texB),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add GBufferB (binding={}).",
+                    lightingGBufferBBinding);
+                DebugAssert(builder.AddTexture(lightingGBufferCBinding, texC),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add GBufferC (binding={}).",
+                    lightingGBufferCBinding);
+                DebugAssert(builder.AddTexture(lightingDepthBinding, depthTex),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add SceneDepth (binding={}).",
+                    lightingDepthBinding);
+                DebugAssert(builder.AddTexture(lightingShadowBinding, shadowTex),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add ShadowMap (binding={}).",
+                    lightingShadowBinding);
+                DebugAssert(builder.AddTexture(lightingIrrBinding, irrTex),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add SkyIrradianceCube (binding={}).",
+                    lightingIrrBinding);
+                DebugAssert(builder.AddTexture(lightingSpecBinding, specTex),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add SkySpecularCube (binding={}).",
+                    lightingSpecBinding);
+                DebugAssert(builder.AddTexture(lightingBrdfBinding, lutTex),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add BrdfLut (binding={}).",
+                    lightingBrdfBinding);
+                DebugAssert(builder.AddTexture(lightingSsaoBinding, ssaoTex),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add SsaoTex (binding={}).",
+                    lightingSsaoBinding);
+                DebugAssert(builder.AddSampler(lightingSamplerBinding, shared.OutputSampler.Get()),
+                    TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: failed to add sampler (binding={}).",
+                    lightingSamplerBinding);
+
                 Rhi::FRhiBindGroupDesc groupDesc{};
-                groupDesc.mLayout = shared.LightingLayout.Get();
-
-                Rhi::FRhiBindGroupEntry cb{};
-                cb.mBinding = 0U;
-                cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                cb.mBuffer  = perFrameBuffer;
-                cb.mOffset  = 0ULL;
-                cb.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
-                groupDesc.mEntries.PushBack(cb);
-
-                Rhi::FRhiBindGroupEntry iblCb{};
-                iblCb.mBinding = 1U;
-                iblCb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                iblCb.mBuffer  = (iblBuffer != nullptr) ? iblBuffer : perFrameBuffer;
-                iblCb.mOffset  = 0ULL;
-                iblCb.mSize    = static_cast<u64>(sizeof(FIblConstants));
-                groupDesc.mEntries.PushBack(iblCb);
-
-                Rhi::FRhiBindGroupEntry eA{};
-                eA.mBinding = MapSampledTextureBinding(0U);
-                eA.mType    = Rhi::ERhiBindingType::SampledTexture;
-                eA.mTexture = texA;
-                groupDesc.mEntries.PushBack(eA);
-
-                Rhi::FRhiBindGroupEntry eB{};
-                eB.mBinding = MapSampledTextureBinding(1U);
-                eB.mType    = Rhi::ERhiBindingType::SampledTexture;
-                eB.mTexture = texB;
-                groupDesc.mEntries.PushBack(eB);
-
-                Rhi::FRhiBindGroupEntry eC{};
-                eC.mBinding = MapSampledTextureBinding(2U);
-                eC.mType    = Rhi::ERhiBindingType::SampledTexture;
-                eC.mTexture = texC;
-                groupDesc.mEntries.PushBack(eC);
-
-                Rhi::FRhiBindGroupEntry eDepth{};
-                eDepth.mBinding = MapSampledTextureBinding(3U);
-                eDepth.mType    = Rhi::ERhiBindingType::SampledTexture;
-                eDepth.mTexture = depthTex;
-                groupDesc.mEntries.PushBack(eDepth);
-
-                Rhi::FRhiBindGroupEntry eShadow{};
-                eShadow.mBinding = MapSampledTextureBinding(4U);
-                eShadow.mType    = Rhi::ERhiBindingType::SampledTexture;
-                eShadow.mTexture = shadowTex;
-                groupDesc.mEntries.PushBack(eShadow);
-
-                // IBL textures (t5..t7).
-                auto* irrTex  = bEnableIbl ? skyIrradiance : shared.IblBlackCube.Get();
-                auto* specTex = bEnableIbl ? skySpecular : shared.IblBlackCube.Get();
-                auto* lutTex  = bEnableIbl ? brdfLut : shared.IblBlack2D.Get();
-
-                Rhi::FRhiBindGroupEntry eIrr{};
-                eIrr.mBinding = MapSampledTextureBinding(5U);
-                eIrr.mType    = Rhi::ERhiBindingType::SampledTexture;
-                eIrr.mTexture = irrTex;
-                groupDesc.mEntries.PushBack(eIrr);
-
-                Rhi::FRhiBindGroupEntry eSpec{};
-                eSpec.mBinding = MapSampledTextureBinding(6U);
-                eSpec.mType    = Rhi::ERhiBindingType::SampledTexture;
-                eSpec.mTexture = specTex;
-                groupDesc.mEntries.PushBack(eSpec);
-
-                Rhi::FRhiBindGroupEntry eLut{};
-                eLut.mBinding = MapSampledTextureBinding(7U);
-                eLut.mType    = Rhi::ERhiBindingType::SampledTexture;
-                eLut.mTexture = lutTex;
-                groupDesc.mEntries.PushBack(eLut);
-
-                // SSAO (t8).
-                Rhi::FRhiBindGroupEntry eSsao{};
-                eSsao.mBinding = MapSampledTextureBinding(8U);
-                eSsao.mType    = Rhi::ERhiBindingType::SampledTexture;
-                eSsao.mTexture = ssaoTex;
-                groupDesc.mEntries.PushBack(eSsao);
-
-                Rhi::FRhiBindGroupEntry sampler{};
-                sampler.mBinding = MapSamplerBinding(0U);
-                sampler.mType    = Rhi::ERhiBindingType::Sampler;
-                sampler.mSampler = shared.OutputSampler.Get();
-                groupDesc.mEntries.PushBack(sampler);
+                DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
+                    "Lighting bind group: builder/layout mismatch.");
 
                 auto bindGroup = device->CreateBindGroup(groupDesc);
                 Assert(!(!bindGroup), TEXT("BasicDeferredRenderer"), "Failed to create bind group");
@@ -2486,35 +2516,41 @@ namespace AltinaEngine::Rendering {
                             auto* device = Rhi::RHIGetDevice();
                             DebugAssert(
                                 device != nullptr, TEXT("BasicDeferredRenderer"), "Device lost");
+                            const u32 skyPerFrameBinding =
+                                RequireBinding(shared.SkyBoxBindings, kNameDeferredView,
+                                    Rhi::ERhiBindingType::ConstantBuffer, TEXT("SkyBox"));
+                            const u32 skyDepthBinding =
+                                RequireBinding(shared.SkyBoxBindings, kNameSceneDepth,
+                                    Rhi::ERhiBindingType::SampledTexture, TEXT("SkyBox"));
+                            const u32 skyCubeBinding    = RequireBinding(shared.SkyBoxBindings,
+                                   kNameSkyCube, Rhi::ERhiBindingType::SampledTexture, TEXT("SkyBox"));
+                            const u32 skySamplerBinding = RequireBinding(shared.SkyBoxBindings,
+                                kNameLinearSampler, Rhi::ERhiBindingType::Sampler, TEXT("SkyBox"));
+
+                            RenderCore::ShaderBinding::FBindGroupBuilder builder(
+                                shared.SkyBoxLayout.Get());
+                            DebugAssert(builder.AddBuffer(skyPerFrameBinding, perFrameBuffer, 0ULL,
+                                            static_cast<u64>(sizeof(FPerFrameConstants))),
+                                TEXT("BasicDeferredRenderer"),
+                                "SkyBox bind group: failed to add per-frame cbuffer (binding={}).",
+                                skyPerFrameBinding);
+                            DebugAssert(builder.AddTexture(skyDepthBinding, depthTex),
+                                TEXT("BasicDeferredRenderer"),
+                                "SkyBox bind group: failed to add depth texture (binding={}).",
+                                skyDepthBinding);
+                            DebugAssert(builder.AddTexture(skyCubeBinding, skyCube),
+                                TEXT("BasicDeferredRenderer"),
+                                "SkyBox bind group: failed to add sky cube (binding={}).",
+                                skyCubeBinding);
+                            DebugAssert(
+                                builder.AddSampler(skySamplerBinding, shared.OutputSampler.Get()),
+                                TEXT("BasicDeferredRenderer"),
+                                "SkyBox bind group: failed to add sampler (binding={}).",
+                                skySamplerBinding);
 
                             Rhi::FRhiBindGroupDesc groupDesc{};
-                            groupDesc.mLayout = shared.SkyBoxLayout.Get();
-
-                            Rhi::FRhiBindGroupEntry cb{};
-                            cb.mBinding = 0U;
-                            cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                            cb.mBuffer  = perFrameBuffer;
-                            cb.mOffset  = 0ULL;
-                            cb.mSize    = static_cast<u64>(sizeof(FPerFrameConstants));
-                            groupDesc.mEntries.PushBack(cb);
-
-                            Rhi::FRhiBindGroupEntry depth{};
-                            depth.mBinding = MapSampledTextureBinding(0U);
-                            depth.mType    = Rhi::ERhiBindingType::SampledTexture;
-                            depth.mTexture = depthTex;
-                            groupDesc.mEntries.PushBack(depth);
-
-                            Rhi::FRhiBindGroupEntry sky{};
-                            sky.mBinding = MapSampledTextureBinding(1U);
-                            sky.mType    = Rhi::ERhiBindingType::SampledTexture;
-                            sky.mTexture = skyCube;
-                            groupDesc.mEntries.PushBack(sky);
-
-                            Rhi::FRhiBindGroupEntry sampler{};
-                            sampler.mBinding = MapSamplerBinding(0U);
-                            sampler.mType    = Rhi::ERhiBindingType::Sampler;
-                            sampler.mSampler = shared.OutputSampler.Get();
-                            groupDesc.mEntries.PushBack(sampler);
+                            DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
+                                "SkyBox bind group: builder/layout mismatch.");
 
                             auto bindGroup = device->CreateBindGroup(groupDesc);
                             if (!bindGroup) {

@@ -156,29 +156,16 @@ namespace AltinaEngine::Rendering {
                         return;
                     }
 
-                    // Bind group: constants + input texture + sampler.
                     Rhi::FRhiBindGroupDesc groupDesc{};
-                    groupDesc.mLayout = shared.Layout.Get();
-
-                    Rhi::FRhiBindGroupEntry cb{};
-                    cb.mBinding = 0U;
-                    cb.mType    = Rhi::ERhiBindingType::ConstantBuffer;
-                    cb.mBuffer  = shared.BlitConstantsBuffer.Get();
-                    cb.mOffset  = 0ULL;
-                    cb.mSize    = static_cast<u64>(sizeof(PostProcess::Detail::FBlitConstants));
-                    groupDesc.mEntries.PushBack(cb);
-
-                    Rhi::FRhiBindGroupEntry tex{};
-                    tex.mBinding = PostProcess::Detail::MapSampledTextureBinding(0U);
-                    tex.mType    = Rhi::ERhiBindingType::SampledTexture;
-                    tex.mTexture = inTex;
-                    groupDesc.mEntries.PushBack(tex);
-
-                    Rhi::FRhiBindGroupEntry sampler{};
-                    sampler.mBinding = PostProcess::Detail::MapSamplerBinding(0U);
-                    sampler.mType    = Rhi::ERhiBindingType::Sampler;
-                    sampler.mSampler = shared.LinearSampler.Get();
-                    groupDesc.mEntries.PushBack(sampler);
+                    if (!PostProcess::Detail::BuildCommonBindGroupDesc(shared,
+                            PostProcess::Detail::kNameBlitConstants,
+                            shared.BlitConstantsBuffer.Get(),
+                            static_cast<u64>(sizeof(PostProcess::Detail::FBlitConstants)), inTex,
+                            groupDesc)) {
+                        DebugAssert(false, TEXT("PostProcess"),
+                            "AddPresent pass skipped draw: failed to build blit bind group desc.");
+                        return;
+                    }
 
                     auto bindGroup = device->CreateBindGroup(groupDesc);
                     if (!bindGroup) {

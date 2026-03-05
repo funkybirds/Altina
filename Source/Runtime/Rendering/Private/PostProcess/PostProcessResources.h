@@ -5,6 +5,7 @@
 #include "Math/Matrix.h"
 #include "Rhi/RhiRefs.h"
 #include "Rhi/RhiInit.h"
+#include "Shader/ShaderBindingUtility.h"
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Rhi {
@@ -12,17 +13,16 @@ namespace AltinaEngine::Rhi {
 }
 
 namespace AltinaEngine::Rendering::PostProcess::Detail {
-    [[nodiscard]] inline auto IsVulkanBackend() noexcept -> bool {
-        return Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan;
-    }
-
-    [[nodiscard]] inline auto MapSampledTextureBinding(u32 binding) noexcept -> u32 {
-        return IsVulkanBackend() ? (1000U + binding) : binding;
-    }
-
-    [[nodiscard]] inline auto MapSamplerBinding(u32 binding) noexcept -> u32 {
-        return IsVulkanBackend() ? (2000U + binding) : binding;
-    }
+    inline constexpr auto kNameSceneColor       = TEXT("SceneColor");
+    inline constexpr auto kNameLinearSampler    = TEXT("LinearSampler");
+    inline constexpr auto kNameBlitConstants    = TEXT("BlitConstants");
+    inline constexpr auto kNameTonemapConstants = TEXT("TonemapConstants");
+    inline constexpr auto kNameFxaaConstants    = TEXT("FxaaConstants");
+    inline constexpr auto kNameBloomConstants   = TEXT("BloomConstants");
+    inline constexpr auto kNameTaaConstants     = TEXT("TaaConstants");
+    inline constexpr auto kNameCurrentColor     = TEXT("CurrentColor");
+    inline constexpr auto kNameHistoryColor     = TEXT("HistoryColor");
+    inline constexpr auto kNameSceneDepth       = TEXT("SceneDepth");
 
     // Constant buffer layouts (b0) for each post-process pass. Keep each struct size a multiple of
     // 16 bytes to match HLSL packing and avoid /WX padding warnings.
@@ -77,47 +77,55 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
     };
 
     struct FPostProcessSharedResources {
-        Rhi::FRhiShaderRef          FullscreenVS;
-        Rhi::FRhiShaderRef          BlitPS;
-        Rhi::FRhiShaderRef          TonemapPS;
-        Rhi::FRhiShaderRef          FxaaPS;
-        Rhi::FRhiShaderRef          BloomPrefilterPS;
-        Rhi::FRhiShaderRef          BloomDownsamplePS;
-        Rhi::FRhiShaderRef          BloomDownsampleWeightedPS;
-        Rhi::FRhiShaderRef          BloomBlurHPS;
-        Rhi::FRhiShaderRef          BloomBlurVPS;
-        Rhi::FRhiShaderRef          BloomUpsamplePS;
-        Rhi::FRhiShaderRef          BloomApplyPS;
-        Rhi::FRhiShaderRef          TaaPS;
+        Rhi::FRhiShaderRef                             FullscreenVS;
+        Rhi::FRhiShaderRef                             BlitPS;
+        Rhi::FRhiShaderRef                             TonemapPS;
+        Rhi::FRhiShaderRef                             FxaaPS;
+        Rhi::FRhiShaderRef                             BloomPrefilterPS;
+        Rhi::FRhiShaderRef                             BloomDownsamplePS;
+        Rhi::FRhiShaderRef                             BloomDownsampleWeightedPS;
+        Rhi::FRhiShaderRef                             BloomBlurHPS;
+        Rhi::FRhiShaderRef                             BloomBlurVPS;
+        Rhi::FRhiShaderRef                             BloomUpsamplePS;
+        Rhi::FRhiShaderRef                             BloomApplyPS;
+        Rhi::FRhiShaderRef                             TaaPS;
 
-        Rhi::FRhiBindGroupLayoutRef Layout;
-        Rhi::FRhiBindGroupLayoutRef TaaLayout;
-        Rhi::FRhiPipelineLayoutRef  PipelineLayout;
-        Rhi::FRhiPipelineLayoutRef  TaaPipelineLayout;
-        Rhi::FRhiSamplerRef         LinearSampler;
+        Rhi::FRhiBindGroupLayoutRef                    Layout;
+        Rhi::FRhiBindGroupLayoutRef                    TaaLayout;
+        RenderCore::ShaderBinding::FBindingLookupTable LayoutBindings;
+        RenderCore::ShaderBinding::FBindingLookupTable TaaLayoutBindings;
+        Rhi::FRhiPipelineLayoutRef                     PipelineLayout;
+        Rhi::FRhiPipelineLayoutRef                     TaaPipelineLayout;
+        Rhi::FRhiSamplerRef                            LinearSampler;
 
-        Rhi::FRhiPipelineRef        BlitPipeline;
-        Rhi::FRhiPipelineRef        TonemapPipeline;
-        Rhi::FRhiPipelineRef        FxaaPipeline;
-        Rhi::FRhiPipelineRef        BloomPrefilterPipeline;
-        Rhi::FRhiPipelineRef        BloomDownsamplePipeline;
-        Rhi::FRhiPipelineRef        BloomDownsampleWeightedPipeline;
-        Rhi::FRhiPipelineRef        BloomBlurHPipeline;
-        Rhi::FRhiPipelineRef        BloomBlurVPipeline;
-        Rhi::FRhiPipelineRef        BloomUpsampleAddPipeline;
-        Rhi::FRhiPipelineRef        BloomApplyAddPipeline;
-        Rhi::FRhiPipelineRef        TaaPipeline;
+        Rhi::FRhiPipelineRef                           BlitPipeline;
+        Rhi::FRhiPipelineRef                           TonemapPipeline;
+        Rhi::FRhiPipelineRef                           FxaaPipeline;
+        Rhi::FRhiPipelineRef                           BloomPrefilterPipeline;
+        Rhi::FRhiPipelineRef                           BloomDownsamplePipeline;
+        Rhi::FRhiPipelineRef                           BloomDownsampleWeightedPipeline;
+        Rhi::FRhiPipelineRef                           BloomBlurHPipeline;
+        Rhi::FRhiPipelineRef                           BloomBlurVPipeline;
+        Rhi::FRhiPipelineRef                           BloomUpsampleAddPipeline;
+        Rhi::FRhiPipelineRef                           BloomApplyAddPipeline;
+        Rhi::FRhiPipelineRef                           TaaPipeline;
 
-        Rhi::FRhiBufferRef          BlitConstantsBuffer;
-        Rhi::FRhiBufferRef          TonemapConstantsBuffer;
-        Rhi::FRhiBufferRef          FxaaConstantsBuffer;
-        Rhi::FRhiBufferRef          BloomConstantsBuffer;
-        Rhi::FRhiBufferRef          TaaConstantsBuffer;
+        Rhi::FRhiBufferRef                             BlitConstantsBuffer;
+        Rhi::FRhiBufferRef                             TonemapConstantsBuffer;
+        Rhi::FRhiBufferRef                             FxaaConstantsBuffer;
+        Rhi::FRhiBufferRef                             BloomConstantsBuffer;
+        Rhi::FRhiBufferRef                             TaaConstantsBuffer;
     };
 
     [[nodiscard]] auto GetPostProcessSharedResources() -> FPostProcessSharedResources&;
 
     // Compiles shaders + creates pipelines/layouts/buffers lazily.
     [[nodiscard]] auto EnsurePostProcessSharedResources() -> bool;
+    [[nodiscard]] auto BuildCommonBindGroupDesc(const FPostProcessSharedResources& resources,
+        const TChar* cbufferName, Rhi::FRhiBuffer* cbuffer, u64 cbufferSize,
+        Rhi::FRhiTexture* texture, Rhi::FRhiBindGroupDesc& outDesc) -> bool;
+    [[nodiscard]] auto BuildTaaBindGroupDesc(const FPostProcessSharedResources& resources,
+        Rhi::FRhiTexture* currentColor, Rhi::FRhiTexture* historyColor,
+        Rhi::FRhiTexture* sceneDepth, Rhi::FRhiBindGroupDesc& outDesc) -> bool;
     void               ShutdownPostProcessSharedResources() noexcept;
 } // namespace AltinaEngine::Rendering::PostProcess::Detail

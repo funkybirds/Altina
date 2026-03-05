@@ -10,6 +10,7 @@
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiShader.h"
+#include "Shader/ShaderBindingUtility.h"
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "ShaderCompiler/ShaderRhiBindings.h"
 #include "Utility/Filesystem/Path.h"
@@ -237,69 +238,91 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
             buffer->Unlock(lock);
         }
 
-        [[nodiscard]] auto BuildLayoutHash(
-            const Core::Container::TVector<Rhi::FRhiBindGroupLayoutEntry>& entries, u32 setIndex)
-            -> u64 {
-            constexpr u64 kOffset = 1469598103934665603ULL;
-            constexpr u64 kPrime  = 1099511628211ULL;
-            u64           hash    = kOffset;
-            auto          mix     = [&](u64 value) { hash = (hash ^ value) * kPrime; };
+        auto EnsureShaders(FPostProcessSharedResources& res) -> bool {
+            if (!res.FullscreenVS || !res.BlitPS || !res.TonemapPS || !res.FxaaPS
+                || !res.BloomPrefilterPS || !res.BloomDownsamplePS || !res.BloomDownsampleWeightedPS
+                || !res.BloomBlurHPS || !res.BloomBlurVPS || !res.BloomUpsamplePS
+                || !res.BloomApplyPS || !res.TaaPS) {
+                const auto shaderDir = FindBuiltinPostProcessShaderDir();
+                if (!shaderDir.IsEmpty()) {
+                    const auto vsPath      = shaderDir / TEXT("FullscreenTriangle.hlsl");
+                    const auto blitPath    = shaderDir / TEXT("Blit.hlsl");
+                    const auto tonemapPath = shaderDir / TEXT("Tonemap.hlsl");
+                    const auto fxaaPath    = shaderDir / TEXT("Fxaa.hlsl");
+                    const auto bloomPath   = shaderDir / TEXT("Bloom.hlsl");
+                    const auto taaPath     = shaderDir / TEXT("Taa.hlsl");
 
-            mix(setIndex);
-            for (const auto& entry : entries) {
-                mix(entry.mBinding);
-                mix(static_cast<u64>(entry.mType));
-                mix(static_cast<u64>(entry.mVisibility));
-                mix(entry.mArrayCount);
-                mix(entry.mHasDynamicOffset ? 1ULL : 0ULL);
+                    LogInfo(TEXT("PostProcess shader dir: '{}'"), shaderDir.GetString().ToView());
+
+                    if (!CompileShaderFromFile(vsPath, TEXT("VSFullScreenTriangle"),
+                            Shader::EShaderStage::Vertex, res.FullscreenVS)
+                        || !CompileShaderFromFile(
+                            blitPath, TEXT("PSBlit"), Shader::EShaderStage::Pixel, res.BlitPS)
+                        || !CompileShaderFromFile(tonemapPath, TEXT("PSTonemap"),
+                            Shader::EShaderStage::Pixel, res.TonemapPS)
+                        || !CompileShaderFromFile(
+                            fxaaPath, TEXT("PSFxaa"), Shader::EShaderStage::Pixel, res.FxaaPS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomPrefilter"),
+                            Shader::EShaderStage::Pixel, res.BloomPrefilterPS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomDownsample"),
+                            Shader::EShaderStage::Pixel, res.BloomDownsamplePS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomDownsampleWeighted"),
+                            Shader::EShaderStage::Pixel, res.BloomDownsampleWeightedPS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomBlurH"),
+                            Shader::EShaderStage::Pixel, res.BloomBlurHPS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomBlurV"),
+                            Shader::EShaderStage::Pixel, res.BloomBlurVPS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomUpsample"),
+                            Shader::EShaderStage::Pixel, res.BloomUpsamplePS)
+                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomApply"),
+                            Shader::EShaderStage::Pixel, res.BloomApplyPS)
+                        || !CompileShaderFromFile(
+                            taaPath, TEXT("PSTaa"), Shader::EShaderStage::Pixel, res.TaaPS)) {
+                        return false;
+                    }
+                } else {
+                    LogError(
+                        TEXT("PostProcess shaders not found. Expected dir '{}' or '{}' or '{}'"),
+                        kPostProcessShaderAssetsRelDir, kPostProcessShaderRelDir,
+                        kPostProcessShaderSourceRelDir);
+                    return false;
+                }
             }
-            return hash;
+            return true;
         }
 
         auto EnsureLayoutAndSampler(Rhi::FRhiDevice& device, FPostProcessSharedResources& res)
             -> bool {
             if (!res.Layout) {
+                Core::Container::TVector<Rhi::FRhiShader*> shaders;
+                shaders.PushBack(res.BlitPS.Get());
+                shaders.PushBack(res.TonemapPS.Get());
+                shaders.PushBack(res.FxaaPS.Get());
+                shaders.PushBack(res.BloomPrefilterPS.Get());
+                shaders.PushBack(res.BloomDownsamplePS.Get());
+                shaders.PushBack(res.BloomDownsampleWeightedPS.Get());
+                shaders.PushBack(res.BloomBlurHPS.Get());
+                shaders.PushBack(res.BloomBlurVPS.Get());
+                shaders.PushBack(res.BloomUpsamplePS.Get());
+                shaders.PushBack(res.BloomApplyPS.Get());
+
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaders(
+                    shaders, 0U, layoutDesc);
+                if (!built) {
+                    LogError(
+                        TEXT("Failed to build PostProcess bind group layout from reflection."));
+                    return false;
+                }
                 layoutDesc.mDebugName.Assign(TEXT("PostProcess.Layout"));
-                layoutDesc.mSetIndex = 0U;
-
-                // b0
-                {
-                    Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = 0U;
-                    entry.mType             = Rhi::ERhiBindingType::ConstantBuffer;
-                    entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
-                    entry.mArrayCount       = 1U;
-                    entry.mHasDynamicOffset = false;
-                    layoutDesc.mEntries.PushBack(entry);
-                }
-
-                // t0
-                {
-                    Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = MapSampledTextureBinding(0U);
-                    entry.mType             = Rhi::ERhiBindingType::SampledTexture;
-                    entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
-                    entry.mArrayCount       = 1U;
-                    entry.mHasDynamicOffset = false;
-                    layoutDesc.mEntries.PushBack(entry);
-                }
-
-                // s0
-                {
-                    Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = MapSamplerBinding(0U);
-                    entry.mType             = Rhi::ERhiBindingType::Sampler;
-                    entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
-                    entry.mArrayCount       = 1U;
-                    entry.mHasDynamicOffset = false;
-                    layoutDesc.mEntries.PushBack(entry);
-                }
-
-                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                res.Layout             = device.CreateBindGroupLayout(layoutDesc);
+                res.Layout = device.CreateBindGroupLayout(layoutDesc);
                 if (!res.Layout) {
                     LogError(TEXT("Failed to create PostProcess bind group layout."));
+                    return false;
+                }
+                if (!RenderCore::ShaderBinding::BuildBindingLookupTableFromShaders(
+                        shaders, layoutDesc.mSetIndex, res.Layout.Get(), res.LayoutBindings)) {
+                    LogError(TEXT("Failed to build PostProcess layout binding lookup table."));
                     return false;
                 }
             }
@@ -307,47 +330,25 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
             // TAA uses a dedicated layout (multiple textures) to avoid breaking the
             // legacy single-texture post-process layout used by other effects.
             if (!res.TaaLayout) {
+                Core::Container::TVector<Rhi::FRhiShader*> shaders;
+                shaders.PushBack(res.TaaPS.Get());
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaders(
+                    shaders, 0U, layoutDesc);
+                if (!built) {
+                    LogError(
+                        TEXT("Failed to build PostProcess TAA bind group layout from reflection."));
+                    return false;
+                }
                 layoutDesc.mDebugName.Assign(TEXT("PostProcess.TAA.Layout"));
-                layoutDesc.mSetIndex = 0U;
-
-                // b0
-                {
-                    Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = 0U;
-                    entry.mType             = Rhi::ERhiBindingType::ConstantBuffer;
-                    entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
-                    entry.mArrayCount       = 1U;
-                    entry.mHasDynamicOffset = false;
-                    layoutDesc.mEntries.PushBack(entry);
-                }
-
-                // t0..t2 (Current, History, Depth)
-                for (u32 binding = 0U; binding < 3U; ++binding) {
-                    Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = MapSampledTextureBinding(binding);
-                    entry.mType             = Rhi::ERhiBindingType::SampledTexture;
-                    entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
-                    entry.mArrayCount       = 1U;
-                    entry.mHasDynamicOffset = false;
-                    layoutDesc.mEntries.PushBack(entry);
-                }
-
-                // s0 (linear)
-                {
-                    Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding          = MapSamplerBinding(0U);
-                    entry.mType             = Rhi::ERhiBindingType::Sampler;
-                    entry.mVisibility       = Rhi::ERhiShaderStageFlags::Pixel;
-                    entry.mArrayCount       = 1U;
-                    entry.mHasDynamicOffset = false;
-                    layoutDesc.mEntries.PushBack(entry);
-                }
-
-                layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                res.TaaLayout          = device.CreateBindGroupLayout(layoutDesc);
+                res.TaaLayout = device.CreateBindGroupLayout(layoutDesc);
                 if (!res.TaaLayout) {
                     LogError(TEXT("Failed to create PostProcess TAA bind group layout."));
+                    return false;
+                }
+                if (!RenderCore::ShaderBinding::BuildBindingLookupTableFromShaders(shaders,
+                        layoutDesc.mSetIndex, res.TaaLayout.Get(), res.TaaLayoutBindings)) {
+                    LogError(TEXT("Failed to build PostProcess TAA layout binding lookup table."));
                     return false;
                 }
             }
@@ -428,56 +429,6 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         }
 
         auto EnsurePipelines(Rhi::FRhiDevice& device, FPostProcessSharedResources& res) -> bool {
-            if (!res.FullscreenVS || !res.BlitPS || !res.TonemapPS || !res.FxaaPS
-                || !res.BloomPrefilterPS || !res.BloomDownsamplePS || !res.BloomDownsampleWeightedPS
-                || !res.BloomBlurHPS || !res.BloomBlurVPS || !res.BloomUpsamplePS
-                || !res.BloomApplyPS || !res.TaaPS) {
-                const auto shaderDir = FindBuiltinPostProcessShaderDir();
-                if (!shaderDir.IsEmpty()) {
-                    const auto vsPath      = shaderDir / TEXT("FullscreenTriangle.hlsl");
-                    const auto blitPath    = shaderDir / TEXT("Blit.hlsl");
-                    const auto tonemapPath = shaderDir / TEXT("Tonemap.hlsl");
-                    const auto fxaaPath    = shaderDir / TEXT("Fxaa.hlsl");
-                    const auto bloomPath   = shaderDir / TEXT("Bloom.hlsl");
-                    const auto taaPath     = shaderDir / TEXT("Taa.hlsl");
-
-                    LogInfo(TEXT("PostProcess shader dir: '{}'"), shaderDir.GetString().ToView());
-
-                    if (!CompileShaderFromFile(vsPath, TEXT("VSFullScreenTriangle"),
-                            Shader::EShaderStage::Vertex, res.FullscreenVS)
-                        || !CompileShaderFromFile(
-                            blitPath, TEXT("PSBlit"), Shader::EShaderStage::Pixel, res.BlitPS)
-                        || !CompileShaderFromFile(tonemapPath, TEXT("PSTonemap"),
-                            Shader::EShaderStage::Pixel, res.TonemapPS)
-                        || !CompileShaderFromFile(
-                            fxaaPath, TEXT("PSFxaa"), Shader::EShaderStage::Pixel, res.FxaaPS)
-                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomPrefilter"),
-                            Shader::EShaderStage::Pixel, res.BloomPrefilterPS)
-                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomDownsample"),
-                            Shader::EShaderStage::Pixel, res.BloomDownsamplePS)
-                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomDownsampleWeighted"),
-                            Shader::EShaderStage::Pixel, res.BloomDownsampleWeightedPS)
-                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomBlurH"),
-                            Shader::EShaderStage::Pixel, res.BloomBlurHPS)
-                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomBlurV"),
-                            Shader::EShaderStage::Pixel, res.BloomBlurVPS)
-                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomUpsample"),
-                            Shader::EShaderStage::Pixel, res.BloomUpsamplePS)
-                        || !CompileShaderFromFile(bloomPath, TEXT("PSBloomApply"),
-                            Shader::EShaderStage::Pixel, res.BloomApplyPS)
-                        || !CompileShaderFromFile(
-                            taaPath, TEXT("PSTaa"), Shader::EShaderStage::Pixel, res.TaaPS)) {
-                        return false;
-                    }
-                } else {
-                    LogError(
-                        TEXT("PostProcess shaders not found. Expected dir '{}' or '{}' or '{}'"),
-                        kPostProcessShaderAssetsRelDir, kPostProcessShaderRelDir,
-                        kPostProcessShaderSourceRelDir);
-                    return false;
-                }
-            }
-
             if (!res.BlitPipeline) {
                 Rhi::FRhiGraphicsPipelineDesc desc{};
                 desc.mDebugName.Assign(TEXT("PostProcess.BlitPipeline"));
@@ -730,6 +681,9 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         }
 
         auto& res = GetPostProcessSharedResources();
+        if (!EnsureShaders(res)) {
+            return false;
+        }
         if (!EnsureLayoutAndSampler(*device, res)) {
             return false;
         }
@@ -737,6 +691,82 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
             return false;
         }
         return true;
+    }
+
+    auto BuildCommonBindGroupDesc(const FPostProcessSharedResources& resources,
+        const TChar* cbufferName, Rhi::FRhiBuffer* cbuffer, u64 cbufferSize,
+        Rhi::FRhiTexture* texture, Rhi::FRhiBindGroupDesc& outDesc) -> bool {
+        if (!resources.Layout || !resources.LinearSampler || cbuffer == nullptr
+            || texture == nullptr || cbufferName == nullptr || cbufferName[0] == 0) {
+            return false;
+        }
+
+        auto findBinding = [&](const TChar* name, Rhi::ERhiBindingType type,
+                               u32& outBinding) -> bool {
+            const auto nameHash =
+                RenderCore::ShaderBinding::HashBindingName(Core::Container::FStringView(name));
+            return RenderCore::ShaderBinding::FindBindingByNameHash(
+                resources.LayoutBindings, nameHash, type, outBinding);
+        };
+
+        u32 cbBinding      = RenderCore::ShaderBinding::kInvalidBinding;
+        u32 texBinding     = RenderCore::ShaderBinding::kInvalidBinding;
+        u32 samplerBinding = RenderCore::ShaderBinding::kInvalidBinding;
+        if (!findBinding(cbufferName, Rhi::ERhiBindingType::ConstantBuffer, cbBinding)
+            || !findBinding(kNameSceneColor, Rhi::ERhiBindingType::SampledTexture, texBinding)
+            || !findBinding(kNameLinearSampler, Rhi::ERhiBindingType::Sampler, samplerBinding)) {
+            return false;
+        }
+
+        RenderCore::ShaderBinding::FBindGroupBuilder builder(resources.Layout.Get());
+        if (!builder.AddBuffer(cbBinding, cbuffer, 0ULL, cbufferSize)
+            || !builder.AddTexture(texBinding, texture)
+            || !builder.AddSampler(samplerBinding, resources.LinearSampler.Get())) {
+            return false;
+        }
+        return builder.Build(outDesc);
+    }
+
+    auto BuildTaaBindGroupDesc(const FPostProcessSharedResources& resources,
+        Rhi::FRhiTexture* currentColor, Rhi::FRhiTexture* historyColor,
+        Rhi::FRhiTexture* sceneDepth, Rhi::FRhiBindGroupDesc& outDesc) -> bool {
+        if (!resources.TaaLayout || !resources.LinearSampler || !resources.TaaConstantsBuffer
+            || currentColor == nullptr || historyColor == nullptr || sceneDepth == nullptr) {
+            return false;
+        }
+
+        auto findBinding = [&](const TChar* name, Rhi::ERhiBindingType type,
+                               u32& outBinding) -> bool {
+            const auto nameHash =
+                RenderCore::ShaderBinding::HashBindingName(Core::Container::FStringView(name));
+            return RenderCore::ShaderBinding::FindBindingByNameHash(
+                resources.TaaLayoutBindings, nameHash, type, outBinding);
+        };
+
+        u32 cbBinding      = RenderCore::ShaderBinding::kInvalidBinding;
+        u32 currentBinding = RenderCore::ShaderBinding::kInvalidBinding;
+        u32 historyBinding = RenderCore::ShaderBinding::kInvalidBinding;
+        u32 depthBinding   = RenderCore::ShaderBinding::kInvalidBinding;
+        u32 samplerBinding = RenderCore::ShaderBinding::kInvalidBinding;
+
+        if (!findBinding(kNameTaaConstants, Rhi::ERhiBindingType::ConstantBuffer, cbBinding)
+            || !findBinding(kNameCurrentColor, Rhi::ERhiBindingType::SampledTexture, currentBinding)
+            || !findBinding(kNameHistoryColor, Rhi::ERhiBindingType::SampledTexture, historyBinding)
+            || !findBinding(kNameSceneDepth, Rhi::ERhiBindingType::SampledTexture, depthBinding)
+            || !findBinding(kNameLinearSampler, Rhi::ERhiBindingType::Sampler, samplerBinding)) {
+            return false;
+        }
+
+        RenderCore::ShaderBinding::FBindGroupBuilder builder(resources.TaaLayout.Get());
+        if (!builder.AddBuffer(cbBinding, resources.TaaConstantsBuffer.Get(), 0ULL,
+                static_cast<u64>(sizeof(FTaaConstants)))
+            || !builder.AddTexture(currentBinding, currentColor)
+            || !builder.AddTexture(historyBinding, historyColor)
+            || !builder.AddTexture(depthBinding, sceneDepth)
+            || !builder.AddSampler(samplerBinding, resources.LinearSampler.Get())) {
+            return false;
+        }
+        return builder.Build(outDesc);
     }
 
     void ShutdownPostProcessSharedResources() noexcept {
@@ -765,6 +795,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         res.TaaPipelineLayout.Reset();
         res.Layout.Reset();
         res.TaaLayout.Reset();
+        res.LayoutBindings.Reset();
+        res.TaaLayoutBindings.Reset();
 
         res.FullscreenVS.Reset();
         res.BlitPS.Reset();

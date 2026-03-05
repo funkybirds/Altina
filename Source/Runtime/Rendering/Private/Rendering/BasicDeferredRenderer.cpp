@@ -317,6 +317,24 @@ namespace AltinaEngine::Rendering {
             return Rhi::RHIGetBackend() == Rhi::ERhiBackend::Vulkan;
         }
 
+        [[nodiscard]] constexpr auto AlignUpU32(u32 value, u32 alignment) noexcept -> u32 {
+            if (alignment == 0U) {
+                return value;
+            }
+            const u32 remainder = value % alignment;
+            return (remainder == 0U) ? value : (value + (alignment - remainder));
+        }
+
+        [[nodiscard]] constexpr auto GetVulkanPerDrawAlignment() noexcept -> u32 {
+            // Conservative default for dynamic UBO offsets.
+            return 256U;
+        }
+
+        [[nodiscard]] constexpr auto GetVulkanPerDrawCapacity() noexcept -> u32 {
+            // Covers base pass + 4 shadow cascades for typical scenes with headroom.
+            return 16384U;
+        }
+
         [[nodiscard]] auto MapSampledTextureBinding(u32 binding) noexcept -> u32 {
             return IsVulkanBackend() ? (1000U + binding) : binding;
         }
@@ -582,9 +600,10 @@ namespace AltinaEngine::Rendering {
 
             if (!resources.PerDrawLayout) {
                 Rhi::FRhiBindGroupLayoutEntry entry{};
-                entry.mBinding    = GetPerDrawConstantBinding();
-                entry.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                entry.mVisibility = Rhi::ERhiShaderStageFlags::All;
+                entry.mBinding          = GetPerDrawConstantBinding();
+                entry.mType             = Rhi::ERhiBindingType::ConstantBuffer;
+                entry.mVisibility       = Rhi::ERhiShaderStageFlags::All;
+                entry.mHasDynamicOffset = IsVulkanBackend();
 
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
                 layoutDesc.mSetIndex = IsVulkanBackend() ? 1U : 0U;
@@ -991,7 +1010,12 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiBuffer*    PerDrawBuffer = nullptr;
             Rhi::FRhiBindGroup* PerDrawGroup  = nullptr;
             // D3D11 backend uses a single set index (0) and distinguishes resources by register.
-            u32                 PerDrawSetIndex = 0U;
+            u32                 PerDrawSetIndex    = 0U;
+            u32                 PerDrawStrideBytes = 0U;
+            u32                 PerDrawCapacity    = 0U;
+            u32*                PerDrawWriteIndex  = nullptr;
+            u32                 PerDrawBaseOffset  = 0U;
+            bool                bUseDynamicOffset  = false;
         };
 
         void BindPerDraw(
@@ -1008,6 +1032,21 @@ namespace AltinaEngine::Rendering {
             FPerDrawConstants constants{};
             constants.World        = batch.Instances[0].World;
             constants.NormalMatrix = ComputeNormalMatrix(constants.World);
+            if (data->bUseDynamicOffset) {
+                DebugAssert(data->PerDrawWriteIndex != nullptr, TEXT("BasicDeferredRenderer"),
+                    "PerDraw dynamic cbuffer state is invalid: write index ptr is null.");
+                const u32 writeIndex = (*data->PerDrawWriteIndex)++;
+                DebugAssert(writeIndex < data->PerDrawCapacity, TEXT("BasicDeferredRenderer"),
+                    "PerDraw dynamic cbuffer overflow (index={}, capacity={}).", writeIndex,
+                    data->PerDrawCapacity);
+                const u32 dynamicOffset =
+                    data->PerDrawBaseOffset + writeIndex * data->PerDrawStrideBytes;
+                ctx.RHIUpdateDynamicBufferDiscard(
+                    data->PerDrawBuffer, &constants, sizeof(constants), dynamicOffset);
+                ctx.RHISetBindGroup(data->PerDrawSetIndex, data->PerDrawGroup, &dynamicOffset, 1U);
+                return;
+            }
+
             // Update through the command context so D3D11 deferred contexts record the update with
             // the correct ordering relative to draws.
             ctx.RHIUpdateDynamicBufferDiscard(
@@ -1232,10 +1271,26 @@ namespace AltinaEngine::Rendering {
             }
         }
 
-        if (!mPerDrawBuffer) {
+        if (IsVulkanBackend()) {
+            mPerDrawStrideBytes = AlignUpU32(
+                static_cast<u32>(sizeof(FPerDrawConstants)), GetVulkanPerDrawAlignment());
+            mPerDrawCapacity = GetVulkanPerDrawCapacity();
+        } else {
+            mPerDrawStrideBytes = static_cast<u32>(sizeof(FPerDrawConstants));
+            mPerDrawCapacity    = 1U;
+        }
+
+        const u64 perDrawBufferSize = static_cast<u64>(mPerDrawStrideBytes)
+            * static_cast<u64>(mPerDrawCapacity)
+            * static_cast<u64>(IsVulkanBackend() ? FBasicDeferredRenderer::kPerDrawFrameRing : 1U);
+
+        if (!mPerDrawBuffer || mPerDrawBuffer->GetDesc().mSizeBytes != perDrawBufferSize) {
+            mPerDrawGroup.Reset();
+            mPerDrawBuffer.Reset();
+
             Rhi::FRhiBufferDesc desc{};
             desc.mDebugName.Assign(TEXT("Deferred.PerDraw"));
-            desc.mSizeBytes = sizeof(FPerDrawConstants);
+            desc.mSizeBytes = perDrawBufferSize;
             desc.mUsage     = Rhi::ERhiResourceUsage::Dynamic;
             desc.mBindFlags = Rhi::ERhiBufferBindFlags::Constant;
             desc.mCpuAccess = Rhi::ERhiCpuAccess::Write;
@@ -1282,6 +1337,19 @@ namespace AltinaEngine::Rendering {
                 static_cast<u32>(height));
             return;
         }
+
+        const bool bVulkanPerDrawDynamic = IsVulkanBackend();
+        if (bVulkanPerDrawDynamic) {
+            DebugAssert(mPerDrawStrideBytes >= static_cast<u32>(sizeof(FPerDrawConstants)),
+                TEXT("BasicDeferredRenderer"), "PerDraw stride invalid (stride={}, expected>={}).",
+                mPerDrawStrideBytes, static_cast<u32>(sizeof(FPerDrawConstants)));
+            DebugAssert(mPerDrawCapacity > 0U, TEXT("BasicDeferredRenderer"),
+                "PerDraw capacity invalid (capacity={}).", mPerDrawCapacity);
+            mPerDrawFrameSlot = static_cast<u32>(view->FrameIndex % kPerDrawFrameRing);
+        } else {
+            mPerDrawFrameSlot = 0U;
+        }
+        mPerDrawWriteIndex = 0U;
 
         struct FImportedExternalTexture {
             Rhi::FRhiTexture*                 Texture = nullptr;
@@ -1436,9 +1504,22 @@ namespace AltinaEngine::Rendering {
         pipelineData.VertexLayout    = resources.BaseVertexLayout;
 
         FBasePassBindingData bindingData{};
-        bindingData.PerDrawBuffer   = mPerDrawBuffer.Get();
-        bindingData.PerDrawGroup    = mPerDrawGroup.Get();
-        bindingData.PerDrawSetIndex = drawBindings.PerDrawSetIndex;
+        bindingData.PerDrawBuffer      = mPerDrawBuffer.Get();
+        bindingData.PerDrawGroup       = mPerDrawGroup.Get();
+        bindingData.PerDrawSetIndex    = drawBindings.PerDrawSetIndex;
+        bindingData.PerDrawStrideBytes = mPerDrawStrideBytes;
+        bindingData.PerDrawCapacity    = mPerDrawCapacity;
+        bindingData.PerDrawWriteIndex  = &mPerDrawWriteIndex;
+        bindingData.PerDrawBaseOffset  = mPerDrawFrameSlot * mPerDrawCapacity * mPerDrawStrideBytes;
+        bindingData.bUseDynamicOffset  = bVulkanPerDrawDynamic;
+        if (bindingData.bUseDynamicOffset && bindingData.PerDrawBuffer != nullptr) {
+            const u64 requiredBytes = static_cast<u64>(bindingData.PerDrawBaseOffset)
+                + static_cast<u64>(bindingData.PerDrawCapacity)
+                    * static_cast<u64>(bindingData.PerDrawStrideBytes);
+            DebugAssert(requiredBytes <= bindingData.PerDrawBuffer->GetDesc().mSizeBytes,
+                TEXT("BasicDeferredRenderer"), "PerDraw buffer too small (required={}, actual={}).",
+                requiredBytes, bindingData.PerDrawBuffer->GetDesc().mSizeBytes);
+        }
 
         const RenderCore::View::FViewRect viewRect = view->ViewRect;
 

@@ -37,12 +37,17 @@ namespace AltinaEngine::Rendering {
         void        FinalizeRendering() override;
 
     private:
-        static constexpr u32                           kShadowCascades = 4U;
+        static constexpr u32                           kShadowCascades   = 4U;
+        static constexpr u32                           kPerDrawFrameRing = 4U;
 
         Rhi::FRhiBufferRef                             mPerFrameBuffer;
         Rhi::FRhiBindGroupRef                          mPerFrameGroup;
         Rhi::FRhiBufferRef                             mPerDrawBuffer;
         Rhi::FRhiBindGroupRef                          mPerDrawGroup;
+        u32                                            mPerDrawStrideBytes = 0U;
+        u32                                            mPerDrawCapacity    = 0U;
+        u32                                            mPerDrawWriteIndex  = 0U;
+        u32                                            mPerDrawFrameSlot   = 0U;
         Rhi::FRhiBufferRef                             mIblConstantsBuffer;
         Rhi::FRhiBufferRef                             mSsaoConstantsBuffer;
 

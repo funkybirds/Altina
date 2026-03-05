@@ -264,7 +264,7 @@ namespace AltinaEngine::GameScene {
             }
         }
 
-        mComponentStorage.clear();
+        mComponentStorage.Clear();
         mGameObjects.Clear();
         mFreeGameObjects.Clear();
     }
@@ -451,7 +451,7 @@ namespace AltinaEngine::GameScene {
 
     void FWorld::Tick(float InDeltaTime) {
         TVector<FComponentStorageBase*> storages;
-        storages.Reserve(static_cast<usize>(mComponentStorage.size()));
+        storages.Reserve(mComponentStorage.Num());
         for (auto& entry : mComponentStorage) {
             if (entry.second) {
                 storages.PushBack(entry.second.Get());
@@ -1106,7 +1106,7 @@ namespace AltinaEngine::GameScene {
     }
 
     auto FWorld::FindComponentStorage(FComponentTypeHash type) const -> FComponentStorageBase* {
-        auto it = mComponentStorage.find(type);
+        auto it = mComponentStorage.FindIt(type);
         if (it == mComponentStorage.end()) {
             return nullptr;
         }

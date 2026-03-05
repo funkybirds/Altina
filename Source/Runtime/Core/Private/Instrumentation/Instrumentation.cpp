@@ -42,8 +42,8 @@ namespace AltinaEngine::Core::Instrumentation {
         // Ensure a placeholder counter entry exists for visibility tools.
         Threading::FScopedLock lk(gMutex);
         FNativeString          key(name);
-        if (gCounters.find(key) == gCounters.end()) {
-            gCounters.emplace(Move(key), MakeShared<FCounter>());
+        if (gCounters.FindIt(key) == gCounters.end()) {
+            gCounters.Emplace(Move(key), MakeShared<FCounter>());
         }
     }
 
@@ -54,11 +54,11 @@ namespace AltinaEngine::Core::Instrumentation {
             return;
         Threading::FScopedLock lk(gMutex);
         FNativeString          key(name);
-        auto                   it = gCounters.find(key);
+        auto                   it = gCounters.FindIt(key);
         if (it == gCounters.end()) {
             auto shared = MakeShared<FCounter>();
             shared->mValue.FetchAdd(static_cast<long long>(delta));
-            gCounters.emplace(Move(key), shared);
+            gCounters.Emplace(Move(key), shared);
             return;
         }
         it->second->mValue.FetchAdd(static_cast<long long>(delta));
@@ -69,7 +69,7 @@ namespace AltinaEngine::Core::Instrumentation {
             return 0;
         Threading::FScopedLock lk(gMutex);
         FNativeString          key(name);
-        auto                   it = gCounters.find(key);
+        auto                   it = gCounters.FindIt(key);
         if (it == gCounters.end())
             return 0;
         return it->second->mValue.Load();
@@ -80,12 +80,12 @@ namespace AltinaEngine::Core::Instrumentation {
             return;
         Threading::FScopedLock lk(gMutex);
         FNativeString          key(name);
-        auto                   it = gTimings.find(key);
+        auto                   it = gTimings.FindIt(key);
         if (it == gTimings.end()) {
             auto shared = MakeShared<FTiming>();
             shared->mTotalMs.FetchAdd(ms);
             shared->mCount.FetchAdd(1);
-            gTimings.emplace(Move(key), shared);
+            gTimings.Emplace(Move(key), shared);
             return;
         }
         it->second->mTotalMs.FetchAdd(ms);
@@ -100,7 +100,7 @@ namespace AltinaEngine::Core::Instrumentation {
             return;
         Threading::FScopedLock lk(gMutex);
         FNativeString          key(name);
-        auto                   it = gTimings.find(key);
+        auto                   it = gTimings.FindIt(key);
         if (it == gTimings.end())
             return;
         outTotalMs = it->second->mTotalMs.Load();

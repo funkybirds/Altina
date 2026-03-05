@@ -290,7 +290,7 @@ namespace AltinaEngine::Core::Jobs {
 
         {
             Threading::FScopedLock lg(gJobsMutex);
-            gJobs.emplace(id, state);
+            gJobs.Emplace(id, state);
         }
 
         // Wrap the user's callback to mark completion.
@@ -334,7 +334,7 @@ namespace AltinaEngine::Core::Jobs {
 
         {
             Threading::FScopedLock lg(gJobsMutex);
-            gJobs.emplace(id, state);
+            gJobs.Emplace(id, state);
         }
 
         TShared<TFunction<void()>> cbptr = MakeShared<TFunction<void()>>(Move(desc.Callback));
@@ -422,7 +422,7 @@ namespace AltinaEngine::Core::Jobs {
         TShared<JobState> state;
         {
             Threading::FScopedLock lg(gJobsMutex);
-            auto                   it = gJobs.find(h.mId);
+            auto                   it = gJobs.FindIt(h.mId);
             if (it == gJobs.end())
                 return;
             state = it->second;

@@ -36,7 +36,7 @@ namespace AltinaEngine::Engine {
         key.Handle    = handle;
         key.ParamHash = parameters.GetHash();
 
-        const auto it = mMaterialCache.find(key);
+        const auto it = mMaterialCache.FindIt(key);
         if (it != mMaterialCache.end()) {
             return it->second.Get();
         }
@@ -45,7 +45,7 @@ namespace AltinaEngine::Engine {
             GameScene::FMeshMaterialComponent::AssetToRenderMaterialConverter(handle, parameters);
         auto  sharedMaterial = Container::MakeShared<Render::FMaterial>(Move(material));
         auto* rawPtr         = sharedMaterial.Get();
-        mMaterialCache.emplace(Move(key), Move(sharedMaterial));
+        mMaterialCache.Emplace(Move(key), Move(sharedMaterial));
         return rawPtr;
     }
 
@@ -68,6 +68,6 @@ namespace AltinaEngine::Engine {
         }
 
         mFallbackMaterial.Reset();
-        mMaterialCache.clear();
+        mMaterialCache.Clear();
     }
 } // namespace AltinaEngine::Engine

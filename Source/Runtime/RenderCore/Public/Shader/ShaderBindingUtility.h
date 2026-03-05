@@ -59,7 +59,7 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
         void                            Reset() {
             mSetIndex = 0U;
             mLayout   = nullptr;
-            mBindingByKey.clear();
+            mBindingByKey.Clear();
         }
     };
 

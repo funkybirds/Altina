@@ -447,7 +447,7 @@ namespace AltinaEngine::GameScene {
     template <typename T>
     inline auto FWorld::FindComponentStorage() const -> TComponentStorage<T>* {
         const FComponentTypeHash typeHash = GetComponentTypeHash<T>();
-        auto                     it       = mComponentStorage.find(typeHash);
+        auto                     it       = mComponentStorage.FindIt(typeHash);
         if (it == mComponentStorage.end()) {
             return nullptr;
         }
@@ -463,7 +463,7 @@ namespace AltinaEngine::GameScene {
         const FComponentTypeHash typeHash = GetComponentTypeHash<T>();
         auto  storagePtr = MakeUniqueAs<FComponentStorageBase, TComponentStorage<T>>();
         auto* rawPtr     = static_cast<TComponentStorage<T>*>(storagePtr.Get());
-        mComponentStorage.emplace(typeHash, Move(storagePtr));
+        mComponentStorage.Emplace(typeHash, Move(storagePtr));
         return *rawPtr;
     }
 

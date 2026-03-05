@@ -193,12 +193,12 @@ namespace AltinaEngine::RenderCore {
         TextureNameHashes.Clear();
         TextureBindings.Clear();
         SamplerBindings.Clear();
-        PropertyMap.clear();
+        PropertyMap.Clear();
     }
 
     void FMaterialLayout::InitFromConstantBuffer(const Shader::FShaderConstantBuffer& cbuffer) {
         PropertyBag.Init(cbuffer);
-        PropertyMap.clear();
+        PropertyMap.Clear();
         for (const auto& member : cbuffer.mMembers) {
             Shader::FShaderPropertyBag::FPropertyDesc desc{};
             desc.mOffset        = member.mOffset;
@@ -302,7 +302,7 @@ namespace AltinaEngine::RenderCore {
 
     auto FMaterialLayout::FindProperty(FMaterialParamId id) const noexcept
         -> const Shader::FShaderPropertyBag::FPropertyDesc* {
-        const auto it = PropertyMap.find(id);
+        const auto it = PropertyMap.FindIt(id);
         if (it == PropertyMap.end()) {
             return nullptr;
         }
@@ -322,7 +322,7 @@ namespace AltinaEngine::RenderCore {
 
     auto FMaterialShaderMap::Find(EMaterialPass pass) const noexcept
         -> const FMaterialPassShaders* {
-        const auto it = PassShaders.find(pass);
+        const auto it = PassShaders.FindIt(pass);
         if (it == PassShaders.end()) {
             return nullptr;
         }
@@ -330,7 +330,7 @@ namespace AltinaEngine::RenderCore {
     }
 
     auto FMaterialShaderMap::Has(EMaterialPass pass) const noexcept -> bool {
-        return PassShaders.find(pass) != PassShaders.end();
+        return PassShaders.FindIt(pass) != PassShaders.end();
     }
 
     void FMaterialTemplate::SetPassDesc(EMaterialPass pass, FMaterialPassDesc desc) {
@@ -344,7 +344,7 @@ namespace AltinaEngine::RenderCore {
 
     auto FMaterialTemplate::FindPassDesc(EMaterialPass pass) const noexcept
         -> const FMaterialPassDesc* {
-        const auto it = mPasses.find(pass);
+        const auto it = mPasses.FindIt(pass);
         if (it == mPasses.end()) {
             return nullptr;
         }
@@ -371,7 +371,7 @@ namespace AltinaEngine::RenderCore {
 
     auto FMaterialTemplate::FindOverrides(EMaterialPass pass) const noexcept
         -> const FMaterialParameterBlock* {
-        const auto it = mOverrides.find(pass);
+        const auto it = mOverrides.FindIt(pass);
         if (it == mOverrides.end()) {
             return nullptr;
         }
@@ -379,7 +379,7 @@ namespace AltinaEngine::RenderCore {
     }
 
     auto FMaterialTemplate::FindAnyPassDesc() const noexcept -> const FMaterialPassDesc* {
-        if (mPasses.empty()) {
+        if (mPasses.IsEmpty()) {
             return nullptr;
         }
         return &mPasses.begin()->second;
@@ -474,7 +474,7 @@ namespace AltinaEngine::RenderCore {
     }
 
     auto FMaterial::GetBindGroup(EMaterialPass pass) const noexcept -> Rhi::FRhiBindGroupRef {
-        const auto it = mBindGroups.find(pass);
+        const auto it = mBindGroups.FindIt(pass);
         if (it == mBindGroups.end()) {
             return {};
         }
@@ -488,16 +488,16 @@ namespace AltinaEngine::RenderCore {
     }
 
     void FMaterial::ReleaseRHI() {
-        mBindGroups.clear();
-        mBindGroupLayouts.clear();
+        mBindGroups.Clear();
+        mBindGroupLayouts.Clear();
         mCBuffer.Reset();
         mCBufferData.Clear();
     }
 
     void FMaterial::UpdateRHI() {
         if (!mTemplate) {
-            mBindGroups.clear();
-            mBindGroupLayouts.clear();
+            mBindGroups.Clear();
+            mBindGroupLayouts.Clear();
             mCBuffer.Reset();
             mCBufferData.Clear();
             mDirtyCBuffer  = false;
@@ -662,8 +662,8 @@ namespace AltinaEngine::RenderCore {
             return;
         }
 
-        mBindGroups.clear();
-        mBindGroupLayouts.clear();
+        mBindGroups.Clear();
+        mBindGroupLayouts.Clear();
 
         for (const auto& entry : templ.GetPasses()) {
             const auto  pass       = entry.first;

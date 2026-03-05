@@ -217,11 +217,11 @@ namespace AltinaEngine::Rendering {
         }
         auto&            s = GetRegistryState();
         std::scoped_lock lock(s.Mutex);
-        const auto       it = s.Effects.find(FString(effectId));
+        const auto       it = s.Effects.FindIt(FString(effectId));
         if (it == s.Effects.end()) {
             return false;
         }
-        s.Effects.erase(it);
+        s.Effects.Erase(it);
         return true;
     }
 
@@ -245,7 +245,7 @@ namespace AltinaEngine::Rendering {
                 FPostProcessAddToGraphFn fn = nullptr;
                 {
                     std::scoped_lock lock(s.Mutex);
-                    const auto       it = s.Effects.find(node.EffectId);
+                    const auto       it = s.Effects.FindIt(node.EffectId);
                     if (it != s.Effects.end()) {
                         fn = it->second.Fn;
                     } else if (!s.MissingLoggedOnce.HasKey(node.EffectId)) {
@@ -268,8 +268,8 @@ namespace AltinaEngine::Rendering {
     void ShutdownPostProcess() noexcept {
         auto&            s = GetRegistryState();
         std::scoped_lock lock(s.Mutex);
-        s.Effects.clear();
-        s.MissingLoggedOnce.clear();
+        s.Effects.Clear();
+        s.MissingLoggedOnce.Clear();
         s.bBuiltinsRegistered = false;
 
         PostProcess::Detail::ShutdownPostProcessSharedResources();

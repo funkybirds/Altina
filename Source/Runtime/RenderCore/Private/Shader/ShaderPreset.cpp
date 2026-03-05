@@ -36,14 +36,14 @@ namespace AltinaEngine::RenderCore {
             return nullptr;
         }
         auto       nameStr = FString(name);
-        const auto it      = sPresets.find(nameStr);
+        const auto it      = sPresets.FindIt(nameStr);
         if (it == sPresets.end()) {
             return nullptr;
         }
         return &it->second;
     }
 
-    void FShaderPresetRegistry::Clear() noexcept { sPresets.clear(); }
+    void FShaderPresetRegistry::Clear() noexcept { sPresets.Clear(); }
 
     void InitCommonShaders() {
         static bool sInitialized = false;

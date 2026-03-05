@@ -231,24 +231,24 @@ namespace AltinaEngine::Core::Console {
 
     void LatchRenderThreadCVars() noexcept {
         FScopedLock lock(gLatchedMutex);
-        gLatchedValues.clear();
+        gLatchedValues.Clear();
         FConsoleVariable::ForEach([&](const FConsoleVariable& v) {
             if (!HasAnyFlags(v.GetFlags(), ECVarFlags::SnapshotPerFrame)) {
                 return;
             }
-            gLatchedValues.emplace(const_cast<FConsoleVariable*>(&v), v.GetValueCopy());
+            gLatchedValues.Emplace(const_cast<FConsoleVariable*>(&v), v.GetValueCopy());
         });
     }
 
     FConsoleVariable* FConsoleVariable::RegisterInternal(
         const FString& name, FConsoleValue&& value, EType type, ECVarFlags flags) noexcept {
         FScopedLock lock(gRegistryMutex);
-        auto        it = gRegistry.find(name);
+        auto        it = gRegistry.FindIt(name);
         if (it != gRegistry.end())
             return it->second.Get();
         auto var = MakeShared<FConsoleVariable>(name, Move(value), type, flags);
-        gRegistry.emplace(name, Move(var));
-        return gRegistry.find(name)->second.Get();
+        gRegistry.Emplace(name, Move(var));
+        return gRegistry.FindIt(name)->second.Get();
     }
 
     FConsoleVariable* FConsoleVariable::Find(const FString& name) noexcept {
@@ -256,7 +256,7 @@ namespace AltinaEngine::Core::Console {
             return nullptr;
         }
         FScopedLock lock(gRegistryMutex);
-        auto        it = gRegistry.find(name);
+        auto        it = gRegistry.FindIt(name);
         return it != gRegistry.end() ? it->second.Get() : nullptr;
     }
 
@@ -319,7 +319,7 @@ namespace AltinaEngine::Core::Console {
             return false;
         }
         FScopedLock lock(gLatchedMutex);
-        auto        it = gLatchedValues.find(const_cast<FConsoleVariable*>(var));
+        auto        it = gLatchedValues.FindIt(const_cast<FConsoleVariable*>(var));
         if (it == gLatchedValues.end()) {
             return false;
         }

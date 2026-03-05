@@ -13,11 +13,14 @@ namespace AltinaEngine::GameScene {
      */
     class ACLASS(Abstract) AE_ENGINE_API FNativeScriptComponent : public FScriptComponentBase {
     public:
-        ~FNativeScriptComponent() override = default;
+        ~FNativeScriptComponent() override;
+
+        FNativeScriptComponent(const FNativeScriptComponent& rhs);
+        auto operator=(const FNativeScriptComponent& rhs) -> FNativeScriptComponent&;
 
         void Tick(float dt) override = 0;
 
     protected:
-        FNativeScriptComponent() = default;
+        FNativeScriptComponent();
     };
 } // namespace AltinaEngine::GameScene

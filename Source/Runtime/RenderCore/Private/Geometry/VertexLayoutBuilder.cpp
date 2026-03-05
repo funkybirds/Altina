@@ -262,7 +262,7 @@ namespace AltinaEngine::RenderCore::Geometry {
                     SetError(outError, message.ToView());
                     return false;
                 }
-                const auto it = semanticToIndex.find(encodedKey);
+                const auto it = semanticToIndex.FindIt(encodedKey);
                 if (it == semanticToIndex.end()) {
                     FShaderVertexInputElement element{};
                     element.mSemantic = semanticKey;
@@ -300,13 +300,13 @@ namespace AltinaEngine::RenderCore::Geometry {
         u32                  nextInputSlot = 0U;
         for (usize i = 0U; i < provided.mElements.Size(); ++i) {
             const auto key = EncodeVertexSemanticKey(provided.mElements[i].mSemantic);
-            if (providedIndexBySemantic.find(key) != providedIndexBySemantic.end()) {
+            if (providedIndexBySemantic.FindIt(key) != providedIndexBySemantic.end()) {
                 SetError(outError, TEXT("VertexFactory layout has duplicated semantic key."));
                 return false;
             }
             providedIndexBySemantic[key] = i;
             const u32 slotKey            = static_cast<u32>(provided.mElements[i].mSlot);
-            if (inputSlotByFactorySlot.find(slotKey) == inputSlotByFactorySlot.end()) {
+            if (inputSlotByFactorySlot.FindIt(slotKey) == inputSlotByFactorySlot.end()) {
                 inputSlotByFactorySlot[slotKey] = nextInputSlot++;
             }
         }
@@ -314,7 +314,7 @@ namespace AltinaEngine::RenderCore::Geometry {
         outResolved.mVertexLayout.mAttributes.Reserve(requirement.mElements.Size());
         for (const auto& required : requirement.mElements) {
             const auto key = EncodeVertexSemanticKey(required.mSemantic);
-            const auto it  = providedIndexBySemantic.find(key);
+            const auto it  = providedIndexBySemantic.FindIt(key);
             if (it == providedIndexBySemantic.end()) {
                 SetError(outError, TEXT("VertexFactory layout misses a required semantic."));
                 return false;
@@ -341,7 +341,7 @@ namespace AltinaEngine::RenderCore::Geometry {
             }
             outAttr.mSemanticIndex = source.mSemantic.mSemanticIndex;
             outAttr.mFormat        = source.mFormat;
-            const auto slotIt      = inputSlotByFactorySlot.find(static_cast<u32>(source.mSlot));
+            const auto slotIt      = inputSlotByFactorySlot.FindIt(static_cast<u32>(source.mSlot));
             if (slotIt == inputSlotByFactorySlot.end()) {
                 SetError(outError, TEXT("VertexFactory slot map resolve failed."));
                 return false;

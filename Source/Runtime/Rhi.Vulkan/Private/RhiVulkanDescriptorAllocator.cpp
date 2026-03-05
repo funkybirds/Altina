@@ -48,9 +48,9 @@ namespace AltinaEngine::Rhi {
                 mix(entry.mHasDynamicOffset ? 1ULL : 0ULL);
             }
         }
-        auto it = mBuckets.find(key);
+        auto it = mBuckets.FindIt(key);
         if (it == mBuckets.end()) {
-            auto inserted = mBuckets.emplace(key, TVector<FLayoutBucket>{});
+            auto inserted = mBuckets.Emplace(key, TVector<FLayoutBucket>{});
             it            = inserted.first;
         }
 
@@ -194,7 +194,7 @@ namespace AltinaEngine::Rhi {
                 bucket.mPools.Clear();
             }
         }
-        mBuckets.clear();
+        mBuckets.Clear();
         mDevice = VK_NULL_HANDLE;
     }
 } // namespace AltinaEngine::Rhi

@@ -830,7 +830,7 @@ namespace AltinaEngine::Rendering {
                 BuildMaterialBindGroupLayoutDesc(passLayout, layoutEntries);
 
             Rhi::FRhiBindGroupLayoutRef materialLayoutRef;
-            if (const auto it = resources.MaterialLayouts.find(materialLayoutHash);
+            if (const auto it = resources.MaterialLayouts.FindIt(materialLayoutHash);
                 it != resources.MaterialLayouts.end()) {
                 materialLayoutRef = it->second;
             } else {
@@ -852,7 +852,7 @@ namespace AltinaEngine::Rendering {
             }
 
             Rhi::FRhiPipelineLayoutRef pipelineLayout;
-            if (const auto it = resources.BasePipelineLayouts.find(materialLayoutHash);
+            if (const auto it = resources.BasePipelineLayouts.FindIt(materialLayoutHash);
                 it != resources.BasePipelineLayouts.end()) {
                 pipelineLayout = it->second;
             } else {
@@ -877,7 +877,8 @@ namespace AltinaEngine::Rendering {
 
             const u64 key =
                 batch.BatchKey.PipelineKey ^ (materialLayoutHash * 0x9e3779b97f4a7c15ULL);
-            if (const auto it = data->PipelineCache->find(key); it != data->PipelineCache->end()) {
+            if (const auto it = data->PipelineCache->FindIt(key);
+                it != data->PipelineCache->end()) {
                 return it->second.Get();
             }
 
@@ -1005,10 +1006,10 @@ namespace AltinaEngine::Rendering {
         resources.DefaultTemplate       = Move(templ);
         resources.DefaultPassDesc       = {};
         resources.DefaultShadowPassDesc = {};
-        resources.MaterialLayouts.clear();
-        resources.BasePipelineLayouts.clear();
-        resources.BasePipelines.clear();
-        resources.ShadowPipelines.clear();
+        resources.MaterialLayouts.Clear();
+        resources.BasePipelineLayouts.Clear();
+        resources.BasePipelines.Clear();
+        resources.ShadowPipelines.Clear();
         EnsureDefaultTemplate(resources);
     }
 
@@ -1087,10 +1088,10 @@ namespace AltinaEngine::Rendering {
         resources.PerFrameBinding = 0U;
         resources.PerDrawBinding  = 0U;
 
-        resources.BasePipelines.clear();
-        resources.ShadowPipelines.clear();
-        resources.MaterialLayouts.clear();
-        resources.BasePipelineLayouts.clear();
+        resources.BasePipelines.Clear();
+        resources.ShadowPipelines.Clear();
+        resources.MaterialLayouts.Clear();
+        resources.BasePipelineLayouts.Clear();
         resources.DefaultTemplate.Reset();
         resources.DefaultPassDesc       = {};
         resources.DefaultShadowPassDesc = {};

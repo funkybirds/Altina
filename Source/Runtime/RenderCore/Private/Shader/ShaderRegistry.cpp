@@ -25,12 +25,12 @@ namespace AltinaEngine::RenderCore {
 
     void FShaderRegistry::Clear() {
         FScopedLock lock(mMutex);
-        mEntries.clear();
+        mEntries.Clear();
     }
 
     auto FShaderRegistry::GetEntryCount() const noexcept -> usize {
         FScopedLock lock(mMutex);
-        return static_cast<usize>(mEntries.size());
+        return mEntries.Num();
     }
 
     auto FShaderRegistry::Contains(const FShaderKey& key) const noexcept -> bool {
@@ -38,7 +38,7 @@ namespace AltinaEngine::RenderCore {
             return false;
         }
         FScopedLock lock(mMutex);
-        return mEntries.find(key) != mEntries.end();
+        return mEntries.FindIt(key) != mEntries.end();
     }
 
     auto FShaderRegistry::FindShader(const FShaderKey& key) const noexcept -> Rhi::FRhiShaderRef {
@@ -46,7 +46,7 @@ namespace AltinaEngine::RenderCore {
             return {};
         }
         FScopedLock lock(mMutex);
-        if (const auto it = mEntries.find(key); it != mEntries.end()) {
+        if (const auto it = mEntries.FindIt(key); it != mEntries.end()) {
             return it->second;
         }
         return {};
@@ -57,7 +57,7 @@ namespace AltinaEngine::RenderCore {
             return false;
         }
         FScopedLock lock(mMutex);
-        mEntries.insert_or_assign(Move(key), Move(shader));
+        mEntries.InsertOrAssign(Move(key), Move(shader));
         return true;
     }
 
@@ -66,7 +66,7 @@ namespace AltinaEngine::RenderCore {
             return false;
         }
         FScopedLock lock(mMutex);
-        return mEntries.erase(key) > 0;
+        return mEntries.Erase(key) > 0;
     }
 
 } // namespace AltinaEngine::RenderCore

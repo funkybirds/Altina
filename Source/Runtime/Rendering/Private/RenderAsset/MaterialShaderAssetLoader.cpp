@@ -807,7 +807,7 @@ namespace AltinaEngine::Rendering {
                 templ->SetPassOverrides(passType, overrideBlock);
             }
         }
-        if (templ->GetPasses().empty()) {
+        if (templ->GetPasses().IsEmpty()) {
             return {};
         }
         return templ;

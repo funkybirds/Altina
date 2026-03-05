@@ -6,7 +6,7 @@ namespace AltinaEngine::GameScene {
     auto FWorldManager::CreateWorld() -> FWorldHandle {
         auto      world = MakeUnique<FWorld>();
         const u32 id    = world->GetWorldId();
-        mWorlds.emplace(id, Move(world));
+        mWorlds.Emplace(id, Move(world));
 
         FWorldHandle handle{ id };
         if (!mActiveWorld.IsValid()) {
@@ -20,7 +20,7 @@ namespace AltinaEngine::GameScene {
             return;
         }
 
-        auto it = mWorlds.find(handle.Id);
+        auto it = mWorlds.FindIt(handle.Id);
         if (it == mWorlds.end()) {
             return;
         }
@@ -29,7 +29,7 @@ namespace AltinaEngine::GameScene {
             mActiveWorld = {};
         }
 
-        mWorlds.erase(it);
+        mWorlds.Erase(it);
     }
 
     auto FWorldManager::GetWorld(FWorldHandle handle) noexcept -> FWorld* {
@@ -37,7 +37,7 @@ namespace AltinaEngine::GameScene {
             return nullptr;
         }
 
-        auto it = mWorlds.find(handle.Id);
+        auto it = mWorlds.FindIt(handle.Id);
         if (it == mWorlds.end()) {
             return nullptr;
         }
@@ -49,7 +49,7 @@ namespace AltinaEngine::GameScene {
             return nullptr;
         }
 
-        auto it = mWorlds.find(handle.Id);
+        auto it = mWorlds.FindIt(handle.Id);
         if (it == mWorlds.end()) {
             return nullptr;
         }
@@ -62,7 +62,7 @@ namespace AltinaEngine::GameScene {
             return;
         }
 
-        if (mWorlds.find(handle.Id) == mWorlds.end()) {
+        if (mWorlds.FindIt(handle.Id) == mWorlds.end()) {
             return;
         }
 
@@ -80,7 +80,7 @@ namespace AltinaEngine::GameScene {
     }
 
     void FWorldManager::Clear() {
-        mWorlds.clear();
+        mWorlds.Clear();
         mActiveWorld = {};
     }
 } // namespace AltinaEngine::GameScene

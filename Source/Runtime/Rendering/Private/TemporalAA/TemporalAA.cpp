@@ -111,7 +111,7 @@ namespace AltinaEngine::Rendering::TemporalAA::Detail {
 
     void ClearAllViewStates() noexcept {
         auto& map = GetStateMap();
-        map.clear();
+        map.Clear();
     }
 } // namespace AltinaEngine::Rendering::TemporalAA::Detail
 

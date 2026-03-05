@@ -1208,7 +1208,7 @@ namespace AltinaEngine::ShaderCompiler {
                     return true;
                 case FShaderPermutationRuleExpression::EKind::Identifier:
                 {
-                    const auto it = env.find(node.mIdentifier);
+                    const auto it = env.FindIt(node.mIdentifier);
                     if (it == env.end()) {
                         if (diagnostics) {
                             AppendDiagnostic(*diagnostics, TEXT("Unknown identifier in rule."));
@@ -1525,7 +1525,7 @@ namespace AltinaEngine::ShaderCompiler {
         }
 
         THashMap<FString, i32> env;
-        env.reserve(layout.mDimensions.Size()
+        env.Reserve(layout.mDimensions.Size()
             + ((builtinLayout != nullptr) ? builtinLayout->mBuiltins.Size() : 0));
         for (usize i = 0; i < layout.mDimensions.Size(); ++i) {
             const auto& dim   = layout.mDimensions[i];
@@ -1553,7 +1553,7 @@ namespace AltinaEngine::ShaderCompiler {
         }
 
         for (const auto& letRule : rules.mLets) {
-            if (env.find(letRule.mName) != env.end()) {
+            if (env.FindIt(letRule.mName) != env.end()) {
                 if (outDiagnostics) {
                     AppendDiagnostic(*outDiagnostics, TEXT("Let rule name conflicts with symbol."));
                 }

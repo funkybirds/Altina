@@ -342,7 +342,7 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
                 }
                 const auto key = MakeLookupKey(
                     HashBindingName(cbuffer.mName.ToView()), Rhi::ERhiBindingType::ConstantBuffer);
-                const auto it = outTable.mBindingByKey.find(key);
+                const auto it = outTable.mBindingByKey.FindIt(key);
                 if (it != outTable.mBindingByKey.end()) {
                     if (it->second != cbuffer.mBinding) {
                         return false;
@@ -362,7 +362,7 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
                 }
                 const auto type = ToRhiBindingType(resource);
                 const auto key  = MakeLookupKey(HashBindingName(resource.mName.ToView()), type);
-                const auto it   = outTable.mBindingByKey.find(key);
+                const auto it   = outTable.mBindingByKey.FindIt(key);
                 if (it != outTable.mBindingByKey.end()) {
                     if (it->second != resource.mBinding) {
                         return false;
@@ -376,7 +376,7 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
             }
         }
 
-        return !outTable.mBindingByKey.empty();
+        return !outTable.mBindingByKey.IsEmpty();
     }
 
     auto BuildBindingLookupTableFromShaders(const TVector<Rhi::FRhiShader*>& shaders, u32 setIndex,
@@ -397,7 +397,7 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
                 }
                 const auto key = MakeLookupKey(
                     HashBindingName(cbuffer.mName.ToView()), Rhi::ERhiBindingType::ConstantBuffer);
-                const auto it = outTable.mBindingByKey.find(key);
+                const auto it = outTable.mBindingByKey.FindIt(key);
                 if (it != outTable.mBindingByKey.end()) {
                     if (it->second != cbuffer.mBinding) {
                         return false;
@@ -417,7 +417,7 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
                 }
                 const auto type = ToRhiBindingType(resource);
                 const auto key  = MakeLookupKey(HashBindingName(resource.mName.ToView()), type);
-                const auto it   = outTable.mBindingByKey.find(key);
+                const auto it   = outTable.mBindingByKey.FindIt(key);
                 if (it != outTable.mBindingByKey.end()) {
                     if (it->second != resource.mBinding) {
                         return false;
@@ -431,13 +431,13 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
             }
         }
 
-        return !outTable.mBindingByKey.empty();
+        return !outTable.mBindingByKey.IsEmpty();
     }
 
     auto FindBindingByNameHash(const FBindingLookupTable& table, u32 nameHash,
         Rhi::ERhiBindingType type, u32& outBinding) -> bool {
         outBinding    = kInvalidBinding;
-        const auto it = table.mBindingByKey.find(MakeLookupKey(nameHash, type));
+        const auto it = table.mBindingByKey.FindIt(MakeLookupKey(nameHash, type));
         if (it == table.mBindingByKey.end()) {
             return false;
         }

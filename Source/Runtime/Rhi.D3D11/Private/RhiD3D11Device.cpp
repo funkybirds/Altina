@@ -2877,7 +2877,7 @@ namespace AltinaEngine::Rhi {
 
         {
             FScopedLock lock(mState->mSamplerCacheMutex);
-            auto        it = mState->mSamplerCache.find(cacheKey);
+            auto        it = mState->mSamplerCache.FindIt(cacheKey);
             if (it != mState->mSamplerCache.end()) {
                 ID3D11SamplerState* cached = it->second.Get();
                 if (cached) {
@@ -2891,7 +2891,7 @@ namespace AltinaEngine::Rhi {
             if (FAILED(hr) || (sampler == nullptr)) {
                 return {};
             }
-            mState->mSamplerCache.emplace(cacheKey, sampler);
+            mState->mSamplerCache.Emplace(cacheKey, sampler);
             return MakeResource<FRhiD3D11Sampler>(desc, sampler.Detach());
         }
 #else

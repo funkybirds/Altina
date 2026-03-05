@@ -35,8 +35,8 @@ namespace AltinaEngine::Shader {
         mRegister  = cbuffer.mRegister;
         mSpace     = cbuffer.mSpace;
 
-        mProperties.clear();
-        mProperties.reserve(static_cast<size_t>(cbuffer.mMembers.Size()));
+        mProperties.Clear();
+        mProperties.Reserve(static_cast<size_t>(cbuffer.mMembers.Size()));
         for (const auto& member : cbuffer.mMembers) {
             FPropertyDesc desc{};
             desc.mOffset              = member.mOffset;
@@ -60,12 +60,12 @@ namespace AltinaEngine::Shader {
         mRegister  = 0U;
         mSpace     = 0U;
         mData.Clear();
-        mProperties.clear();
+        mProperties.Clear();
     }
 
     auto FShaderPropertyBag::FindProperty(const FString& name) const noexcept
         -> const FPropertyDesc* {
-        const auto it = mProperties.find(name);
+        const auto it = mProperties.FindIt(name);
         if (it == mProperties.end()) {
             return nullptr;
         }

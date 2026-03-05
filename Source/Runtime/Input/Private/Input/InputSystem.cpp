@@ -2,10 +2,10 @@
 
 namespace AltinaEngine::Input {
     void FInputSystem::ClearFrameState() {
-        mKeysPressedThisFrame.clear();
-        mKeysReleasedThisFrame.clear();
-        mMouseButtonsPressedThisFrame.clear();
-        mMouseButtonsReleasedThisFrame.clear();
+        mKeysPressedThisFrame.Clear();
+        mKeysReleasedThisFrame.Clear();
+        mMouseButtonsPressedThisFrame.Clear();
+        mMouseButtonsReleasedThisFrame.Clear();
         mCharInputs.Clear();
         mMouseDeltaX     = 0;
         mMouseDeltaY     = 0;
@@ -13,27 +13,27 @@ namespace AltinaEngine::Input {
     }
 
     auto FInputSystem::IsKeyDown(EKey InKey) const noexcept -> bool {
-        return mPressedKeys.count(InKey) != 0U;
+        return mPressedKeys.Count(InKey) != 0U;
     }
 
     auto FInputSystem::WasKeyPressed(EKey InKey) const noexcept -> bool {
-        return mKeysPressedThisFrame.count(InKey) != 0U;
+        return mKeysPressedThisFrame.Count(InKey) != 0U;
     }
 
     auto FInputSystem::WasKeyReleased(EKey InKey) const noexcept -> bool {
-        return mKeysReleasedThisFrame.count(InKey) != 0U;
+        return mKeysReleasedThisFrame.Count(InKey) != 0U;
     }
 
     auto FInputSystem::IsMouseButtonDown(u32 InButton) const noexcept -> bool {
-        return mPressedMouseButtons.count(InButton) != 0U;
+        return mPressedMouseButtons.Count(InButton) != 0U;
     }
 
     auto FInputSystem::WasMouseButtonPressed(u32 InButton) const noexcept -> bool {
-        return mMouseButtonsPressedThisFrame.count(InButton) != 0U;
+        return mMouseButtonsPressedThisFrame.Count(InButton) != 0U;
     }
 
     auto FInputSystem::WasMouseButtonReleased(u32 InButton) const noexcept -> bool {
-        return mMouseButtonsReleasedThisFrame.count(InButton) != 0U;
+        return mMouseButtonsReleasedThisFrame.Count(InButton) != 0U;
     }
 
     auto FInputSystem::GetPressedKeys() const noexcept -> const FKeySet& { return mPressedKeys; }
@@ -91,24 +91,24 @@ namespace AltinaEngine::Input {
 
     void FInputSystem::OnWindowFocusLost() {
         mHasFocus = false;
-        mPressedKeys.clear();
-        mPressedMouseButtons.clear();
+        mPressedKeys.Clear();
+        mPressedMouseButtons.Clear();
     }
 
     void FInputSystem::OnKeyDown(EKey InKey, bool InRepeat) {
         // Robustness: some platforms / message pumps may mark the initial keydown as "repeat"
         // depending on focus changes or message ordering. We treat a transition from "not down"
         // to "down" as a press regardless of the repeat flag.
-        if (mPressedKeys.count(InKey) == 0U) {
+        if (mPressedKeys.Count(InKey) == 0U) {
             (void)InRepeat;
-            mKeysPressedThisFrame.insert(InKey);
+            mKeysPressedThisFrame.Insert(InKey);
         }
-        mPressedKeys.insert(InKey);
+        mPressedKeys.Insert(InKey);
     }
 
     void FInputSystem::OnKeyUp(EKey InKey) {
-        mPressedKeys.erase(InKey);
-        mKeysReleasedThisFrame.insert(InKey);
+        mPressedKeys.Erase(InKey);
+        mKeysReleasedThisFrame.Insert(InKey);
     }
 
     void FInputSystem::OnCharInput(u32 InCharCode) { mCharInputs.PushBack(InCharCode); }
@@ -125,15 +125,15 @@ namespace AltinaEngine::Input {
     }
 
     void FInputSystem::OnMouseButtonDown(u32 InButton) {
-        if (mPressedMouseButtons.count(InButton) == 0U) {
-            mMouseButtonsPressedThisFrame.insert(InButton);
+        if (mPressedMouseButtons.Count(InButton) == 0U) {
+            mMouseButtonsPressedThisFrame.Insert(InButton);
         }
-        mPressedMouseButtons.insert(InButton);
+        mPressedMouseButtons.Insert(InButton);
     }
 
     void FInputSystem::OnMouseButtonUp(u32 InButton) {
-        mPressedMouseButtons.erase(InButton);
-        mMouseButtonsReleasedThisFrame.insert(InButton);
+        mPressedMouseButtons.Erase(InButton);
+        mMouseButtonsReleasedThisFrame.Insert(InButton);
     }
 
     void FInputSystem::OnMouseWheel(f32 InDelta) { mMouseWheelDelta += InDelta; }

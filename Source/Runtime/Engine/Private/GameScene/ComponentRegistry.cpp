@@ -25,7 +25,7 @@ namespace AltinaEngine::GameScene {
     }
 
     auto FComponentRegistry::Find(FComponentTypeHash type) const -> const FComponentTypeEntry* {
-        auto it = mEntries.find(type);
+        auto it = mEntries.FindIt(type);
         if (it == mEntries.end()) {
             return nullptr;
         }

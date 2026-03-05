@@ -355,7 +355,7 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
 
     void FConfigCollection::ApplyStartupParamOverrides(
         const FStartupParameters& startupParameters) {
-        mOverrides.clear();
+        mOverrides.Clear();
 
         const FNativeStringView commandLine = startupParameters.mCommandLine.ToView();
         if (commandLine.Length() == 0) {
@@ -427,7 +427,7 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
 
     void FConfigCollection::Clear() noexcept {
         mDocument.Clear();
-        mOverrides.clear();
+        mOverrides.Clear();
     }
 
     auto FConfigCollection::GetBool(FStringView path) const noexcept -> bool {
@@ -689,7 +689,7 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
         if (path.Length() == 0) {
             return nullptr;
         }
-        auto it = mOverrides.find(FString(path));
+        auto it = mOverrides.FindIt(FString(path));
         if (it == mOverrides.end()) {
             return nullptr;
         }

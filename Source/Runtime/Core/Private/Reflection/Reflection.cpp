@@ -344,7 +344,7 @@ namespace AltinaEngine::Core::Reflection {
         }
 
         const auto& tpMeta = manager.mRegistry[classHash];
-        result.Reserve(tpMeta.mProperties.size());
+        result.Reserve(tpMeta.mProperties.Num());
 
         for (const auto& [propHash, propField] : tpMeta.mProperties) {
             FObject propObject = propField.mAccessor(object);

@@ -4,13 +4,15 @@
 
 #include "Render/DrawList.h"
 #include "Rhi/RhiFwd.h"
+#include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rendering {
     struct FDrawListBindings {
-        Rhi::FRhiBindGroup* PerFrame            = nullptr;
-        u32                 PerFrameSetIndex    = 0U;
-        u32                 PerDrawSetIndex     = 1U;
-        u32                 PerMaterialSetIndex = 2U;
+        Rhi::FRhiBindGroup*              PerFrame             = nullptr;
+        u32                              PerFrameSetIndex     = 0U;
+        u32                              PerDrawSetIndex      = 1U;
+        u32                              PerMaterialSetIndex  = 2U;
+        const Rhi::FRhiVertexLayoutDesc* ResolvedVertexLayout = nullptr;
     };
 
     using FDrawPipelineResolver =

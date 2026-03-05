@@ -6,6 +6,7 @@
 #include "Rhi/Command/RhiCmdContext.h"
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiPipeline.h"
+#include "Utility/String/StringViewUtility.h"
 #include "Logging/Log.h"
 
 namespace AltinaEngine::Rendering {
@@ -18,16 +19,16 @@ namespace AltinaEngine::Rendering {
             return &lod.Sections[sectionIndex];
         }
 
-        void BindVertexBuffers(
+        void BindVertexBuffersLegacy(
             Rhi::FRhiCmdContext& ctx, const RenderCore::Geometry::FStaticMeshLodData& lod) {
-            const auto posView = lod.PositionBuffer.GetView();
-            if (posView.mBuffer != nullptr) {
-                ctx.RHISetVertexBuffer(0U, posView);
+            const auto positionView = lod.PositionBuffer.GetView();
+            if (positionView.mBuffer != nullptr) {
+                ctx.RHISetVertexBuffer(0U, positionView);
             }
 
-            const auto tangentView = lod.TangentBuffer.GetView();
-            if (tangentView.mBuffer != nullptr) {
-                ctx.RHISetVertexBuffer(1U, tangentView);
+            const auto normalView = lod.TangentBuffer.GetView();
+            if (normalView.mBuffer != nullptr) {
+                ctx.RHISetVertexBuffer(1U, normalView);
             }
 
             const auto uv0View = lod.UV0Buffer.GetView();
@@ -38,6 +39,65 @@ namespace AltinaEngine::Rendering {
             const auto uv1View = lod.UV1Buffer.GetView();
             if (uv1View.mBuffer != nullptr) {
                 ctx.RHISetVertexBuffer(3U, uv1View);
+            }
+        }
+
+        auto ResolveVertexStreamView(const RenderCore::Geometry::FStaticMeshLodData& lod,
+            const Rhi::FRhiVertexAttributeDesc& attr, Rhi::FRhiVertexBufferView& outView) -> bool {
+            const auto semantic = attr.mSemanticName.ToView();
+            if (Core::Utility::String::EqualsIgnoreCase(semantic, TEXT("POSITION"))) {
+                outView = lod.PositionBuffer.GetView();
+                return outView.mBuffer != nullptr;
+            }
+            if (Core::Utility::String::EqualsIgnoreCase(semantic, TEXT("NORMAL"))
+                || Core::Utility::String::EqualsIgnoreCase(semantic, TEXT("TANGENT"))) {
+                // Static-mesh slot1 currently stores packed normal(float3).
+                outView = lod.TangentBuffer.GetView();
+                return outView.mBuffer != nullptr;
+            }
+            if (Core::Utility::String::EqualsIgnoreCase(semantic, TEXT("TEXCOORD"))) {
+                if (attr.mSemanticIndex == 0U) {
+                    outView = lod.UV0Buffer.GetView();
+                } else if (attr.mSemanticIndex == 1U) {
+                    outView = lod.UV1Buffer.GetView();
+                } else {
+                    return false;
+                }
+                return outView.mBuffer != nullptr;
+            }
+            return false;
+        }
+
+        void BindVertexBuffersResolved(Rhi::FRhiCmdContext& ctx,
+            const RenderCore::Geometry::FStaticMeshLodData& lod,
+            const Rhi::FRhiVertexLayoutDesc*                layout) {
+            if (layout == nullptr || layout->mAttributes.IsEmpty()) {
+                BindVertexBuffersLegacy(ctx, lod);
+                return;
+            }
+
+            u32 boundCount = 0U;
+            u32 missCount  = 0U;
+            for (const auto& attr : layout->mAttributes) {
+                Rhi::FRhiVertexBufferView view{};
+                if (!ResolveVertexStreamView(lod, attr, view)) {
+                    ++missCount;
+                    continue;
+                }
+                ctx.RHISetVertexBuffer(attr.mInputSlot, view);
+                ++boundCount;
+            }
+
+            if (boundCount == 0U) {
+                BindVertexBuffersLegacy(ctx, lod);
+                LogWarningCat(TEXT("Rendering.DrawList"),
+                    "BindVertexBuffersResolved: no streams matched resolved layout, fallback to legacy binding.");
+                return;
+            }
+            if (missCount > 0U) {
+                LogWarningCat(TEXT("Rendering.DrawList"),
+                    "BindVertexBuffersResolved: {} attributes not bound from resolved layout.",
+                    missCount);
             }
         }
     } // namespace
@@ -115,7 +175,7 @@ namespace AltinaEngine::Rendering {
             }
 
             ctx.RHISetPrimitiveTopology(lod.PrimitiveTopology);
-            BindVertexBuffers(ctx, lod);
+            BindVertexBuffersResolved(ctx, lod, bindings.ResolvedVertexLayout);
             ctx.RHISetIndexBuffer(indexView);
 
             const u32 instanceCount = static_cast<u32>(batch.Instances.Size());

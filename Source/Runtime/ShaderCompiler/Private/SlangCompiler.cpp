@@ -614,6 +614,121 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             return EShaderResourceType::Texture;
         }
 
+        auto IsSystemValueSemantic(const FNativeString& semantic) -> bool {
+            if (semantic.Length() < 3U) {
+                return false;
+            }
+            const auto* data = semantic.GetData();
+            return ((data[0] == 'S' || data[0] == 's') && (data[1] == 'V' || data[1] == 'v')
+                && data[2] == '_');
+        }
+
+        auto ParseSemanticIndexFromName(FNativeString& semanticInOut, u32& outSemanticIndex)
+            -> void {
+            outSemanticIndex = 0U;
+            const usize len  = semanticInOut.Length();
+            if (len == 0U) {
+                return;
+            }
+
+            usize digitStart = len;
+            while (digitStart > 0U) {
+                const char c = semanticInOut[digitStart - 1U];
+                if (c < '0' || c > '9') {
+                    break;
+                }
+                --digitStart;
+            }
+
+            if (digitStart == len) {
+                return;
+            }
+
+            u32 value = 0U;
+            for (usize i = digitStart; i < len; ++i) {
+                value = value * 10U + static_cast<u32>(semanticInOut[i] - '0');
+            }
+            outSemanticIndex = value;
+
+            FNativeString base;
+            base.Append(semanticInOut.GetData(), digitStart);
+            semanticInOut = base;
+        }
+
+        auto GetVertexValueTypeFromTypeObject(const FJsonValue* typeObj) -> EShaderVertexValueType {
+            if (typeObj == nullptr || typeObj->mType != EJsonType::Object) {
+                return EShaderVertexValueType::Unknown;
+            }
+
+            FNativeString scalarType;
+            GetStringValue(FindObjectValue(*typeObj, "scalarType"), scalarType);
+            const FNativeStringView scalarView(scalarType.GetData(), scalarType.Length());
+            const bool              isFloat =
+                (scalarView == FNativeStringView("float") || scalarView == FNativeStringView("half")
+                    || scalarView == FNativeStringView("double"));
+            if (!isFloat) {
+                return EShaderVertexValueType::Unknown;
+            }
+
+            u32 laneCount = 0U;
+            GetNumberAsU32(FindObjectValue(*typeObj, "elementCount"), laneCount);
+            if (laneCount == 0U) {
+                GetNumberAsU32(FindObjectValue(*typeObj, "columnCount"), laneCount);
+            }
+            if (laneCount == 0U) {
+                laneCount = 1U;
+            }
+
+            switch (laneCount) {
+                case 1U:
+                    return EShaderVertexValueType::Float1;
+                case 2U:
+                    return EShaderVertexValueType::Float2;
+                case 3U:
+                    return EShaderVertexValueType::Float3;
+                case 4U:
+                    return EShaderVertexValueType::Float4;
+                default:
+                    return EShaderVertexValueType::Unknown;
+            }
+        }
+
+        auto AddVertexInputFromJsonParam(
+            const FJsonValue& paramObj, TVector<FShaderVertexInput>& outInputs) -> void {
+            if (paramObj.mType != EJsonType::Object) {
+                return;
+            }
+
+            FNativeString semantic;
+            if (!GetStringValue(FindObjectValue(paramObj, "semanticName"), semantic)) {
+                if (!GetStringValue(FindObjectValue(paramObj, "semantic"), semantic)) {
+                    return;
+                }
+            }
+            if (semantic.IsEmptyString() || IsSystemValueSemantic(semantic)) {
+                return;
+            }
+
+            u32 semanticIndex = 0U;
+            if (!GetNumberAsU32(FindObjectValue(paramObj, "semanticIndex"), semanticIndex)) {
+                ParseSemanticIndexFromName(semantic, semanticIndex);
+            }
+
+            const auto*        typeObj = FindObjectValue(paramObj, "type");
+            FShaderVertexInput input{};
+            input.mSemanticName  = NativeToFString(semantic);
+            input.mSemanticIndex = semanticIndex;
+            input.mValueType     = GetVertexValueTypeFromTypeObject(typeObj);
+
+            for (const auto& existing : outInputs) {
+                if (existing.mSemanticIndex == input.mSemanticIndex
+                    && existing.mSemanticName == input.mSemanticName) {
+                    return;
+                }
+            }
+            outInputs.PushBack(input);
+        }
+
         auto ParseSlangReflectionJson(const FNativeString& text, FShaderReflection& outReflection,
             FString& diagnostics) -> bool {
             FJsonValue  root;
@@ -625,6 +740,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
             outReflection.mResources.Clear();
             outReflection.mConstantBuffers.Clear();
+            outReflection.mVertexInputs.Clear();
 
             const auto* params = FindObjectValue(root, "parameters");
             if (params != nullptr && params->mType == EJsonType::Array) {
@@ -743,6 +859,38 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 && entryPoints->mArray.Size() > 0) {
                 const auto* entry = entryPoints->mArray[0];
                 if (entry != nullptr && entry->mType == EJsonType::Object) {
+                    const auto* entryParams = FindObjectValue(*entry, "parameters");
+                    if (entryParams != nullptr && entryParams->mType == EJsonType::Array) {
+                        for (const auto* param : entryParams->mArray) {
+                            if (param == nullptr || param->mType != EJsonType::Object) {
+                                continue;
+                            }
+                            AddVertexInputFromJsonParam(*param, outReflection.mVertexInputs);
+
+                            const auto* paramType = FindObjectValue(*param, "type");
+                            if (paramType != nullptr && paramType->mType == EJsonType::Object) {
+                                FNativeString kind;
+                                if (GetStringValue(FindObjectValue(*paramType, "kind"), kind)) {
+                                    if (FNativeStringView(kind.GetData(), kind.Length())
+                                        == FNativeStringView("struct")) {
+                                        const auto* fields = FindObjectValue(*paramType, "fields");
+                                        if (fields != nullptr
+                                            && fields->mType == EJsonType::Array) {
+                                            for (const auto* field : fields->mArray) {
+                                                if (field == nullptr
+                                                    || field->mType != EJsonType::Object) {
+                                                    continue;
+                                                }
+                                                AddVertexInputFromJsonParam(
+                                                    *field, outReflection.mVertexInputs);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     const auto* threadGroup = FindObjectValue(*entry, "threadGroupSize");
                     if (threadGroup != nullptr && threadGroup->mType == EJsonType::Array
                         && threadGroup->mArray.Size() >= 3) {

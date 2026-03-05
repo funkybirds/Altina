@@ -26,4 +26,7 @@ namespace AltinaEngine::Rendering {
         TEXT("r.Ssao.Power"), 1.6f, ECVarFlags::SnapshotPerFrame);
     Core::Console::TConsoleVariable<f32> rSsaoIntensity(
         TEXT("r.Ssao.Intensity"), 1.0f, ECVarFlags::SnapshotPerFrame);
+
+    Core::Console::TConsoleVariable<i32> rVertexLayoutUseShaderReflection(
+        TEXT("r.VertexLayout.UseShaderReflection"), 1, ECVarFlags::SnapshotPerFrame);
 } // namespace AltinaEngine::Rendering

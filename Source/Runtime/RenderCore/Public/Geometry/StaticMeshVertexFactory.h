@@ -1,0 +1,17 @@
+#pragma once
+
+#include "RenderCoreAPI.h"
+
+#include "Geometry/VertexLayoutBuilder.h"
+#include "Rhi/RhiStructs.h"
+
+namespace AltinaEngine::RenderCore::Geometry {
+    // CPU stream mapping for static mesh base pass:
+    // slot0 POSITION(float3), slot1 NORMAL(float3), slot2 TEXCOORD0(float2).
+    AE_RENDER_CORE_API auto BuildStaticMeshProvidedLayout(FVertexFactoryProvidedLayout& outLayout)
+        -> bool;
+
+    // Transitional layout (keeps renderer behavior unchanged before full reflection path).
+    AE_RENDER_CORE_API auto BuildStaticMeshLegacyVertexLayout(Rhi::FRhiVertexLayoutDesc& outLayout)
+        -> bool;
+} // namespace AltinaEngine::RenderCore::Geometry

@@ -51,9 +51,24 @@ namespace AltinaEngine::Shader {
         u32                   mSpace    = 0U;
     };
 
+    enum class EShaderVertexValueType : u8 {
+        Unknown = 0,
+        Float1,
+        Float2,
+        Float3,
+        Float4
+    };
+
+    struct FShaderVertexInput {
+        FString                mSemanticName;
+        u32                    mSemanticIndex = 0U;
+        EShaderVertexValueType mValueType     = EShaderVertexValueType::Unknown;
+    };
+
     struct FShaderReflection {
         TVector<FShaderResourceBinding> mResources;
         TVector<FShaderConstantBuffer>  mConstantBuffers;
+        TVector<FShaderVertexInput>     mVertexInputs;
         u32                             mPushConstantBytes = 0U;
         u32                             mThreadGroupSizeX  = 1U;
         u32                             mThreadGroupSizeY  = 1U;

@@ -8,6 +8,8 @@
 #include "Deferred/DeferredCsm.h"
 
 #include "FrameGraph/FrameGraph.h"
+#include "Geometry/StaticMeshVertexFactory.h"
+#include "Geometry/VertexLayoutBuilder.h"
 #include "Lighting/LightTypes.h"
 #include "Material/MaterialPass.h"
 #include "Shadow/CascadedShadowMapping.h"
@@ -705,36 +707,86 @@ namespace AltinaEngine::Rendering {
                 return;
             }
 
-            Rhi::FRhiVertexAttributeDesc position{};
-            position.mSemanticName.Assign(TEXT("POSITION"));
-            position.mSemanticIndex     = 0U;
-            position.mFormat            = Rhi::ERhiFormat::R32G32B32Float;
-            position.mInputSlot         = 0U;
-            position.mAlignedByteOffset = 0U;
-            position.mPerInstance       = false;
-            position.mInstanceStepRate  = 0U;
+            const i32 useReflection = rVertexLayoutUseShaderReflection.GetRenderValue();
+            if (useReflection != 0) {
+                constexpr const TChar* kFactoryName = TEXT("StaticMeshVertexFactory");
+                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys{};
+                if (resources.DefaultPassDesc.Shaders.Vertex.IsValid()) {
+                    shaderKeys.PushBack(resources.DefaultPassDesc.Shaders.Vertex);
+                }
+                if (resources.DefaultPassDesc.Shaders.Pixel.IsValid()) {
+                    shaderKeys.PushBack(resources.DefaultPassDesc.Shaders.Pixel);
+                }
 
-            resources.BaseVertexLayout.mAttributes.PushBack(position);
+                RenderCore::Geometry::FShaderVertexInputRequirement requirement{};
+                FString                                             requirementError{};
+                const bool                                          requirementBuilt =
+                    RenderCore::Geometry::BuildShaderVertexInputRequirementFromShaderSet(
+                        resources.Registry, shaderKeys, requirement, &requirementError);
 
-            Rhi::FRhiVertexAttributeDesc normal{};
-            normal.mSemanticName.Assign(TEXT("NORMAL"));
-            normal.mSemanticIndex     = 0U;
-            normal.mFormat            = Rhi::ERhiFormat::R32G32B32Float;
-            normal.mInputSlot         = 1U;
-            normal.mAlignedByteOffset = 0U;
-            normal.mPerInstance       = false;
-            normal.mInstanceStepRate  = 0U;
-            resources.BaseVertexLayout.mAttributes.PushBack(normal);
+                RenderCore::Geometry::FVertexFactoryProvidedLayout provided{};
+                const bool                                         providedBuilt =
+                    RenderCore::Geometry::BuildStaticMeshProvidedLayout(provided);
+                DebugAssert(providedBuilt, TEXT("BasicDeferredRenderer"),
+                    "Failed to build StaticMesh provided vertex layout.");
 
-            Rhi::FRhiVertexAttributeDesc texcoord{};
-            texcoord.mSemanticName.Assign(TEXT("TEXCOORD"));
-            texcoord.mSemanticIndex     = 0U;
-            texcoord.mFormat            = Rhi::ERhiFormat::R32G32Float;
-            texcoord.mInputSlot         = 2U;
-            texcoord.mAlignedByteOffset = 0U;
-            texcoord.mPerInstance       = false;
-            texcoord.mInstanceStepRate  = 0U;
-            resources.BaseVertexLayout.mAttributes.PushBack(texcoord);
+                RenderCore::Geometry::FResolvedVertexLayout resolved{};
+                FString                                     resolveError{};
+                const bool resolvedOk = requirementBuilt && providedBuilt
+                    && RenderCore::Geometry::ValidateAndBuildVertexLayout(
+                        requirement, provided, resolved, &resolveError);
+                if (resolvedOk) {
+                    resources.BaseVertexLayout       = Move(resolved.mVertexLayout);
+                    resources.bBaseVertexLayoutReady = true;
+                    return;
+                }
+
+                FString shaderLabel{};
+                for (usize i = 0U; i < shaderKeys.Size(); ++i) {
+                    if (i > 0U) {
+                        shaderLabel.Append(TEXT(","));
+                    }
+                    shaderLabel.Append(shaderKeys[i].Name.ToView());
+                }
+                if (shaderLabel.IsEmptyString()) {
+                    shaderLabel.Assign(TEXT("<none>"));
+                }
+
+                LogErrorCat(TEXT("BasicDeferredRenderer"),
+                    "VertexLayout resolve failed: shader='{}' factory='{}' requirementBuilt={} "
+                    "resolved={} requirementError='{}' resolveError='{}'.",
+                    shaderLabel, kFactoryName, requirementBuilt ? 1U : 0U, resolvedOk ? 1U : 0U,
+                    requirementError, resolveError);
+                for (const auto& req : requirement.mElements) {
+                    const auto semanticName = req.mSemanticName.IsEmptyString()
+                        ? TEXT("<unknown>")
+                        : req.mSemanticName.CStr();
+                    LogErrorCat(TEXT("BasicDeferredRenderer"),
+                        "VertexLayout requirement: shader='{}' semantic='{}{}' format={} factory='{}'.",
+                        shaderLabel, semanticName, req.mSemantic.mSemanticIndex,
+                        static_cast<u32>(req.mFormat), kFactoryName);
+                }
+                for (const auto& prov : provided.mElements) {
+                    const auto semanticName = prov.mSemanticName.IsEmptyString()
+                        ? TEXT("<unknown>")
+                        : prov.mSemanticName.CStr();
+                    LogErrorCat(TEXT("BasicDeferredRenderer"),
+                        "VertexLayout factory-provided: shader='{}' semantic='{}{}' format={} factory='{}'.",
+                        shaderLabel, semanticName, prov.mSemantic.mSemanticIndex,
+                        static_cast<u32>(prov.mFormat), kFactoryName);
+                }
+                LogWarningCat(TEXT("BasicDeferredRenderer"),
+                    "Vertex reflection path failed; fallback to legacy vertex layout (shader='{}' factory='{}').",
+                    shaderLabel, kFactoryName);
+            }
+
+            const bool built =
+                RenderCore::Geometry::BuildStaticMeshLegacyVertexLayout(resources.BaseVertexLayout);
+            DebugAssert(built, TEXT("BasicDeferredRenderer"),
+                "Failed to build base vertex layout from StaticMeshVertexFactory.");
+            if (!built) {
+                return;
+            }
             resources.bBaseVertexLayoutReady = true;
         }
 
@@ -1380,7 +1432,8 @@ namespace AltinaEngine::Rendering {
             resources.PerFrameLayout ? resources.PerFrameLayout->GetDesc().mSetIndex : 0U;
         drawBindings.PerDrawSetIndex =
             resources.PerDrawLayout ? resources.PerDrawLayout->GetDesc().mSetIndex : 0U;
-        drawBindings.PerMaterialSetIndex = IsVulkanBackend() ? 2U : 0U;
+        drawBindings.PerMaterialSetIndex  = IsVulkanBackend() ? 2U : 0U;
+        drawBindings.ResolvedVertexLayout = &resources.BaseVertexLayout;
 
         FBasePassPipelineData pipelineData{};
         pipelineData.Device          = Rhi::RHIGetDevice();

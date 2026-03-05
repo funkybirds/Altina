@@ -329,6 +329,45 @@ namespace AltinaEngine::ShaderCompiler::Detail {
             }
         }
 
+        auto IsSystemSemanticName(const char* semanticName) -> bool {
+            if (semanticName == nullptr) {
+                return false;
+            }
+            const size_t len = std::strlen(semanticName);
+            if (len < 3U) {
+                return false;
+            }
+            return ((semanticName[0] == 'S' || semanticName[0] == 's')
+                && (semanticName[1] == 'V' || semanticName[1] == 'v') && semanticName[2] == '_');
+        }
+
+        auto CountMaskBits(u8 mask) -> u32 {
+            u32 count = 0U;
+            for (u32 i = 0U; i < 8U; ++i) {
+                count += ((mask >> i) & 1U) ? 1U : 0U;
+            }
+            return count;
+        }
+
+        auto MapVertexInputValueType(D3D_REGISTER_COMPONENT_TYPE componentType, u32 laneCount)
+            -> EShaderVertexValueType {
+            if (componentType != D3D_REGISTER_COMPONENT_FLOAT32) {
+                return EShaderVertexValueType::Unknown;
+            }
+            switch (laneCount) {
+                case 1U:
+                    return EShaderVertexValueType::Float1;
+                case 2U:
+                    return EShaderVertexValueType::Float2;
+                case 3U:
+                    return EShaderVertexValueType::Float3;
+                case 4U:
+                    return EShaderVertexValueType::Float4;
+                default:
+                    return EShaderVertexValueType::Unknown;
+            }
+        }
+
         auto ExtractReflectionFromDxil(const TVector<u8>& bytecode,
             FShaderReflection& outReflection, FString& diagnostics) -> bool {
             if (bytecode.IsEmpty()) {
@@ -409,6 +448,7 @@ namespace AltinaEngine::ShaderCompiler::Detail {
 
             outReflection.mConstantBuffers.Clear();
             outReflection.mConstantBuffers.Reserve(desc.ConstantBuffers);
+            outReflection.mVertexInputs.Clear();
 
             for (UINT i = 0; i < desc.ConstantBuffers; ++i) {
                 ID3D12ShaderReflectionConstantBuffer* cb = reflector->GetConstantBufferByIndex(i);
@@ -474,6 +514,26 @@ namespace AltinaEngine::ShaderCompiler::Detail {
                 }
 
                 outReflection.mConstantBuffers.PushBack(cbInfo);
+            }
+
+            if (desc.InputParameters > 0U) {
+                outReflection.mVertexInputs.Reserve(desc.InputParameters);
+                for (UINT i = 0; i < desc.InputParameters; ++i) {
+                    D3D12_SIGNATURE_PARAMETER_DESC paramDesc{};
+                    if (FAILED(reflector->GetInputParameterDesc(i, &paramDesc))) {
+                        continue;
+                    }
+                    if (IsSystemSemanticName(paramDesc.SemanticName)) {
+                        continue;
+                    }
+
+                    FShaderVertexInput input{};
+                    input.mSemanticName  = ConvertNameToString(paramDesc.SemanticName);
+                    input.mSemanticIndex = paramDesc.SemanticIndex;
+                    input.mValueType     = MapVertexInputValueType(
+                        paramDesc.ComponentType, CountMaskBits(static_cast<u8>(paramDesc.Mask)));
+                    outReflection.mVertexInputs.PushBack(input);
+                }
             }
 
             UINT tgx = 1;

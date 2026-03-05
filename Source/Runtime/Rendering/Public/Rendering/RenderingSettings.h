@@ -26,6 +26,10 @@ namespace AltinaEngine::Rendering {
     AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rSsaoPower;
     AE_RENDERING_API extern Core::Console::TConsoleVariable<f32> rSsaoIntensity;
 
+    // Vertex layout source switch (0=legacy/factory fixed mapping, 1=shader-reflection path).
+    // Reflection mode is scaffold-only for now and remains disabled by default.
+    AE_RENDERING_API extern Core::Console::TConsoleVariable<i32> rVertexLayoutUseShaderReflection;
+
     [[nodiscard]] inline auto GetRendererTypeSetting() noexcept -> ERendererType {
         const i32 value = gRendererType.Get();
         if (value <= 0) {

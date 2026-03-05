@@ -394,12 +394,42 @@ TEST_CASE("Rhi.Vulkan.UpdateTextureSubresource.DispatchReadsCorrectTexel") {
         return;
     }
 
-    FRhiBindGroupDesc                            groupDesc{};
-    RenderCore::ShaderBinding::FBindGroupBuilder bindGroupBuilder(
-        layoutDesc.mBindGroupLayouts[texSet]);
-    REQUIRE(bindGroupBuilder.AddTexture(texBinding, texture.Get()));
-    REQUIRE(bindGroupBuilder.AddBuffer(outBinding, outBuffer.Get(), 0ULL, 0ULL));
-    REQUIRE(bindGroupBuilder.Build(groupDesc));
+    auto* setLayout = layoutDesc.mBindGroupLayouts[texSet];
+    REQUIRE(setLayout != nullptr);
+
+    FRhiBindGroupDesc groupDesc{};
+    groupDesc.mLayout = setLayout;
+
+    bool boundAllLayoutEntries = true;
+    bool boundTexture          = false;
+    bool boundOutputBuffer     = false;
+    for (const auto& layoutEntry : setLayout->GetDesc().mEntries) {
+        FRhiBindGroupEntry entry{};
+        entry.mBinding = layoutEntry.mBinding;
+        entry.mType    = layoutEntry.mType;
+
+        if (layoutEntry.mBinding == texBinding
+            && layoutEntry.mType == ERhiBindingType::SampledTexture) {
+            entry.mTexture = texture.Get();
+            boundTexture   = true;
+        } else if (layoutEntry.mBinding == outBinding
+            && (layoutEntry.mType == ERhiBindingType::StorageBuffer
+                || layoutEntry.mType == ERhiBindingType::SampledBuffer
+                || layoutEntry.mType == ERhiBindingType::ConstantBuffer)) {
+            entry.mBuffer     = outBuffer.Get();
+            entry.mOffset     = 0ULL;
+            entry.mSize       = 0ULL;
+            boundOutputBuffer = true;
+        } else {
+            boundAllLayoutEntries = false;
+            break;
+        }
+
+        groupDesc.mEntries.PushBack(entry);
+    }
+    REQUIRE(boundAllLayoutEntries);
+    REQUIRE(boundTexture);
+    REQUIRE(boundOutputBuffer);
     auto group = device->CreateBindGroup(groupDesc);
     REQUIRE(group.Get() != nullptr);
     if (!group) {

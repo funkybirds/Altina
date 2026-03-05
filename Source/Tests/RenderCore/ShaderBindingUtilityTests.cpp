@@ -75,6 +75,16 @@ namespace {
         cbuffer.mSet     = setIndex;
         cbuffer.mBinding = bindingIndex;
         desc.mReflection.mConstantBuffers.PushBack(cbuffer);
+
+        // Runtime compiler reflection reports cbuffers in both constant buffer and
+        // generic resource lists.
+        FShaderResourceBinding resource{};
+        resource.mName.Assign(name);
+        resource.mType    = EShaderResourceType::ConstantBuffer;
+        resource.mAccess  = EShaderResourceAccess::ReadOnly;
+        resource.mSet     = setIndex;
+        resource.mBinding = bindingIndex;
+        desc.mReflection.mResources.PushBack(resource);
     }
 
     void AddResourceReflection(FRhiShaderDesc& desc, const TChar* name, EShaderResourceType type,
@@ -95,7 +105,7 @@ namespace {
         permutation.mHash = hashSeed;
         const auto key    = FShaderRegistry::MakeKey(shaderName, stage, permutation);
         auto       shader = device.CreateShader(desc);
-        REQUIRE(shader != nullptr);
+        REQUIRE(shader);
         REQUIRE(registry.RegisterShader(key, shader));
         return key;
     }

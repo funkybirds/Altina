@@ -1,19 +1,32 @@
 set(TargetName AltinaEngineDemoMinimal)
+set(DemoModuleTarget AltinaDemoMinimal)
 
 add_executable(${TargetName})
+add_library(${DemoModuleTarget} SHARED)
 
 set(AE_DEMO_ENABLE_SHIPPING OFF CACHE BOOL "Stage Demo/<Name>/Shipping from Demo/<Name>/Binaries (copies runtime payload recursively; excludes debug artifacts)" FORCE)
 
 set(Target_Private_Sources
     Source/Main.cpp
 )
+set(DemoModule_Private_Sources
+    Source/MinimalDemoModule.cpp
+)
 
 target_sources(${TargetName}
     PRIVATE
         ${Target_Private_Sources}
 )
+target_sources(${DemoModuleTarget}
+    PRIVATE
+        ${DemoModule_Private_Sources}
+)
 
 target_link_libraries(${TargetName}
+    PRIVATE
+        AltinaEngine::Launch
+)
+target_link_libraries(${DemoModuleTarget}
     PRIVATE
         AltinaEngine::Launch
         AltinaEngine::ShaderCompiler
@@ -23,6 +36,7 @@ target_link_libraries(${TargetName}
 if(TARGET AltinaEngineDemoLauncher)
     add_dependencies(${TargetName} AltinaEngineDemoLauncher)
 endif()
+add_dependencies(${TargetName} ${DemoModuleTarget})
 
 if(WIN32)
     target_link_libraries(${TargetName}
@@ -34,6 +48,10 @@ if(WIN32)
 endif()
 
 target_compile_features(${TargetName}
+    PRIVATE
+        cxx_std_23
+)
+target_compile_features(${DemoModuleTarget}
     PRIVATE
         cxx_std_23
 )
@@ -71,6 +89,12 @@ set_target_properties(${TargetName}
         RUNTIME_OUTPUT_DIRECTORY ${DemoBinaryDir}
         FOLDER "Demo/Minimal"
 )
+set_target_properties(${DemoModuleTarget}
+    PROPERTIES
+        OUTPUT_NAME AltinaDemoMinimal
+        RUNTIME_OUTPUT_DIRECTORY ${DemoBinaryDir}
+        FOLDER "Demo/Minimal"
+)
 
 # Explicitly stage all engine runtime modules to avoid stale DLLs when some modules are loaded
 # indirectly (and thus not discovered by TARGET_RUNTIME_DLLS dependency scanning).
@@ -100,6 +124,7 @@ set(DemoRuntimeEngineDepTargets)
 foreach(EngineRuntimeTarget IN LISTS AE_DEMO_RUNTIME_ENGINE_TARGETS)
     if(TARGET ${EngineRuntimeTarget})
         add_dependencies(${TargetName} ${EngineRuntimeTarget})
+        add_dependencies(${DemoModuleTarget} ${EngineRuntimeTarget})
         list(APPEND DemoRuntimeEngineDepTargets ${EngineRuntimeTarget})
         list(APPEND DemoRuntimeEngineCopyCommands
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -119,6 +144,15 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}/Assets/Config
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${DemoConfigRoot} ${DemoBinaryDir}/Assets/Config
     COMMENT "Staging Minimal demo executable"
+)
+add_custom_command(
+    TARGET ${DemoModuleTarget}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${DemoBinaryDir}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:${DemoModuleTarget}>
+        ${DemoBinaryDir}
+    COMMENT "Staging Minimal demo module"
 )
 
 # Put the stamp under the demo output tree so the PreClean target removes it, forcing restaging.

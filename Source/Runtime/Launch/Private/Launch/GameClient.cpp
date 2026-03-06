@@ -3,34 +3,66 @@
 #include "Utility/EngineConfig/EngineConfig.h"
 
 namespace AltinaEngine::Launch {
-    auto RunGameClient(FGameClient& client, const FStartupParameters& startupParameters) -> int {
+    namespace {
+        class FGameHostHooks final : public IRuntimeHostHooks {
+        public:
+            FGameHostHooks(FGameClient& inClient, FEngineLoop& inEngineLoop)
+                : Client(inClient), EngineLoop(inEngineLoop) {}
+
+            auto OnPreInit(IRuntimeSession& session) -> bool override {
+                (void)session;
+                return Client.OnPreInit(EngineLoop);
+            }
+
+            auto OnInit(IRuntimeSession& session) -> bool override {
+                (void)session;
+                return Client.OnInit(EngineLoop);
+            }
+
+            auto OnHostFrame(IRuntimeSession& session, const FFrameContext& frameContext)
+                -> bool override {
+                (void)session;
+                return Client.OnTick(EngineLoop, frameContext.DeltaSeconds);
+            }
+
+            auto OnAfterFrame(IRuntimeSession& session, const FFrameContext& frameContext)
+                -> void override {
+                (void)session;
+                (void)frameContext;
+            }
+
+            auto OnShutdown(IRuntimeSession& session) -> void override {
+                (void)session;
+                Client.OnShutdown(EngineLoop);
+            }
+
+        private:
+            FGameClient& Client;
+            FEngineLoop& EngineLoop;
+        };
+    } // namespace
+
+    auto RunGameHost(FGameClient& client, const FStartupParameters& startupParameters) -> int {
         Core::Utility::EngineConfig::InitializeGlobalConfig(startupParameters);
 
-        FEngineLoop engineLoop(startupParameters);
-        if (!engineLoop.PreInit()) {
+        auto  sessionOwner = CreateDefaultRuntimeSession(startupParameters);
+        auto* engineLoop   = dynamic_cast<FEngineLoop*>(sessionOwner.Get());
+        if (engineLoop == nullptr) {
             return 1;
         }
 
-        if (!client.OnPreInit(engineLoop)) {
-            engineLoop.Exit();
-            return 1;
-        }
+        FGameHostHooks             hooks(client, *engineLoop);
 
-        if (!engineLoop.Init()) {
-            engineLoop.Exit();
-            return 1;
-        }
+        FHostApplicationLoopConfig config{};
+        config.FixedDeltaSeconds = client.GetFixedDeltaTimeSeconds();
+        config.SleepPerFrame     = true;
+        config.SleepMilliseconds = client.GetSleepMilliseconds();
 
-        if (!client.OnInit(engineLoop)) {
-            engineLoop.Exit();
-            return 1;
-        }
+        FHostApplicationLoop loop{};
+        return loop.Run(*engineLoop, hooks, config);
+    }
 
-        const float fixedDeltaSeconds = client.GetFixedDeltaTimeSeconds();
-        while (client.OnTick(engineLoop, fixedDeltaSeconds)) {}
-
-        client.OnShutdown(engineLoop);
-        engineLoop.Exit();
-        return 0;
+    auto RunGameClient(FGameClient& client, const FStartupParameters& startupParameters) -> int {
+        return RunGameHost(client, startupParameters);
     }
 } // namespace AltinaEngine::Launch

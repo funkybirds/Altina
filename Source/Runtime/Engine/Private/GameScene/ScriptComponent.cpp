@@ -3,6 +3,10 @@
 #include "Asset/AssetManager.h"
 #include "Asset/ScriptAsset.h"
 #include "Logging/Log.h"
+#include "Platform/PlatformFileSystem.h"
+#include "Utility/EngineConfig/EngineConfig.h"
+#include "Utility/Filesystem/Path.h"
+#include "Utility/String/CodeConvert.h"
 
 using AltinaEngine::Core::Container::FNativeStringView;
 using AltinaEngine::Core::Container::FString;
@@ -26,6 +30,35 @@ namespace AltinaEngine::GameScene {
             out.Append(text.Data(), text.Length());
 #endif
             return out;
+        }
+
+        auto ResolveAssemblyPath(FNativeStringView assemblyPath) -> Core::Container::FNativeString {
+            using Core::Utility::Filesystem::FPath;
+
+            if (assemblyPath.IsEmpty()) {
+                return {};
+            }
+
+            const auto assemblyText = ToFStringFromUtf8(assemblyPath);
+            if (Core::Platform::IsAbsolutePath(assemblyText.ToView())) {
+                return Core::Utility::String::ToUtf8Bytes(assemblyText);
+            }
+
+            const auto& config    = Core::Utility::EngineConfig::GetGlobalConfig();
+            const auto  assetRoot = config.GetString(TEXT("GameClient/AssetRoot"));
+            if (!assetRoot.IsEmptyString()) {
+                auto resolved =
+                    (FPath(assetRoot).ParentPath() / assemblyText.ToView()).Normalized();
+                return Core::Utility::String::ToUtf8Bytes(resolved.GetString());
+            }
+
+            const auto exeDir = Core::Platform::GetExecutableDir();
+            if (!exeDir.IsEmptyString()) {
+                auto resolved = (FPath(exeDir) / assemblyText.ToView()).Normalized();
+                return Core::Utility::String::ToUtf8Bytes(resolved.GetString());
+            }
+
+            return Core::Utility::String::ToUtf8Bytes(assemblyText);
         }
     } // namespace
 
@@ -245,7 +278,7 @@ namespace AltinaEngine::GameScene {
             return false;
         }
 
-        mAssemblyPath.Assign(assemblyPath);
+        mAssemblyPath = ResolveAssemblyPath(assemblyPath);
         mTypeName.Assign(typeName);
         mAssetResolved = true;
         if (!mLoggedResolved) {

@@ -189,9 +189,10 @@ namespace AltinaEngine::Rendering::Deferred {
             shadowDesc.mWidth       = shadowSize;
             shadowDesc.mHeight      = shadowSize;
             shadowDesc.mArrayLayers = shadowLayers;
-            shadowDesc.mDimension   = (shadowLayers > 1U) ? Rhi::ERhiTextureDimension::Tex2DArray
-                                                          : Rhi::ERhiTextureDimension::Tex2D;
-            shadowDesc.mFormat      = Rhi::ERhiFormat::D32Float;
+            // Keep ShadowMap SRV shape consistent with shaders (Texture2DArray), even when only
+            // one cascade is active.
+            shadowDesc.mDimension = Rhi::ERhiTextureDimension::Tex2DArray;
+            shadowDesc.mFormat    = Rhi::ERhiFormat::D32Float;
             shadowDesc.mBindFlags =
                 Rhi::ERhiTextureBindFlags::DepthStencil | Rhi::ERhiTextureBindFlags::ShaderResource;
 

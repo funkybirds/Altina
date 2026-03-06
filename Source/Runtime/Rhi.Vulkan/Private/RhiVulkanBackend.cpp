@@ -311,11 +311,9 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        VkSemaphore pendingAcquire        = VK_NULL_HANDLE;
-        VkSemaphore pendingRenderComplete = VK_NULL_HANDLE;
+        VkSemaphore pendingAcquire = VK_NULL_HANDLE;
         if (mDevice) {
-            pendingAcquire        = mDevice->ConsumePendingAcquireSemaphore();
-            pendingRenderComplete = mDevice->ConsumePendingRenderCompleteSemaphore();
+            pendingAcquire = mDevice->ConsumePendingAcquireSemaphore();
         }
 
         if (pendingAcquire != VK_NULL_HANDLE) {
@@ -345,7 +343,7 @@ namespace AltinaEngine::Rhi {
         }
 
         if (info.mSignals && info.mSignalCount > 0U) {
-            work.mSignalSemaphores.Reserve(info.mSignalCount + (pendingRenderComplete ? 1 : 0));
+            work.mSignalSemaphores.Reserve(info.mSignalCount);
             work.mSignalValues.Reserve(info.mSignalCount);
             for (u32 i = 0; i < info.mSignalCount; ++i) {
                 const auto& signal = info.mSignals[i];
@@ -361,10 +359,6 @@ namespace AltinaEngine::Rhi {
                     work.mSignalValues.PushBack(signal.mValue);
                 }
             }
-        }
-
-        if (pendingRenderComplete != VK_NULL_HANDLE) {
-            work.mSignalSemaphores.PushBack(pendingRenderComplete);
         }
 
         if (!work.mWaitValues.IsEmpty() && work.mWaitValues.Size() < work.mWaitSemaphores.Size()) {
@@ -419,14 +413,27 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
+        // Make present wait on a signal that is submitted after all prior queue work in this
+        // frame, so multi-submit frames (scene + overlays) don't present too early.
+        VkSemaphore renderComplete = VK_NULL_HANDLE;
+        if (mDevice) {
+            renderComplete = mDevice->ConsumePendingRenderCompleteSemaphore();
+        }
+        if (renderComplete != VK_NULL_HANDLE) {
+            FSubmitWork signalWork;
+            signalWork.mType  = FSubmitWork::EType::Submit;
+            signalWork.mQueue = mQueue;
+            signalWork.mSignalSemaphores.PushBack(renderComplete);
+            mSubmitter->Enqueue(Move(signalWork));
+        }
+
         FSubmitWork work;
-        work.mType          = FSubmitWork::EType::Present;
-        work.mQueue         = mQueue;
-        work.mSwapchain     = viewport->GetNativeSwapchain();
-        work.mImageIndex    = viewport->GetCurrentImageIndex();
-        VkSemaphore waitSem = viewport->GetRenderCompleteSemaphore();
-        if (waitSem) {
-            work.mPresentWaitSemaphores.PushBack(waitSem);
+        work.mType       = FSubmitWork::EType::Present;
+        work.mQueue      = mQueue;
+        work.mSwapchain  = viewport->GetNativeSwapchain();
+        work.mImageIndex = viewport->GetCurrentImageIndex();
+        if (renderComplete != VK_NULL_HANDLE) {
+            work.mPresentWaitSemaphores.PushBack(renderComplete);
         }
         mSubmitter->Enqueue(Move(work));
         viewport->Present(info);

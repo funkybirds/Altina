@@ -2,6 +2,7 @@
 
 #include "Base/LaunchAPI.h"
 #include "CoreMinimal.h"
+#include "Launch/RuntimeSession.h"
 #include "Container/SmartPtr.h"
 #include "Container/Function.h"
 #include "Container/Queue.h"
@@ -20,7 +21,6 @@
 #include "Input/InputMessageHandler.h"
 #include "Input/InputSystem.h"
 #include "Threading/RenderingThread.h"
-#include "Scripting/ScriptSystemCoreCLR.h"
 #include "Jobs/JobSystem.h"
 #include "Rhi/RhiContext.h"
 #include "Rhi/RhiDevice.h"
@@ -63,7 +63,7 @@ namespace AltinaEngine::DebugGui {
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
 
-    class AE_LAUNCH_API FEngineLoop final {
+    class AE_LAUNCH_API FEngineLoop final : public IRuntimeSession {
     public:
         using FRenderCallback = TFunction<void(Rhi::FRhiDevice&, Rhi::FRhiViewport&, u32, u32)>;
 
@@ -71,12 +71,21 @@ namespace AltinaEngine::Launch {
         explicit FEngineLoop(const FStartupParameters& InStartupParameters);
         ~FEngineLoop();
 
-        auto               PreInit() -> bool;
-        auto               Init() -> bool;
+        auto               PreInit() -> bool override;
+        auto               Init() -> bool override;
+        auto               BeginFrame(const FFrameContext& frameContext) -> bool override;
+        void               TickSimulation(const FSimulationTick& tick) override;
+        void               RenderFrame(const FRenderTick& tick) override;
+        void               EndFrame() override;
+        void               Shutdown() override;
+        [[nodiscard]] auto GetServices() noexcept -> FRuntimeServices override;
+        [[nodiscard]] auto GetServices() const noexcept -> FRuntimeServicesConst override;
+        [[nodiscard]] auto IsRunning() const noexcept -> bool override { return mIsRunning; }
+
+        // Backward-compatible helper for existing gameplay clients.
         void               Tick(float InDeltaTime);
-        void               Exit();
+        void               Exit() { Shutdown(); }
         void               SetRenderCallback(FRenderCallback callback);
-        [[nodiscard]] auto IsRunning() const noexcept -> bool { return mIsRunning; }
         [[nodiscard]] auto GetInputSystem() noexcept -> Input::FInputSystem*;
         [[nodiscard]] auto GetInputSystem() const noexcept -> const Input::FInputSystem*;
         [[nodiscard]] auto GetMainWindow() noexcept -> Application::FPlatformWindow*;
@@ -251,15 +260,17 @@ namespace AltinaEngine::Launch {
             };
         }
 
-        void                                Draw();
+        void                                Draw(const FRenderTick& tick);
         void                                FlushRenderFrames();
         void                                EnforceRenderLag(u32 maxLagFrames);
 
         TOwner<Input::FInputSystem>         mInputSystem;
         TOwner<Input::FInputMessageHandler> mAppMessageHandler;
         TOwner<Application::FApplication, TPolymorphicDeleter<Application::FApplication>>
-                                                                        mApplication;
-        TOwner<Scripting::CoreCLR::FScriptSystem>                       mScriptSystem;
+            mApplication;
+        TOwner<Scripting::CoreCLR::FScriptSystem,
+            TPolymorphicDeleter<Scripting::CoreCLR::FScriptSystem>>
+                                                                        mScriptSystem;
         TOwner<Rhi::FRhiContext, TPolymorphicDeleter<Rhi::FRhiContext>> mRhiContext;
         TShared<Rhi::FRhiDevice>                                        mRhiDevice;
         Rhi::FRhiViewportRef                                            mMainViewport;
@@ -267,6 +278,8 @@ namespace AltinaEngine::Launch {
         u32                                                             mViewportHeight = 0U;
         u64                                                             mFrameIndex     = 0ULL;
         f32                                  mLastDeltaTimeSeconds                      = 0.0f;
+        u64                                  mHostFrameIndex                            = 0ULL;
+        bool                                 mFrameActive                               = false;
         FRenderCallback                      mRenderCallback;
         FStartupParameters                   mStartupParameters{};
         bool                                 mIsRunning  = false;

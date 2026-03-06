@@ -544,7 +544,7 @@ namespace {
         }
 
         auto OnTick(Launch::FEngineLoop& engineLoop, float deltaSeconds) -> bool override {
-            engineLoop.Tick(deltaSeconds);
+            (void)deltaSeconds;
 
             UpdateSunLightDirection(engineLoop);
 
@@ -584,7 +584,6 @@ namespace {
                 }
             }
 
-            Core::Platform::Generic::PlatformSleepMilliseconds(16);
             return engineLoop.IsRunning();
         }
 
@@ -650,5 +649,5 @@ int main(int argc, char** argv) {
     }
 
     FSpaceshipGameClient client;
-    return Launch::RunGameClient(client, startupParams);
+    return Launch::RunGameHost(client, startupParams);
 }

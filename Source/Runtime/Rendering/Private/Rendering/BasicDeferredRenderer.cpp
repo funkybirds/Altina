@@ -996,7 +996,6 @@ namespace AltinaEngine::Rendering {
     auto FBasicDeferredRenderer::GetDefaultMaterialTemplate()
         -> Core::Container::TShared<RenderCore::FMaterialTemplate> {
         auto& resources = GetSharedResources();
-        EnsureDefaultTemplate(resources);
         return resources.DefaultTemplate;
     }
 
@@ -1010,7 +1009,6 @@ namespace AltinaEngine::Rendering {
         resources.BasePipelineLayouts.Clear();
         resources.BasePipelines.Clear();
         resources.ShadowPipelines.Clear();
-        EnsureDefaultTemplate(resources);
     }
 
     void FBasicDeferredRenderer::SetOutputShaderKeys(

@@ -1,0 +1,5 @@
+add_subdirectory(Core)
+add_subdirectory(UI)
+add_subdirectory(Viewport)
+add_subdirectory(PlaySession)
+add_subdirectory(Host)

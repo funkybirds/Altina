@@ -1065,7 +1065,8 @@ namespace AltinaEngine::Launch {
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
         if (!mScriptSystem) {
-            mScriptSystem = MakeUnique<Scripting::CoreCLR::FScriptSystem>();
+            mScriptSystem = MakeUniqueAs<Scripting::CoreCLR::FScriptSystem,
+                Scripting::CoreCLR::FScriptSystem>();
         }
         if (mScriptSystem) {
             gScriptWorldManager        = &mEngineRuntime.GetWorldManager();
@@ -1121,12 +1122,14 @@ namespace AltinaEngine::Launch {
         return true;
     }
 
-    void FEngineLoop::Tick(float InDeltaTime) {
+    auto FEngineLoop::BeginFrame(const FFrameContext& frameContext) -> bool {
         if (!mIsRunning) {
-            return;
+            return false;
         }
 
-        mLastDeltaTimeSeconds = InDeltaTime;
+        mFrameActive          = true;
+        mHostFrameIndex       = frameContext.FrameIndex;
+        mLastDeltaTimeSeconds = frameContext.DeltaSeconds;
         Core::Jobs::FJobSystem::ProcessGameThreadJobs();
 
         if (mInputSystem) {
@@ -1134,24 +1137,56 @@ namespace AltinaEngine::Launch {
         }
 
         if (mApplication) {
-            mApplication->Tick(InDeltaTime);
+            mApplication->Tick(frameContext.DeltaSeconds);
             if (!mApplication->IsRunning()) {
                 mIsRunning = false;
             }
         }
 
         if (!mIsRunning || !mRhiDevice) {
+            mFrameActive = false;
+            return false;
+        }
+        return true;
+    }
+
+    void FEngineLoop::TickSimulation(const FSimulationTick& tick) {
+        if (!mFrameActive || !mIsRunning) {
             return;
         }
 
+        const f32 scaledDelta = tick.DeltaSeconds * tick.TimeScale;
         if (auto* world = mEngineRuntime.GetWorldManager().GetActiveWorld()) {
-            world->Tick(InDeltaTime);
+            world->Tick(scaledDelta);
         }
-
-        Draw();
     }
 
-    void FEngineLoop::Draw() {
+    void FEngineLoop::RenderFrame(const FRenderTick& tick) {
+        if (!mFrameActive || !mIsRunning || !mRhiDevice) {
+            return;
+        }
+        Draw(tick);
+    }
+
+    void FEngineLoop::EndFrame() { mFrameActive = false; }
+
+    void FEngineLoop::Tick(float InDeltaTime) {
+        FFrameContext frameContext{};
+        frameContext.DeltaSeconds = InDeltaTime;
+        frameContext.FrameIndex   = mFrameIndex + 1ULL;
+        if (!BeginFrame(frameContext)) {
+            return;
+        }
+
+        FSimulationTick simulationTick{};
+        simulationTick.DeltaSeconds = InDeltaTime;
+        TickSimulation(simulationTick);
+
+        RenderFrame({});
+        EndFrame();
+    }
+
+    void FEngineLoop::Draw(const FRenderTick& tick) {
         u32  width        = 0U;
         u32  height       = 0U;
         bool shouldResize = false;
@@ -1172,11 +1207,17 @@ namespace AltinaEngine::Launch {
             }
         }
 
-        const u64  frameIndex   = ++mFrameIndex;
-        auto       device       = mRhiDevice;
-        auto       viewport     = mMainViewport;
-        auto       callback     = mRenderCallback;
-        auto*      debugGui     = mDebugGui.Get();
+        if (tick.RenderWidth > 0U && tick.RenderHeight > 0U) {
+            width  = tick.RenderWidth;
+            height = tick.RenderHeight;
+        }
+
+        const u64 frameIndex = (mHostFrameIndex == 0ULL) ? (mFrameIndex + 1ULL) : mHostFrameIndex;
+        mFrameIndex          = frameIndex;
+        auto       device    = mRhiDevice;
+        auto       viewport  = mMainViewport;
+        auto       callback  = mRenderCallback;
+        auto*      debugGui  = mDebugGui.Get();
         const auto rendererType = Rendering::GetRendererTypeSetting();
         if (rendererType == Rendering::ERendererType::Deferred) {
             mMaterialCache.SetDefaultTemplate(
@@ -1295,39 +1336,8 @@ namespace AltinaEngine::Launch {
                         callback(*device, *viewport, width, height);
                     }
 
-                    bool renderedDebugGui = false;
                     if (debugGui) {
                         debugGui->RenderRenderThread(*device, *viewport);
-                        renderedDebugGui = true;
-                    }
-
-                    if (renderedDebugGui) {
-                        auto* backBuffer = viewport->GetBackBuffer();
-                        if (backBuffer != nullptr) {
-                            Rhi::FRhiCommandContextDesc ctxDesc{};
-                            ctxDesc.mQueueType = Rhi::ERhiQueueType::Graphics;
-                            ctxDesc.mDebugName.Assign(TEXT("Launch.BackBuffer.PresentTransition"));
-                            auto transitionContext = device->CreateCommandContext(ctxDesc);
-                            if (transitionContext) {
-                                auto* ops =
-                                    dynamic_cast<Rhi::IRhiCmdContextOps*>(transitionContext.Get());
-                                if (ops != nullptr) {
-                                    Rhi::FRhiCmdContextAdapter ctx(*transitionContext.Get(), *ops);
-                                    Rhi::FRhiTransitionInfo    toPresent{};
-                                    toPresent.mResource = backBuffer;
-                                    toPresent.mBefore   = Rhi::ERhiResourceState::RenderTarget;
-                                    toPresent.mAfter    = Rhi::ERhiResourceState::Present;
-
-                                    Rhi::FRhiTransitionCreateInfo transition{};
-                                    transition.mTransitions     = &toPresent;
-                                    transition.mTransitionCount = 1U;
-                                    transition.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
-                                    transition.mDstQueue        = Rhi::ERhiQueueType::Graphics;
-                                    ctx.RHIBeginTransition(transition);
-                                    transitionContext->RHIFlushContextDevice({});
-                                }
-                            }
-                        }
                     }
 
                     const auto queue = device->GetQueue(Rhi::ERhiQueueType::Graphics);
@@ -1357,7 +1367,7 @@ namespace AltinaEngine::Launch {
         }
     }
 
-    void FEngineLoop::Exit() {
+    void FEngineLoop::Shutdown() {
         mIsRunning = false;
 
         FlushRenderFrames();
@@ -1427,11 +1437,11 @@ namespace AltinaEngine::Launch {
             mAppMessageHandler.Reset();
         }
 
+#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
         if (mScriptSystem) {
             mScriptSystem->Shutdown();
             mScriptSystem.Reset();
         }
-#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
         Scripting::CoreCLR::SetTransformAccess(
             nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
         Scripting::CoreCLR::SetWindowTitleAccess(nullptr);
@@ -1447,6 +1457,28 @@ namespace AltinaEngine::Launch {
     void FEngineLoop::SetRenderCallback(FRenderCallback callback) {
         FlushRenderFrames();
         mRenderCallback = Move(callback);
+    }
+
+    auto FEngineLoop::GetServices() noexcept -> FRuntimeServices {
+        FRuntimeServices services{};
+        services.InputSystem    = mInputSystem.Get();
+        services.MainWindow     = mApplication ? mApplication->GetMainWindow() : nullptr;
+        services.WorldManager   = &mEngineRuntime.GetWorldManager();
+        services.AssetRegistry  = &mAssetRegistry;
+        services.AssetManager   = &mAssetManager;
+        services.DebugGuiSystem = mDebugGui.Get();
+        return services;
+    }
+
+    auto FEngineLoop::GetServices() const noexcept -> FRuntimeServicesConst {
+        FRuntimeServicesConst services{};
+        services.InputSystem    = mInputSystem.Get();
+        services.MainWindow     = mApplication ? mApplication->GetMainWindow() : nullptr;
+        services.WorldManager   = &mEngineRuntime.GetWorldManager();
+        services.AssetRegistry  = &mAssetRegistry;
+        services.AssetManager   = &mAssetManager;
+        services.DebugGuiSystem = mDebugGui.Get();
+        return services;
     }
 
     auto FEngineLoop::GetInputSystem() noexcept -> Input::FInputSystem* {
@@ -1492,26 +1524,48 @@ namespace AltinaEngine::Launch {
     }
 
     auto FEngineLoop::LoadDemoAssetRegistry() -> bool {
-        const auto baseDir = Core::Platform::GetExecutableDir();
-        if (baseDir.IsEmptyString()) {
-            return false;
+        Container::FString registryPath;
+        const auto&        config            = Core::Utility::EngineConfig::GetGlobalConfig();
+        const auto         assetRootOverride = config.GetString(TEXT("GameClient/AssetRoot"));
+        LogInfo(TEXT("LoadDemoAssetRegistry AssetRoot override: {}"),
+            assetRootOverride.IsEmptyString() ? TEXT("<empty>") : assetRootOverride.ToView());
+        if (!assetRootOverride.IsEmptyString()) {
+            if (Core::Platform::IsAbsolutePath(assetRootOverride.ToView())) {
+                registryPath = assetRootOverride;
+            } else {
+                const auto exeDir = Core::Platform::GetExecutableDir();
+                if (exeDir.IsEmptyString()) {
+                    return false;
+                }
+                registryPath = Core::Utility::Filesystem::FPath(exeDir)
+                                   .Append(assetRootOverride.ToView())
+                                   .Normalized()
+                                   .GetString();
+            }
+            registryPath.Append(TEXT("/Registry/AssetRegistry.json"));
+        } else {
+            const auto baseDir = Core::Platform::GetExecutableDir();
+            if (baseDir.IsEmptyString()) {
+                return false;
+            }
+            registryPath = baseDir;
+            registryPath.Append(TEXT("/Assets/Registry/AssetRegistry.json"));
         }
-
-        Container::FString registryPath = baseDir;
-        registryPath.Append(TEXT("/Assets/Registry/AssetRegistry.json"));
+        LogInfo(TEXT("LoadDemoAssetRegistry path: {}"), registryPath.ToView());
         if (!Core::Platform::IsPathExist(registryPath)) {
+            LogWarning(TEXT("Asset registry not found at {}"), registryPath.ToView());
             return false;
         }
 
         if (!mAssetRegistry.LoadFromJsonFile(registryPath)) {
+            LogWarning(TEXT("Failed to load asset registry from {}"), registryPath.ToView());
             return false;
         }
 
         const auto assetRoot =
             Core::Utility::Filesystem::FPath(registryPath).ParentPath().ParentPath();
         if (!Core::Utility::Filesystem::SetCurrentWorkingDir(assetRoot)) {
-            const auto rootText = ToFString(assetRoot);
-            LogWarning(TEXT("Failed to set asset root to {}."), rootText.ToView());
+            LogWarning(TEXT("Failed to set asset root as working directory."));
         }
         return true;
     }

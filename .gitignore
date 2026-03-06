@@ -2,12 +2,15 @@
 out/
 build/
 build_*/
+build-*/
+cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
 
 # Demo binaries staged by post-build steps
 Demo/*/Binaries/
 Demo/*/Shipping/
+Source/Editor/Binaries/
 
 # Generated files
 *.sln
@@ -81,6 +84,8 @@ Testing/
 # Scripting / test managed build outputs
 Source/Tests/Scripting/Managed/**/bin/
 Source/Tests/Scripting/Managed/**/obj/
+Source/Managed/**/bin/
+Source/Managed/**/obj/
 
 # Demo managed build outputs
 Demo/*/Source/Managed/**/bin/

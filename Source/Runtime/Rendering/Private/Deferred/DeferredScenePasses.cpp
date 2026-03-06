@@ -117,6 +117,7 @@ namespace AltinaEngine::Rendering::Deferred {
                     shadowDesc.mDesc.mWidth       = 1U;
                     shadowDesc.mDesc.mHeight      = 1U;
                     shadowDesc.mDesc.mArrayLayers = 1U;
+                    shadowDesc.mDesc.mDimension   = Rhi::ERhiTextureDimension::Tex2DArray;
                     shadowDesc.mDesc.mFormat      = Rhi::ERhiFormat::D32Float;
                     shadowDesc.mDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::DepthStencil
                         | Rhi::ERhiTextureBindFlags::ShaderResource;

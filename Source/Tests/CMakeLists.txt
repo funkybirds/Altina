@@ -214,6 +214,34 @@ ae_add_test_target(AltinaEngineTestsGameScene
         AltinaEngine::Rhi::Mock
 )
 
+file(GLOB_RECURSE AE_TEST_LAUNCH_SOURCES
+    CONFIGURE_DEPENDS
+    ${AE_TESTS_ROOT}/Launch/*.cpp
+)
+
+if(AE_TEST_LAUNCH_SOURCES)
+    ae_add_test_target(AltinaEngineTestsLaunch
+        FOLDER "Launch"
+        SOURCES ${AE_TEST_LAUNCH_SOURCES}
+        LIBS AltinaEngine::Launch
+    )
+endif()
+
+file(GLOB_RECURSE AE_TEST_EDITOR_SOURCES
+    CONFIGURE_DEPENDS
+    ${AE_TESTS_ROOT}/Editor/*.cpp
+)
+
+if(AE_TEST_EDITOR_SOURCES)
+    ae_add_test_target(AltinaEngineTestsEditor
+        FOLDER "Editor"
+        SOURCES ${AE_TEST_EDITOR_SOURCES}
+        LIBS
+            AltinaEditor::Core
+            AltinaEngine::Core
+    )
+endif()
+
 if(AE_ENABLE_SCRIPTING_CORECLR)
     find_program(AE_DOTNET_HOST dotnet)
     if(AE_DOTNET_HOST)

@@ -578,8 +578,7 @@ namespace {
         }
 
         auto OnTick(Launch::FEngineLoop& engineLoop, float deltaSeconds) -> bool override {
-            engineLoop.Tick(deltaSeconds);
-            Core::Platform::Generic::PlatformSleepMilliseconds(16);
+            (void)deltaSeconds;
             return engineLoop.IsRunning();
         }
     };
@@ -592,7 +591,7 @@ int main(int argc, char** argv) {
     }
 
     F@DEMO_NAME@GameClient client;
-    return Launch::RunGameClient(client, startupParams);
+    return Launch::RunGameHost(client, startupParams);
 }
 )cpp";
 

@@ -449,6 +449,25 @@ namespace AltinaEngine::RenderCore {
             queueState.mHasCommands = true;
         }
 
+        // Apply external-output final transitions (for example backbuffer RenderTarget->Present).
+        // The non-executor FrameGraph::Execute path performs these explicitly; keep executor
+        // behavior consistent so presentable images are finalized reliably.
+        if (!graph.mCompiledFinalTransitions.IsEmpty()) {
+            auto& graphicsQueue = queues[GetQueueIndex(ERhiQueueType::Graphics)];
+            if (graphicsQueue.mQueue && graphicsQueue.mContext && graphicsQueue.mOps != nullptr) {
+                BeginQueueIfNeeded(graphicsQueue);
+                FRhiCmdContextAdapter adapter(*graphicsQueue.mContext.Get(), *graphicsQueue.mOps);
+                FRhiTransitionCreateInfo transition{};
+                transition.mTransitions = graph.mCompiledFinalTransitions.Data();
+                transition.mTransitionCount =
+                    static_cast<u32>(graph.mCompiledFinalTransitions.Size());
+                transition.mSrcQueue = ERhiQueueType::Graphics;
+                transition.mDstQueue = ERhiQueueType::Graphics;
+                adapter.RHIBeginTransition(transition);
+                graphicsQueue.mHasCommands = true;
+            }
+        }
+
         for (auto& queueState : queues) {
             if (queueState.mRecording && queueState.mHasCommands) {
                 SubmitQueue(queueState);

@@ -1295,25 +1295,8 @@ namespace AltinaEngine::DebugGui {
         public:
             void Render(Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport,
                 const FDrawData& drawData, const FFontAtlas& atlas) {
-                if (drawData.Cmds.IsEmpty() || drawData.Vertices.IsEmpty()
-                    || drawData.Indices.IsEmpty()) {
-                    return;
-                }
-
-                if (!EnsureResources(device, atlas)) {
-                    return;
-                }
-
                 auto* backBuffer = viewport.GetBackBuffer();
                 if (backBuffer == nullptr) {
-                    return;
-                }
-
-                if (!EnsureBackBufferRtv(device, backBuffer)) {
-                    return;
-                }
-
-                if (!EnsureGeometryBuffers(device, drawData)) {
                     return;
                 }
 
@@ -1332,9 +1315,39 @@ namespace AltinaEngine::DebugGui {
 
                 Rhi::FRhiCmdContextAdapter ctx(*commandContext.Get(), *ops);
 
-                const auto&                bbDesc = backBuffer->GetDesc();
-                const u32                  w      = bbDesc.mWidth;
-                const u32                  h      = bbDesc.mHeight;
+                const bool hasDrawData = !drawData.Cmds.IsEmpty() && !drawData.Vertices.IsEmpty()
+                    && !drawData.Indices.IsEmpty();
+                if (!hasDrawData) {
+                    // Ensure present layout is restored even when this frame has no GUI geometry.
+                    Rhi::FRhiTransitionInfo toPresent{};
+                    toPresent.mResource = backBuffer;
+                    toPresent.mBefore   = Rhi::ERhiResourceState::RenderTarget;
+                    toPresent.mAfter    = Rhi::ERhiResourceState::Present;
+                    Rhi::FRhiTransitionCreateInfo toPresentBatch{};
+                    toPresentBatch.mTransitions     = &toPresent;
+                    toPresentBatch.mTransitionCount = 1U;
+                    toPresentBatch.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
+                    toPresentBatch.mDstQueue        = Rhi::ERhiQueueType::Graphics;
+                    ctx.RHIBeginTransition(toPresentBatch);
+                    commandContext->RHIFlushContextDevice({});
+                    return;
+                }
+
+                if (!EnsureResources(device, atlas)) {
+                    return;
+                }
+
+                if (!EnsureBackBufferRtv(device, backBuffer)) {
+                    return;
+                }
+
+                if (!EnsureGeometryBuffers(device, drawData)) {
+                    return;
+                }
+
+                const auto& bbDesc = backBuffer->GetDesc();
+                const u32   w      = bbDesc.mWidth;
+                const u32   h      = bbDesc.mHeight;
 
                 UpdateConstants(w, h);
 
@@ -1415,7 +1428,6 @@ namespace AltinaEngine::DebugGui {
                     sc.mWidth  = sw;
                     sc.mHeight = sh;
                     ctx.RHISetScissor(sc);
-
                     ctx.RHIDrawIndexed(cmd.IndexCount, 1U, idxOffset, 0, 0U);
                     idxOffset += cmd.IndexCount;
                 }
@@ -2035,7 +2047,7 @@ namespace AltinaEngine::DebugGui {
                 bool      enabled = false;
                 {
                     FScopedLock lock(mMutex);
-                    drawData = Move(mRender);
+                    drawData = mRender;
                     enabled  = mEnabledRenderThread;
                 }
                 if (!enabled) {

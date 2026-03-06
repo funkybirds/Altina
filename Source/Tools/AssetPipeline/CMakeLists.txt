@@ -8,17 +8,19 @@ file(MAKE_DIRECTORY "${AssimpBuildDir}/include")
 
 if(MSVC)
     if(MSVC_TOOLSET_VERSION)
+        # Keep in sync with Assimp naming: assimp-vc${MSVC_TOOLSET_VERSION}-mt.lib.
         set(_assimp_msvc_prefix "vc${MSVC_TOOLSET_VERSION}")
+    elseif(MSVC_VERSION LESS 1910)
+        set(_assimp_msvc_prefix "vc140")
+    elseif(MSVC_VERSION LESS 1920)
+        set(_assimp_msvc_prefix "vc141")
+    elseif(MSVC_VERSION LESS 1930)
+        set(_assimp_msvc_prefix "vc142")
+    elseif(MSVC_VERSION LESS 1950)
+        set(_assimp_msvc_prefix "vc143")
     else()
-        if(MSVC_VERSION LESS 1910)
-            set(_assimp_msvc_prefix "vc140")
-        elseif(MSVC_VERSION LESS 1920)
-            set(_assimp_msvc_prefix "vc141")
-        elseif(MSVC_VERSION LESS 1930)
-            set(_assimp_msvc_prefix "vc142")
-        else()
-            set(_assimp_msvc_prefix "vc150")
-        endif()
+        # VS 2026 / MSVC v19.50+ emits Assimp artifacts with vc145 suffix.
+        set(_assimp_msvc_prefix "vc145")
     endif()
     set(_assimp_libname "assimp-${_assimp_msvc_prefix}-mt.lib")
 else()
@@ -26,15 +28,14 @@ else()
 endif()
 
 set(_assimp_libdir "${AssimpBuildDir}/lib")
-set(_assimp_byproduct "${_assimp_libdir}/${CMAKE_CFG_INTDIR}/${_assimp_libname}")
+set(_assimp_byproduct "${_assimp_libdir}/${_assimp_libname}")
 set(_assimp_zlib_libdir "${AssimpBuildDir}/contrib/zlib")
-set(_assimp_zlib_byproduct
-    "${_assimp_zlib_libdir}/${CMAKE_CFG_INTDIR}/zlibstatic${CMAKE_STATIC_LIBRARY_SUFFIX}")
+set(_assimp_zlib_byproduct "${_assimp_zlib_libdir}/zlibstatic${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
 set(_assimp_cmake_args
     # Bump this value to force the ExternalProject configure step to re-run when assimp fork
     # sources change, even if other configure args remain the same.
-    -DAE_ASSIMP_SUPERBUILD_REV=4
+    -DAE_ASSIMP_SUPERBUILD_REV=5
     -DBUILD_SHARED_LIBS=OFF
     -DASSIMP_NO_EXPORT=ON
     -DASSIMP_BUILD_TESTS=OFF
@@ -64,13 +65,6 @@ if (MSVC)
         -DCMAKE_CXX_FLAGS_MINSIZEREL=/MD
     )
 
-    # ExternalProject_Add configures Assimp in a nested CMake run (Ninja generator).
-    # In some environments the nested run does not populate MSVC_TOOLSET_VERSION, which
-    # affects Assimp's output library naming (assimp-vcXXX-mt.lib). Pass it through so
-    # our BUILD_BYPRODUCTS and imported target path remain consistent.
-    if (MSVC_TOOLSET_VERSION)
-        list(APPEND _assimp_cmake_args -DMSVC_TOOLSET_VERSION=${MSVC_TOOLSET_VERSION})
-    endif()
 endif()
 
 ExternalProject_Add(assimp_ext

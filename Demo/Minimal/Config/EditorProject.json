@@ -1,0 +1,6 @@
+{
+  "DemoName": "Minimal",
+  "DemoModule": "../../../Demo/Minimal/Binaries/AltinaDemoMinimal.dll",
+  "DefaultConfig": "-Config:GameClient/ResolutionX=1280 -Config:GameClient/ResolutionY=720",
+  "AssetRoot": "../../../Demo/Minimal/Binaries/Assets"
+}

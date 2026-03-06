@@ -3,6 +3,7 @@
 #include "Base/LaunchAPI.h"
 #include "CoreMinimal.h"
 #include "Launch/EngineLoop.h"
+#include "Launch/HostApplicationLoop.h"
 
 namespace AltinaEngine::Launch {
     class AE_LAUNCH_API FGameClient {
@@ -26,8 +27,14 @@ namespace AltinaEngine::Launch {
         [[nodiscard]] virtual auto GetFixedDeltaTimeSeconds() const -> float {
             return 1.0f / 60.0f;
         }
+        [[nodiscard]] virtual auto GetSleepMilliseconds() const -> u32 { return 16U; }
     };
 
+    // Preferred host entry for demos/games.
+    AE_LAUNCH_API auto RunGameHost(FGameClient& client, const FStartupParameters& startupParameters)
+        -> int;
+
+    // Deprecated compatibility alias.
     AE_LAUNCH_API auto RunGameClient(
         FGameClient& client, const FStartupParameters& startupParameters) -> int;
 } // namespace AltinaEngine::Launch

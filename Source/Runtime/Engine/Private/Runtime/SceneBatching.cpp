@@ -4,11 +4,9 @@
 #include "Material/Material.h"
 #include "Material/MaterialPass.h"
 #include "Shader/ShaderRegistry.h"
-
-#include <algorithm>
-#include <bit>
-#include <cstdint>
-#include <functional>
+#include "Types/Conversion.h"
+#include "Algorithm/Sort.h"
+#include "Container/HashUtility.h"
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Engine {
@@ -27,7 +25,7 @@ namespace AltinaEngine::Engine {
         }
 
         auto HashFloat(f32 value) noexcept -> u64 {
-            const auto bits = std::bit_cast<u32>(value);
+            const auto bits = BitCast<u32>(value);
             return static_cast<u64>(bits);
         }
 
@@ -35,9 +33,9 @@ namespace AltinaEngine::Engine {
             if (!key.IsValid()) {
                 return 0ULL;
             }
-            u64 hash = std::hash<RenderCore::Container::FString>{}(key.Name);
-            hash     = HashCombine(hash, static_cast<u64>(key.Stage));
-            hash     = HashCombine(hash, static_cast<u64>(key.Permutation.mHash));
+            auto hash = Core::Container::THashFunc<RenderCore::Container::FString>{}(key.Name);
+            hash      = HashCombine(hash, static_cast<u64>(key.Stage));
+            hash      = HashCombine(hash, static_cast<u64>(key.Permutation.mHash));
             return hash;
         }
 
@@ -188,8 +186,8 @@ namespace AltinaEngine::Engine {
             return;
         }
 
-        std::sort(items.begin(), items.end(),
-            [](const FDrawItem& lhs, const FDrawItem& rhs) { return lhs.Key < rhs.Key; });
+        Core::Algorithm::Sort(
+            items, [](const FDrawItem& lhs, const FDrawItem& rhs) { return lhs.Key < rhs.Key; });
 
         outDrawList.Batches.Reserve(items.Size());
         for (const auto& item : items) {

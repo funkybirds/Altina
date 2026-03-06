@@ -1,7 +1,7 @@
 #include "ShaderCompiler/ShaderRhiBindings.h"
 
 #include "Container/Vector.h"
-#include <algorithm>
+#include "Algorithm/Sort.h"
 
 namespace AltinaEngine::ShaderCompiler {
     namespace {
@@ -129,7 +129,7 @@ namespace AltinaEngine::ShaderCompiler {
 
         for (auto& set : sets) {
             auto& entries = set.mEntries;
-            std::sort(entries.begin(), entries.end(),
+            Core::Algorithm::Sort(entries,
                 [](const auto& lhs, const auto& rhs) { return lhs.mBinding < rhs.mBinding; });
 
             Rhi::FRhiBindGroupLayoutDesc layout{};
@@ -139,7 +139,7 @@ namespace AltinaEngine::ShaderCompiler {
             result.mBindGroupLayouts.PushBack(layout);
         }
 
-        std::sort(result.mBindGroupLayouts.begin(), result.mBindGroupLayouts.end(),
+        Core::Algorithm::Sort(result.mBindGroupLayouts,
             [](const auto& lhs, const auto& rhs) { return lhs.mSetIndex < rhs.mSetIndex; });
 
         if (reflection.mPushConstantBytes > 0U) {

@@ -15,7 +15,7 @@
 #include "Types/Traits.h"
 #include "Utility/Assert.h"
 
-#include <algorithm>
+#include "Algorithm/Sort.h"
 
 using AltinaEngine::Move;
 namespace AltinaEngine::RenderCore {
@@ -247,7 +247,7 @@ namespace AltinaEngine::RenderCore {
             entries.PushBack(entry);
         }
 
-        std::sort(entries.begin(), entries.end(),
+        Core::Algorithm::Sort(entries,
             [](const FEntry& a, const FEntry& b) { return a.mTextureBinding < b.mTextureBinding; });
 
         TVector<FEntry> deduplicated;
@@ -715,13 +715,12 @@ namespace AltinaEngine::RenderCore {
                 layoutEntries.PushBack(entryDesc);
             }
 
-            std::sort(
-                layoutEntries.begin(), layoutEntries.end(), [](const auto& lhs, const auto& rhs) {
-                    if (lhs.mBinding != rhs.mBinding) {
-                        return lhs.mBinding < rhs.mBinding;
-                    }
-                    return lhs.mType < rhs.mType;
-                });
+            Core::Algorithm::Sort(layoutEntries, [](const auto& lhs, const auto& rhs) {
+                if (lhs.mBinding != rhs.mBinding) {
+                    return lhs.mBinding < rhs.mBinding;
+                }
+                return lhs.mType < rhs.mType;
+            });
 
             layoutDesc.mEntries    = layoutEntries;
             layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);

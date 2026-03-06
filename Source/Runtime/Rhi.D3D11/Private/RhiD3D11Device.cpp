@@ -24,6 +24,7 @@
 #include "Container/HashMap.h"
 #include "Threading/Mutex.h"
 #include "Types/Aliases.h"
+#include "Types/NumericProperties.h"
 #include "Types/Traits.h"
 
 #if AE_PLATFORM_WIN
@@ -49,7 +50,6 @@
 
 #include <vector>
 #include <type_traits>
-#include <limits>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -1787,7 +1787,7 @@ namespace AltinaEngine::Rhi {
                                     const u64 firstConstant64 = offsetBytes / 16ULL;
                                     const u64 numConstants64  = sizeBytes / 16ULL;
                                     const u64 maxUint =
-                                        static_cast<u64>(std::numeric_limits<UINT>::max());
+                                        static_cast<u64>(TNumericProperty<UINT>::Max);
                                     const bool alignedForSet1 = (offsetBytes % 256ULL == 0ULL)
                                         && (sizeBytes % 256ULL == 0ULL);
                                     if (firstConstant64 <= maxUint && numConstants64 <= maxUint

@@ -8,6 +8,7 @@
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiTexture.h"
 #include "Types/Aliases.h"
+#include "Types/NumericProperties.h"
 #include "Types/Traits.h"
 
 #if AE_PLATFORM_WIN
@@ -27,8 +28,6 @@
     #include <d3d11.h>
     #include <wrl/client.h>
 #endif
-
-#include <limits>
 
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
@@ -511,7 +510,7 @@ namespace AltinaEngine::Rhi {
 
         [[nodiscard]] auto BuildBufferBox(u64 offset, u64 size, D3D11_BOX& box) noexcept -> bool {
             const u64 end     = offset + size;
-            const u64 maxUint = static_cast<u64>(std::numeric_limits<UINT>::max());
+            const u64 maxUint = static_cast<u64>(TNumericProperty<UINT>::Max);
             if (offset > maxUint || end > maxUint) {
                 return false;
             }
@@ -902,7 +901,7 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        if (desc.mSizeBytes > static_cast<u64>(std::numeric_limits<UINT>::max())) {
+        if (desc.mSizeBytes > static_cast<u64>(TNumericProperty<UINT>::Max)) {
             return {};
         }
 
@@ -1043,7 +1042,7 @@ namespace AltinaEngine::Rhi {
             if (desc.mArrayLayers > 1U) {
                 return {};
             }
-            if (desc.mDepth > static_cast<u32>(std::numeric_limits<UINT>::max())) {
+            if (desc.mDepth > static_cast<u32>(TNumericProperty<UINT>::Max)) {
                 return {};
             }
 
@@ -1091,7 +1090,7 @@ namespace AltinaEngine::Rhi {
         if (desc.mSampleCount > 1U && desc.mMipLevels > 1U) {
             return {};
         }
-        if (desc.mArrayLayers > static_cast<u32>(std::numeric_limits<UINT>::max())) {
+        if (desc.mArrayLayers > static_cast<u32>(TNumericProperty<UINT>::Max)) {
             return {};
         }
 

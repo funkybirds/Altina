@@ -2,12 +2,11 @@
 
 #include "Platform/PlatformFileSystem.h"
 #include "Types/Traits.h"
+#include "Types/NumericProperties.h"
 #include "Utility/Json.h"
 #include "Utility/String/CodeConvert.h"
 #include "Utility/String/StringViewUtility.h"
 #include "Utility/String/UuidParser.h"
-
-#include <limits>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Asset {
@@ -66,7 +65,7 @@ namespace AltinaEngine::Asset {
             if (number < 0.0) {
                 return;
             }
-            if (number > static_cast<double>(std::numeric_limits<u32>::max())) {
+            if (number > static_cast<double>(TNumericProperty<u32>::Max)) {
                 return;
             }
             out = static_cast<u32>(number);

@@ -34,14 +34,13 @@
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiTexture.h"
+#include "Types/NumericProperties.h"
 
 #include "Math/Common.h"
 #include "Math/LinAlg/Common.h"
 #include "Math/LinAlg/RenderingMath.h"
 #include "Algorithm/Sort.h"
 #include "Utility/Assert.h"
-
-#include <limits>
 
 using AltinaEngine::Move;
 using AltinaEngine::Core::Math::FMatrix4x4f;
@@ -91,8 +90,8 @@ namespace AltinaEngine::Rendering {
             FWorldBoundsDebug out{};
             out.BatchCount = static_cast<u32>(list.Batches.Size());
 
-            FVector3f minWS(std::numeric_limits<f32>::max());
-            FVector3f maxWS(-std::numeric_limits<f32>::max());
+            FVector3f minWS(TNumericProperty<f32>::Max);
+            FVector3f maxWS(-TNumericProperty<f32>::Max);
 
             for (const auto& batch : list.Batches) {
                 const auto* mesh = batch.Static.Mesh;

@@ -2,10 +2,10 @@
 
 #include "Asset/AssetBinary.h"
 #include "Asset/Texture2DAsset.h"
+#include "Types/NumericProperties.h"
 #include "Types/Traits.h"
 
 #include <cstring>
-#include <limits>
 
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
@@ -65,7 +65,7 @@ namespace AltinaEngine::Asset {
                 if (rowPitch == 0U || mipSize / rowPitch != height) {
                     return false;
                 }
-                if (total > std::numeric_limits<u64>::max() - mipSize) {
+                if (total > TNumericProperty<u64>::Max - mipSize) {
                     return false;
                 }
                 total += mipSize;
@@ -134,7 +134,7 @@ namespace AltinaEngine::Asset {
         if (!ComputeTightlyPackedSize(blobDesc, bytesPerPixel, expectedSize)) {
             return {};
         }
-        if (expectedSize > static_cast<u64>(std::numeric_limits<usize>::max())) {
+        if (expectedSize > static_cast<u64>(TNumericProperty<usize>::Max)) {
             return {};
         }
 

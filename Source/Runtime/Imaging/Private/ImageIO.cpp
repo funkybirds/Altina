@@ -28,7 +28,8 @@
 #endif
 
 #include <algorithm>
-#include <limits>
+
+#include "Types/NumericProperties.h"
 
 namespace AltinaEngine::Imaging {
 #if AE_PLATFORM_WIN
@@ -58,11 +59,11 @@ namespace AltinaEngine::Imaging {
         };
 
         [[nodiscard]] auto FitsInDword(usize size) noexcept -> bool {
-            return size <= static_cast<usize>(std::numeric_limits<DWORD>::max());
+            return size <= static_cast<usize>(TNumericProperty<DWORD>::Max);
         }
 
         [[nodiscard]] auto FitsInUint(usize size) noexcept -> bool {
-            return size <= static_cast<usize>(std::numeric_limits<UINT>::max());
+            return size <= static_cast<usize>(TNumericProperty<UINT>::Max);
         }
 
         [[nodiscard]] auto CreateWicFactory(ComPtr<IWICImagingFactory>& outFactory) -> bool {
@@ -350,7 +351,7 @@ namespace AltinaEngine::Imaging {
             STATSTG stat{};
             hr = stream->Stat(&stat, STATFLAG_NONAME);
             if (FAILED(hr) || stat.cbSize.QuadPart <= 0
-                || stat.cbSize.QuadPart > std::numeric_limits<ULONG>::max()) {
+                || stat.cbSize.QuadPart > TNumericProperty<ULONG>::Max) {
                 return false;
             }
 

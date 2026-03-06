@@ -4,13 +4,13 @@
 #include "CoreMinimal.h"
 #include "Logging/Log.h"
 #include "Platform/PlatformFileSystem.h"
+#include "Types/NumericProperties.h"
 #include "Utility/String/CodeConvert.h"
 
 #include <cctype>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
-#include <limits>
 
 using AltinaEngine::Move;
 using AltinaEngine::Core::Algorithm::ToLowerChar;
@@ -510,7 +510,7 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
 
     auto FConfigCollection::GetInt32(FStringView path) const noexcept -> i32 {
         const auto value = GetInt64(path);
-        if (value < std::numeric_limits<i32>::min() || value > std::numeric_limits<i32>::max()) {
+        if (value < TNumericProperty<i32>::Min || value > TNumericProperty<i32>::Max) {
             return 0;
         }
         return static_cast<i32>(value);
@@ -551,8 +551,8 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
 
         double number = 0.0;
         if (GetNumberValue(value, number)) {
-            if (number < static_cast<double>(std::numeric_limits<i64>::min())
-                || number > static_cast<double>(std::numeric_limits<i64>::max())) {
+            if (number < static_cast<double>(TNumericProperty<i64>::Min)
+                || number > static_cast<double>(TNumericProperty<i64>::Max)) {
                 return 0;
             }
             return static_cast<i64>(number);
@@ -626,7 +626,7 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
 
     auto FConfigCollection::GetUint32(FStringView path) const noexcept -> u32 {
         const auto value = GetUint64(path);
-        if (value > std::numeric_limits<u32>::max()) {
+        if (value > TNumericProperty<u32>::Max) {
             return 0;
         }
         return static_cast<u32>(value);
@@ -667,7 +667,7 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
 
         double number = 0.0;
         if (GetNumberValue(value, number)) {
-            if (number < 0.0 || number > static_cast<double>(std::numeric_limits<u64>::max())) {
+            if (number < 0.0 || number > static_cast<double>(TNumericProperty<u64>::Max)) {
                 return 0;
             }
             return static_cast<u64>(number);

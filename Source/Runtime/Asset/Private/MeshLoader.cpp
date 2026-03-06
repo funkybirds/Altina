@@ -2,9 +2,8 @@
 
 #include "Asset/AssetBinary.h"
 #include "Asset/MeshAsset.h"
+#include "Types/NumericProperties.h"
 #include "Types/Traits.h"
-
-#include <limits>
 
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
@@ -58,7 +57,7 @@ namespace AltinaEngine::Asset {
             if (stride == 0U) {
                 return false;
             }
-            if (count > (std::numeric_limits<u64>::max() / stride)) {
+            if (count > (TNumericProperty<u64>::Max / stride)) {
                 return false;
             }
             outBytes = count * stride;

@@ -1,10 +1,9 @@
 #include "Asset/AssetBundle.h"
 
 #include "Types/Traits.h"
+#include "Types/NumericProperties.h"
 #include "Utility/Filesystem/Path.h"
 #include "Utility/String/CodeConvert.h"
-
-#include <limits>
 
 namespace AltinaEngine::Asset {
     namespace {
@@ -144,7 +143,7 @@ namespace AltinaEngine::Asset {
         if (entry.Offset + entry.Size > mHeader.BundleSize) {
             return false;
         }
-        if (entry.Size > static_cast<u64>(std::numeric_limits<usize>::max())) {
+        if (entry.Size > static_cast<u64>(TNumericProperty<usize>::Max)) {
             return false;
         }
 

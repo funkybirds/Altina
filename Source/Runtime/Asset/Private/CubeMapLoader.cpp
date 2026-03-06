@@ -2,9 +2,7 @@
 
 #include "Asset/AssetBinary.h"
 #include "Asset/CubeMapAsset.h"
-
-#include <cstring>
-#include <limits>
+#include "Types/NumericProperties.h"
 
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
@@ -71,7 +69,7 @@ namespace AltinaEngine::Asset {
                     return false;
                 }
 
-                if (total > std::numeric_limits<u64>::max() - mipSize) {
+                if (total > TNumericProperty<u64>::Max - mipSize) {
                     return false;
                 }
                 total += mipSize;
@@ -138,7 +136,7 @@ namespace AltinaEngine::Asset {
         if (!ComputeTightlyPackedSize(blobDesc, bytesPerPixel, expectedSize)) {
             return {};
         }
-        if (expectedSize > static_cast<u64>(std::numeric_limits<usize>::max())) {
+        if (expectedSize > static_cast<u64>(TNumericProperty<usize>::Max)) {
             return {};
         }
 

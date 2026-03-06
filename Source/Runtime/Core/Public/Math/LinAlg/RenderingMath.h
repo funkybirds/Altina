@@ -4,6 +4,7 @@
 #include "Math/Matrix.h"
 #include "Math/Vector.h"
 #include "Math/LinAlg/Common.h"
+#include "Types/NumericProperties.h"
 #include <climits>
 
 namespace AltinaEngine::Core::Math::LinAlg {
@@ -40,8 +41,8 @@ namespace AltinaEngine::Core::Math::LinAlg {
         const FVector3f& bmin = bboxMin;
         const FVector3f& bmax = bboxMax;
 
-        FVector3f        minWS(std::numeric_limits<f32>::max());
-        FVector3f        maxWS(-std::numeric_limits<f32>::max());
+        FVector3f        minWS(TNumericProperty<f32>::Max);
+        FVector3f        maxWS(-TNumericProperty<f32>::Max);
 
         const f32        xs[2] = { bmin[0], bmax[0] };
         const f32        ys[2] = { bmin[1], bmax[1] };

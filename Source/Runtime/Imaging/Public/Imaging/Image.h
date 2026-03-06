@@ -4,8 +4,7 @@
 
 #include "Container/Vector.h"
 #include "Types/Aliases.h"
-
-#include <limits>
+#include "Types/NumericProperties.h"
 
 namespace AltinaEngine::Imaging {
     namespace Container = Core::Container;
@@ -93,8 +92,7 @@ namespace AltinaEngine::Imaging {
 
             const u64 rowPitch64 = static_cast<u64>(width) * bytesPerPixel;
             const u64 size64     = rowPitch64 * static_cast<u64>(height);
-            if (rowPitch64 > std::numeric_limits<u32>::max()
-                || size64 > std::numeric_limits<usize>::max()) {
+            if (rowPitch64 > TNumericProperty<u32>::Max || size64 > TNumericProperty<usize>::Max) {
                 Reset();
                 return;
             }

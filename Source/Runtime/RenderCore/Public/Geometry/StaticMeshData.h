@@ -1,13 +1,12 @@
 #pragma once
 
-#include <limits>
-
 #include "RenderCoreAPI.h"
 
 #include "Container/Vector.h"
 #include "Math/Vector.h"
 #include "RenderResource.h"
 #include "Types/Aliases.h"
+#include "Types/NumericProperties.h"
 
 namespace AltinaEngine::RenderCore::Geometry {
     namespace Container = Core::Container;
@@ -17,8 +16,8 @@ namespace AltinaEngine::RenderCore::Geometry {
     struct AE_RENDER_CORE_API FStaticMeshBounds3f {
         // Core::Math::TVector declares custom constructors, so it has no implicit default ctor.
         // Initialize to an invalid bounds by default so IsValid() works as expected.
-        Math::FVector3f              Min{ std::numeric_limits<f32>::max() };
-        Math::FVector3f              Max{ -std::numeric_limits<f32>::max() };
+        Math::FVector3f              Min{ TNumericProperty<f32>::Max };
+        Math::FVector3f              Max{ -TNumericProperty<f32>::Max };
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {
             return (Min[0] <= Max[0]) && (Min[1] <= Max[1]) && (Min[2] <= Max[2]);

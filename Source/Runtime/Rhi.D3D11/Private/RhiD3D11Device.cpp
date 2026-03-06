@@ -363,11 +363,13 @@ namespace AltinaEngine::Rhi {
             mActiveSection->mExecution.mTouched = false;
             mActiveSection->mUploading.mTouched = false;
         }
+        RHIBeginSectionDebugMarkers();
 #endif
     }
 
     void FRhiD3D11CommandContext::FinalizeRecording() {
 #if AE_PLATFORM_WIN
+        RHIEndSectionDebugMarkers();
         if (!mState || mState->mUseImmediate || !mState->mDeferredContext) {
             return;
         }
@@ -386,6 +388,76 @@ namespace AltinaEngine::Rhi {
         mState->mDeferredContext->ClearState();
         mState->mDeferredContext.Reset();
         mState->mDeferredContext1.Reset();
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHIPushDebugMarkerNative(FStringView text) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (context == nullptr || text.IsEmpty()) {
+            return;
+        }
+
+        ComPtr<ID3DUserDefinedAnnotation> annotation;
+        if (FAILED(context->QueryInterface(IID_PPV_ARGS(&annotation))) || !annotation) {
+            return;
+        }
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        Core::Container::FString markerText;
+        markerText.Append(text.Data(), text.Length());
+        annotation->BeginEvent(markerText.CStr());
+    #else
+        std::wstring markerText;
+        markerText.reserve(text.Length());
+        for (usize i = 0U; i < text.Length(); ++i) {
+            markerText.push_back(static_cast<wchar_t>(text[i]));
+        }
+        annotation->BeginEvent(markerText.c_str());
+    #endif
+#else
+        (void)text;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHIPopDebugMarkerNative() {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (context == nullptr) {
+            return;
+        }
+        ComPtr<ID3DUserDefinedAnnotation> annotation;
+        if (FAILED(context->QueryInterface(IID_PPV_ARGS(&annotation))) || !annotation) {
+            return;
+        }
+        annotation->EndEvent();
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHIInsertDebugMarkerNative(FStringView text) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (context == nullptr || text.IsEmpty()) {
+            return;
+        }
+
+        ComPtr<ID3DUserDefinedAnnotation> annotation;
+        if (FAILED(context->QueryInterface(IID_PPV_ARGS(&annotation))) || !annotation) {
+            return;
+        }
+    #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
+        Core::Container::FString markerText;
+        markerText.Append(text.Data(), text.Length());
+        annotation->SetMarker(markerText.CStr());
+    #else
+        std::wstring markerText;
+        markerText.reserve(text.Length());
+        for (usize i = 0U; i < text.Length(); ++i) {
+            markerText.push_back(static_cast<wchar_t>(text[i]));
+        }
+        annotation->SetMarker(markerText.c_str());
+    #endif
+#else
+        (void)text;
 #endif
     }
 

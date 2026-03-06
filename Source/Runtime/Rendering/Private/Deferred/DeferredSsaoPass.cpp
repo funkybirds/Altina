@@ -3,6 +3,7 @@
 #include "Container/StringView.h"
 #include "Rhi/Command/RhiCmdContext.h"
 #include "Rhi/RhiBindGroup.h"
+#include "Rhi/RhiDebugMarker.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiInit.h"
 #include "Utility/Assert.h"
@@ -111,6 +112,7 @@ namespace AltinaEngine::Rendering::Deferred {
                 ssaoBuffer = inputs.SsaoConstantsBuffer, runtime = inputs.RuntimeSettings](
                 Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources& res,
                 const FSsaoPassData& data) -> void {
+                Rhi::FRhiDebugMarker marker(ctx, TEXT("Deferred.SSAO"));
                 if (!pipeline || !layout || !sampler || !bindings || !perFrameBuffer
                     || !ssaoBuffer) {
                     return;

@@ -3,9 +3,13 @@
 #include "RhiGeneralAPI.h"
 #include "Rhi/RhiEnums.h"
 #include "Rhi/RhiFwd.h"
+#include "Container/StringView.h"
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Rhi {
+    namespace Container = Core::Container;
+    using Container::FStringView;
+
     class AE_RHI_GENERAL_API IRhiCmdContextOps {
     public:
         IRhiCmdContextOps();
@@ -38,6 +42,12 @@ namespace AltinaEngine::Rhi {
         virtual void RHIDrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
             i32 vertexOffset, u32 firstInstance)                                    = 0;
         virtual void RHIDispatch(u32 groupCountX, u32 groupCountY, u32 groupCountZ) = 0;
+
+        // Optional debug markers. Default implementation is no-op so lightweight
+        // mock/test contexts do not need to implement them.
+        virtual void RHIPushDebugMarker(FStringView /*text*/) {}
+        virtual void RHIPopDebugMarker() {}
+        virtual void RHIInsertDebugMarker(FStringView /*text*/) {}
     };
 
 } // namespace AltinaEngine::Rhi

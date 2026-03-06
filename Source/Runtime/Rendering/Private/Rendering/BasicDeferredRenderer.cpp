@@ -29,6 +29,7 @@
 #include "Rhi/Command/RhiCmdContext.h"
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiDebugMarker.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiInit.h"
 #include "Rhi/RhiPipeline.h"
@@ -1575,6 +1576,7 @@ namespace AltinaEngine::Rendering {
             },
             [drawList, drawBindings, pipelineData, bindingData, viewRect](Rhi::FRhiCmdContext& ctx,
                 const RenderCore::FFrameGraphPassResources&, const FBasePassData&) -> void {
+                Rhi::FRhiDebugMarker  marker(ctx, TEXT("Deferred.BasePass"));
                 Rhi::FRhiViewportRect viewport{};
                 viewport.mX        = static_cast<f32>(viewRect.X);
                 viewport.mY        = static_cast<f32>(viewRect.Y);

@@ -3,6 +3,7 @@
 #include "Rhi/Command/RhiCmdContextAdapter.h"
 #include "Rhi/RhiBuffer.h"
 #include "Rhi/RhiCommandContext.h"
+#include "Rhi/RhiDebugMarker.h"
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiTexture.h"
 #include "Rhi/RhiTransition.h"
@@ -22,6 +23,7 @@ namespace AltinaEngine::RenderCore {
         using AltinaEngine::Rhi::FRhiCmdContextAdapter;
         using AltinaEngine::Rhi::FRhiCommandContext;
         using AltinaEngine::Rhi::FRhiCommandContextDesc;
+        using AltinaEngine::Rhi::FRhiDebugMarker;
         using AltinaEngine::Rhi::FRhiDevice;
         using AltinaEngine::Rhi::FRhiQueue;
         using AltinaEngine::Rhi::FRhiQueueSignal;
@@ -362,7 +364,15 @@ namespace AltinaEngine::RenderCore {
             }
 
             BeginQueueIfNeeded(queueState);
-            FRhiCmdContextAdapter adapter(*queueState.mContext.Get(), *queueState.mOps);
+            FRhiCmdContextAdapter    adapter(*queueState.mContext.Get(), *queueState.mOps);
+            Core::Container::FString passMarkerText;
+            passMarkerText.Assign(TEXT("FrameGraph.Pass"));
+            if (pass.mDesc.mName != nullptr && pass.mDesc.mName[0] != '\0') {
+                passMarkerText.Append(TEXT(":"));
+                passMarkerText.Append(Core::Utility::String::FromUtf8Bytes(
+                    pass.mDesc.mName, static_cast<usize>(std::strlen(pass.mDesc.mName))));
+            }
+            FRhiDebugMarker passMarker(adapter, passMarkerText.ToView());
 
             for (u32 edgeIndex : transitions.mAcquireEdges) {
                 auto& edge = edges[edgeIndex];

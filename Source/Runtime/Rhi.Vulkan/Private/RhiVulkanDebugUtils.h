@@ -42,4 +42,10 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         SetVkObjectDebugNameRaw(
             device, ToVkObjectHandle(handle), objectType, baseName, fallbackBaseName, suffix);
     }
+
+    void CmdBeginDebugLabel(
+        VkDevice device, VkCommandBuffer commandBuffer, FStringView label) noexcept;
+    void CmdEndDebugLabel(VkDevice device, VkCommandBuffer commandBuffer) noexcept;
+    void CmdInsertDebugLabel(
+        VkDevice device, VkCommandBuffer commandBuffer, FStringView label) noexcept;
 } // namespace AltinaEngine::Rhi::Vulkan::Detail

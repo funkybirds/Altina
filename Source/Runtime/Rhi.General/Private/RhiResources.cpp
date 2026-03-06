@@ -13,6 +13,8 @@
 #include "Rhi/RhiShader.h"
 #include "Rhi/RhiTexture.h"
 #include "Rhi/RhiViewport.h"
+#include "Logging/Log.h"
+#include "Utility/Assert.h"
 
 namespace AltinaEngine::Rhi {
 
@@ -182,6 +184,80 @@ namespace AltinaEngine::Rhi {
     auto FRhiCommandContext::RHISwitchContextCapability(ERhiContextCapability /*capability*/)
         -> FRhiCommandSubmissionStamp {
         return RHIFlushContextDevice({});
+    }
+
+    void FRhiCommandContext::RHIPushDebugMarker(FStringView text) {
+        static bool sLoggedPush = false;
+        if (text.IsEmpty()) {
+            return;
+        }
+
+        if (!sLoggedPush) {
+            sLoggedPush = true;
+            Core::Logging::LogInfoCat(TEXT("RHI.DebugMarker"),
+                TEXT("RHIPushDebugMarker entered (first marker='{}')."), text);
+        }
+
+        FString markerText;
+        markerText.Append(text.Data(), text.Length());
+        mDebugMarkerStack.PushBack(Move(markerText));
+
+        if (mSectionDebugMarkersOpen) {
+            RHIPushDebugMarkerNative(text);
+        }
+    }
+
+    void FRhiCommandContext::RHIPopDebugMarker() {
+        if (mDebugMarkerStack.IsEmpty()) {
+            Core::Utility::DebugAssert(
+                false, TEXT("RHI"), "RHIPopDebugMarker called without a matching push.");
+            return;
+        }
+
+        if (mSectionDebugMarkersOpen) {
+            RHIPopDebugMarkerNative();
+        }
+        mDebugMarkerStack.PopBack();
+    }
+
+    void FRhiCommandContext::RHIInsertDebugMarker(FStringView text) {
+        if (text.IsEmpty() || !mSectionDebugMarkersOpen) {
+            return;
+        }
+        RHIInsertDebugMarkerNative(text);
+    }
+
+    void FRhiCommandContext::RHIPushDebugMarkerNative(FStringView /*text*/) {}
+
+    void FRhiCommandContext::RHIPopDebugMarkerNative() {}
+
+    void FRhiCommandContext::RHIInsertDebugMarkerNative(FStringView /*text*/) {}
+
+    void FRhiCommandContext::RHIBeginSectionDebugMarkers() {
+        static bool sLoggedReplay = false;
+        if (mSectionDebugMarkersOpen) {
+            return;
+        }
+        if (!sLoggedReplay && !mDebugMarkerStack.IsEmpty()) {
+            sLoggedReplay = true;
+            Core::Logging::LogInfoCat(TEXT("RHI.DebugMarker"),
+                TEXT("Replaying {} debug marker(s) at section begin."),
+                static_cast<u32>(mDebugMarkerStack.Size()));
+        }
+        for (const auto& markerText : mDebugMarkerStack) {
+            RHIPushDebugMarkerNative(markerText.ToView());
+        }
+        mSectionDebugMarkersOpen = true;
+    }
+
+    void FRhiCommandContext::RHIEndSectionDebugMarkers() {
+        if (!mSectionDebugMarkersOpen) {
+            return;
+        }
+        for (usize i = mDebugMarkerStack.Size(); i > 0U; --i) {
+            RHIPopDebugMarkerNative();
+        }
+        mSectionDebugMarkersOpen = false;
     }
 
 } // namespace AltinaEngine::Rhi

@@ -10,6 +10,7 @@
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiInit.h"
+#include "Logging/Log.h"
 #include "Types/CheckedCast.h"
 #include "Utility/Assert.h"
 
@@ -570,6 +571,7 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::EnsureRecording() {
+        static bool sLoggedEnsureRecording = false;
         if (!mState || !mState->mDevice) {
             return;
         }
@@ -607,6 +609,12 @@ namespace AltinaEngine::Rhi {
             mActiveSection->mExecution.mState   = ERhiCommandSectionState::Active;
             mActiveSection->mExecution.mTouched = true;
         }
+        RHIBeginSectionDebugMarkers();
+        if (!sLoggedEnsureRecording) {
+            sLoggedEnsureRecording = true;
+            Core::Logging::LogInfoCat(TEXT("RHI.Vulkan.DebugMarker"),
+                TEXT("EnsureRecording opened command buffer and replayed section debug markers."));
+        }
     }
 
     void FRhiVulkanCommandContext::FinalizeRecording() {
@@ -616,6 +624,7 @@ namespace AltinaEngine::Rhi {
         if (mState->mInRenderPass) {
             RHIEndRenderPass();
         }
+        RHIEndSectionDebugMarkers();
         vkEndCommandBuffer(mState->mCmd);
         mState->mCmd = VK_NULL_HANDLE;
     }
@@ -637,6 +646,47 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiVulkanCommandContext::GetNativeCommandBuffer() const noexcept -> VkCommandBuffer {
         return mState ? mState->mCmd : VK_NULL_HANDLE;
+    }
+
+    void FRhiVulkanCommandContext::RHIPushDebugMarkerNative(FStringView text) {
+        static bool sLoggedMissingStateOrCmd = false;
+        static bool sLoggedEmptyLabel        = false;
+        if (!mState || mState->mDevice == VK_NULL_HANDLE || mState->mCmd == VK_NULL_HANDLE) {
+            if (!sLoggedMissingStateOrCmd) {
+                sLoggedMissingStateOrCmd = true;
+                Core::Logging::LogWarningCat(TEXT("RHI.Vulkan.DebugMarker"),
+                    TEXT(
+                        "Skip RHIPushDebugMarkerNative: invalid state/device/cmd (state={}, device={}, cmd={})."),
+                    static_cast<const void*>(mState),
+                    static_cast<const void*>(mState ? mState->mDevice : VK_NULL_HANDLE),
+                    static_cast<const void*>(mState ? mState->mCmd : VK_NULL_HANDLE));
+            }
+            return;
+        }
+        if (text.IsEmpty()) {
+            if (!sLoggedEmptyLabel) {
+                sLoggedEmptyLabel = true;
+                Core::Logging::LogWarningCat(TEXT("RHI.Vulkan.DebugMarker"),
+                    TEXT("Skip RHIPushDebugMarkerNative: empty label."));
+            }
+            return;
+        }
+        Vulkan::Detail::CmdBeginDebugLabel(mState->mDevice, mState->mCmd, text);
+    }
+
+    void FRhiVulkanCommandContext::RHIPopDebugMarkerNative() {
+        if (!mState || mState->mDevice == VK_NULL_HANDLE || mState->mCmd == VK_NULL_HANDLE) {
+            return;
+        }
+        Vulkan::Detail::CmdEndDebugLabel(mState->mDevice, mState->mCmd);
+    }
+
+    void FRhiVulkanCommandContext::RHIInsertDebugMarkerNative(FStringView text) {
+        if (!mState || mState->mDevice == VK_NULL_HANDLE || mState->mCmd == VK_NULL_HANDLE
+            || text.IsEmpty()) {
+            return;
+        }
+        Vulkan::Detail::CmdInsertDebugLabel(mState->mDevice, mState->mCmd, text);
     }
 
     void FRhiVulkanCommandContext::RHISetGraphicsPipeline(FRhiPipeline* pipeline) {

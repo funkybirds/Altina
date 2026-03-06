@@ -252,10 +252,12 @@ namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
         mState->mEnabledExtensions.PushBack(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #endif
-        if ((desc.mEnableDebugLayer || desc.mEnableDebugNames)
-            && HasExtension(exts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
+        if (HasExtension(exts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
             mState->mEnabledExtensions.PushBack(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
             mState->mDebugUtilsEnabled = true;
+        } else {
+            LogWarningCat(TEXT("RHI.Vulkan"),
+                TEXT("VK_EXT_debug_utils is unavailable. Debug names/markers will be disabled."));
         }
 
         VkInstanceCreateInfo createInfo{};
@@ -271,7 +273,7 @@ namespace AltinaEngine::Rhi {
             return false;
         }
 
-        if (mState->mDebugUtilsEnabled) {
+        if (mState->mDebugUtilsEnabled && (desc.mEnableDebugLayer || desc.mEnableGpuValidation)) {
             mState->mDebugMessenger = CreateDebugMessenger(mState->mInstance);
         }
 

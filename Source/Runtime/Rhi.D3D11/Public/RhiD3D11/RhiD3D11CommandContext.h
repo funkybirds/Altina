@@ -64,6 +64,9 @@ namespace AltinaEngine::Rhi {
         void                   EnsureRecording();
         void                   FinalizeRecording();
         auto                   GetExecutionCommandList() const noexcept -> FRhiD3D11CommandList*;
+        void                   RHIPushDebugMarkerNative(FStringView text) override;
+        void                   RHIPopDebugMarkerNative() override;
+        void                   RHIInsertDebugMarkerNative(FStringView text) override;
 
         FState*                mState = nullptr;
         FRhiD3D11Device*       mOwner = nullptr;

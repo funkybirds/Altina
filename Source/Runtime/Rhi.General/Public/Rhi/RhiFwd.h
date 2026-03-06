@@ -29,6 +29,7 @@ namespace AltinaEngine::Rhi {
     class FRhiCommandPool;
     class FRhiCommandList;
     class FRhiCommandContext;
+    class FRhiDebugMarker;
     class FRhiCmd;
     class FRhiCmdList;
     class FRhiCmdContext;

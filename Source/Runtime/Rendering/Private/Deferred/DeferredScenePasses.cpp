@@ -3,6 +3,7 @@
 #include "Logging/Log.h"
 #include "Utility/Assert.h"
 #include "Rhi/Command/RhiCmdContext.h"
+#include "Rhi/RhiDebugMarker.h"
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiDevice.h"
 #include "Rhi/RhiInit.h"
@@ -168,6 +169,7 @@ namespace AltinaEngine::Rendering::Deferred {
                 settings = inputs.RuntimeSettings](Rhi::FRhiCmdContext& ctx,
                 const RenderCore::FFrameGraphPassResources&             res,
                 const FLightingPassData&                                data) -> void {
+                Rhi::FRhiDebugMarker marker(ctx, TEXT("Deferred.Lighting"));
                 if (!pipeline || !layout || !sampler || !bindings) {
                     DebugAssert(false, TEXT("BasicDeferredRenderer"),
                         "DeferredLighting skipped: shared pipeline/layout/sampler/bindings missing.");
@@ -355,8 +357,9 @@ namespace AltinaEngine::Rendering::Deferred {
                 perFrameBuffer = inputs.PerFrameBuffer, skyCube = inputs.SkyCube](
                 Rhi::FRhiCmdContext& ctx, const RenderCore::FFrameGraphPassResources& res,
                 const FSkyBoxPassData& data) -> void {
-                auto* depthTex = res.GetTexture(data.Depth);
-                auto* device   = Rhi::RHIGetDevice();
+                Rhi::FRhiDebugMarker marker(ctx, TEXT("Deferred.SkyBox"));
+                auto*                depthTex = res.GetTexture(data.Depth);
+                auto*                device   = Rhi::RHIGetDevice();
                 if (!depthTex || !device) {
                     return;
                 }

@@ -57,6 +57,9 @@ namespace AltinaEngine::Rhi {
         void EnsureRecording();
         void FinalizeRecording();
         auto GetExecutionCommandList() const noexcept -> FRhiVulkanCommandList*;
+        void RHIPushDebugMarkerNative(FStringView text) override;
+        void RHIPopDebugMarkerNative() override;
+        void RHIInsertDebugMarkerNative(FStringView text) override;
 
         struct FState;
         FState*                        mState = nullptr;

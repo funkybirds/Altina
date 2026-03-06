@@ -3,6 +3,7 @@
 #include "Container/Vector.h"
 #include "FrameGraph/FrameGraph.h"
 #include "Material/Material.h"
+#include "Rhi/RhiDebugMarker.h"
 #include "Rhi/RhiInit.h"
 #include "Utility/Assert.h"
 
@@ -276,6 +277,24 @@ namespace AltinaEngine::Rendering::Deferred {
                     cascade, lightViewProj = csmData.Cascades[cascade].LightViewProj,
                     shadowSize](Rhi::FRhiCmdContext& ctx,
                     const RenderCore::FFrameGraphPassResources&, const FShadowPassData&) -> void {
+                    const TChar* markerName = TEXT("Deferred.Shadow.Cascade");
+                    switch (cascade) {
+                        case 0U:
+                            markerName = TEXT("Deferred.Shadow.Cascade0");
+                            break;
+                        case 1U:
+                            markerName = TEXT("Deferred.Shadow.Cascade1");
+                            break;
+                        case 2U:
+                            markerName = TEXT("Deferred.Shadow.Cascade2");
+                            break;
+                        case 3U:
+                            markerName = TEXT("Deferred.Shadow.Cascade3");
+                            break;
+                        default:
+                            break;
+                    }
+                    Rhi::FRhiDebugMarker marker(ctx, markerName);
                     executeFn(ctx, cascade, lightViewProj, shadowSize, userData);
                 });
         }

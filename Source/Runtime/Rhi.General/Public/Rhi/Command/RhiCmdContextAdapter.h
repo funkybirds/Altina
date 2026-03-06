@@ -93,6 +93,12 @@ namespace AltinaEngine::Rhi {
             mOps->RHIDispatch(groupCountX, groupCountY, groupCountZ);
         }
 
+        void RHIPushDebugMarker(FStringView text) override { mOps->RHIPushDebugMarker(text); }
+
+        void RHIPopDebugMarker() override { mOps->RHIPopDebugMarker(); }
+
+        void RHIInsertDebugMarker(FStringView text) override { mOps->RHIInsertDebugMarker(text); }
+
         [[nodiscard]] auto GetRhiContext() const noexcept -> FRhiCommandContext& {
             return *mContext;
         }

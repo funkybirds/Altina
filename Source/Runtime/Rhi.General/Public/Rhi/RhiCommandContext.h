@@ -4,11 +4,15 @@
 #include "Rhi/RhiResource.h"
 #include "Rhi/Command/RhiCmdContextOps.h"
 #include "Rhi/RhiStructs.h"
+#include "Container/String.h"
 #include "Container/StringView.h"
+#include "Container/Vector.h"
 
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
+    using Container::FString;
     using Container::FStringView;
+    using Container::TVector;
 
     class AE_RHI_GENERAL_API FRhiCommandContext : public FRhiResource, public IRhiCmdContextOps {
     public:
@@ -50,8 +54,25 @@ namespace AltinaEngine::Rhi {
         virtual auto RHISwitchContextCapability(ERhiContextCapability capability)
             -> FRhiCommandSubmissionStamp;
 
+        void RHIPushDebugMarker(FStringView text) override;
+        void RHIPopDebugMarker() override;
+        void RHIInsertDebugMarker(FStringView text) override;
+
+    protected:
+        virtual void       RHIPushDebugMarkerNative(FStringView text);
+        virtual void       RHIPopDebugMarkerNative();
+        virtual void       RHIInsertDebugMarkerNative(FStringView text);
+
+        void               RHIBeginSectionDebugMarkers();
+        void               RHIEndSectionDebugMarkers();
+        [[nodiscard]] auto HasOpenSectionDebugMarkers() const noexcept -> bool {
+            return mSectionDebugMarkersOpen;
+        }
+
     private:
         FRhiCommandContextDesc mDesc;
+        TVector<FString>       mDebugMarkerStack;
+        bool                   mSectionDebugMarkersOpen = false;
     };
 
 } // namespace AltinaEngine::Rhi

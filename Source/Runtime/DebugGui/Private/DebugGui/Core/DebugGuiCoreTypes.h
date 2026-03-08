@@ -23,6 +23,7 @@ namespace AltinaEngine::DebugGui::Private {
     struct FDrawCmd {
         u32   IndexCount  = 0U;
         u32   IndexOffset = 0U;
+        u64   TextureId   = 0ULL; // 0 = internal font/solid texture.
         FRect ClipRect{};
     };
 

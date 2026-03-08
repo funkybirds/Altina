@@ -10,6 +10,7 @@ namespace AltinaEngine::Input {
 
 namespace AltinaEngine::Rhi {
     class FRhiDevice;
+    class FRhiTexture;
     class FRhiViewport;
 } // namespace AltinaEngine::Rhi
 
@@ -32,8 +33,10 @@ namespace AltinaEngine::DebugGui {
         [[nodiscard]] virtual auto IsConsoleShown() const noexcept -> bool = 0;
         [[nodiscard]] virtual auto IsCVarsShown() const noexcept -> bool   = 0;
 
-        virtual void               RegisterPanel(FStringView name, FPanelFn fn)   = 0;
-        virtual void               RegisterOverlay(FStringView name, FPanelFn fn) = 0;
+        virtual void               RegisterPanel(FStringView name, FPanelFn fn)             = 0;
+        virtual void               RegisterBackgroundOverlay(FStringView name, FPanelFn fn) = 0;
+        virtual void               RegisterOverlay(FStringView name, FPanelFn fn)           = 0;
+        virtual void               SetImageTexture(u64 imageId, Rhi::FRhiTexture* texture)  = 0;
 
         virtual void SetExternalStats(const FDebugGuiExternalStats& stats) noexcept = 0;
         virtual void SetTheme(const FDebugGuiTheme& theme) noexcept                 = 0;

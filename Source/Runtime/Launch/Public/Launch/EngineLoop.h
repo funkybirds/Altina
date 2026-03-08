@@ -100,6 +100,13 @@ namespace AltinaEngine::Launch {
         auto               LoadDemoAssetRegistry() -> bool;
 
     private:
+        struct FEditorOffscreenCache {
+            Rhi::FRhiTextureRef Texture;
+            u32                 Width  = 0U;
+            u32                 Height = 0U;
+            Rhi::ERhiFormat     Format = Rhi::ERhiFormat::Unknown;
+        };
+
         static void BindMeshMaterialConverter(
             Asset::FAssetRegistry& registry, Asset::FAssetManager& manager) {
             GameScene::FMeshMaterialComponent::AssetToRenderMaterialConverter =
@@ -297,6 +304,7 @@ namespace AltinaEngine::Launch {
         Engine::FMaterialCache               mMaterialCache;
         TOwner<RenderCore::FRenderingThread> mRenderingThread;
         TOwner<DebugGui::IDebugGuiSystem, TPolymorphicDeleter<DebugGui::IDebugGuiSystem>> mDebugGui;
+        FEditorOffscreenCache          mEditorOffscreenCache{};
         TQueue<Core::Jobs::FJobHandle> mPendingRenderFrames;
         Engine::FEngineRuntime         mEngineRuntime{};
     };

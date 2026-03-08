@@ -109,6 +109,11 @@ namespace AltinaEngine::DebugGui::Private {
         }
     } // namespace
 
+    void FDebugGuiRendererD3D11::SetExternalTextures(const FImageTextureMap& textures) {
+        mExternalTextures = textures;
+        PruneExternalTextureCache();
+    }
+
     void FDebugGuiRendererD3D11::Render(Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport,
         const FDrawData& drawData, const FFontAtlas& atlas) {
         auto* backBuffer = viewport.GetBackBuffer();
@@ -222,10 +227,35 @@ namespace AltinaEngine::DebugGui::Private {
         ib.mOffsetBytes = 0U;
         ctx.RHISetIndexBuffer(ib);
 
-        ctx.RHISetBindGroup(0U, mBindGroup.Get(), nullptr, 0U);
+        Rhi::FRhiBindGroup* currentBindGroup = nullptr;
 
-        u32 idxOffset = 0U;
+        u32                 idxOffset = 0U;
         for (const auto& cmd : drawData.Cmds) {
+            Rhi::FRhiBindGroupRef imageBindGroup;
+            if (cmd.TextureId == 0ULL) {
+                imageBindGroup = mBindGroup;
+            } else {
+                auto* texturePtr = mExternalTextures.Find(cmd.TextureId);
+                if (texturePtr == nullptr || *texturePtr == nullptr) {
+                    idxOffset += cmd.IndexCount;
+                    continue;
+                }
+                if (!EnsureBindGroupForTexture(
+                        device, cmd.TextureId, *texturePtr, imageBindGroup)) {
+                    idxOffset += cmd.IndexCount;
+                    continue;
+                }
+            }
+
+            if (!imageBindGroup) {
+                idxOffset += cmd.IndexCount;
+                continue;
+            }
+            if (currentBindGroup != imageBindGroup.Get()) {
+                currentBindGroup = imageBindGroup.Get();
+                ctx.RHISetBindGroup(0U, currentBindGroup, nullptr, 0U);
+            }
+
             const i32 sx = static_cast<i32>(cmd.ClipRect.Min.X());
             const i32 sy = static_cast<i32>(cmd.ClipRect.Min.Y());
             const i32 ex = static_cast<i32>(cmd.ClipRect.Max.X());
@@ -336,6 +366,19 @@ namespace AltinaEngine::DebugGui::Private {
                 LogError(TEXT("DebugGui: Failed to build binding lookup table."));
                 return false;
             }
+
+            if (!RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
+                    RenderCore::ShaderBinding::HashBindingName(TEXT("DebugGuiConstants")),
+                    Rhi::ERhiBindingType::ConstantBuffer, mConstantsBinding)
+                || !RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
+                    RenderCore::ShaderBinding::HashBindingName(TEXT("gFontAtlas")),
+                    Rhi::ERhiBindingType::SampledTexture, mTextureBinding)
+                || !RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
+                    RenderCore::ShaderBinding::HashBindingName(TEXT("gSampler")),
+                    Rhi::ERhiBindingType::Sampler, mSamplerBinding)) {
+                LogError(TEXT("DebugGui: Failed to resolve bind-group bindings from reflection."));
+                return false;
+            }
         }
 
         if (!mPipelineLayout) {
@@ -364,39 +407,30 @@ namespace AltinaEngine::DebugGui::Private {
         }
 
         if (!mBindGroup) {
-            u32 constantsBinding = RenderCore::ShaderBinding::kInvalidBinding;
-            u32 fontBinding      = RenderCore::ShaderBinding::kInvalidBinding;
-            u32 samplerBinding   = RenderCore::ShaderBinding::kInvalidBinding;
-            if (!RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
-                    RenderCore::ShaderBinding::HashBindingName(TEXT("DebugGuiConstants")),
-                    Rhi::ERhiBindingType::ConstantBuffer, constantsBinding)
-                || !RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
-                    RenderCore::ShaderBinding::HashBindingName(TEXT("gFontAtlas")),
-                    Rhi::ERhiBindingType::SampledTexture, fontBinding)
-                || !RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
-                    RenderCore::ShaderBinding::HashBindingName(TEXT("gSampler")),
-                    Rhi::ERhiBindingType::Sampler, samplerBinding)) {
-                LogError(TEXT("DebugGui: Failed to resolve bind-group bindings from reflection."));
+            if (mConstantsBinding == RenderCore::ShaderBinding::kInvalidBinding
+                || mTextureBinding == RenderCore::ShaderBinding::kInvalidBinding
+                || mSamplerBinding == RenderCore::ShaderBinding::kInvalidBinding) {
+                LogError(TEXT("DebugGui: Invalid bind-group binding lookup state."));
                 return false;
             }
 
             RenderCore::ShaderBinding::FBindGroupBuilder builder(mLayout.Get());
-            if (!builder.AddBuffer(constantsBinding, mConstantsBuffer.Get(), 0ULL,
+            if (!builder.AddBuffer(mConstantsBinding, mConstantsBuffer.Get(), 0ULL,
                     static_cast<u64>(sizeof(FConstants)))) {
                 LogError(
                     TEXT("DebugGui: Failed to add constant-buffer bind-group entry (binding={})."),
-                    constantsBinding);
+                    mConstantsBinding);
                 return false;
             }
-            if (!builder.AddTexture(fontBinding, mFontTexture.Get())) {
+            if (!builder.AddTexture(mTextureBinding, mFontTexture.Get())) {
                 LogError(
                     TEXT("DebugGui: Failed to add font-texture bind-group entry (binding={})."),
-                    fontBinding);
+                    mTextureBinding);
                 return false;
             }
-            if (!builder.AddSampler(samplerBinding, mSampler.Get())) {
+            if (!builder.AddSampler(mSamplerBinding, mSampler.Get())) {
                 LogError(TEXT("DebugGui: Failed to add sampler bind-group entry (binding={})."),
-                    samplerBinding);
+                    mSamplerBinding);
                 return false;
             }
 
@@ -465,6 +499,87 @@ namespace AltinaEngine::DebugGui::Private {
         }
 
         return true;
+    }
+
+    bool FDebugGuiRendererD3D11::EnsureBindGroupForTexture(Rhi::FRhiDevice& device, u64 imageId,
+        Rhi::FRhiTexture* texture, Rhi::FRhiBindGroupRef& out) {
+        if (imageId == 0ULL || texture == nullptr || !mLayout || !mSampler || !mConstantsBuffer) {
+            return false;
+        }
+        if (mConstantsBinding == RenderCore::ShaderBinding::kInvalidBinding
+            || mTextureBinding == RenderCore::ShaderBinding::kInvalidBinding
+            || mSamplerBinding == RenderCore::ShaderBinding::kInvalidBinding) {
+            return false;
+        }
+
+        auto it = mExternalTextureCache.FindIt(imageId);
+        if (it != mExternalTextureCache.end()) {
+            if (it->second.Texture == texture && it->second.BindGroup) {
+                out = it->second.BindGroup;
+                return true;
+            }
+            mExternalTextureCache.Erase(it);
+        }
+
+        Rhi::FRhiShaderResourceViewDesc srvDesc{};
+        srvDesc.mDebugName.Assign(TEXT("DebugGui.ExternalImage.SRV"));
+        srvDesc.mTexture               = texture;
+        srvDesc.mFormat                = texture->GetDesc().mFormat;
+        srvDesc.mTextureRange.mBaseMip = 0U;
+        srvDesc.mTextureRange.mMipCount =
+            (texture->GetDesc().mMipLevels > 0U) ? texture->GetDesc().mMipLevels : 1U;
+        srvDesc.mTextureRange.mBaseArrayLayer = 0U;
+        srvDesc.mTextureRange.mLayerCount =
+            (texture->GetDesc().mArrayLayers > 0U) ? texture->GetDesc().mArrayLayers : 1U;
+        auto srv = device.CreateShaderResourceView(srvDesc);
+        if (!srv) {
+            return false;
+        }
+
+        RenderCore::ShaderBinding::FBindGroupBuilder builder(mLayout.Get());
+        if (!builder.AddBuffer(mConstantsBinding, mConstantsBuffer.Get(), 0ULL,
+                static_cast<u64>(sizeof(FConstants)))) {
+            return false;
+        }
+        if (!builder.AddTexture(mTextureBinding, texture)) {
+            return false;
+        }
+        if (!builder.AddSampler(mSamplerBinding, mSampler.Get())) {
+            return false;
+        }
+
+        Rhi::FRhiBindGroupDesc bindGroupDesc{};
+        bindGroupDesc.mDebugName.Assign(TEXT("DebugGui.ExternalImage.BindGroup"));
+        if (!builder.Build(bindGroupDesc)) {
+            return false;
+        }
+
+        auto bindGroup = device.CreateBindGroup(bindGroupDesc);
+        if (!bindGroup) {
+            return false;
+        }
+
+        FExternalTextureBinding entry{};
+        entry.Texture                  = texture;
+        entry.Srv                      = srv;
+        entry.BindGroup                = bindGroup;
+        mExternalTextureCache[imageId] = entry;
+        out                            = bindGroup;
+        return true;
+    }
+
+    void FDebugGuiRendererD3D11::PruneExternalTextureCache() {
+        TVector<u64> removeKeys{};
+        for (const auto& entry : mExternalTextureCache) {
+            auto* texture = mExternalTextures.Find(entry.first);
+            if (texture == nullptr || *texture != entry.second.Texture || *texture == nullptr) {
+                removeKeys.PushBack(entry.first);
+            }
+        }
+
+        for (const u64 key : removeKeys) {
+            mExternalTextureCache.Erase(key);
+        }
     }
 
     bool FDebugGuiRendererD3D11::EnsureBackBufferRtv(

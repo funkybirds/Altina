@@ -338,3 +338,70 @@ TEST_CASE("DebugGui window collapse toggle reduces draw stats") {
 
     DestroyDebugGuiSystem(sys);
 }
+
+TEST_CASE("DebugGui background overlay executes before panel and overlay") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    AltinaEngine::Core::Container::TVector<int> sequence;
+    sys->RegisterBackgroundOverlay(TEXT("BG"), [&](IDebugGui& gui) {
+        (void)gui;
+        sequence.PushBack(1);
+    });
+    sys->RegisterPanel(TEXT("Panel"), [&](IDebugGui& gui) {
+        (void)gui;
+        sequence.PushBack(2);
+    });
+    sys->RegisterOverlay(TEXT("Overlay"), [&](IDebugGui& gui) {
+        (void)gui;
+        sequence.PushBack(3);
+    });
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 20, 20);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+
+    REQUIRE_EQ(sequence.Size(), static_cast<AltinaEngine::usize>(3));
+    REQUIRE_EQ(sequence[0], 1);
+    REQUIRE_EQ(sequence[1], 2);
+    REQUIRE_EQ(sequence[2], 3);
+
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("DebugGui DrawImage emits additional draw geometry") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    bool drawImage = false;
+    sys->RegisterPanel(TEXT("ImagePanel"), [&](IDebugGui& gui) {
+        if (drawImage) {
+            const FRect rect{ FVector2f(10.0f, 10.0f), FVector2f(120.0f, 80.0f) };
+            gui.DrawImage(rect, 0x1234ULL);
+        }
+    });
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 20, 20);
+    drawImage = false;
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto withoutImage = sys->GetLastFrameStats();
+
+    PrepareInput(input, 1280, 720, 20, 20);
+    drawImage = true;
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto withImage = sys->GetLastFrameStats();
+
+    REQUIRE(withImage.VertexCount > withoutImage.VertexCount);
+    REQUIRE(withImage.IndexCount > withoutImage.IndexCount);
+
+    DestroyDebugGuiSystem(sys);
+}

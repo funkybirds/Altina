@@ -126,7 +126,7 @@ namespace AltinaEngine::Rendering {
                     rtv.mClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
                     builder.SetRenderTargets(&rtv, 1U, nullptr);
 
-                    builder.SetExternalOutput(data.Out, Rhi::ERhiResourceState::Present);
+                    builder.SetExternalOutput(data.Out, ctx.BackBufferFinalState);
                 },
                 [viewRect = view.ViewRect](Rhi::FRhiCmdContext& cmd,
                     const RenderCore::FFrameGraphPassResources& res,

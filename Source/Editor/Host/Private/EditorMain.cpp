@@ -9,30 +9,10 @@
 #include "Launch/RuntimeSession.h"
 #include "Utility/EngineConfig/EngineConfig.h"
 #include "DebugGui/DebugGui.h"
-#include "Math/Vector.h"
 
 using namespace AltinaEngine;
 
 namespace {
-    auto EditorStateText(Launch::EEditorRuntimeState state) -> const TChar* {
-        switch (state) {
-            case Launch::EEditorRuntimeState::Stopped:
-                return TEXT("Stopped");
-            case Launch::EEditorRuntimeState::Starting:
-                return TEXT("Starting");
-            case Launch::EEditorRuntimeState::Running:
-                return TEXT("Running");
-            case Launch::EEditorRuntimeState::Paused:
-                return TEXT("Paused");
-            case Launch::EEditorRuntimeState::Stepping:
-                return TEXT("Stepping");
-            case Launch::EEditorRuntimeState::Stopping:
-                return TEXT("Stopping");
-            default:
-                return TEXT("Unknown");
-        }
-    }
-
     class FEditorHostHooks final : public Launch::IRuntimeHostHooks {
     public:
         auto OnInit(Launch::IRuntimeSession& session) -> bool override {
@@ -45,27 +25,41 @@ namespace {
 
             auto services = session.GetServices();
             UiModule.RegisterDefaultPanels(services.DebugGuiSystem);
-            if (services.DebugGuiSystem != nullptr) {
-                services.DebugGuiSystem->RegisterOverlay(
-                    TEXT("Editor.RuntimeOverlay"), [this](DebugGui::IDebugGui& gui) {
-                        constexpr auto kColor = DebugGui::MakeColor32(255, 255, 255, 255);
-                        gui.DrawText(Core::Math::FVector2f(14.0f, 14.0f), kColor,
-                            TEXT("Editor Host Active"));
-                        gui.DrawText(Core::Math::FVector2f(14.0f, 30.0f), kColor,
-                            EditorStateText(PlaySession.GetState()));
-                        gui.DrawText(Core::Math::FVector2f(14.0f, 46.0f), kColor,
-                            TEXT("F5 Play | F6 Pause | F10 Step | F8 Stop"));
-                    });
-            }
             return true;
         }
 
         auto OnHostFrame(Launch::IRuntimeSession& session,
             const Launch::FFrameContext&          frameContext) -> bool override {
             (void)frameContext;
-            auto services = session.GetServices();
-            PlaySession.HandleFrameInput(services.InputSystem);
-            return PlaySession.GetState() != Launch::EEditorRuntimeState::Stopped;
+            auto       services = session.GetServices();
+            const auto commands = UiModule.ConsumeUiCommands();
+            for (auto cmd : commands) {
+                switch (cmd) {
+                    case Editor::UI::EEditorUiCommand::Play:
+                        PlaySession.RequestPlay();
+                        break;
+                    case Editor::UI::EEditorUiCommand::Pause:
+                        PlaySession.RequestPause();
+                        break;
+                    case Editor::UI::EEditorUiCommand::Step:
+                        PlaySession.RequestStep();
+                        break;
+                    case Editor::UI::EEditorUiCommand::Stop:
+                        PlaySession.RequestStop();
+                        break;
+                    case Editor::UI::EEditorUiCommand::Exit:
+                        bExitRequested = true;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            const bool allowHotkeys = (services.DebugGuiSystem == nullptr)
+                || !services.DebugGuiSystem->WantsCaptureKeyboard();
+            PlaySession.HandleFrameInput(services.InputSystem, allowHotkeys);
+            return !bExitRequested
+                && PlaySession.GetState() != Launch::EEditorRuntimeState::Stopped;
         }
 
         auto ShouldTickSimulation(Launch::IRuntimeSession& session,
@@ -79,6 +73,23 @@ namespace {
             const Launch::FFrameContext& frameContext) -> Launch::FSimulationTick override {
             (void)session;
             return PlaySession.BuildSimulationTick(frameContext);
+        }
+
+        auto BuildRenderTick(Launch::IRuntimeSession& session,
+            const Launch::FFrameContext& frameContext) -> Launch::FRenderTick override {
+            (void)session;
+            (void)frameContext;
+
+            Launch::FRenderTick tick{};
+            tick.bRedirectPrimaryViewToOffscreen = true;
+            tick.PrimaryViewImageId              = Editor::UI::kEditorViewportImageId;
+            const auto viewportRequest           = UiModule.GetViewportRequest();
+            if (viewportRequest.bHasContent && viewportRequest.Width > 0U
+                && viewportRequest.Height > 0U) {
+                tick.RenderWidth  = viewportRequest.Width;
+                tick.RenderHeight = viewportRequest.Height;
+            }
+            return tick;
         }
 
         void OnAfterFrame(
@@ -98,7 +109,7 @@ namespace {
         [[nodiscard]] auto ShouldContinue(const Launch::IRuntimeSession& session,
             const Launch::FFrameContext& frameContext) const -> bool override {
             (void)frameContext;
-            return session.IsRunning()
+            return session.IsRunning() && !bExitRequested
                 && PlaySession.GetState() != Launch::EEditorRuntimeState::Stopped;
         }
 
@@ -108,6 +119,7 @@ namespace {
         Editor::Viewport::FEditorViewportBootstrap ViewportBootstrap{};
         Editor::PlaySession::FEditorPlaySession    PlaySession{};
         Editor::UI::FEditorUiModule                UiModule{};
+        bool                                       bExitRequested = false;
     };
 } // namespace
 

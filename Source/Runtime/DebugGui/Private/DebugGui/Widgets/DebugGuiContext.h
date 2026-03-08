@@ -87,12 +87,28 @@ namespace AltinaEngine::DebugGui::Private {
         void DrawText(const FVector2f& pos, FColor32 color, FStringView text) override {
             AddText(pos, color, text);
         }
+        void DrawImage(const FRect& rect, u64 imageId, FColor32 tint) override {
+            if (imageId == 0ULL) {
+                return;
+            }
+            AddQuad(rect.Min, FVector2f(rect.Max.X(), rect.Min.Y()), rect.Max,
+                FVector2f(rect.Min.X(), rect.Max.Y()), 0.0f, 0.0f, 1.0f, 1.0f, tint, imageId);
+        }
 
         [[nodiscard]] auto GetDisplaySize() const noexcept -> FVector2f override {
             return mDisplaySize;
         }
         [[nodiscard]] auto GetMousePos() const noexcept -> FVector2f override {
             return mInput.MousePos;
+        }
+        [[nodiscard]] auto IsMouseDown() const noexcept -> bool override {
+            return mInput.bMouseDown;
+        }
+        [[nodiscard]] auto WasMousePressed() const noexcept -> bool override {
+            return mInput.bMousePressed;
+        }
+        [[nodiscard]] auto WasMouseReleased() const noexcept -> bool override {
+            return mInput.bMouseReleased;
         }
 
         bool BeginWindow(FStringView title, bool* open) override {
@@ -366,11 +382,12 @@ namespace AltinaEngine::DebugGui::Private {
             return h;
         }
 
-        void BeginCmdIfNeeded() {
+        void BeginCmdIfNeeded(u64 textureId) {
             if (mDrawData->Cmds.IsEmpty()) {
                 FDrawCmd cmd{};
                 cmd.IndexOffset = 0U;
                 cmd.IndexCount  = 0U;
+                cmd.TextureId   = textureId;
                 cmd.ClipRect    = mClip->Current(mDisplaySize);
                 mDrawData->Cmds.PushBack(cmd);
                 return;
@@ -380,18 +397,21 @@ namespace AltinaEngine::DebugGui::Private {
             const FRect last = mDrawData->Cmds.Back().ClipRect;
             const bool  same = (cur.Min.X() == last.Min.X()) && (cur.Min.Y() == last.Min.Y())
                 && (cur.Max.X() == last.Max.X()) && (cur.Max.Y() == last.Max.Y());
-            if (!same) {
+            const bool sameTexture = (mDrawData->Cmds.Back().TextureId == textureId);
+            if (!same || !sameTexture) {
                 FDrawCmd cmd{};
                 cmd.IndexOffset = static_cast<u32>(mDrawData->Indices.Size());
                 cmd.IndexCount  = 0U;
+                cmd.TextureId   = textureId;
                 cmd.ClipRect    = cur;
                 mDrawData->Cmds.PushBack(cmd);
             }
         }
 
         void AddQuad(const FVector2f& p0, const FVector2f& p1, const FVector2f& p2,
-            const FVector2f& p3, f32 u0, f32 v0, f32 u1, f32 v1, FColor32 color) {
-            BeginCmdIfNeeded();
+            const FVector2f& p3, f32 u0, f32 v0, f32 u1, f32 v1, FColor32 color,
+            u64 textureId = 0ULL) {
+            BeginCmdIfNeeded(textureId);
             const u32 base = static_cast<u32>(mDrawData->Vertices.Size());
             mDrawData->Vertices.PushBack({ p0.X(), p0.Y(), u0, v0, color });
             mDrawData->Vertices.PushBack({ p1.X(), p1.Y(), u1, v0, color });
@@ -410,7 +430,7 @@ namespace AltinaEngine::DebugGui::Private {
 
         void AddTriangleFilled(
             const FVector2f& p0, const FVector2f& p1, const FVector2f& p2, FColor32 color) {
-            BeginCmdIfNeeded();
+            BeginCmdIfNeeded(0ULL);
             const u32 base = static_cast<u32>(mDrawData->Vertices.Size());
             const f32 u    = (mSolidU0 + mSolidU1) * 0.5f;
             const f32 v    = (mSolidV0 + mSolidV1) * 0.5f;

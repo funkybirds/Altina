@@ -41,8 +41,10 @@ namespace AltinaEngine::Launch {
     };
 
     struct FRenderTick {
-        u32 RenderWidth  = 0U;
-        u32 RenderHeight = 0U;
+        u32  RenderWidth                     = 0U;
+        u32  RenderHeight                    = 0U;
+        bool bRedirectPrimaryViewToOffscreen = false;
+        u64  PrimaryViewImageId              = 0ULL;
     };
 
     struct FRuntimeServices {

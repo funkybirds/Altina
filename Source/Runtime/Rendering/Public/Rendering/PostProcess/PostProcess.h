@@ -48,7 +48,8 @@ namespace AltinaEngine::Rendering {
     struct AE_RENDERING_API FPostProcessBuildContext {
         u64 ViewKey = 0ULL; // For per-view persistent effects (e.g. TAA history).
         RenderCore::FFrameGraphTextureRef BackBuffer;
-        Rhi::ERhiFormat                   BackBufferFormat = Rhi::ERhiFormat::Unknown;
+        Rhi::ERhiFormat                   BackBufferFormat     = Rhi::ERhiFormat::Unknown;
+        Rhi::ERhiResourceState            BackBufferFinalState = Rhi::ERhiResourceState::Present;
     };
 
     using FPostProcessAddToGraphFn = void (*)(RenderCore::FFrameGraph& graph,
@@ -70,7 +71,7 @@ namespace AltinaEngine::Rendering {
 
     /**
      * Build a post-process chain from (stack + effect registry), then always append a final Present
-     * pass that writes to ctx.BackBuffer and marks it as ExternalOutput(Present).
+     * pass that writes to ctx.BackBuffer and marks it as ExternalOutput(ctx.BackBufferFinalState).
      *
      * Notes:
      * - Unregistered effects are skipped (logged once).

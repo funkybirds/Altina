@@ -5,8 +5,9 @@
 #include "Launch/RuntimeSession.h"
 
 namespace AltinaEngine::Editor::PlaySession {
-    void FEditorPlaySession::HandleFrameInput(const Input::FInputSystem* inputSystem) {
-        if (inputSystem == nullptr) {
+    void FEditorPlaySession::HandleFrameInput(
+        const Input::FInputSystem* inputSystem, bool allowHotkeys) {
+        if (inputSystem == nullptr || !allowHotkeys) {
             return;
         }
 
@@ -23,6 +24,11 @@ namespace AltinaEngine::Editor::PlaySession {
             mController.RequestStop();
         }
     }
+
+    void FEditorPlaySession::RequestPlay() { mController.RequestPlay(); }
+    void FEditorPlaySession::RequestPause() { mController.RequestPause(); }
+    void FEditorPlaySession::RequestStep() { mController.RequestStep(); }
+    void FEditorPlaySession::RequestStop() { mController.RequestStop(); }
 
     auto FEditorPlaySession::ShouldTickSimulation() const -> bool {
         return mController.ShouldTickSimulation();

@@ -53,3 +53,14 @@ set_target_properties(${TargetName}
         OUTPUT_NAME AltinaEditor.UI
         FOLDER "Editor/UI"
 )
+
+set(AE_TEST_BIN_DIR ${CMAKE_BINARY_DIR}/Source/Tests)
+add_custom_command(
+    TARGET ${TargetName}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${AE_TEST_BIN_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:${TargetName}>
+        ${AE_TEST_BIN_DIR}
+    COMMENT "Copying ${TargetName} to test binaries"
+)

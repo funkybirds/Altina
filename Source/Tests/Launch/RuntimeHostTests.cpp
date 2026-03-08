@@ -206,3 +206,11 @@ TEST_CASE("DemoHostHooks forwards wrapped hooks on fallback path") {
     REQUIRE_EQ(wrapped.HostFrameCount, 2);
     REQUIRE_EQ(wrapped.ShutdownCount, 1);
 }
+
+TEST_CASE("RenderTick defaults to swapchain present path") {
+    AltinaEngine::Launch::FRenderTick tick{};
+    REQUIRE_EQ(tick.RenderWidth, 0U);
+    REQUIRE_EQ(tick.RenderHeight, 0U);
+    REQUIRE(!tick.bRedirectPrimaryViewToOffscreen);
+    REQUIRE_EQ(tick.PrimaryViewImageId, 0ULL);
+}

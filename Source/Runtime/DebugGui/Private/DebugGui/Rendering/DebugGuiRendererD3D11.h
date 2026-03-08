@@ -3,6 +3,8 @@
 #include "DebugGui/Core/DebugGuiCoreTypes.h"
 #include "DebugGui/Core/FontAtlas.h"
 
+#include "Container/HashMap.h"
+
 #include "Rhi/RhiBindGroup.h"
 #include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiBuffer.h"
@@ -24,6 +26,9 @@ namespace AltinaEngine::Rhi {
 namespace AltinaEngine::DebugGui::Private {
     class FDebugGuiRendererD3D11 {
     public:
+        using FImageTextureMap = Core::Container::THashMap<u64, Rhi::FRhiTexture*>;
+
+        void SetExternalTextures(const FImageTextureMap& textures);
         void Render(Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport, const FDrawData& drawData,
             const FFontAtlas& atlas);
 
@@ -40,6 +45,9 @@ namespace AltinaEngine::DebugGui::Private {
         bool EnsureAuxiliaryRtvs(
             Rhi::FRhiDevice& device, u32 width, u32 height, Rhi::ERhiFormat format);
         bool EnsureGeometryBuffers(Rhi::FRhiDevice& device, const FDrawData& drawData);
+        bool EnsureBindGroupForTexture(Rhi::FRhiDevice& device, u64 imageId,
+            Rhi::FRhiTexture* texture, Rhi::FRhiBindGroupRef& out);
+        void PruneExternalTextureCache();
         void UpdateConstants(u32 w, u32 h);
         bool CompileShaders(Rhi::FRhiDevice& device);
 
@@ -54,20 +62,32 @@ namespace AltinaEngine::DebugGui::Private {
         Rhi::FRhiShaderRef                             mPixelShader;
         Rhi::FRhiPipelineRef                           mPipeline;
         RenderCore::ShaderBinding::FBindingLookupTable mBindingLookupTable;
+        u32                          mConstantsBinding = RenderCore::ShaderBinding::kInvalidBinding;
+        u32                          mTextureBinding   = RenderCore::ShaderBinding::kInvalidBinding;
+        u32                          mSamplerBinding   = RenderCore::ShaderBinding::kInvalidBinding;
 
-        Rhi::FRhiTexture*                              mBackBufferTex = nullptr;
-        Rhi::FRhiRenderTargetViewRef                   mBackBufferRtv;
-        Rhi::FRhiTextureRef                            mAuxColorTex1;
-        Rhi::FRhiTextureRef                            mAuxColorTex2;
-        Rhi::FRhiRenderTargetViewRef                   mAuxColorRtv1;
-        Rhi::FRhiRenderTargetViewRef                   mAuxColorRtv2;
-        u32                                            mAuxWidth  = 0U;
-        u32                                            mAuxHeight = 0U;
-        Rhi::ERhiFormat                                mAuxFormat = Rhi::ERhiFormat::Unknown;
+        Rhi::FRhiTexture*            mBackBufferTex = nullptr;
+        Rhi::FRhiRenderTargetViewRef mBackBufferRtv;
+        Rhi::FRhiTextureRef          mAuxColorTex1;
+        Rhi::FRhiTextureRef          mAuxColorTex2;
+        Rhi::FRhiRenderTargetViewRef mAuxColorRtv1;
+        Rhi::FRhiRenderTargetViewRef mAuxColorRtv2;
+        u32                          mAuxWidth  = 0U;
+        u32                          mAuxHeight = 0U;
+        Rhi::ERhiFormat              mAuxFormat = Rhi::ERhiFormat::Unknown;
 
-        Rhi::FRhiBufferRef                             mVertexBuffer;
-        Rhi::FRhiBufferRef                             mIndexBuffer;
-        u64                                            mVertexBufferSize = 0ULL;
-        u64                                            mIndexBufferSize  = 0ULL;
+        Rhi::FRhiBufferRef           mVertexBuffer;
+        Rhi::FRhiBufferRef           mIndexBuffer;
+        u64                          mVertexBufferSize = 0ULL;
+        u64                          mIndexBufferSize  = 0ULL;
+
+        struct FExternalTextureBinding {
+            Rhi::FRhiTexture*              Texture = nullptr;
+            Rhi::FRhiShaderResourceViewRef Srv;
+            Rhi::FRhiBindGroupRef          BindGroup;
+        };
+
+        FImageTextureMap                                        mExternalTextures;
+        Core::Container::THashMap<u64, FExternalTextureBinding> mExternalTextureCache;
     };
 } // namespace AltinaEngine::DebugGui::Private

@@ -596,17 +596,142 @@ namespace AltinaEngine::Rendering {
                 if (resources.SsaoPSKey.IsValid()) {
                     shaderKeys.PushBack(resources.SsaoPSKey);
                 }
-                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
-                    resources.Registry, shaderKeys, 0U, layoutDesc);
-                DebugAssert(built, TEXT("BasicDeferredRenderer"),
-                    "Failed to build SSAO bind group layout from shader reflection.");
-                if (built) {
-                    resources.SsaoLayout = device.CreateBindGroupLayout(layoutDesc);
-                    DebugAssert(
-                        RenderCore::ShaderBinding::BuildBindingLookupTable(resources.Registry,
-                            shaderKeys, 0U, resources.SsaoLayout.Get(), resources.SsaoBindings),
-                        TEXT("BasicDeferredRenderer"),
-                        "Failed to build SSAO binding lookup table from shader reflection.");
+
+                if (!shaderKeys.IsEmpty()) {
+                    struct FSsaoBindingSpec {
+                        const TChar*         Name            = nullptr;
+                        Rhi::ERhiBindingType Type            = Rhi::ERhiBindingType::SampledTexture;
+                        bool                 bConstantBuffer = false;
+                    };
+
+                    struct FSsaoResolvedBinding {
+                        const TChar*              Name       = nullptr;
+                        Rhi::ERhiBindingType      Type       = Rhi::ERhiBindingType::SampledTexture;
+                        u32                       Binding    = 0U;
+                        Rhi::ERhiShaderStageFlags Visibility = Rhi::ERhiShaderStageFlags::All;
+                    };
+
+                    constexpr FSsaoBindingSpec kSsaoSpecs[] = {
+                        { TEXT("DeferredView"), Rhi::ERhiBindingType::ConstantBuffer, true },
+                        { TEXT("SsaoConstants"), Rhi::ERhiBindingType::ConstantBuffer, true },
+                        { TEXT("GBufferB"), Rhi::ERhiBindingType::SampledTexture, false },
+                        { TEXT("SceneDepth"), Rhi::ERhiBindingType::SampledTexture, false },
+                        { TEXT("LinearSampler"), Rhi::ERhiBindingType::Sampler, false },
+                    };
+
+                    TVector<FSsaoResolvedBinding> resolvedBindings{};
+                    bool                          allResolved  = true;
+                    bool                          setResolved  = false;
+                    u32                           ssaoSetIndex = 0U;
+
+                    auto ResolveSsaoBinding = [&](const FSsaoBindingSpec& spec) -> void {
+                        u32                       setIndex   = 0U;
+                        u32                       binding    = 0U;
+                        Rhi::ERhiShaderStageFlags visibility = Rhi::ERhiShaderStageFlags::None;
+
+                        const bool                found = spec.bConstantBuffer
+                                           ? RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
+                                  resources.Registry, shaderKeys, FStringView(spec.Name), setIndex,
+                                  binding, visibility)
+                                           : RenderCore::ShaderBinding::ResolveResourceBindingByName(
+                                  resources.Registry, shaderKeys, FStringView(spec.Name), spec.Type,
+                                  setIndex, binding, visibility);
+                        DebugAssert(found, TEXT("BasicDeferredRenderer"),
+                            "Failed to resolve SSAO binding '{}' from shader reflection.",
+                            spec.Name);
+                        if (!found) {
+                            allResolved = false;
+                            return;
+                        }
+
+                        if (!setResolved) {
+                            setResolved  = true;
+                            ssaoSetIndex = setIndex;
+                        } else {
+                            const bool sameSet = (ssaoSetIndex == setIndex);
+                            DebugAssert(sameSet, TEXT("BasicDeferredRenderer"),
+                                "SSAO binding '{}' set mismatch: expected set={}, actual set={}.",
+                                spec.Name, ssaoSetIndex, setIndex);
+                            if (!sameSet) {
+                                allResolved = false;
+                                return;
+                            }
+                        }
+
+                        FSsaoResolvedBinding resolved{};
+                        resolved.Name       = spec.Name;
+                        resolved.Type       = spec.Type;
+                        resolved.Binding    = binding;
+                        resolved.Visibility = visibility;
+                        resolvedBindings.PushBack(resolved);
+                    };
+
+                    for (const auto& spec : kSsaoSpecs) {
+                        ResolveSsaoBinding(spec);
+                    }
+
+                    if (allResolved && setResolved && !resolvedBindings.IsEmpty()) {
+                        layoutDesc.mSetIndex = ssaoSetIndex;
+                        for (const auto& resolved : resolvedBindings) {
+                            Rhi::FRhiBindGroupLayoutEntry entry{};
+                            entry.mBinding    = resolved.Binding;
+                            entry.mType       = resolved.Type;
+                            entry.mVisibility = resolved.Visibility;
+                            layoutDesc.mEntries.PushBack(entry);
+                        }
+
+                        Core::Algorithm::Sort(layoutDesc.mEntries.begin(),
+                            layoutDesc.mEntries.end(), [](const auto& lhs, const auto& rhs) {
+                                if (lhs.mBinding != rhs.mBinding) {
+                                    return lhs.mBinding < rhs.mBinding;
+                                }
+                                return lhs.mType < rhs.mType;
+                            });
+
+                        TVector<Rhi::FRhiBindGroupLayoutEntry> mergedEntries{};
+                        for (const auto& entry : layoutDesc.mEntries) {
+                            if (!mergedEntries.IsEmpty()) {
+                                auto& last = mergedEntries.Back();
+                                if (last.mBinding == entry.mBinding && last.mType == entry.mType) {
+                                    last.mVisibility =
+                                        RenderCore::ShaderBinding::OrShaderStageFlags(
+                                            last.mVisibility, entry.mVisibility);
+                                    continue;
+                                }
+                            }
+                            mergedEntries.PushBack(entry);
+                        }
+                        layoutDesc.mEntries = Move(mergedEntries);
+                        layoutDesc.mLayoutHash =
+                            BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
+
+                        resources.SsaoLayout = device.CreateBindGroupLayout(layoutDesc);
+                        if (resources.SsaoLayout) {
+                            bool builtLookup = RenderCore::ShaderBinding::BuildBindingLookupTable(
+                                resources.Registry, shaderKeys, ssaoSetIndex,
+                                resources.SsaoLayout.Get(), resources.SsaoBindings);
+
+                            if (!builtLookup) {
+                                resources.SsaoBindings.Reset();
+                                resources.SsaoBindings.mSetIndex = ssaoSetIndex;
+                                resources.SsaoBindings.mLayout   = resources.SsaoLayout.Get();
+                                for (const auto& resolved : resolvedBindings) {
+                                    const u32 nameHash = RenderCore::ShaderBinding::HashBindingName(
+                                        FStringView(resolved.Name));
+                                    const u64 key = (static_cast<u64>(nameHash) << 32U)
+                                        | static_cast<u64>(static_cast<u8>(resolved.Type));
+                                    resources.SsaoBindings.mBindingByKey[key] = resolved.Binding;
+                                }
+                                builtLookup = !resources.SsaoBindings.mBindingByKey.IsEmpty();
+                            }
+
+                            DebugAssert(builtLookup, TEXT("BasicDeferredRenderer"),
+                                "Failed to build SSAO binding lookup table from shader reflection.");
+                        }
+                    } else {
+                        DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                            "Failed to build SSAO bind group layout from shader reflection.");
+                    }
                 }
             }
 
@@ -1790,7 +1915,7 @@ namespace AltinaEngine::Rendering {
             }
         }
 
-        auto outputTexture = graph.ImportTexture(outputTarget, Rhi::ERhiResourceState::Present);
+        auto outputTexture = graph.ImportTexture(outputTarget, mViewContext.OutputFinalState);
         RenderCore::FFrameGraphTextureRef sceneColorHDR;
 
         auto*                             device = Rhi::RHIGetDevice();
@@ -1925,9 +2050,10 @@ namespace AltinaEngine::Rendering {
             io.Depth      = sceneDepth;
 
             FPostProcessBuildContext buildCtx{};
-            buildCtx.ViewKey          = mViewContext.ViewKey;
-            buildCtx.BackBuffer       = outputTexture;
-            buildCtx.BackBufferFormat = outputTarget->GetDesc().mFormat;
+            buildCtx.ViewKey              = mViewContext.ViewKey;
+            buildCtx.BackBuffer           = outputTexture;
+            buildCtx.BackBufferFormat     = outputTarget->GetDesc().mFormat;
+            buildCtx.BackBufferFinalState = mViewContext.OutputFinalState;
 
             BuildPostProcess(graph, *view, pp, io, buildCtx);
         }

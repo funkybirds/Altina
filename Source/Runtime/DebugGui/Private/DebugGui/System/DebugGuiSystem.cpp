@@ -89,6 +89,17 @@ namespace AltinaEngine::DebugGui {
                 mPanels.PushBack(Move(e));
             }
 
+            void RegisterBackgroundOverlay(FStringView name, FPanelFn fn) override {
+                if (name.IsEmpty() || !fn) {
+                    return;
+                }
+                FScopedLock lock(mMutex);
+                FPanelEntry e{};
+                e.Name.Assign(name);
+                e.Fn = Move(fn);
+                mBackgroundOverlays.PushBack(Move(e));
+            }
+
             void RegisterOverlay(FStringView name, FPanelFn fn) override {
                 if (name.IsEmpty() || !fn) {
                     return;
@@ -98,6 +109,18 @@ namespace AltinaEngine::DebugGui {
                 e.Name.Assign(name);
                 e.Fn = Move(fn);
                 mOverlays.PushBack(Move(e));
+            }
+
+            void SetImageTexture(u64 imageId, Rhi::FRhiTexture* texture) override {
+                if (imageId == 0ULL) {
+                    return;
+                }
+                FScopedLock lock(mMutex);
+                if (texture == nullptr) {
+                    mImageTextures.Erase(imageId);
+                    return;
+                }
+                mImageTextures[imageId] = texture;
             }
 
             void SetExternalStats(const FDebugGuiExternalStats& stats) noexcept override {
@@ -123,17 +146,29 @@ namespace AltinaEngine::DebugGui {
                 // Toggle via F1.
                 const bool             toggle = input.WasKeyPressed(Input::EKey::F1);
 
-                bool                   enabled = false;
+                bool                   enabled     = false;
+                bool                   showStats   = false;
+                bool                   showConsole = false;
+                bool                   showCVars   = false;
                 FDebugGuiExternalStats ext{};
                 FDebugGuiTheme         theme{};
+                TVector<FPanelEntry>   backgroundOverlays;
+                TVector<FPanelEntry>   panels;
+                TVector<FPanelEntry>   overlays;
                 {
                     FScopedLock lock(mMutex);
                     if (toggle) {
                         mEnabledGameThread = !mEnabledGameThread;
                     }
-                    enabled = mEnabledGameThread;
-                    ext     = mExternalStats;
-                    theme   = mTheme;
+                    enabled            = mEnabledGameThread;
+                    showStats          = mShowStats;
+                    showConsole        = mShowConsole;
+                    showCVars          = mShowCVars;
+                    ext                = mExternalStats;
+                    theme              = mTheme;
+                    backgroundOverlays = mBackgroundOverlays;
+                    panels             = mPanels;
+                    overlays           = mOverlays;
                 }
 
                 mUi.ClearTransient();
@@ -163,37 +198,38 @@ namespace AltinaEngine::DebugGui {
                     mWindowOrder, mWindows, mDraggingWindowKey, mWindowDragOffset);
                 ctx.PushClipRect({ FVector2f(0.0f, 0.0f), displaySize });
 
+                // Background overlays (drawn below windows/panels).
+                for (auto& o : backgroundOverlays) {
+                    if (o.Fn) {
+                        o.Fn(ctx);
+                    }
+                }
+
                 // Built-in panels.
-                if (mShowStats) {
+                if (showStats) {
                     DrawStatsWindow(ctx, dtSeconds, ext);
                 }
-                if (mShowConsole) {
+                if (showConsole) {
                     DrawConsoleWindow(ctx, guiInput);
                 }
-                if (mShowCVars) {
+                if (showCVars) {
                     DrawCVarsWindow(ctx, guiInput);
                 }
 
                 // Custom panels (can use widgets).
-                {
-                    FScopedLock lock(mMutex);
-                    for (auto& p : mPanels) {
-                        if (p.Fn) {
-                            if (ctx.BeginWindow(p.Name.ToView(), nullptr)) {
-                                p.Fn(ctx);
-                                ctx.EndWindow();
-                            }
+                for (auto& p : panels) {
+                    if (p.Fn) {
+                        if (ctx.BeginWindow(p.Name.ToView(), nullptr)) {
+                            p.Fn(ctx);
+                            ctx.EndWindow();
                         }
                     }
                 }
 
                 // Overlays (no window chrome).
-                {
-                    FScopedLock lock(mMutex);
-                    for (auto& o : mOverlays) {
-                        if (o.Fn) {
-                            o.Fn(ctx);
-                        }
+                for (auto& o : overlays) {
+                    if (o.Fn) {
+                        o.Fn(ctx);
                     }
                 }
 
@@ -206,16 +242,19 @@ namespace AltinaEngine::DebugGui {
             }
 
             void RenderRenderThread(Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport) override {
-                FDrawData drawData{};
-                bool      enabled = false;
+                FDrawData                                drawData{};
+                bool                                     enabled = false;
+                FDebugGuiRendererD3D11::FImageTextureMap imageTextures{};
                 {
                     FScopedLock lock(mMutex);
-                    drawData = mRender;
-                    enabled  = mEnabledRenderThread;
+                    drawData      = mRender;
+                    enabled       = mEnabledRenderThread;
+                    imageTextures = mImageTextures;
                 }
                 if (!enabled) {
                     return;
                 }
+                mRenderer.SetExternalTextures(imageTextures);
                 mRenderer.Render(device, viewport, drawData, mFont);
             }
 
@@ -687,32 +726,34 @@ namespace AltinaEngine::DebugGui {
                 mEnabledRenderThread   = enabled;
             }
 
-            mutable FMutex                         mMutex;
-            bool                                   mEnabledGameThread   = true;
-            bool                                   mEnabledRenderThread = true;
-            TVector<FPanelEntry>                   mPanels;
-            TVector<FPanelEntry>                   mOverlays;
-            FDebugGuiExternalStats                 mExternalStats{};
-            FDebugGuiTheme                         mTheme{};
+            mutable FMutex                           mMutex;
+            bool                                     mEnabledGameThread   = true;
+            bool                                     mEnabledRenderThread = true;
+            TVector<FPanelEntry>                     mPanels;
+            TVector<FPanelEntry>                     mBackgroundOverlays;
+            TVector<FPanelEntry>                     mOverlays;
+            FDebugGuiRendererD3D11::FImageTextureMap mImageTextures;
+            FDebugGuiExternalStats                   mExternalStats{};
+            FDebugGuiTheme                           mTheme{};
 
-            FUIState                               mUi{};
-            FFontAtlas                             mFont{};
-            FClipRectStack                         mClip{};
-            FDrawData                              mPending{};
-            FDrawData                              mRender{};
-            FDebugGuiRendererD3D11                 mRenderer{};
-            FDebugGuiFrameStats                    mLastStats{};
+            FUIState                                 mUi{};
+            FFontAtlas                               mFont{};
+            FClipRectStack                           mClip{};
+            FDrawData                                mPending{};
+            FDrawData                                mRender{};
+            FDebugGuiRendererD3D11                   mRenderer{};
+            FDebugGuiFrameStats                      mLastStats{};
 
             // Window order used for deterministic stacking.
-            TVector<FString>                       mWindowOrder;
-            Container::THashMap<u64, FWindowState> mWindows;
-            u64                                    mDraggingWindowKey = 0ULL;
-            FVector2f                              mWindowDragOffset  = FVector2f(0.0f, 0.0f);
+            TVector<FString>                         mWindowOrder;
+            Container::THashMap<u64, FWindowState>   mWindows;
+            u64                                      mDraggingWindowKey = 0ULL;
+            FVector2f                                mWindowDragOffset  = FVector2f(0.0f, 0.0f);
 
             // Console/log capture.
-            static constexpr u32                   kMaxLogLines = 2000U;
-            mutable FMutex                         mLogMutex;
-            TVector<FLogLine>                      mLogLines;
+            static constexpr u32                     kMaxLogLines = 2000U;
+            mutable FMutex                           mLogMutex;
+            TVector<FLogLine>                        mLogLines;
             u32          mLogStart            = 0U; // Oldest entry index in ring buffer.
             u32          mLogCount            = 0U;
             bool         mHasAttachedSink     = false;

@@ -29,9 +29,14 @@ namespace AltinaEngine::DebugGui {
         virtual void DrawTriangleFilled(
             const FVector2f& p0, const FVector2f& p1, const FVector2f& p2, FColor32 color) = 0;
         virtual void DrawText(const FVector2f& pos, FColor32 color, FStringView text)      = 0;
+        virtual void DrawImage(
+            const FRect& rect, u64 imageId, FColor32 tint = MakeColor32(255, 255, 255, 255)) = 0;
 
         [[nodiscard]] virtual auto GetDisplaySize() const noexcept -> FVector2f = 0;
         [[nodiscard]] virtual auto GetMousePos() const noexcept -> FVector2f    = 0;
+        [[nodiscard]] virtual auto IsMouseDown() const noexcept -> bool         = 0;
+        [[nodiscard]] virtual auto WasMousePressed() const noexcept -> bool     = 0;
+        [[nodiscard]] virtual auto WasMouseReleased() const noexcept -> bool    = 0;
 
         // Widgets.
         virtual bool               BeginWindow(FStringView title, bool* open = nullptr) = 0;

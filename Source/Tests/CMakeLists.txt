@@ -251,7 +251,9 @@ if(AE_TEST_EDITOR_SOURCES)
         SOURCES ${AE_TEST_EDITOR_SOURCES}
         LIBS
             AltinaEditor::Core
+            AltinaEditor::UI
             AltinaEngine::Core
+            AltinaEngine::DebugGui
     )
 endif()
 

@@ -14,7 +14,11 @@ namespace AltinaEngine::Launch {
 namespace AltinaEngine::Editor::PlaySession {
     class AE_EDITOR_PLAYSESSION_API FEditorPlaySession final {
     public:
-        void               HandleFrameInput(const Input::FInputSystem* inputSystem);
+        void HandleFrameInput(const Input::FInputSystem* inputSystem, bool allowHotkeys = true);
+        void RequestPlay();
+        void RequestPause();
+        void RequestStep();
+        void RequestStop();
         [[nodiscard]] auto ShouldTickSimulation() const -> bool;
         [[nodiscard]] auto BuildSimulationTick(const Launch::FFrameContext& frameContext) const
             -> Launch::FSimulationTick;

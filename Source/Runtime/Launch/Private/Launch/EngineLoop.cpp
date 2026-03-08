@@ -493,7 +493,7 @@ namespace AltinaEngine::Launch {
             Engine::FRenderScene& scene, const TVector<RenderCore::Render::FDrawList>& drawLists,
             const TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
             Rendering::ERendererType rendererType, const Asset::FAssetRegistry* assetRegistry,
-            Asset::FAssetManager* assetManager) {
+            Asset::FAssetManager* assetManager, Rhi::FRhiTexture* primaryViewOutputOverride) {
             DebugAssert(defaultViewport != nullptr, TEXT("Launch.EngineLoop"),
                 "SendSceneRenderingRequest: default viewport is null.");
             if (scene.Views.IsEmpty()) {
@@ -728,7 +728,9 @@ namespace AltinaEngine::Launch {
                     continue;
                 }
 
-                auto* outputTarget = ResolveViewOutputTarget(view, defaultViewport);
+                auto* outputTarget = (i == 0U && primaryViewOutputOverride != nullptr)
+                    ? primaryViewOutputOverride
+                    : ResolveViewOutputTarget(view, defaultViewport);
                 if (outputTarget == nullptr) {
                     LogWarningCat(TEXT("Launch.EngineLoop"),
                         "SendSceneRenderingRequest: skip view {} because output target is null (targetType={}, viewViewport={}, fallbackViewport={}).",
@@ -758,7 +760,12 @@ namespace AltinaEngine::Launch {
                 viewContext.DrawList = (i < drawLists.Size()) ? &drawLists[i] : nullptr;
                 viewContext.ShadowDrawList =
                     (i < shadowDrawLists.Size()) ? &shadowDrawLists[i] : nullptr;
-                viewContext.OutputTarget      = outputTarget;
+                viewContext.OutputTarget = outputTarget;
+                const auto* swapchainBackBuffer =
+                    (defaultViewport != nullptr) ? defaultViewport->GetBackBuffer() : nullptr;
+                viewContext.OutputFinalState  = (outputTarget == swapchainBackBuffer)
+                     ? Rhi::ERhiResourceState::Present
+                     : Rhi::ERhiResourceState::ShaderResource;
                 viewContext.Lights            = &scene.Lights;
                 viewContext.SkyCubeTexture    = skyCubeTexture;
                 viewContext.bHasSkyCube       = bHasSkyCube;
@@ -1187,29 +1194,33 @@ namespace AltinaEngine::Launch {
     }
 
     void FEngineLoop::Draw(const FRenderTick& tick) {
-        u32  width        = 0U;
-        u32  height       = 0U;
+        u32  windowWidth  = 0U;
+        u32  windowHeight = 0U;
+        u32  renderWidth  = 0U;
+        u32  renderHeight = 0U;
         bool shouldResize = false;
 
         if (mApplication) {
             auto* window = mApplication->GetMainWindow();
             if (window != nullptr) {
                 const auto extent = window->GetSize();
-                width             = extent.mWidth;
-                height            = extent.mHeight;
-                if (width > 0U && height > 0U) {
-                    if (width != mViewportWidth || height != mViewportHeight) {
-                        mViewportWidth  = width;
-                        mViewportHeight = height;
+                windowWidth       = extent.mWidth;
+                windowHeight      = extent.mHeight;
+                if (windowWidth > 0U && windowHeight > 0U) {
+                    if (windowWidth != mViewportWidth || windowHeight != mViewportHeight) {
+                        mViewportWidth  = windowWidth;
+                        mViewportHeight = windowHeight;
                         shouldResize    = true;
                     }
                 }
             }
         }
 
+        renderWidth  = windowWidth;
+        renderHeight = windowHeight;
         if (tick.RenderWidth > 0U && tick.RenderHeight > 0U) {
-            width  = tick.RenderWidth;
-            height = tick.RenderHeight;
+            renderWidth  = tick.RenderWidth;
+            renderHeight = tick.RenderHeight;
         }
 
         const u64 frameIndex = (mHostFrameIndex == 0ULL) ? (mFrameIndex + 1ULL) : mHostFrameIndex;
@@ -1228,12 +1239,13 @@ namespace AltinaEngine::Launch {
         TVector<RenderCore::Render::FDrawList> drawLists;
         TVector<RenderCore::Render::FDrawList> shadowDrawLists;
 
-        if (width > 0U && height > 0U) {
+        if (renderWidth > 0U && renderHeight > 0U) {
             if (auto* world = mEngineRuntime.GetWorldManager().GetActiveWorld()) {
                 Engine::FSceneViewBuildParams viewParams{};
-                viewParams.ViewRect = RenderCore::View::FViewRect{ 0, 0, width, height };
+                viewParams.ViewRect =
+                    RenderCore::View::FViewRect{ 0, 0, renderWidth, renderHeight };
                 viewParams.RenderTargetExtent =
-                    RenderCore::View::FRenderTargetExtent2D{ width, height };
+                    RenderCore::View::FRenderTargetExtent2D{ renderWidth, renderHeight };
                 viewParams.FrameIndex          = frameIndex;
                 viewParams.DeltaTimeSeconds    = mLastDeltaTimeSeconds;
                 viewParams.ViewTarget.Type     = Engine::FSceneView::ETargetType::Viewport;
@@ -1277,7 +1289,7 @@ namespace AltinaEngine::Launch {
                 }
                 DebugAssert(!renderScene.Views.IsEmpty(), TEXT("Launch.EngineLoop"),
                     "Draw: no active scene views generated (width={}, height={}, frame={}).",
-                    static_cast<u32>(width), static_cast<u32>(height),
+                    static_cast<u32>(renderWidth), static_cast<u32>(renderHeight),
                     static_cast<u64>(frameIndex));
             }
         }
@@ -1293,7 +1305,8 @@ namespace AltinaEngine::Launch {
             stats.ViewCount       = static_cast<u32>(renderScene.Views.Size());
             stats.SceneBatchCount = totalBatches;
             mDebugGui->SetExternalStats(stats);
-            mDebugGui->TickGameThread(*mInputSystem.Get(), mLastDeltaTimeSeconds, width, height);
+            mDebugGui->TickGameThread(
+                *mInputSystem.Get(), mLastDeltaTimeSeconds, windowWidth, windowHeight);
         }
         // LogInfo(TEXT("Scene Batches: {} (Views: {})"), totalBatches,
         //     static_cast<u32>(renderScene.Views.Size()));
@@ -1304,10 +1317,12 @@ namespace AltinaEngine::Launch {
         auto* assetManager  = &mAssetManager;
 
         auto  handle = RenderCore::EnqueueRenderTask(Container::FString(TEXT("RenderFrame")),
-             [device, viewport, callback, debugGui, frameIndex, width, height, shouldResize,
-                renderScene = Move(renderScene), drawLists = Move(drawLists),
-                shadowDrawLists = Move(shadowDrawLists), rendererType, assetRegistry,
-                assetManager]() mutable -> void {
+             [this, device, viewport, callback, debugGui, frameIndex, windowWidth, windowHeight,
+                renderWidth, renderHeight, shouldResize,
+                bRedirectPrimaryViewToOffscreen = tick.bRedirectPrimaryViewToOffscreen,
+                primaryViewImageId = tick.PrimaryViewImageId, renderScene = Move(renderScene),
+                drawLists = Move(drawLists), shadowDrawLists = Move(shadowDrawLists), rendererType,
+                assetRegistry, assetManager]() mutable -> void {
                 Assert(static_cast<bool>(device), TEXT("Launch.EngineLoop"),
                      "RenderFrame: RHI device is null at frame {}.", static_cast<u64>(frameIndex));
                 if (!device)
@@ -1318,9 +1333,50 @@ namespace AltinaEngine::Launch {
 
                 DebugAssert(static_cast<bool>(viewport), TEXT("Launch.EngineLoop"),
                      "RenderFrame: viewport is null at frame {}.", static_cast<u64>(frameIndex));
-                if (viewport && width > 0U && height > 0U) {
+                if (viewport && windowWidth > 0U && windowHeight > 0U) {
                     if (shouldResize) {
-                        viewport->Resize(width, height);
+                        viewport->Resize(windowWidth, windowHeight);
+                    }
+
+                    Rhi::FRhiTexture* primaryViewOutputOverride = nullptr;
+                    if (bRedirectPrimaryViewToOffscreen && renderWidth > 0U && renderHeight > 0U) {
+                        Rhi::ERhiFormat targetFormat = Rhi::ERhiFormat::B8G8R8A8Unorm;
+                        if (auto* backBuffer = viewport->GetBackBuffer(); backBuffer != nullptr) {
+                            targetFormat = backBuffer->GetDesc().mFormat;
+                        }
+
+                        auto&      editorOffscreenCache = this->mEditorOffscreenCache;
+                        const bool needRecreate         = !editorOffscreenCache.Texture
+                            || editorOffscreenCache.Width != renderWidth
+                            || editorOffscreenCache.Height != renderHeight
+                            || editorOffscreenCache.Format != targetFormat;
+                        if (needRecreate) {
+                            editorOffscreenCache.Texture.Reset();
+
+                            Rhi::FRhiTextureDesc offscreenDesc{};
+                            offscreenDesc.mDebugName.Assign(TEXT("Editor.PrimaryView.Offscreen"));
+                            offscreenDesc.mDimension   = Rhi::ERhiTextureDimension::Tex2D;
+                            offscreenDesc.mWidth       = renderWidth;
+                            offscreenDesc.mHeight      = renderHeight;
+                            offscreenDesc.mDepth       = 1U;
+                            offscreenDesc.mMipLevels   = 1U;
+                            offscreenDesc.mArrayLayers = 1U;
+                            offscreenDesc.mFormat      = targetFormat;
+                            offscreenDesc.mBindFlags   = Rhi::ERhiTextureBindFlags::RenderTarget
+                                | Rhi::ERhiTextureBindFlags::ShaderResource;
+                            editorOffscreenCache.Texture = device->CreateTexture(offscreenDesc);
+                            editorOffscreenCache.Width   = renderWidth;
+                            editorOffscreenCache.Height  = renderHeight;
+                            editorOffscreenCache.Format  = targetFormat;
+                        }
+
+                        if (editorOffscreenCache.Texture) {
+                            primaryViewOutputOverride = editorOffscreenCache.Texture.Get();
+                        }
+                    }
+
+                    if (debugGui != nullptr && primaryViewImageId != 0ULL) {
+                        debugGui->SetImageTexture(primaryViewImageId, primaryViewOutputOverride);
                     }
 
                     DebugAssert(!renderScene.Views.IsEmpty(), TEXT("Launch.EngineLoop"),
@@ -1329,11 +1385,12 @@ namespace AltinaEngine::Launch {
                     if (!renderScene.Views.IsEmpty()) {
                         LogInfo(TEXT("Sending Rendering Request {}"), frameIndex);
                         SendSceneRenderingRequest(*device, viewport.Get(), renderScene, drawLists,
-                             shadowDrawLists, rendererType, assetRegistry, assetManager);
+                             shadowDrawLists, rendererType, assetRegistry, assetManager,
+                             primaryViewOutputOverride);
                     }
 
                     if (callback) {
-                        callback(*device, *viewport, width, height);
+                        callback(*device, *viewport, windowWidth, windowHeight);
                     }
 
                     if (debugGui) {
@@ -1353,8 +1410,8 @@ namespace AltinaEngine::Launch {
                 } else {
                     DebugAssert(false, TEXT("Launch.EngineLoop"),
                          "RenderFrame: skipped because viewport/extent is invalid (viewport={}, width={}, height={}, frame={}).",
-                         static_cast<int>(viewport ? 1 : 0), static_cast<u32>(width),
-                         static_cast<u32>(height), static_cast<u64>(frameIndex));
+                         static_cast<int>(viewport ? 1 : 0), static_cast<u32>(windowWidth),
+                         static_cast<u32>(windowHeight), static_cast<u64>(frameIndex));
                 }
 
                 device->EndFrame();
@@ -1371,6 +1428,10 @@ namespace AltinaEngine::Launch {
         mIsRunning = false;
 
         FlushRenderFrames();
+        mEditorOffscreenCache.Texture.Reset();
+        mEditorOffscreenCache.Width  = 0U;
+        mEditorOffscreenCache.Height = 0U;
+        mEditorOffscreenCache.Format = Rhi::ERhiFormat::Unknown;
 
         if (mDebugGui) {
             mDebugGui.Reset();

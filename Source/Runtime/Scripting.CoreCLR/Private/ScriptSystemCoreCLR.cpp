@@ -34,10 +34,12 @@
 
 using AltinaEngine::Core::Logging::ELogLevel;
 using AltinaEngine::Core::Logging::FLogger;
+using AltinaEngine::Core::Logging::LogInfoCat;
 
 namespace AltinaEngine::Scripting::CoreCLR {
     namespace {
         constexpr auto             kManagedLogCategory  = TEXT("Scripting.Managed");
+        constexpr auto             kInputTraceCategory  = TEXT("Input.Trace.Space");
         const Input::FInputSystem* gInputSystem         = nullptr;
         FGetWorldTranslationFn     gGetWorldTranslation = nullptr;
         FSetWorldTranslationFn     gSetWorldTranslation = nullptr;
@@ -106,7 +108,15 @@ namespace AltinaEngine::Scripting::CoreCLR {
             if (!gInputSystem) {
                 return false;
             }
-            return gInputSystem->WasKeyPressed(static_cast<Input::EKey>(key));
+            const auto eKey    = static_cast<Input::EKey>(key);
+            const bool pressed = gInputSystem->WasKeyPressed(eKey);
+            if (eKey == Input::EKey::Space && pressed) {
+                LogInfoCat(kInputTraceCategory,
+                    TEXT("ScriptSystemCoreCLR::WasKeyPressed(Space)=true focus={} down={}"),
+                    gInputSystem->HasFocus() ? 1U : 0U,
+                    gInputSystem->IsKeyDown(Input::EKey::Space) ? 1U : 0U);
+            }
+            return pressed;
         }
 
         auto WasKeyReleased(u16 key) -> bool {

@@ -74,6 +74,19 @@ ae_add_test_target(AltinaEngineTestsRenderCore
         AltinaEngine::Rhi::Mock
 )
 
+file(GLOB_RECURSE AE_TEST_GEOMETRY_PROCESSING_SOURCES
+    CONFIGURE_DEPENDS
+    ${AE_TESTS_ROOT}/GeometryProcessing/*.cpp
+)
+
+if(AE_TEST_GEOMETRY_PROCESSING_SOURCES)
+    ae_add_test_target(AltinaEngineTestsGeometryProcessing
+        FOLDER "GeometryProcessing"
+        SOURCES ${AE_TEST_GEOMETRY_PROCESSING_SOURCES}
+        LIBS AltinaEngine::GeometryProcessing
+    )
+endif()
+
 file(GLOB_RECURSE AE_TEST_RHI_MOCK_SOURCES
     CONFIGURE_DEPENDS
     ${AE_TESTS_ROOT}/Rhi/Mock/*.cpp

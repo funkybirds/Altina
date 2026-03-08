@@ -731,6 +731,7 @@ namespace @MANAGED_ASSEMBLY@;
 public sealed class DemoScript : ScriptComponent
 {
     private float _elapsedSeconds;
+    private bool _spaceDownLastFrame;
 
     public override void OnCreate()
     {
@@ -746,10 +747,17 @@ public sealed class DemoScript : ScriptComponent
             ManagedLog.Info($"[DemoScript] Tick mouse=({Input.MouseX},{Input.MouseY})");
         }
 
-        if (Input.WasKeyPressed(EKey.Space))
+        if (!Input.HasFocus)
+        {
+            _spaceDownLastFrame = false;
+        }
+
+        bool spaceDown = Input.IsKeyDown(EKey.Space);
+        if (spaceDown && !_spaceDownLastFrame)
         {
             ManagedLog.Info("[DemoScript] Space pressed (managed).");
         }
+        _spaceDownLastFrame = spaceDown;
     }
 }
 )cs";

@@ -4,11 +4,14 @@
 #include "Input/Keys.h"
 #include "Application/PlatformWindow.h"
 #include "Base/AltinaBase.h"
+#include "Logging/Log.h"
 
 namespace {
     using AltinaEngine::u32;
+    using AltinaEngine::Core::Logging::LogInfoCat;
+    constexpr auto kInputTraceCategory = TEXT("Input.Trace.Space");
 
-    auto TryTranslateKeyCode(u32 KeyCode, AltinaEngine::Input::EKey& OutKey) -> bool {
+    auto           TryTranslateKeyCode(u32 KeyCode, AltinaEngine::Input::EKey& OutKey) -> bool {
 #if AE_PLATFORM_WIN
         constexpr u32 kVkA = 0x41;
         constexpr u32 kVkZ = 0x5A;
@@ -152,6 +155,12 @@ namespace AltinaEngine::Input {
         if (mInputSystem != nullptr) {
             EKey translatedKey = EKey::Unknown;
             if (TryTranslateKeyCode(InKeyCode, translatedKey)) {
+                if (translatedKey == EKey::Space) {
+                    LogInfoCat(kInputTraceCategory,
+                        TEXT(
+                            "InputMessageHandler::OnKeyDown raw=0x{:X} repeat={} translated=Space"),
+                        static_cast<u32>(InKeyCode), InRepeat ? 1U : 0U);
+                }
                 mInputSystem->OnKeyDown(translatedKey, InRepeat);
             }
         }
@@ -161,6 +170,11 @@ namespace AltinaEngine::Input {
         if (mInputSystem != nullptr) {
             EKey translatedKey = EKey::Unknown;
             if (TryTranslateKeyCode(InKeyCode, translatedKey)) {
+                if (translatedKey == EKey::Space) {
+                    LogInfoCat(kInputTraceCategory,
+                        TEXT("InputMessageHandler::OnKeyUp raw=0x{:X} translated=Space"),
+                        static_cast<u32>(InKeyCode));
+                }
                 mInputSystem->OnKeyUp(translatedKey);
             }
         }

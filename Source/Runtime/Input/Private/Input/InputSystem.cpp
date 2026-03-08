@@ -1,6 +1,12 @@
 #include "Input/InputSystem.h"
+#include "Logging/Log.h"
 
 namespace AltinaEngine::Input {
+    namespace {
+        using Core::Logging::LogInfoCat;
+        constexpr auto kInputTraceCategory = TEXT("Input.Trace.Space");
+    } // namespace
+
     void FInputSystem::ClearFrameState() {
         mKeysPressedThisFrame.Clear();
         mKeysReleasedThisFrame.Clear();
@@ -17,7 +23,13 @@ namespace AltinaEngine::Input {
     }
 
     auto FInputSystem::WasKeyPressed(EKey InKey) const noexcept -> bool {
-        return mKeysPressedThisFrame.Count(InKey) != 0U;
+        const bool pressed = mKeysPressedThisFrame.Count(InKey) != 0U;
+        if (InKey == EKey::Space && pressed) {
+            LogInfoCat(kInputTraceCategory,
+                TEXT("InputSystem::WasKeyPressed(Space)=true focus={} down={}"),
+                mHasFocus ? 1U : 0U, IsKeyDown(EKey::Space) ? 1U : 0U);
+        }
+        return pressed;
     }
 
     auto FInputSystem::WasKeyReleased(EKey InKey) const noexcept -> bool {
@@ -87,31 +99,65 @@ namespace AltinaEngine::Input {
         mWindowHeight = InHeight;
     }
 
-    void FInputSystem::OnWindowFocusGained() { mHasFocus = true; }
+    void FInputSystem::OnWindowFocusGained() {
+        mHasFocus = true;
+        // Focus transitions can enqueue stale transient events from the platform queue.
+        // Flush per-frame state to avoid reporting phantom "pressed this frame" edges.
+        ClearFrameState();
+    }
 
     void FInputSystem::OnWindowFocusLost() {
         mHasFocus = false;
+        ClearFrameState();
         mPressedKeys.Clear();
         mPressedMouseButtons.Clear();
     }
 
     void FInputSystem::OnKeyDown(EKey InKey, bool InRepeat) {
+        if (!mHasFocus) {
+            if (InKey == EKey::Space) {
+                LogInfoCat(kInputTraceCategory,
+                    TEXT("InputSystem::OnKeyDown(Space) ignored (no focus) repeat={}"),
+                    InRepeat ? 1U : 0U);
+            }
+            return;
+        }
         // Robustness: some platforms / message pumps may mark the initial keydown as "repeat"
         // depending on focus changes or message ordering. We treat a transition from "not down"
         // to "down" as a press regardless of the repeat flag.
         if (mPressedKeys.Count(InKey) == 0U) {
             (void)InRepeat;
             mKeysPressedThisFrame.Insert(InKey);
+            if (InKey == EKey::Space) {
+                LogInfoCat(kInputTraceCategory,
+                    TEXT("InputSystem::OnKeyDown(Space) inserted PressedThisFrame repeat={}"),
+                    InRepeat ? 1U : 0U);
+            }
         }
         mPressedKeys.Insert(InKey);
     }
 
     void FInputSystem::OnKeyUp(EKey InKey) {
+        if (!mHasFocus) {
+            if (InKey == EKey::Space) {
+                LogInfoCat(
+                    kInputTraceCategory, TEXT("InputSystem::OnKeyUp(Space) ignored (no focus)"));
+            }
+            return;
+        }
         mPressedKeys.Erase(InKey);
         mKeysReleasedThisFrame.Insert(InKey);
+        if (InKey == EKey::Space) {
+            LogInfoCat(kInputTraceCategory, TEXT("InputSystem::OnKeyUp(Space) released"));
+        }
     }
 
-    void FInputSystem::OnCharInput(u32 InCharCode) { mCharInputs.PushBack(InCharCode); }
+    void FInputSystem::OnCharInput(u32 InCharCode) {
+        if (!mHasFocus) {
+            return;
+        }
+        mCharInputs.PushBack(InCharCode);
+    }
 
     void FInputSystem::OnMouseMove(i32 InPositionX, i32 InPositionY) {
         if (mHasMousePosition) {

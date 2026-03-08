@@ -340,7 +340,6 @@ namespace AltinaEngine::Application {
                 }
                 break;
             case WM_KEYDOWN:
-            case WM_SYSKEYDOWN:
             {
                 const bool isRepeat = (InLParam & (1LL << 30)) != 0;
                 const u32  keyCode  = static_cast<u32>(InWParam);
@@ -350,11 +349,32 @@ namespace AltinaEngine::Application {
                 break;
             }
             case WM_KEYUP:
-            case WM_SYSKEYUP:
             {
                 const u32 keyCode = static_cast<u32>(InWParam);
                 dispatchIfAvailable(
                     [keyCode](FAppMessageRouter& router) { router.BroadcastKeyUp(keyCode); });
+                break;
+            }
+            case WM_SYSKEYDOWN:
+            {
+                const bool isRepeat = (InLParam & (1LL << 30)) != 0;
+                const u32  keyCode  = static_cast<u32>(InWParam);
+                // System key messages may include menu accelerators (for example VK_SPACE/F10)
+                // that are not intended as gameplay/script input. Only forward Alt keys.
+                if (keyCode == VK_MENU || keyCode == VK_LMENU || keyCode == VK_RMENU) {
+                    dispatchIfAvailable([keyCode, isRepeat](FAppMessageRouter& router) {
+                        router.BroadcastKeyDown(keyCode, isRepeat);
+                    });
+                }
+                break;
+            }
+            case WM_SYSKEYUP:
+            {
+                const u32 keyCode = static_cast<u32>(InWParam);
+                if (keyCode == VK_MENU || keyCode == VK_LMENU || keyCode == VK_RMENU) {
+                    dispatchIfAvailable(
+                        [keyCode](FAppMessageRouter& router) { router.BroadcastKeyUp(keyCode); });
+                }
                 break;
             }
             case WM_CHAR:

@@ -1,5 +1,12 @@
 # AltinaEngine Guide for Agents
 
+## CRITICAL: CMake No-Hang Rule
+- **Rule**: In this repo, always configure CMake with `CMAKE_SUPPRESS_REGENERATION=ON` before any `cmake --build` call. This avoids a Ninja/CMake regeneration loop that can appear stuck.
+- Use:
+  - `cmake -S . -B out/build/windows-msvc-relwithdebinfo -D CMAKE_SUPPRESS_REGENERATION=ON`
+  - `cmake --build --preset windows-msvc-relwithdebinfo --target <TargetName>`
+- If `CMakeLists.txt` or build presets change, re-run the configure command above, then build again.
+
 Project Altina is a `personal` playground (or toy gaming engine) to validate gaming techniques and programming ideas. Architecture, runtime performance and visual effects are top priorities.
 
 ## Definitions

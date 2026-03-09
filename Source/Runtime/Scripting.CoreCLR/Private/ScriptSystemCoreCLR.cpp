@@ -281,8 +281,7 @@ namespace AltinaEngine::Scripting::CoreCLR {
             Shutdown();
         }
 
-        mInputSystem = inputSystem;
-        gInputSystem = inputSystem;
+        SetInputSystem(inputSystem);
 
         mNativeApi                        = {};
         mNativeApi.LogInfo                = &LogManagedInfo;
@@ -339,9 +338,13 @@ namespace AltinaEngine::Scripting::CoreCLR {
 
         ClearManagedApi();
         mRuntime.Shutdown();
-        gInputSystem = nullptr;
-        mInputSystem = nullptr;
+        SetInputSystem(nullptr);
         mInitialized = false;
+    }
+
+    void FScriptSystem::SetInputSystem(const Input::FInputSystem* inputSystem) noexcept {
+        mInputSystem = inputSystem;
+        gInputSystem = inputSystem;
     }
 
     auto FScriptSystem::GetManagedApi() const noexcept -> const FManagedApi* {

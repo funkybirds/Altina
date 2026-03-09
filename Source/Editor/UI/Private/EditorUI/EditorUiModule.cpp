@@ -153,7 +153,8 @@ namespace AltinaEngine::Editor::UI {
             }
         };
 
-        const bool  blockWorkspaceInput = (mOpenMenu >= 0 && mOpenMenu < 3);
+        const bool blockWorkspaceInput    = (mOpenMenu >= 0 && mOpenMenu < 3);
+        mViewportRequest.bUiBlockingInput = blockWorkspaceInput;
 
         const FRect workspaceRect = MakeRect(kWorkspacePad, menuRect.Max.Y() + kWorkspacePad,
             display.X() - kWorkspacePad, display.Y() - kWorkspacePad);
@@ -348,6 +349,8 @@ namespace AltinaEngine::Editor::UI {
                     Clamp(contentRect.Max.X() - contentRect.Min.X(), 0.0f, 8192.0f));
                 mViewportRequest.Height = static_cast<u32>(
                     Clamp(contentRect.Max.Y() - contentRect.Min.Y(), 0.0f, 8192.0f));
+                mViewportRequest.ContentMinX = static_cast<i32>(contentRect.Min.X());
+                mViewportRequest.ContentMinY = static_cast<i32>(contentRect.Min.Y());
                 mViewportRequest.bHasContent =
                     (mViewportRequest.Width > 0U && mViewportRequest.Height > 0U);
                 mViewportRequest.bHovered = IsInside(contentRect, mouse);

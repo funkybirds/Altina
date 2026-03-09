@@ -334,6 +334,7 @@ namespace AltinaEngine::DebugGui::Private {
         [[nodiscard]] bool SliderFloat(
             FStringView label, f32& value, f32 minValue, f32 maxValue) override;
         [[nodiscard]] bool InputText(FStringView label, Container::FString& value) override;
+        [[nodiscard]] bool Gizmo(FStringView label, FVector2f& value) override;
 
     private:
         void AdvanceLine() {

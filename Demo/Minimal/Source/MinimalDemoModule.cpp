@@ -244,11 +244,13 @@ namespace {
         }
 
         auto OnTick(Launch::FEngineLoop& engineLoop, float deltaSeconds) -> bool override {
-            // Mouse look: hold RMB and move the mouse to rotate the camera.
-            // NOTE: We apply last frame's mouse delta before EngineLoop::Tick clears input state,
-            // so the updated camera takes effect in the current frame.
+            // Camera controls:
+            // - RMB + mouse delta: look around.
+            // - WASD + QE: translate camera in local space (+ world up/down for QE).
+            // NOTE: We apply input before EngineLoop::Tick clears platform frame state.
             if (const auto* input = engineLoop.GetInputSystem();
                 input != nullptr && input->HasFocus()) {
+                UpdateCameraKeyboardMove(engineLoop, *input, deltaSeconds);
                 constexpr u32 kRmb = 1U;
                 if (input->IsMouseButtonDown(kRmb)) {
                     UpdateCameraMouseLook(engineLoop, *input);
@@ -292,6 +294,64 @@ namespace {
             transform.Rotation =
                 Core::Math::FEulerRotator(mCameraPitchRadians, mCameraYawRadians, 0.0f)
                     .ToQuaternion();
+            obj.SetWorldTransform(transform);
+        }
+
+        void UpdateCameraKeyboardMove(Launch::FEngineLoop& engineLoop,
+            const Input::FInputSystem& input, f32 deltaSeconds) noexcept {
+            auto& worldManager = engineLoop.GetWorldManager();
+            auto* world        = worldManager.GetWorld(mWorldHandle);
+            if (world == nullptr || !world->IsAlive(mCameraObjectId)) {
+                return;
+            }
+
+            f32 moveForward = 0.0f;
+            f32 moveRight   = 0.0f;
+            f32 moveUp      = 0.0f;
+            if (input.IsKeyDown(Input::EKey::W)) {
+                moveForward += 1.0f;
+            }
+            if (input.IsKeyDown(Input::EKey::S)) {
+                moveForward -= 1.0f;
+            }
+            if (input.IsKeyDown(Input::EKey::D)) {
+                moveRight += 1.0f;
+            }
+            if (input.IsKeyDown(Input::EKey::A)) {
+                moveRight -= 1.0f;
+            }
+            if (input.IsKeyDown(Input::EKey::E)) {
+                moveUp += 1.0f;
+            }
+            if (input.IsKeyDown(Input::EKey::Q)) {
+                moveUp -= 1.0f;
+            }
+
+            if (moveForward == 0.0f && moveRight == 0.0f && moveUp == 0.0f) {
+                return;
+            }
+
+            auto       obj       = world->Object(mCameraObjectId);
+            auto       transform = obj.GetWorldTransform();
+
+            const auto forward =
+                transform.Rotation.RotateVector(Core::Math::FVector3f(0.0f, 0.0f, 1.0f));
+            const auto right =
+                transform.Rotation.RotateVector(Core::Math::FVector3f(1.0f, 0.0f, 0.0f));
+            const auto up = Core::Math::FVector3f(0.0f, 1.0f, 0.0f);
+
+            auto       moveDir = forward * Core::Math::FVector3f(moveForward)
+                + right * Core::Math::FVector3f(moveRight) + up * Core::Math::FVector3f(moveUp);
+            const f32 len2 =
+                moveDir[0] * moveDir[0] + moveDir[1] * moveDir[1] + moveDir[2] * moveDir[2];
+            if (len2 > 1e-8f) {
+                const f32 invLen = 1.0f / Core::Math::Sqrt(len2);
+                moveDir          = Core::Math::FVector3f(
+                    moveDir[0] * invLen, moveDir[1] * invLen, moveDir[2] * invLen);
+            }
+
+            constexpr f32 kMoveSpeed = 140.0f;
+            transform.Translation += moveDir * Core::Math::FVector3f(kMoveSpeed * deltaSeconds);
             obj.SetWorldTransform(transform);
         }
 

@@ -50,5 +50,6 @@ namespace AltinaEngine::DebugGui {
         [[nodiscard]] virtual bool SliderFloat(
             FStringView label, f32& value, f32 minValue, f32 maxValue)                     = 0;
         [[nodiscard]] virtual bool InputText(FStringView label, Container::FString& value) = 0;
+        [[nodiscard]] virtual bool Gizmo(FStringView label, FVector2f& value)              = 0;
     };
 } // namespace AltinaEngine::DebugGui

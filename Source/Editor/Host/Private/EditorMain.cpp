@@ -5,6 +5,7 @@
 #include "EditorUI/EditorUiModule.h"
 #include "EditorViewport/EditorViewportBootstrap.h"
 #include "Launch/DemoRuntime.h"
+#include "Launch/EngineLoop.h"
 #include "Launch/HostApplicationLoop.h"
 #include "Launch/RuntimeSession.h"
 #include "Utility/EngineConfig/EngineConfig.h"
@@ -13,6 +14,177 @@
 using namespace AltinaEngine;
 
 namespace {
+    class FEditorRuntimeInputRouter final {
+    public:
+        void Route(const Input::FInputSystem*         source,
+            const Editor::UI::FEditorViewportRequest& viewportRequest, bool allowRuntimeInput) {
+            mRoutedInput.ClearFrameState();
+
+            if (source == nullptr) {
+                SetRuntimeFocus(false);
+                return;
+            }
+
+            const u32 targetWidth  = (viewportRequest.bHasContent && viewportRequest.Width > 0U)
+                 ? viewportRequest.Width
+                 : source->GetWindowWidth();
+            const u32 targetHeight = (viewportRequest.bHasContent && viewportRequest.Height > 0U)
+                ? viewportRequest.Height
+                : source->GetWindowHeight();
+            mRoutedInput.OnWindowResized(targetWidth, targetHeight);
+
+            const bool hasViewportRect = viewportRequest.bHasContent && viewportRequest.Width > 0U
+                && viewportRequest.Height > 0U;
+            const i32 rawMouseX = source->GetMouseX();
+            const i32 rawMouseY = source->GetMouseY();
+
+            bool      mouseInsideViewport = false;
+            if (hasViewportRect) {
+                const i32 viewportMaxX =
+                    viewportRequest.ContentMinX + static_cast<i32>(viewportRequest.Width);
+                const i32 viewportMaxY =
+                    viewportRequest.ContentMinY + static_cast<i32>(viewportRequest.Height);
+                mouseInsideViewport = rawMouseX >= viewportRequest.ContentMinX
+                    && rawMouseX < viewportMaxX && rawMouseY >= viewportRequest.ContentMinY
+                    && rawMouseY < viewportMaxY;
+            }
+
+            const bool viewportInteractive =
+                hasViewportRect && (viewportRequest.bFocused || mouseInsideViewport);
+            const bool allowKeyboard =
+                allowRuntimeInput && hasViewportRect && !viewportRequest.bUiBlockingInput;
+            const bool allowMouse = allowRuntimeInput && viewportInteractive
+                && !viewportRequest.bUiBlockingInput && mouseInsideViewport;
+            const bool runtimeFocus =
+                allowRuntimeInput && hasViewportRect && !viewportRequest.bUiBlockingInput;
+            SetRuntimeFocus(runtimeFocus);
+
+            if (!runtimeFocus) {
+                return;
+            }
+
+            if (allowKeyboard) {
+                SyncKeyboard(*source);
+            } else {
+                ReleaseAllKeys();
+            }
+
+            if (allowMouse) {
+                i32 mappedX = rawMouseX;
+                i32 mappedY = rawMouseY;
+                if (hasViewportRect) {
+                    mappedX = MapToRuntimeAxis(
+                        rawMouseX, viewportRequest.ContentMinX, viewportRequest.Width, targetWidth);
+                    mappedY = MapToRuntimeAxis(rawMouseY, viewportRequest.ContentMinY,
+                        viewportRequest.Height, targetHeight);
+                }
+                mRoutedInput.OnMouseMove(mappedX, mappedY);
+                SyncMouse(*source);
+                const f32 wheelDelta = source->GetMouseWheelDelta();
+                if (wheelDelta != 0.0f) {
+                    mRoutedInput.OnMouseWheel(wheelDelta);
+                }
+            } else {
+                ReleaseAllMouseButtons();
+            }
+        }
+
+        [[nodiscard]] auto GetRoutedInput() noexcept -> Input::FInputSystem* {
+            return &mRoutedInput;
+        }
+
+    private:
+        [[nodiscard]] static auto MapToRuntimeAxis(
+            i32 raw, i32 min, u32 sourceExtent, u32 targetExtent) -> i32 {
+            if (sourceExtent == 0U || targetExtent == 0U) {
+                return 0;
+            }
+
+            const i32 local        = raw - min;
+            i32       clampedLocal = local;
+            if (clampedLocal < 0) {
+                clampedLocal = 0;
+            }
+            const i32 maxLocal = static_cast<i32>(sourceExtent) - 1;
+            if (clampedLocal > maxLocal) {
+                clampedLocal = maxLocal;
+            }
+
+            i64 scaled = static_cast<i64>(clampedLocal) * static_cast<i64>(targetExtent);
+            scaled /= static_cast<i64>(sourceExtent);
+            if (scaled < 0LL) {
+                scaled = 0LL;
+            }
+            const i64 maxTarget = static_cast<i64>(targetExtent) - 1LL;
+            if (scaled > maxTarget) {
+                scaled = maxTarget;
+            }
+            return static_cast<i32>(scaled);
+        }
+
+        void SetRuntimeFocus(bool focused) {
+            if (mHasRuntimeFocus == focused) {
+                return;
+            }
+            mHasRuntimeFocus = focused;
+            if (mHasRuntimeFocus) {
+                mRoutedInput.OnWindowFocusGained();
+            } else {
+                mRoutedInput.OnWindowFocusLost();
+            }
+        }
+
+        void SyncKeyboard(const Input::FInputSystem& source) {
+            for (auto key : source.GetKeysReleasedThisFrame()) {
+                mRoutedInput.OnKeyUp(key);
+            }
+            for (auto key : source.GetKeysPressedThisFrame()) {
+                mRoutedInput.OnKeyDown(key, false);
+            }
+            for (auto key : source.GetPressedKeys()) {
+                mRoutedInput.OnKeyDown(key, true);
+            }
+            for (auto ch : source.GetCharInputs()) {
+                mRoutedInput.OnCharInput(ch);
+            }
+        }
+
+        void SyncMouse(const Input::FInputSystem& source) {
+            for (auto button : source.GetMouseButtonsReleasedThisFrame()) {
+                mRoutedInput.OnMouseButtonUp(button);
+            }
+            for (auto button : source.GetMouseButtonsPressedThisFrame()) {
+                mRoutedInput.OnMouseButtonDown(button);
+            }
+            for (auto button : source.GetPressedMouseButtons()) {
+                mRoutedInput.OnMouseButtonDown(button);
+            }
+        }
+
+        void ReleaseAllKeys() {
+            Core::Container::TVector<Input::EKey> keysToRelease;
+            for (auto key : mRoutedInput.GetPressedKeys()) {
+                keysToRelease.PushBack(key);
+            }
+            for (auto key : keysToRelease) {
+                mRoutedInput.OnKeyUp(key);
+            }
+        }
+
+        void ReleaseAllMouseButtons() {
+            Core::Container::TVector<u32> buttonsToRelease;
+            for (auto button : mRoutedInput.GetPressedMouseButtons()) {
+                buttonsToRelease.PushBack(button);
+            }
+            for (auto button : buttonsToRelease) {
+                mRoutedInput.OnMouseButtonUp(button);
+            }
+        }
+
+        Input::FInputSystem mRoutedInput{};
+        bool                mHasRuntimeFocus = false;
+    };
+
     class FEditorHostHooks final : public Launch::IRuntimeHostHooks {
     public:
         auto OnInit(Launch::IRuntimeSession& session) -> bool override {
@@ -31,8 +203,9 @@ namespace {
         auto OnHostFrame(Launch::IRuntimeSession& session,
             const Launch::FFrameContext&          frameContext) -> bool override {
             (void)frameContext;
-            auto       services = session.GetServices();
-            const auto commands = UiModule.ConsumeUiCommands();
+            auto        services      = session.GetServices();
+            const auto* platformInput = ResolvePlatformInput(session, services.InputSystem);
+            const auto  commands      = UiModule.ConsumeUiCommands();
             for (auto cmd : commands) {
                 switch (cmd) {
                     case Editor::UI::EEditorUiCommand::Play:
@@ -57,15 +230,16 @@ namespace {
 
             const bool allowHotkeys = (services.DebugGuiSystem == nullptr)
                 || !services.DebugGuiSystem->WantsCaptureKeyboard();
-            PlaySession.HandleFrameInput(services.InputSystem, allowHotkeys);
+            PlaySession.HandleFrameInput(platformInput, allowHotkeys);
+            UpdateRuntimeInputRouting(session, platformInput, services.DebugGuiSystem);
             return !bExitRequested
                 && PlaySession.GetState() != Launch::EEditorRuntimeState::Stopped;
         }
 
         auto ShouldTickSimulation(Launch::IRuntimeSession& session,
             const Launch::FFrameContext&                   frameContext) -> bool override {
-            (void)session;
             (void)frameContext;
+            (void)session;
             return PlaySession.ShouldTickSimulation();
         }
 
@@ -101,7 +275,9 @@ namespace {
         }
 
         void OnShutdown(Launch::IRuntimeSession& session) override {
-            (void)session;
+            if (auto* engineLoop = dynamic_cast<Launch::FEngineLoop*>(&session)) {
+                engineLoop->SetRuntimeInputOverride(nullptr);
+            }
             PlaySession.Shutdown();
             CoreModule.Shutdown(EditorContext);
         }
@@ -114,11 +290,38 @@ namespace {
         }
 
     private:
+        [[nodiscard]] static auto ResolvePlatformInput(Launch::IRuntimeSession& session,
+            const Input::FInputSystem* fallback) -> const Input::FInputSystem* {
+            if (auto* engineLoop = dynamic_cast<Launch::FEngineLoop*>(&session)) {
+                return engineLoop->GetPlatformInputSystem();
+            }
+            return fallback;
+        }
+
+        void UpdateRuntimeInputRouting(Launch::IRuntimeSession& session,
+            const Input::FInputSystem* platformInput, DebugGui::IDebugGuiSystem* debugGuiSystem) {
+            auto* engineLoop = dynamic_cast<Launch::FEngineLoop*>(&session);
+            if (engineLoop == nullptr) {
+                return;
+            }
+
+            if (platformInput == nullptr) {
+                engineLoop->SetRuntimeInputOverride(nullptr);
+                return;
+            }
+
+            const bool allowRuntimeInput = PlaySession.ShouldTickSimulation();
+            (void)debugGuiSystem;
+            InputRouter.Route(platformInput, UiModule.GetViewportRequest(), allowRuntimeInput);
+            engineLoop->SetRuntimeInputOverride(InputRouter.GetRoutedInput());
+        }
+
         Editor::Core::FEditorCoreModule            CoreModule{};
         Editor::Core::FEditorContext               EditorContext{};
         Editor::Viewport::FEditorViewportBootstrap ViewportBootstrap{};
         Editor::PlaySession::FEditorPlaySession    PlaySession{};
         Editor::UI::FEditorUiModule                UiModule{};
+        FEditorRuntimeInputRouter                  InputRouter{};
         bool                                       bExitRequested = false;
     };
 } // namespace

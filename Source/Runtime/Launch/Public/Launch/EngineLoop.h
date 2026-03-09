@@ -86,8 +86,11 @@ namespace AltinaEngine::Launch {
         void               Tick(float InDeltaTime);
         void               Exit() { Shutdown(); }
         void               SetRenderCallback(FRenderCallback callback);
+        void               SetRuntimeInputOverride(Input::FInputSystem* inputSystem) noexcept;
         [[nodiscard]] auto GetInputSystem() noexcept -> Input::FInputSystem*;
         [[nodiscard]] auto GetInputSystem() const noexcept -> const Input::FInputSystem*;
+        [[nodiscard]] auto GetPlatformInputSystem() noexcept -> Input::FInputSystem*;
+        [[nodiscard]] auto GetPlatformInputSystem() const noexcept -> const Input::FInputSystem*;
         [[nodiscard]] auto GetMainWindow() noexcept -> Application::FPlatformWindow*;
         [[nodiscard]] auto GetWorldManager() noexcept -> GameScene::FWorldManager&;
         [[nodiscard]] auto GetWorldManager() const noexcept -> const GameScene::FWorldManager&;
@@ -272,6 +275,7 @@ namespace AltinaEngine::Launch {
         void                                EnforceRenderLag(u32 maxLagFrames);
 
         TOwner<Input::FInputSystem>         mInputSystem;
+        Input::FInputSystem*                mRuntimeInputOverride = nullptr;
         TOwner<Input::FInputMessageHandler> mAppMessageHandler;
         TOwner<Application::FApplication, TPolymorphicDeleter<Application::FApplication>>
             mApplication;

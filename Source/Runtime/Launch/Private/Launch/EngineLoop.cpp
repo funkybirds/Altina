@@ -922,6 +922,11 @@ namespace AltinaEngine::Launch {
             LogError(TEXT("FEngineLoop PreInit failed: application did not start."));
             return false;
         }
+        if (mInputSystem) {
+            // Some startup paths may miss the initial WM_SETFOCUS message.
+            // Prime keyboard focus so key events are not filtered out before first focus callback.
+            mInputSystem->OnWindowFocusGained();
+        }
 
         mIsRunning = true;
         return true;
@@ -1383,7 +1388,7 @@ namespace AltinaEngine::Launch {
                          "RenderFrame: scene view list is empty at frame {}.",
                          static_cast<u64>(frameIndex));
                     if (!renderScene.Views.IsEmpty()) {
-                        LogInfo(TEXT("Sending Rendering Request {}"), frameIndex);
+                        // LogInfo(TEXT("Sending Rendering Request {}"), frameIndex);
                         SendSceneRenderingRequest(*device, viewport.Get(), renderScene, drawLists,
                              shadowDrawLists, rendererType, assetRegistry, assetManager,
                              primaryViewOutputOverride);
@@ -1416,7 +1421,7 @@ namespace AltinaEngine::Launch {
 
                 device->EndFrame();
 
-                LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
+                // LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
             });
         if (handle.IsValid()) {
             mPendingRenderFrames.Push(handle);
@@ -1513,6 +1518,7 @@ namespace AltinaEngine::Launch {
         if (mInputSystem) {
             mInputSystem.Reset();
         }
+        mRuntimeInputOverride = nullptr;
     }
 
     void FEngineLoop::SetRenderCallback(FRenderCallback callback) {
@@ -1520,9 +1526,22 @@ namespace AltinaEngine::Launch {
         mRenderCallback = Move(callback);
     }
 
+    void FEngineLoop::SetRuntimeInputOverride(Input::FInputSystem* inputSystem) noexcept {
+        mRuntimeInputOverride = inputSystem;
+#if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
+        if (mScriptSystem) {
+            const auto* runtimeInput =
+                (mRuntimeInputOverride != nullptr) ? mRuntimeInputOverride : mInputSystem.Get();
+            mScriptSystem->SetInputSystem(runtimeInput);
+        }
+#endif
+    }
+
     auto FEngineLoop::GetServices() noexcept -> FRuntimeServices {
+        auto* runtimeInput =
+            (mRuntimeInputOverride != nullptr) ? mRuntimeInputOverride : mInputSystem.Get();
         FRuntimeServices services{};
-        services.InputSystem    = mInputSystem.Get();
+        services.InputSystem    = runtimeInput;
         services.MainWindow     = mApplication ? mApplication->GetMainWindow() : nullptr;
         services.WorldManager   = &mEngineRuntime.GetWorldManager();
         services.AssetRegistry  = &mAssetRegistry;
@@ -1532,8 +1551,10 @@ namespace AltinaEngine::Launch {
     }
 
     auto FEngineLoop::GetServices() const noexcept -> FRuntimeServicesConst {
+        const auto* runtimeInput =
+            (mRuntimeInputOverride != nullptr) ? mRuntimeInputOverride : mInputSystem.Get();
         FRuntimeServicesConst services{};
-        services.InputSystem    = mInputSystem.Get();
+        services.InputSystem    = runtimeInput;
         services.MainWindow     = mApplication ? mApplication->GetMainWindow() : nullptr;
         services.WorldManager   = &mEngineRuntime.GetWorldManager();
         services.AssetRegistry  = &mAssetRegistry;
@@ -1543,10 +1564,18 @@ namespace AltinaEngine::Launch {
     }
 
     auto FEngineLoop::GetInputSystem() noexcept -> Input::FInputSystem* {
-        return mInputSystem.Get();
+        return (mRuntimeInputOverride != nullptr) ? mRuntimeInputOverride : mInputSystem.Get();
     }
 
     auto FEngineLoop::GetInputSystem() const noexcept -> const Input::FInputSystem* {
+        return (mRuntimeInputOverride != nullptr) ? mRuntimeInputOverride : mInputSystem.Get();
+    }
+
+    auto FEngineLoop::GetPlatformInputSystem() noexcept -> Input::FInputSystem* {
+        return mInputSystem.Get();
+    }
+
+    auto FEngineLoop::GetPlatformInputSystem() const noexcept -> const Input::FInputSystem* {
         return mInputSystem.Get();
     }
 

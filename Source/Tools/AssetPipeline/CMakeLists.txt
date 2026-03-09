@@ -7,22 +7,9 @@ set(AssimpBuildDir "${CMAKE_BINARY_DIR}/assimp-build")
 file(MAKE_DIRECTORY "${AssimpBuildDir}/include")
 
 if(MSVC)
-    if(MSVC_TOOLSET_VERSION)
-        # Keep in sync with Assimp naming: assimp-vc${MSVC_TOOLSET_VERSION}-mt.lib.
-        set(_assimp_msvc_prefix "vc${MSVC_TOOLSET_VERSION}")
-    elseif(MSVC_VERSION LESS 1910)
-        set(_assimp_msvc_prefix "vc140")
-    elseif(MSVC_VERSION LESS 1920)
-        set(_assimp_msvc_prefix "vc141")
-    elseif(MSVC_VERSION LESS 1930)
-        set(_assimp_msvc_prefix "vc142")
-    elseif(MSVC_VERSION LESS 1950)
-        set(_assimp_msvc_prefix "vc143")
-    else()
-        # VS 2026 / MSVC v19.50+ emits Assimp artifacts with vc145 suffix.
-        set(_assimp_msvc_prefix "vc145")
-    endif()
-    set(_assimp_libname "assimp-${_assimp_msvc_prefix}-mt.lib")
+    # Assimp's suffix policy can lag behind the host toolset (for example VS 2026 may still
+    # emit "assimp-vc143-mt.lib"). Resolve the actual output after assimp_ext is built.
+    set(_assimp_libname "assimp-selected-mt.lib")
 else()
     set(_assimp_libname "${CMAKE_STATIC_LIBRARY_PREFIX}assimp${CMAKE_STATIC_LIBRARY_SUFFIX}")
 endif()
@@ -31,6 +18,10 @@ set(_assimp_libdir "${AssimpBuildDir}/lib")
 set(_assimp_byproduct "${_assimp_libdir}/${_assimp_libname}")
 set(_assimp_zlib_libdir "${AssimpBuildDir}/contrib/zlib")
 set(_assimp_zlib_byproduct "${_assimp_zlib_libdir}/zlibstatic${CMAKE_STATIC_LIBRARY_SUFFIX}")
+set(_assimp_external_byproducts "${_assimp_zlib_byproduct}")
+if(NOT MSVC)
+    list(APPEND _assimp_external_byproducts "${_assimp_byproduct}")
+endif()
 
 set(_assimp_cmake_args
     # Bump this value to force the ExternalProject configure step to re-run when assimp fork
@@ -71,9 +62,7 @@ ExternalProject_Add(assimp_ext
     SOURCE_DIR "${AssimpSourceDir}"
     BINARY_DIR "${AssimpBuildDir}"
     CMAKE_ARGS ${_assimp_cmake_args}
-    BUILD_BYPRODUCTS
-        "${_assimp_byproduct}"
-        "${_assimp_zlib_byproduct}"
+    BUILD_BYPRODUCTS ${_assimp_external_byproducts}
     INSTALL_COMMAND ""
 )
 
@@ -84,6 +73,23 @@ add_dependencies(assimp::assimp assimp_ext)
 
 add_library(zlib::zlibstatic STATIC IMPORTED GLOBAL)
 add_dependencies(zlib::zlibstatic assimp_ext)
+
+if(MSVC)
+    set(_assimp_resolve_script "${CMAKE_CURRENT_SOURCE_DIR}/CMake/ResolveAssimpLibrary.cmake")
+    add_custom_command(
+        OUTPUT "${_assimp_byproduct}"
+        COMMAND ${CMAKE_COMMAND}
+            -DASSIMP_LIB_DIR:PATH=${_assimp_libdir}
+            -DASSIMP_SELECTED_LIB:FILEPATH=${_assimp_byproduct}
+            -P "${_assimp_resolve_script}"
+        DEPENDS assimp_ext
+        COMMENT "Resolving assimp static library output name"
+        VERBATIM
+    )
+    add_custom_target(assimp_resolved_lib DEPENDS "${_assimp_byproduct}")
+    add_dependencies(assimp_resolved_lib assimp_ext)
+    add_dependencies(assimp::assimp assimp_resolved_lib)
+endif()
 
 set_target_properties(assimp::assimp PROPERTIES
     IMPORTED_LOCATION "${_assimp_byproduct}"

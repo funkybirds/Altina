@@ -33,6 +33,14 @@ namespace AltinaEngine::DebugGui {
         FColor32  InputActiveBorder = MakeColor32(255, 255, 255, 160);
         FColor32  InputText         = MakeColor32(220, 220, 220, 255);
 
+        FColor32  GizmoBg         = MakeColor32(20, 22, 26, 255);
+        FColor32  GizmoBorder     = MakeColor32(255, 255, 255, 110);
+        FColor32  GizmoAxisX      = MakeColor32(220, 80, 80, 255);
+        FColor32  GizmoAxisY      = MakeColor32(100, 210, 120, 255);
+        FColor32  GizmoAxisXY     = MakeColor32(120, 160, 220, 255);
+        FColor32  GizmoAxisHover  = MakeColor32(245, 245, 245, 255);
+        FColor32  GizmoAxisActive = MakeColor32(255, 210, 120, 255);
+
         FColor32  ScrollBarTrackBg       = MakeColor32(10, 10, 10, 90);
         FColor32  ScrollBarTrackBorder   = MakeColor32(255, 255, 255, 60);
         FColor32  ScrollBarThumbBg       = MakeColor32(110, 110, 110, 180);
@@ -74,6 +82,14 @@ namespace AltinaEngine::DebugGui {
         f32       InputTextOffsetX    = 6.0f;
         f32       InputTextOffsetY    = 4.0f;
         f32       InputBottomSpacingY = 6.0f;
+
+        f32       GizmoSize            = 96.0f;
+        f32       GizmoPadding         = 10.0f;
+        f32       GizmoAxisThickness   = 2.0f;
+        f32       GizmoHitRadius       = 6.0f;
+        f32       GizmoCenterHalfSize  = 7.0f;
+        f32       GizmoBottomSpacingY  = 6.0f;
+        f32       GizmoDragSensitivity = 1.0f;
 
         f32       ScrollBarWidth          = 10.0f;
         f32       ScrollBarPadding        = 2.0f;

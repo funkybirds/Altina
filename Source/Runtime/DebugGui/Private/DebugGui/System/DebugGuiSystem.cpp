@@ -187,6 +187,8 @@ namespace AltinaEngine::DebugGui {
                 guiInput.Input    = &input;
                 guiInput.MousePos = FVector2f(
                     static_cast<f32>(input.GetMouseX()), static_cast<f32>(input.GetMouseY()));
+                guiInput.MouseDeltaX          = input.GetMouseDeltaX();
+                guiInput.MouseDeltaY          = input.GetMouseDeltaY();
                 guiInput.bMouseDown           = input.IsMouseButtonDown(0U);
                 guiInput.bMousePressed        = input.WasMouseButtonPressed(0U);
                 guiInput.bMouseReleased       = input.WasMouseButtonReleased(0U);

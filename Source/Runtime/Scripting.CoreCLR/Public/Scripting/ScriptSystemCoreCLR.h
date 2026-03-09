@@ -52,6 +52,7 @@ namespace AltinaEngine::Scripting::CoreCLR {
             const FManagedRuntimeConfig& managedConfig, const Input::FInputSystem* inputSystem)
             -> bool;
         void               Shutdown();
+        void               SetInputSystem(const Input::FInputSystem* inputSystem) noexcept;
 
         [[nodiscard]] auto IsInitialized() const noexcept -> bool { return mInitialized; }
         [[nodiscard]] auto GetManagedApi() const noexcept -> const FManagedApi*;

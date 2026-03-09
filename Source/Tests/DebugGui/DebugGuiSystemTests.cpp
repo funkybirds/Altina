@@ -241,6 +241,58 @@ TEST_CASE("DebugGui widgets: Button/Checkbox/Slider/InputText basic interactions
     DestroyDebugGuiSystem(sys);
 }
 
+TEST_CASE("DebugGui widget: Gizmo drag updates value") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    FVector2f gizmoValue(0.0f, 0.0f);
+    sys->RegisterPanel(
+        TEXT("GizmoTest"), [&](IDebugGui& gui) { (void)gui.Gizmo(TEXT("Move2D"), gizmoValue); });
+
+    AltinaEngine::Input::FInputSystem input;
+    constexpr AltinaEngine::u32       kW      = 1280U;
+    constexpr AltinaEngine::u32       kH      = 720U;
+    constexpr AltinaEngine::i32       kGlyphH = 11; // FFontAtlas::kDrawGlyphH (private).
+
+    const auto                        theme    = sys->GetTheme();
+    const AltinaEngine::i32           contentX = 10 + 8;
+    const AltinaEngine::i32           contentY = 10 + 18 + 8;
+    const AltinaEngine::i32           gizmoTopY =
+        contentY + kGlyphH + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+
+    const AltinaEngine::i32 centerX =
+        contentX + static_cast<AltinaEngine::i32>(theme.GizmoSize * 0.5f);
+    const AltinaEngine::i32 centerY =
+        gizmoTopY + static_cast<AltinaEngine::i32>(theme.GizmoSize * 0.5f);
+    const AltinaEngine::i32 pressX =
+        centerX + static_cast<AltinaEngine::i32>(theme.GizmoSize * 0.25f);
+    const AltinaEngine::i32 pressY = centerY;
+
+    // Press on X axis handle.
+    PrepareInput(input, kW, kH, pressX, pressY);
+    input.OnMouseButtonDown(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
+
+    // Drag right while holding.
+    PrepareInput(input, kW, kH, pressX + 40, pressY);
+    sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
+
+    // Release.
+    PrepareInput(input, kW, kH, pressX + 40, pressY);
+    input.OnMouseButtonUp(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
+
+    REQUIRE(gizmoValue.X() > 10.0f);
+    REQUIRE(gizmoValue.Y() > -0.001f);
+    REQUIRE(gizmoValue.Y() < 0.001f);
+
+    DestroyDebugGuiSystem(sys);
+}
+
 TEST_CASE("DebugGui default built-in panel visibility") {
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);

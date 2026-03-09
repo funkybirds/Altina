@@ -87,6 +87,8 @@ namespace AltinaEngine::DebugGui::Private {
     struct FGuiInput {
         const Input::FInputSystem* Input                = nullptr;
         FVector2f                  MousePos             = FVector2f(0.0f, 0.0f);
+        i32                        MouseDeltaX          = 0;
+        i32                        MouseDeltaY          = 0;
         bool                       bMouseDown           = false;
         bool                       bMousePressed        = false;
         bool                       bMouseReleased       = false;

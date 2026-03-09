@@ -23,11 +23,14 @@ namespace AltinaEngine::Editor::UI {
     };
 
     struct FEditorViewportRequest {
-        u32  Width       = 0U;
-        u32  Height      = 0U;
-        bool bHovered    = false;
-        bool bFocused    = false;
-        bool bHasContent = false;
+        u32  Width            = 0U;
+        u32  Height           = 0U;
+        i32  ContentMinX      = 0;
+        i32  ContentMinY      = 0;
+        bool bHovered         = false;
+        bool bFocused         = false;
+        bool bHasContent      = false;
+        bool bUiBlockingInput = false;
     };
 
     class AE_EDITOR_UI_API FEditorUiModule final {

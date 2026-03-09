@@ -8,7 +8,6 @@ public sealed class DemoScript : ScriptComponent
     private float _elapsedSeconds;
     private bool _loggedCreate;
     private bool _loggedFirstTick;
-    private bool _spaceDownLastFrame;
     private const float MoveSpeed = 24.0f;
 
     public override void OnCreate()
@@ -44,15 +43,13 @@ public sealed class DemoScript : ScriptComponent
 
         if (!Input.HasFocus)
         {
-            _spaceDownLastFrame = false;
+            return;
         }
 
-        bool spaceDown = Input.IsKeyDown(EKey.Space);
-        if (spaceDown && !_spaceDownLastFrame)
+        if (Input.WasKeyPressed(EKey.Space))
         {
             ManagedLog.Info("[DemoScript] Space pressed (managed).");
         }
-        _spaceDownLastFrame = spaceDown;
 
         if (!TryGetWorldPosition(out var position))
         {

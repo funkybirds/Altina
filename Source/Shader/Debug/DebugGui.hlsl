@@ -34,8 +34,5 @@ VSOutput DebugGuiVSMain(VSInput input)
 float4 DebugGuiPSMain(VSOutput input) : SV_Target0
 {
     float4 tex = gFontAtlas.Sample(gSampler, input.UV);
-    float a = tex.a;
-    float4 outColor = input.Color;
-    outColor.a *= a;
-    return outColor;
+    return tex * input.Color;
 }

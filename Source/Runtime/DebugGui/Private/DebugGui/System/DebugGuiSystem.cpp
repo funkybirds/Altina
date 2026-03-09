@@ -773,7 +773,7 @@ namespace AltinaEngine::DebugGui {
             // Panel toggles.
             bool         mShowStats   = true;
             bool         mShowConsole = false;
-            bool         mShowCVars   = true;
+            bool         mShowCVars   = false;
         };
     } // namespace
 

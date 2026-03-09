@@ -26,6 +26,7 @@ namespace AltinaEngine::DebugGui::Private {
         using Container::FStringView;
         using Container::TVector;
         using Core::Logging::LogError;
+        using Core::Logging::LogInfo;
         using Core::Utility::Filesystem::FPath;
 
         void UploadDynamicBuffer(Rhi::FRhiBuffer* buffer, const void* data, u64 sizeBytes) {
@@ -53,8 +54,45 @@ namespace AltinaEngine::DebugGui::Private {
             constexpr FStringView kLegacyRelPath = TEXT("Shader/Debug/DebugGui.hlsl");
             constexpr FStringView kSourceRelPath = TEXT("Source/Shader/Debug/DebugGui.hlsl");
 
-            const FPath           exeDir(Core::Platform::GetExecutableDir());
+            auto                  TrySourceInParents = [&](const FPath& base) -> FPath {
+                if (base.IsEmpty()) {
+                    return {};
+                }
+
+                FPath probe = base;
+                for (u32 i = 0U; i < 8U && !probe.IsEmpty(); ++i) {
+                    const auto pSource = probe / kSourceRelPath;
+                    if (pSource.Exists()) {
+                        return pSource;
+                    }
+                    const auto parent = probe.ParentPath();
+                    if (parent == probe) {
+                        break;
+                    }
+                    probe = parent;
+                }
+                return {};
+            };
+
+            const auto cwd = Core::Utility::Filesystem::GetCurrentWorkingDir();
+            if (!cwd.IsEmpty()) {
+                const auto pSource = cwd / kSourceRelPath;
+                if (pSource.Exists()) {
+                    return pSource;
+                }
+                const auto sourceInParents = TrySourceInParents(cwd);
+                if (!sourceInParents.IsEmpty()) {
+                    return sourceInParents;
+                }
+            }
+
+            const FPath exeDir(Core::Platform::GetExecutableDir());
             if (!exeDir.IsEmpty()) {
+                const auto sourceInParents = TrySourceInParents(exeDir);
+                if (!sourceInParents.IsEmpty()) {
+                    return sourceInParents;
+                }
+
                 const auto pAssets = exeDir / kAssetsRelPath;
                 if (pAssets.Exists()) {
                     return pAssets;
@@ -76,12 +114,7 @@ namespace AltinaEngine::DebugGui::Private {
                 }
             }
 
-            const auto cwd = Core::Utility::Filesystem::GetCurrentWorkingDir();
             if (!cwd.IsEmpty()) {
-                const auto pSource = cwd / kSourceRelPath;
-                if (pSource.Exists()) {
-                    return pSource;
-                }
                 const auto pAssets = cwd / kAssetsRelPath;
                 if (pAssets.Exists()) {
                     return pAssets;
@@ -90,19 +123,6 @@ namespace AltinaEngine::DebugGui::Private {
                 if (pLegacy.Exists()) {
                     return pLegacy;
                 }
-            }
-
-            FPath probe = cwd;
-            for (u32 i = 0U; i < 6U && !probe.IsEmpty(); ++i) {
-                const auto pSource = probe / kSourceRelPath;
-                if (pSource.Exists()) {
-                    return pSource;
-                }
-                const auto parent = probe.ParentPath();
-                if (parent == probe) {
-                    break;
-                }
-                probe = parent;
             }
 
             return {};
@@ -706,6 +726,7 @@ namespace AltinaEngine::DebugGui::Private {
                 TEXT("DebugGui shader source not found: '{}'"), shaderPath.GetString().ToView());
             return false;
         }
+        LogInfo(TEXT("DebugGui shader source: '{}'"), shaderPath.GetString().ToView());
 
         auto CompileStage = [&](FStringView entry, Shader::EShaderStage stage,
                                 Rhi::FRhiShaderRef& out) -> bool {

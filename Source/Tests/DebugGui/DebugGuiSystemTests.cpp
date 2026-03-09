@@ -140,6 +140,7 @@ TEST_CASE("DebugGui widgets: Button/Checkbox/Slider/InputText basic interactions
     sys->SetEnabled(true);
     // Keep the built-in window stack stable: Stats/Console/CVars then custom panels.
     sys->SetShowConsole(true);
+    sys->SetShowCVars(true);
 
     // Use a large height so the custom window (stacked after built-ins) remains visible.
     constexpr AltinaEngine::u32            kW = 1280U;
@@ -236,6 +237,17 @@ TEST_CASE("DebugGui widgets: Button/Checkbox/Slider/InputText basic interactions
     input.OnCharInput(static_cast<AltinaEngine::u32>('c'));
     sys->TickGameThread(input, 1.0f / 60.0f, kW, kH);
     REQUIRE(text.ToView().Contains(TEXT("abc")));
+
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("DebugGui default built-in panel visibility") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+
+    REQUIRE(sys->IsStatsShown());
+    REQUIRE(!sys->IsConsoleShown());
+    REQUIRE(!sys->IsCVarsShown());
 
     DestroyDebugGuiSystem(sys);
 }

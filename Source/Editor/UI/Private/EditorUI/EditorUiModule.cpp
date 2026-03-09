@@ -153,88 +153,7 @@ namespace AltinaEngine::Editor::UI {
             }
         };
 
-        if (mOpenMenu >= 0 && mOpenMenu < 3) {
-            const FRect anchor    = menus[mOpenMenu].Rect;
-            const f32   itemH     = 20.0f;
-            const f32   menuW     = (mOpenMenu == 1) ? 220.0f : 180.0f;
-            const usize itemCount = (mOpenMenu == 1) ? 7U : 5U;
-            const FRect dropRect =
-                MakeRect(anchor.Min.X(), menuRect.Max.Y(), anchor.Min.X() + menuW,
-                    menuRect.Max.Y() + static_cast<f32>(itemCount) * itemH + 4.0f);
-            gui.DrawRectFilled(dropRect, colMenuBg);
-            gui.DrawRect(dropRect, colBorder, 1.0f);
-
-            auto itemRect = [&](usize idx) -> FRect {
-                const f32 y0 = dropRect.Min.Y() + 2.0f + static_cast<f32>(idx) * itemH;
-                return MakeRect(dropRect.Min.X() + 2.0f, y0, dropRect.Max.X() - 2.0f, y0 + itemH);
-            };
-
-            if (mOpenMenu == 0) {
-                drawMenuItem(itemRect(0), TEXT("New Project"), false, false, [] {});
-                drawMenuItem(itemRect(1), TEXT("Open Project"), false, false, [] {});
-                drawMenuItem(itemRect(2), TEXT("Save"), false, false, [] {});
-                drawMenuItem(itemRect(3), TEXT("Save All"), false, false, [] {});
-                drawMenuItem(itemRect(4), TEXT("Exit"), false, true,
-                    [&]() { queueCommand(EEditorUiCommand::Exit); });
-            } else if (mOpenMenu == 1) {
-                auto panelChecked = [&](FStringView panelName) -> bool {
-                    for (auto& panel : mPanels) {
-                        if (panel.Name.ToView() == panelName) {
-                            return panel.bVisible;
-                        }
-                    }
-                    return false;
-                };
-                auto togglePanel = [&](FStringView panelName) {
-                    for (auto& panel : mPanels) {
-                        if (panel.Name.ToView() == panelName) {
-                            panel.bVisible = !panel.bVisible;
-                        }
-                    }
-                };
-
-                drawMenuItem(itemRect(0), TEXT("Hierarchy"), panelChecked(TEXT("Hierarchy")), true,
-                    [&]() { togglePanel(TEXT("Hierarchy")); });
-                drawMenuItem(itemRect(1), TEXT("Viewport"), panelChecked(TEXT("Viewport")), true,
-                    [&]() { togglePanel(TEXT("Viewport")); });
-                drawMenuItem(itemRect(2), TEXT("Inspector"), panelChecked(TEXT("Inspector")), true,
-                    [&]() { togglePanel(TEXT("Inspector")); });
-                drawMenuItem(itemRect(3), TEXT("Output"), panelChecked(TEXT("Output")), true,
-                    [&]() { togglePanel(TEXT("Output")); });
-
-                const bool statsShown =
-                    (debugGuiSystem != nullptr) ? debugGuiSystem->IsStatsShown() : false;
-                const bool consoleShown =
-                    (debugGuiSystem != nullptr) ? debugGuiSystem->IsConsoleShown() : false;
-                const bool cvarsShown =
-                    (debugGuiSystem != nullptr) ? debugGuiSystem->IsCVarsShown() : false;
-                drawMenuItem(itemRect(4), TEXT("Debug Stats"), statsShown,
-                    debugGuiSystem != nullptr,
-                    [&]() { debugGuiSystem->SetShowStats(!statsShown); });
-                drawMenuItem(itemRect(5), TEXT("Debug Console"), consoleShown,
-                    debugGuiSystem != nullptr,
-                    [&]() { debugGuiSystem->SetShowConsole(!consoleShown); });
-                drawMenuItem(itemRect(6), TEXT("Debug CVars"), cvarsShown,
-                    debugGuiSystem != nullptr,
-                    [&]() { debugGuiSystem->SetShowCVars(!cvarsShown); });
-            } else {
-                drawMenuItem(itemRect(0), TEXT("Play"), false, true,
-                    [&]() { queueCommand(EEditorUiCommand::Play); });
-                drawMenuItem(itemRect(1), TEXT("Pause"), false, true,
-                    [&]() { queueCommand(EEditorUiCommand::Pause); });
-                drawMenuItem(itemRect(2), TEXT("Step"), false, true,
-                    [&]() { queueCommand(EEditorUiCommand::Step); });
-                drawMenuItem(itemRect(3), TEXT("Stop"), false, true,
-                    [&]() { queueCommand(EEditorUiCommand::Stop); });
-                drawMenuItem(itemRect(4), TEXT("Simulate"), false, false, [] {});
-            }
-
-            if (mousePressed && !IsInside(dropRect, mouse) && !IsInside(anchor, mouse)) {
-                mOpenMenu = -1;
-            }
-        } else if (mousePressed && mouse.Y() > menuRect.Max.Y()) {
-            mOpenMenu = -1;
-        }
+        const bool  blockWorkspaceInput = (mOpenMenu >= 0 && mOpenMenu < 3);
 
         const FRect workspaceRect = MakeRect(kWorkspacePad, menuRect.Max.Y() + kWorkspacePad,
             display.X() - kWorkspacePad, display.Y() - kWorkspacePad);
@@ -276,7 +195,7 @@ namespace AltinaEngine::Editor::UI {
         FRect bottomRect = MakeRect(
             workspaceRect.Min.X(), splitH.Max.Y(), workspaceRect.Max.X(), workspaceRect.Max.Y());
 
-        if (mousePressed) {
+        if (!blockWorkspaceInput && mousePressed) {
             if (IsInside(splitV1, mouse)) {
                 mActiveSplitter = 1;
             } else if (IsInside(splitV2, mouse)) {
@@ -285,10 +204,10 @@ namespace AltinaEngine::Editor::UI {
                 mActiveSplitter = 3;
             }
         }
-        if (!mouseDown) {
+        if (!blockWorkspaceInput && !mouseDown) {
             mActiveSplitter = 0;
         }
-        if (mouseDown) {
+        if (!blockWorkspaceInput && mouseDown) {
             if (mActiveSplitter == 1) {
                 const f32 relative = mouse.X() - workspaceRect.Min.X();
                 leftW              = Clamp(relative, kMinPanelWidth,
@@ -343,7 +262,7 @@ namespace AltinaEngine::Editor::UI {
             { EDockArea::Bottom, bottomRect },
         };
 
-        if (mDraggingPanel >= 0 && mouseReleased
+        if (!blockWorkspaceInput && mDraggingPanel >= 0 && mouseReleased
             && mDraggingPanel < static_cast<i32>(mPanels.Size())) {
             for (const auto& area : areas) {
                 if (IsInside(area.Rect, mouse)) {
@@ -402,7 +321,7 @@ namespace AltinaEngine::Editor::UI {
                 gui.DrawText(FVector2f(tabRect.Min.X() + 8.0f, tabRect.Min.Y() + 4.0f), colText,
                     panel.Name.ToView());
 
-                if (hovered && mousePressed) {
+                if (!blockWorkspaceInput && hovered && mousePressed) {
                     activePanel    = panelIndex;
                     mDraggingPanel = panelIndex;
                 }
@@ -495,7 +414,90 @@ namespace AltinaEngine::Editor::UI {
                 panel.Name.ToView());
         }
 
-        if (mousePressed) {
+        if (mOpenMenu >= 0 && mOpenMenu < 3) {
+            const FRect anchor    = menus[mOpenMenu].Rect;
+            const f32   itemH     = 20.0f;
+            const f32   menuW     = (mOpenMenu == 1) ? 220.0f : 180.0f;
+            const usize itemCount = (mOpenMenu == 1) ? 7U : 5U;
+            const FRect dropRect =
+                MakeRect(anchor.Min.X(), menuRect.Max.Y(), anchor.Min.X() + menuW,
+                    menuRect.Max.Y() + static_cast<f32>(itemCount) * itemH + 4.0f);
+            gui.DrawRectFilled(dropRect, colMenuBg);
+            gui.DrawRect(dropRect, colBorder, 1.0f);
+
+            auto itemRect = [&](usize idx) -> FRect {
+                const f32 y0 = dropRect.Min.Y() + 2.0f + static_cast<f32>(idx) * itemH;
+                return MakeRect(dropRect.Min.X() + 2.0f, y0, dropRect.Max.X() - 2.0f, y0 + itemH);
+            };
+
+            if (mOpenMenu == 0) {
+                drawMenuItem(itemRect(0), TEXT("New Project"), false, false, [] {});
+                drawMenuItem(itemRect(1), TEXT("Open Project"), false, false, [] {});
+                drawMenuItem(itemRect(2), TEXT("Save"), false, false, [] {});
+                drawMenuItem(itemRect(3), TEXT("Save All"), false, false, [] {});
+                drawMenuItem(itemRect(4), TEXT("Exit"), false, true,
+                    [&]() { queueCommand(EEditorUiCommand::Exit); });
+            } else if (mOpenMenu == 1) {
+                auto panelChecked = [&](FStringView panelName) -> bool {
+                    for (auto& panel : mPanels) {
+                        if (panel.Name.ToView() == panelName) {
+                            return panel.bVisible;
+                        }
+                    }
+                    return false;
+                };
+                auto togglePanel = [&](FStringView panelName) {
+                    for (auto& panel : mPanels) {
+                        if (panel.Name.ToView() == panelName) {
+                            panel.bVisible = !panel.bVisible;
+                        }
+                    }
+                };
+
+                drawMenuItem(itemRect(0), TEXT("Hierarchy"), panelChecked(TEXT("Hierarchy")), true,
+                    [&]() { togglePanel(TEXT("Hierarchy")); });
+                drawMenuItem(itemRect(1), TEXT("Viewport"), panelChecked(TEXT("Viewport")), true,
+                    [&]() { togglePanel(TEXT("Viewport")); });
+                drawMenuItem(itemRect(2), TEXT("Inspector"), panelChecked(TEXT("Inspector")), true,
+                    [&]() { togglePanel(TEXT("Inspector")); });
+                drawMenuItem(itemRect(3), TEXT("Output"), panelChecked(TEXT("Output")), true,
+                    [&]() { togglePanel(TEXT("Output")); });
+
+                const bool statsShown =
+                    (debugGuiSystem != nullptr) ? debugGuiSystem->IsStatsShown() : false;
+                const bool consoleShown =
+                    (debugGuiSystem != nullptr) ? debugGuiSystem->IsConsoleShown() : false;
+                const bool cvarsShown =
+                    (debugGuiSystem != nullptr) ? debugGuiSystem->IsCVarsShown() : false;
+                drawMenuItem(itemRect(4), TEXT("Debug Stats"), statsShown,
+                    debugGuiSystem != nullptr,
+                    [&]() { debugGuiSystem->SetShowStats(!statsShown); });
+                drawMenuItem(itemRect(5), TEXT("Debug Console"), consoleShown,
+                    debugGuiSystem != nullptr,
+                    [&]() { debugGuiSystem->SetShowConsole(!consoleShown); });
+                drawMenuItem(itemRect(6), TEXT("Debug CVars"), cvarsShown,
+                    debugGuiSystem != nullptr,
+                    [&]() { debugGuiSystem->SetShowCVars(!cvarsShown); });
+            } else {
+                drawMenuItem(itemRect(0), TEXT("Play"), false, true,
+                    [&]() { queueCommand(EEditorUiCommand::Play); });
+                drawMenuItem(itemRect(1), TEXT("Pause"), false, true,
+                    [&]() { queueCommand(EEditorUiCommand::Pause); });
+                drawMenuItem(itemRect(2), TEXT("Step"), false, true,
+                    [&]() { queueCommand(EEditorUiCommand::Step); });
+                drawMenuItem(itemRect(3), TEXT("Stop"), false, true,
+                    [&]() { queueCommand(EEditorUiCommand::Stop); });
+                drawMenuItem(itemRect(4), TEXT("Simulate"), false, false, [] {});
+            }
+
+            if (mousePressed && !IsInside(dropRect, mouse) && !IsInside(anchor, mouse)) {
+                mOpenMenu = -1;
+            }
+        } else if (mousePressed && mouse.Y() > menuRect.Max.Y()) {
+            mOpenMenu = -1;
+        }
+
+        if (!blockWorkspaceInput && mousePressed) {
             mFocusedViewport = mViewportRequest.bHovered;
         }
         mViewportRequest.bFocused = mFocusedViewport;

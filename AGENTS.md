@@ -1,12 +1,5 @@
 # AltinaEngine Guide for Agents
 
-## CRITICAL: CMake No-Hang Rule
-- **Rule**: In this repo, always configure CMake with `CMAKE_SUPPRESS_REGENERATION=ON` before any `cmake --build` call. This avoids a Ninja/CMake regeneration loop that can appear stuck.
-- Use:
-  - `cmake -S . -B out/build/windows-msvc-relwithdebinfo -D CMAKE_SUPPRESS_REGENERATION=ON`
-  - `cmake --build --preset windows-msvc-relwithdebinfo --target <TargetName>`
-- If `CMakeLists.txt` or build presets change, re-run the configure command above, then build again.
-
 Project Altina is a `personal` playground (or toy gaming engine) to validate gaming techniques and programming ideas. Architecture, runtime performance and visual effects are top priorities.
 
 ## Definitions
@@ -14,8 +7,23 @@ Project Altina is a `personal` playground (or toy gaming engine) to validate gam
 - **Guidelines** are things that you should follow in almost all cases. If there are users' prompts and specifications, follow users' requirement first.
 - **Suggestions** are things that you are suggested to follow. You should make architectural considerations before you accept a suggestion.
 
-## Specifications and Prototyping
-- **Rule**: Do reference specifications in `Docs/Spec` folder first.
+## IMPORTANT: Building
+- **Suggstion**: You can use CMake (with reldebinfo preset), if it fails, use following shortcuts:
+  - Building demo: `Scripts/BuildDemo.ps1` (Always run before commit)
+  - Run tests: `Scripts/RunTests.ps1` (Always run before commit)
+- **Suggstion**: Do not use `Debug` profile. You might encounter linking errors.
+- **Rule**: In this repo, always configure CMake with `CMAKE_SUPPRESS_REGENERATION=ON` before any `cmake --build` call. This avoids a Ninja/CMake regeneration loop that can appear stuck.
+- Use:
+  - `cmake -S . -B out/build/windows-msvc-relwithdebinfo -D CMAKE_SUPPRESS_REGENERATION=ON`
+  - `cmake --build --preset windows-msvc-relwithdebinfo --target <TargetName>`
+- If `CMakeLists.txt` or build presets change, re-run the configure command above, then build again.
+
+## IMPORTANT: Coding Styles
+- **Rule**: Reference `Docs/CodingStyle.md` for detailed naming, formatting, and tooling guidance.
+- **Rule**: Do not introduce non-English characters in any source files.
+- **Rule**: Add `m` prefix for all members!
+
+## Prototyping
 - **Suggestion**: Prototype an idea with `python`. Call `python3` or `py` on Windows.
   - **Guideline**: Keep prototypes in `**/Misc/` folder and not tracked by `git`.
   
@@ -27,9 +35,7 @@ Project Altina is a `personal` playground (or toy gaming engine) to validate gam
 
 ## Libraries and Dependencies
 - Thirdparty libraries are located in `ThirdParty` submodule.
-- **Rule**: Unless specified, **DO NOT** introduce thirdparty libraries!
-- **Rule**: Unless specified, **DO NOT** add new module dependency in CMake!
-- **Suggestion**: This is an experimental and personal project, so you can make these hand-crafted without third-party dependencies.
+- **Rule**: Unless specified, **DO NOT** introduce thirdparty libraries or add new module dependency in CMake!
 
 ## Structure
 Some core modules:
@@ -54,15 +60,6 @@ Some core modules:
 - **Rule**: Do not directly implement a `Loader` that relies on a external format (like `*.usdz`,`*.slang`,`*.exr`,`*.glb`,`*.blend`,`*.mp3`,etc)
 - **Suggstion**: Implement a `Importer` in `Tool/AssetPipe` to convert it into internal format. Specify external asset dependencies when introduces a new importer (like `*.gltf`)
 
-## Building
-- **Suggstion**: You can use CMake (with reldebinfo preset), if it fails, use following shortcuts:
-  - Building demo: `Scripts/BuildDemo.ps1` (Always run before commit)
-  - Run tests: `Scripts/RunTests.ps1` (Always run before commit)
-- **Suggstion**: Do not use `Debug` profile. You might encounter linking errors.
-
-## Coding Styles
-- **Rule**: Reference `Docs/CodingStyle.md` for detailed naming, formatting, and tooling guidance.
-- **Rule**: Do not introduce non-English characters in any source files.
 
 ### Assertion, Logging and Error Handling
 - **Rule**: Do log internal processes with **PROPER CATEGORY**.

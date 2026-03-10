@@ -33,9 +33,9 @@ namespace AltinaEngine::Engine {
             if (!key.IsValid()) {
                 return 0ULL;
             }
-            auto hash = Core::Container::THashFunc<RenderCore::Container::FString>{}(key.Name);
-            hash      = HashCombine(hash, static_cast<u64>(key.Stage));
-            hash      = HashCombine(hash, static_cast<u64>(key.Permutation.mHash));
+            auto hash = Core::Container::THashFunc<RenderCore::Container::FString>{}(key.mName);
+            hash      = HashCombine(hash, static_cast<u64>(key.mStage));
+            hash      = HashCombine(hash, static_cast<u64>(key.mPermutation.mHash));
             return hash;
         }
 
@@ -79,13 +79,13 @@ namespace AltinaEngine::Engine {
             }
 
             u64 hash = 0ULL;
-            hash     = HashCombine(hash, HashShaderKey(passDesc->Shaders.Vertex));
-            hash     = HashCombine(hash, HashShaderKey(passDesc->Shaders.Pixel));
-            hash     = HashCombine(hash, HashShaderKey(passDesc->Shaders.Compute));
-            hash     = HashCombine(hash, static_cast<u64>(passDesc->Shaders.Permutation.mHash));
-            hash     = HashCombine(hash, HashRasterState(passDesc->State.Raster));
-            hash     = HashCombine(hash, HashDepthState(passDesc->State.Depth));
-            hash     = HashCombine(hash, HashBlendState(passDesc->State.Blend));
+            hash     = HashCombine(hash, HashShaderKey(passDesc->mShaders.mVertex));
+            hash     = HashCombine(hash, HashShaderKey(passDesc->mShaders.mPixel));
+            hash     = HashCombine(hash, HashShaderKey(passDesc->mShaders.mCompute));
+            hash     = HashCombine(hash, static_cast<u64>(passDesc->mShaders.mPermutation.mHash));
+            hash     = HashCombine(hash, HashRasterState(passDesc->mState.mRaster));
+            hash     = HashCombine(hash, HashDepthState(passDesc->mState.mDepth));
+            hash     = HashCombine(hash, HashBlendState(passDesc->mState.mBlend));
             return hash;
         }
 
@@ -160,23 +160,23 @@ namespace AltinaEngine::Engine {
                 }
 
                 FDrawItem item{};
-                item.MeshType            = RenderCore::Render::EDrawMeshType::StaticMesh;
-                item.Pass                = params.Pass;
-                item.Material            = material;
-                item.Static.Mesh         = entry.Mesh;
-                item.Static.LodIndex     = params.LodIndex;
-                item.Static.SectionIndex = sectionIndex;
-                item.Instance.World      = entry.WorldMatrix;
-                item.Instance.PrevWorld  = entry.PrevWorldMatrix;
-                item.Instance.ObjectId   = entry.OwnerId.IsValid() ? entry.OwnerId.Index : 0U;
+                item.mMeshType             = RenderCore::Render::EDrawMeshType::StaticMesh;
+                item.mPass                 = params.Pass;
+                item.mMaterial             = material;
+                item.mStatic.mMesh         = entry.Mesh;
+                item.mStatic.mLodIndex     = params.LodIndex;
+                item.mStatic.mSectionIndex = sectionIndex;
+                item.mInstance.mWorld      = entry.WorldMatrix;
+                item.mInstance.mPrevWorld  = entry.PrevWorldMatrix;
+                item.mInstance.mObjectId   = entry.OwnerId.IsValid() ? entry.OwnerId.Index : 0U;
 
-                item.Key.PassKey     = static_cast<u64>(params.Pass);
-                item.Key.PipelineKey = BuildPipelineKey(
+                item.mKey.mPassKey     = static_cast<u64>(params.Pass);
+                item.mKey.mPipelineKey = BuildPipelineKey(
                     material != nullptr ? material->FindPassDesc(params.Pass) : nullptr);
-                item.Key.MaterialKey = HashPointer(material);
-                item.Key.GeometryKey =
+                item.mKey.mMaterialKey = HashPointer(material);
+                item.mKey.mGeometryKey =
                     BuildGeometryKey(entry.Mesh, params.LodIndex, lod.PrimitiveTopology);
-                item.Key.SectionKey = BuildSectionKey(section);
+                item.mKey.mSectionKey = BuildSectionKey(section);
 
                 items.PushBack(Move(item));
             }
@@ -187,21 +187,21 @@ namespace AltinaEngine::Engine {
         }
 
         Core::Algorithm::Sort(
-            items, [](const FDrawItem& lhs, const FDrawItem& rhs) { return lhs.Key < rhs.Key; });
+            items, [](const FDrawItem& lhs, const FDrawItem& rhs) { return lhs.mKey < rhs.mKey; });
 
-        outDrawList.Batches.Reserve(items.Size());
+        outDrawList.mBatches.Reserve(items.Size());
         for (const auto& item : items) {
-            if (outDrawList.Batches.IsEmpty() || !params.bAllowInstancing
-                || !(item.Key == outDrawList.Batches.Back().BatchKey)) {
+            if (outDrawList.mBatches.IsEmpty() || !params.bAllowInstancing
+                || !(item.mKey == outDrawList.mBatches.Back().mBatchKey)) {
                 RenderCore::Render::FDrawBatch batch{};
-                batch.BatchKey = item.Key;
-                batch.Pass     = item.Pass;
-                batch.Material = item.Material;
-                batch.Static   = item.Static;
-                batch.Instances.PushBack(item.Instance);
-                outDrawList.Batches.PushBack(Move(batch));
+                batch.mBatchKey = item.mKey;
+                batch.mPass     = item.mPass;
+                batch.mMaterial = item.mMaterial;
+                batch.mStatic   = item.mStatic;
+                batch.mInstances.PushBack(item.mInstance);
+                outDrawList.mBatches.PushBack(Move(batch));
             } else {
-                outDrawList.Batches.Back().Instances.PushBack(item.Instance);
+                outDrawList.mBatches.Back().mInstances.PushBack(item.mInstance);
             }
         }
     }

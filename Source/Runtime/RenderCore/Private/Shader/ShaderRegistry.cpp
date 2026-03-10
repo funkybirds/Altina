@@ -1,14 +1,15 @@
 #include "Shader/ShaderRegistry.h"
 
 #include "Types/Traits.h"
+#include "Rhi/RhiShader.h"
 
 namespace AltinaEngine::RenderCore {
     auto FShaderRegistry::MakeKey(
         FStringView name, EShaderStage stage, FShaderPermutationId permutation) -> FShaderKey {
         FShaderKey key{};
-        key.Name.Assign(name);
-        key.Stage       = stage;
-        key.Permutation = permutation;
+        key.mName.Assign(name);
+        key.mStage       = stage;
+        key.mPermutation = permutation;
         return key;
     }
 

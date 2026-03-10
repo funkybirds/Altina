@@ -14,25 +14,25 @@ namespace AltinaEngine::RenderCore::Shadow {
     inline constexpr u32 kMaxCascades = 4U;
 
     struct AE_RENDER_CORE_API FCSMSettings {
-        u32 CascadeCount = 4U;     // [1,4]
-        f32 SplitLambda  = 0.5f;   // [0,1]
-        f32 MaxDistance  = 100.0f; // clamp view far
+        u32 mCascadeCount = 4U;     // [1,4]
+        f32 mSplitLambda  = 0.5f;   // [0,1]
+        f32 mMaxDistance  = 100.0f; // clamp view far
 
-        u32 ShadowMapSize = 2048U;
+        u32 mShadowMapSize = 2048U;
 
         // Depth bias applied in shading (receiver bias in NDC depth).
-        f32 ReceiverBias = 0.0015f;
+        f32 mReceiverBias = 0.0015f;
     };
 
     struct AE_RENDER_CORE_API FCSMCascade {
-        Math::FMatrix4x4f LightViewProj = Math::FMatrix4x4f(0.0f);
+        Math::FMatrix4x4f mLightViewProj = Math::FMatrix4x4f(0.0f);
         // View-space split range for cascade selection (x=near, y=far).
-        Math::FVector2f   SplitVS = Math::FVector2f(0.0f, 0.0f);
+        Math::FVector2f   mSplitVs = Math::FVector2f(0.0f, 0.0f);
     };
 
     struct AE_RENDER_CORE_API FCSMData {
-        u32         CascadeCount = 0U;
-        FCSMCascade Cascades[kMaxCascades]{};
+        u32         mCascadeCount = 0U;
+        FCSMCascade mCascades[kMaxCascades]{};
     };
 
     /**

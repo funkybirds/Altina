@@ -1,5 +1,5 @@
 #include "Geometry/VertexLayoutBuilder.h"
-
+#include "Rhi/RhiShader.h"
 #include "Container/HashMap.h"
 
 namespace AltinaEngine::RenderCore::Geometry {
@@ -257,7 +257,7 @@ namespace AltinaEngine::RenderCore::Geometry {
                     message.Append(TEXT("' index="));
                     message.Append(FString::ToString(input.mSemanticIndex));
                     message.Append(TEXT(" shader='"));
-                    message.Append(shaderKey.Name.ToView());
+                    message.Append(shaderKey.mName.ToView());
                     message.Append(TEXT("'."));
                     SetError(outError, message.ToView());
                     return false;

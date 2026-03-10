@@ -49,12 +49,12 @@ namespace AltinaEngine::Rendering::Deferred {
             };
 
             const auto& parameters = material->GetParameters();
-            for (const auto paramId : layout->TextureNameHashes) {
+            for (const auto paramId : layout->mTextureNameHashes) {
                 const auto* textureParam = parameters.FindTextureParam(paramId);
-                if (textureParam == nullptr || !textureParam->SRV) {
+                if (textureParam == nullptr || !textureParam->mSrv) {
                     continue;
                 }
-                auto* texture = textureParam->SRV->GetTexture();
+                auto* texture = textureParam->mSrv->GetTexture();
                 if (texture == nullptr) {
                     continue;
                 }
@@ -102,11 +102,11 @@ namespace AltinaEngine::Rendering::Deferred {
             recvBias = 0.0f;
         }
 
-        result.Settings.CascadeCount  = cascades;
-        result.Settings.SplitLambda   = lambda;
-        result.Settings.MaxDistance   = maxDist;
-        result.Settings.ShadowMapSize = mapSize;
-        result.Settings.ReceiverBias  = recvBias;
+        result.Settings.mCascadeCount  = cascades;
+        result.Settings.mSplitLambda   = lambda;
+        result.Settings.mMaxDistance   = maxDist;
+        result.Settings.mShadowMapSize = mapSize;
+        result.Settings.mReceiverBias  = recvBias;
 
         if (inputs.View != nullptr && inputs.Lights != nullptr
             && inputs.Lights->bHasMainDirectionalLight
@@ -121,10 +121,10 @@ namespace AltinaEngine::Rendering::Deferred {
 
     void FillPerFrameCsmConstants(
         const FCsmBuildResult& csm, FPerFrameConstants& outPerFrameConstants) {
-        outPerFrameConstants.CSMCascadeCount = csm.Data.CascadeCount;
-        outPerFrameConstants.ShadowBias      = csm.Settings.ReceiverBias;
-        if (csm.Settings.ShadowMapSize > 0U) {
-            const f32 inv = 1.0f / static_cast<f32>(csm.Settings.ShadowMapSize);
+        outPerFrameConstants.CSMCascadeCount = csm.Data.mCascadeCount;
+        outPerFrameConstants.ShadowBias      = csm.Settings.mReceiverBias;
+        if (csm.Settings.mShadowMapSize > 0U) {
+            const f32 inv = 1.0f / static_cast<f32>(csm.Settings.mShadowMapSize);
             outPerFrameConstants.ShadowMapInvSize[0] = inv;
             outPerFrameConstants.ShadowMapInvSize[1] = inv;
         }
@@ -136,24 +136,24 @@ namespace AltinaEngine::Rendering::Deferred {
             outPerFrameConstants.CSM_SplitsVS[i][3] = 0.0f;
         }
 
-        if (csm.Data.CascadeCount == 0U) {
+        if (csm.Data.mCascadeCount == 0U) {
             return;
         }
 
-        for (u32 i = 0U; i < csm.Data.CascadeCount && i < RenderCore::Shadow::kMaxCascades; ++i) {
-            outPerFrameConstants.CSM_SplitsVS[i][0] = csm.Data.Cascades[i].SplitVS[0];
-            outPerFrameConstants.CSM_SplitsVS[i][1] = csm.Data.Cascades[i].SplitVS[1];
+        for (u32 i = 0U; i < csm.Data.mCascadeCount && i < RenderCore::Shadow::kMaxCascades; ++i) {
+            outPerFrameConstants.CSM_SplitsVS[i][0] = csm.Data.mCascades[i].mSplitVs[0];
+            outPerFrameConstants.CSM_SplitsVS[i][1] = csm.Data.mCascades[i].mSplitVs[1];
         }
 
-        outPerFrameConstants.CSM_LightViewProj0 = csm.Data.Cascades[0].LightViewProj;
-        if (csm.Data.CascadeCount > 1U) {
-            outPerFrameConstants.CSM_LightViewProj1 = csm.Data.Cascades[1].LightViewProj;
+        outPerFrameConstants.CSM_LightViewProj0 = csm.Data.mCascades[0].mLightViewProj;
+        if (csm.Data.mCascadeCount > 1U) {
+            outPerFrameConstants.CSM_LightViewProj1 = csm.Data.mCascades[1].mLightViewProj;
         }
-        if (csm.Data.CascadeCount > 2U) {
-            outPerFrameConstants.CSM_LightViewProj2 = csm.Data.Cascades[2].LightViewProj;
+        if (csm.Data.mCascadeCount > 2U) {
+            outPerFrameConstants.CSM_LightViewProj2 = csm.Data.mCascades[2].mLightViewProj;
         }
-        if (csm.Data.CascadeCount > 3U) {
-            outPerFrameConstants.CSM_LightViewProj3 = csm.Data.Cascades[3].LightViewProj;
+        if (csm.Data.mCascadeCount > 3U) {
+            outPerFrameConstants.CSM_LightViewProj3 = csm.Data.mCascades[3].mLightViewProj;
         }
     }
 
@@ -167,7 +167,7 @@ namespace AltinaEngine::Rendering::Deferred {
 
         const auto& csmData     = inputs.Csm->Data;
         const auto& csmSettings = inputs.Csm->Settings;
-        if (csmData.CascadeCount == 0U) {
+        if (csmData.mCascadeCount == 0U) {
             return;
         }
 
@@ -175,8 +175,8 @@ namespace AltinaEngine::Rendering::Deferred {
         Assert(device != nullptr, TEXT("BasicDeferredRenderer"),
             "Render failed: RHI device is null while preparing CSM shadow map.");
 
-        const u32  shadowSize   = csmSettings.ShadowMapSize;
-        const u32  shadowLayers = csmData.CascadeCount;
+        const u32  shadowSize   = csmSettings.mShadowMapSize;
+        const u32  shadowLayers = csmData.mCascadeCount;
 
         const bool bNeedRecreateShadowMap = (!(*inputs.PersistentShadowMap))
             || (*inputs.PersistentShadowMapSize != shadowSize)
@@ -217,7 +217,7 @@ namespace AltinaEngine::Rendering::Deferred {
 
         Core::Container::TVector<FImportedExternalTexture> importedExternalTextures;
 
-        for (u32 cascade = 0U; cascade < csmData.CascadeCount; ++cascade) {
+        for (u32 cascade = 0U; cascade < csmData.mCascadeCount; ++cascade) {
             struct FShadowPassData {
                 RenderCore::FFrameGraphTextureRef Shadow;
                 RenderCore::FFrameGraphDSVRef     ShadowDSV;
@@ -247,9 +247,9 @@ namespace AltinaEngine::Rendering::Deferred {
                     data.Shadow = builder.Write(outShadowMap, Rhi::ERhiResourceState::DepthWrite);
 
                     if (inputs.ShadowDrawList != nullptr) {
-                        for (const auto& batch : inputs.ShadowDrawList->Batches) {
-                            RegisterMaterialTextureReads(graph, builder, batch.Material, batch.Pass,
-                                importedExternalTextures);
+                        for (const auto& batch : inputs.ShadowDrawList->mBatches) {
+                            RegisterMaterialTextureReads(graph, builder, batch.mMaterial,
+                                batch.mPass, importedExternalTextures);
                         }
                     }
 
@@ -275,7 +275,7 @@ namespace AltinaEngine::Rendering::Deferred {
                     builder.SetRenderTargets(nullptr, 0U, &ds);
                 },
                 [executeFn = inputs.ExecuteCascadeFn, userData = inputs.ExecuteCascadeUserData,
-                    cascade, lightViewProj = csmData.Cascades[cascade].LightViewProj,
+                    cascade, lightViewProj = csmData.mCascades[cascade].mLightViewProj,
                     shadowSize](Rhi::FRhiCmdContext& ctx,
                     const RenderCore::FFrameGraphPassResources&, const FShadowPassData&) -> void {
                     const TChar* markerName = TEXT("Deferred.Shadow.Cascade");

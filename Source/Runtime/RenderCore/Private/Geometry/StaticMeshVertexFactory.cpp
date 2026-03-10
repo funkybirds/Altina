@@ -1,4 +1,5 @@
 #include "Geometry/StaticMeshVertexFactory.h"
+#include "Rhi/RhiShader.h"
 
 namespace AltinaEngine::RenderCore::Geometry {
     auto BuildStaticMeshProvidedLayout(FVertexFactoryProvidedLayout& outLayout) -> bool {

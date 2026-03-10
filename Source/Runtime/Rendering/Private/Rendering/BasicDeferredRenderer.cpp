@@ -89,29 +89,29 @@ namespace AltinaEngine::Rendering {
         [[nodiscard]] auto ComputeDrawListWorldBounds(const RenderCore::Render::FDrawList& list)
             -> FWorldBoundsDebug {
             FWorldBoundsDebug out{};
-            out.BatchCount = static_cast<u32>(list.Batches.Size());
+            out.BatchCount = static_cast<u32>(list.mBatches.Size());
 
             FVector3f minWS(TNumericProperty<f32>::Max);
             FVector3f maxWS(-TNumericProperty<f32>::Max);
 
-            for (const auto& batch : list.Batches) {
-                const auto* mesh = batch.Static.Mesh;
+            for (const auto& batch : list.mBatches) {
+                const auto* mesh = batch.mStatic.mMesh;
                 if (mesh == nullptr) {
                     continue;
                 }
-                if (batch.Static.LodIndex >= mesh->Lods.Size()) {
+                if (batch.mStatic.mLodIndex >= mesh->Lods.Size()) {
                     continue;
                 }
 
-                const auto& lodBounds = mesh->Lods[batch.Static.LodIndex].Bounds;
+                const auto& lodBounds = mesh->Lods[batch.mStatic.mLodIndex].Bounds;
                 if (!lodBounds.IsValid()) {
                     continue;
                 }
 
-                for (const auto& inst : batch.Instances) {
+                for (const auto& inst : batch.mInstances) {
                     FVector3f instMinWS(0.0f);
                     FVector3f instMaxWS(0.0f);
-                    if (!TransformAabbToWorld(inst.World, lodBounds, instMinWS, instMaxWS)) {
+                    if (!TransformAabbToWorld(inst.mWorld, lodBounds, instMinWS, instMaxWS)) {
                         continue;
                     }
 
@@ -230,9 +230,9 @@ namespace AltinaEngine::Rendering {
             TVector<Rhi::FRhiBindGroupLayoutEntry>& outEntries) -> u64 {
             outEntries.Clear();
 
-            if (materialLayout.PropertyBag.IsValid()) {
+            if (materialLayout.mPropertyBag.IsValid()) {
                 Rhi::FRhiBindGroupLayoutEntry entry{};
-                entry.mBinding          = materialLayout.PropertyBag.GetBinding();
+                entry.mBinding          = materialLayout.mPropertyBag.GetBinding();
                 entry.mType             = Rhi::ERhiBindingType::ConstantBuffer;
                 entry.mVisibility       = Rhi::ERhiShaderStageFlags::All;
                 entry.mArrayCount       = 1U;
@@ -240,10 +240,10 @@ namespace AltinaEngine::Rendering {
                 outEntries.PushBack(entry);
             }
 
-            const usize textureCount = materialLayout.TextureBindings.Size();
+            const usize textureCount = materialLayout.mTextureBindings.Size();
             for (usize i = 0U; i < textureCount; ++i) {
                 Rhi::FRhiBindGroupLayoutEntry entry{};
-                entry.mBinding          = materialLayout.TextureBindings[i];
+                entry.mBinding          = materialLayout.mTextureBindings[i];
                 entry.mType             = Rhi::ERhiBindingType::SampledTexture;
                 entry.mVisibility       = Rhi::ERhiShaderStageFlags::All;
                 entry.mArrayCount       = 1U;
@@ -251,9 +251,9 @@ namespace AltinaEngine::Rendering {
                 outEntries.PushBack(entry);
             }
 
-            const usize samplerCount = materialLayout.SamplerBindings.Size();
+            const usize samplerCount = materialLayout.mSamplerBindings.Size();
             for (usize i = 0U; i < samplerCount; ++i) {
-                const u32 samplerBinding = materialLayout.SamplerBindings[i];
+                const u32 samplerBinding = materialLayout.mSamplerBindings[i];
                 if (samplerBinding == RenderCore::kMaterialInvalidBinding) {
                     continue;
                 }
@@ -461,17 +461,17 @@ namespace AltinaEngine::Rendering {
 
         void EnsureLayouts(Rhi::FRhiDevice& device, FDeferredSharedResources& resources) {
             TVector<RenderCore::FShaderRegistry::FShaderKey> basePassShaderKeys;
-            if (resources.DefaultPassDesc.Shaders.Vertex.IsValid()) {
-                basePassShaderKeys.PushBack(resources.DefaultPassDesc.Shaders.Vertex);
+            if (resources.DefaultPassDesc.mShaders.mVertex.IsValid()) {
+                basePassShaderKeys.PushBack(resources.DefaultPassDesc.mShaders.mVertex);
             }
-            if (resources.DefaultPassDesc.Shaders.Pixel.IsValid()) {
-                basePassShaderKeys.PushBack(resources.DefaultPassDesc.Shaders.Pixel);
+            if (resources.DefaultPassDesc.mShaders.mPixel.IsValid()) {
+                basePassShaderKeys.PushBack(resources.DefaultPassDesc.mShaders.mPixel);
             }
-            if (resources.DefaultShadowPassDesc.Shaders.Vertex.IsValid()) {
-                basePassShaderKeys.PushBack(resources.DefaultShadowPassDesc.Shaders.Vertex);
+            if (resources.DefaultShadowPassDesc.mShaders.mVertex.IsValid()) {
+                basePassShaderKeys.PushBack(resources.DefaultShadowPassDesc.mShaders.mVertex);
             }
-            if (resources.DefaultShadowPassDesc.Shaders.Pixel.IsValid()) {
-                basePassShaderKeys.PushBack(resources.DefaultShadowPassDesc.Shaders.Pixel);
+            if (resources.DefaultShadowPassDesc.mShaders.mPixel.IsValid()) {
+                basePassShaderKeys.PushBack(resources.DefaultShadowPassDesc.mShaders.mPixel);
             }
 
             if (!resources.PerFrameLayout) {
@@ -836,11 +836,11 @@ namespace AltinaEngine::Rendering {
             if (useReflection != 0) {
                 constexpr const TChar* kFactoryName = TEXT("StaticMeshVertexFactory");
                 TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys{};
-                if (resources.DefaultPassDesc.Shaders.Vertex.IsValid()) {
-                    shaderKeys.PushBack(resources.DefaultPassDesc.Shaders.Vertex);
+                if (resources.DefaultPassDesc.mShaders.mVertex.IsValid()) {
+                    shaderKeys.PushBack(resources.DefaultPassDesc.mShaders.mVertex);
                 }
-                if (resources.DefaultPassDesc.Shaders.Pixel.IsValid()) {
-                    shaderKeys.PushBack(resources.DefaultPassDesc.Shaders.Pixel);
+                if (resources.DefaultPassDesc.mShaders.mPixel.IsValid()) {
+                    shaderKeys.PushBack(resources.DefaultPassDesc.mShaders.mPixel);
                 }
 
                 RenderCore::Geometry::FShaderVertexInputRequirement requirement{};
@@ -871,7 +871,7 @@ namespace AltinaEngine::Rendering {
                     if (i > 0U) {
                         shaderLabel.Append(TEXT(","));
                     }
-                    shaderLabel.Append(shaderKeys[i].Name.ToView());
+                    shaderLabel.Append(shaderKeys[i].mName.ToView());
                 }
                 if (shaderLabel.IsEmptyString()) {
                     shaderLabel.Assign(TEXT("<none>"));
@@ -948,7 +948,7 @@ namespace AltinaEngine::Rendering {
             }
 
             auto&                                  resources  = GetSharedResources();
-            const auto&                            passLayout = resolvedPass->Layout;
+            const auto&                            passLayout = resolvedPass->mLayout;
 
             TVector<Rhi::FRhiBindGroupLayoutEntry> layoutEntries;
             const u64                              materialLayoutHash =
@@ -1001,16 +1001,16 @@ namespace AltinaEngine::Rendering {
             }
 
             const u64 key =
-                batch.BatchKey.PipelineKey ^ (materialLayoutHash * 0x9e3779b97f4a7c15ULL);
+                batch.mBatchKey.mPipelineKey ^ (materialLayoutHash * 0x9e3779b97f4a7c15ULL);
             if (const auto it = data->PipelineCache->FindIt(key);
                 it != data->PipelineCache->end()) {
                 return it->second.Get();
             }
 
-            const auto         vs = data->Registry->FindShader(resolvedPass->Shaders.Vertex);
+            const auto         vs = data->Registry->FindShader(resolvedPass->mShaders.mVertex);
             Rhi::FRhiShaderRef ps{};
-            if (resolvedPass->Shaders.Pixel.IsValid()) {
-                ps = data->Registry->FindShader(resolvedPass->Shaders.Pixel);
+            if (resolvedPass->mShaders.mPixel.IsValid()) {
+                ps = data->Registry->FindShader(resolvedPass->mShaders.mPixel);
             }
             if (!vs) {
                 return nullptr;
@@ -1022,9 +1022,9 @@ namespace AltinaEngine::Rendering {
             desc.mPixelShader    = ps ? ps.Get() : nullptr;
             desc.mPipelineLayout = pipelineLayout.Get();
             desc.mVertexLayout   = data->VertexLayout;
-            desc.mRasterState    = resolvedPass->State.Raster;
-            desc.mDepthState     = resolvedPass->State.Depth;
-            desc.mBlendState     = resolvedPass->State.Blend;
+            desc.mRasterState    = resolvedPass->mState.mRaster;
+            desc.mDepthState     = resolvedPass->mState.mDepth;
+            desc.mBlendState     = resolvedPass->mState.mBlend;
 
             auto pipeline = data->Device->CreateGraphicsPipeline(desc);
             if (!pipeline) {
@@ -1049,9 +1049,9 @@ namespace AltinaEngine::Rendering {
             // Create a synthetic batch key by forcing the pipeline key to a stable constant so it
             // can't collide with BasePass pipelines.
             RenderCore::Render::FDrawBatch synthetic = batch;
-            synthetic.BatchKey.PipelineKey           = 0x43534D534841444FULL; // "CSMSHADO"
+            synthetic.mBatchKey.mPipelineKey         = 0x43534D534841444FULL; // "CSMSHADO"
             auto shadowDesc                          = *data->DefaultPassDesc;
-            shadowDesc.Shaders.Pixel                 = {};
+            shadowDesc.mShaders.mPixel               = {};
             auto&                 resources          = GetSharedResources();
             FBasePassPipelineData shadowData         = *data;
             shadowData.PipelineCache                 = &resources.ShadowPipelines;
@@ -1077,12 +1077,12 @@ namespace AltinaEngine::Rendering {
                 return;
             }
 
-            if (batch.Instances.IsEmpty()) {
+            if (batch.mInstances.IsEmpty()) {
                 return;
             }
 
             FPerDrawConstants constants{};
-            constants.World        = batch.Instances[0].World;
+            constants.World        = batch.mInstances[0].mWorld;
             constants.NormalMatrix = Core::Math::LinAlg::ComputeNormalMatrix(constants.World);
             if (data->bUseDynamicOffset) {
                 DebugAssert(data->PerDrawWriteIndex != nullptr, TEXT("BasicDeferredRenderer"),
@@ -1458,12 +1458,12 @@ namespace AltinaEngine::Rendering {
             }
 
             const auto& parameters = material->GetParameters();
-            for (const auto paramId : layout->TextureNameHashes) {
+            for (const auto paramId : layout->mTextureNameHashes) {
                 const auto* textureParam = parameters.FindTextureParam(paramId);
-                if (textureParam == nullptr || !textureParam->SRV) {
+                if (textureParam == nullptr || !textureParam->mSrv) {
                     continue;
                 }
-                auto* texture = textureParam->SRV->GetTexture();
+                auto* texture = textureParam->mSrv->GetTexture();
                 if (texture == nullptr) {
                     continue;
                 }
@@ -1518,8 +1518,8 @@ namespace AltinaEngine::Rendering {
 
                 LogInfo(TEXT("View OriginWS=({}, {}, {}) Near={} Far={} FovY(rad)={} ReverseZ={}"),
                     view->ViewOrigin[0], view->ViewOrigin[1], view->ViewOrigin[2],
-                    view->Camera.NearPlane, view->Camera.FarPlane, view->Camera.VerticalFovRadians,
-                    view->bReverseZ ? 1 : 0);
+                    view->Camera.mNearPlane, view->Camera.mFarPlane,
+                    view->Camera.mVerticalFovRadians, view->bReverseZ ? 1 : 0);
             }
         }
 
@@ -1632,8 +1632,8 @@ namespace AltinaEngine::Rendering {
                 data.Depth    = builder.Write(data.Depth, Rhi::ERhiResourceState::DepthWrite);
 
                 if (drawList != nullptr) {
-                    for (const auto& batch : drawList->Batches) {
-                        registerMaterialTextureReads(builder, batch.Material, batch.Pass);
+                    for (const auto& batch : drawList->mBatches) {
+                        registerMaterialTextureReads(builder, batch.mMaterial, batch.mPass);
                     }
                 }
 

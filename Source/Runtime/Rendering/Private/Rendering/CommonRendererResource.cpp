@@ -20,6 +20,7 @@
 #include "Utility/Filesystem/Path.h"
 #include "Utility/Filesystem/PathUtils.h"
 #include "Utility/String/CodeConvert.h"
+#include "Rhi/RhiShader.h"
 
 namespace AltinaEngine::Rendering {
     namespace {
@@ -258,7 +259,7 @@ namespace AltinaEngine::Rendering {
 
             if (!FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
                 LogError(
-                    TEXT("Failed to register deferred shader: key='{}'"), outKey.Name.ToView());
+                    TEXT("Failed to register deferred shader: key='{}'"), outKey.mName.ToView());
                 return false;
             }
 
@@ -370,7 +371,7 @@ namespace AltinaEngine::Rendering {
             // backend binding index (notably D3D11 register flattening) and cause false
             // conflicts; only fall back to VS when PS has no texture bindings.
             AddTextureBindings(layout, pixel);
-            if (layout.TextureBindings.IsEmpty()) {
+            if (layout.mTextureBindings.IsEmpty()) {
                 AddTextureBindings(layout, vertex);
             }
             layout.SortTextureBindings();
@@ -508,38 +509,38 @@ namespace AltinaEngine::Rendering {
 
         auto templ = Container::MakeShared<RenderCore::FMaterialTemplate>();
         RenderCore::FMaterialPassDesc passDesc{};
-        passDesc.Shaders.Vertex = vsKey;
-        passDesc.Shaders.Pixel  = psKey;
-        passDesc.Layout         = BuildMaterialLayout(&vsResult.mReflection, &psResult.mReflection);
-        passDesc.State.Depth.mDepthEnable  = true;
-        passDesc.State.Depth.mDepthWrite   = true;
-        passDesc.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::GreaterEqual;
+        passDesc.mShaders.mVertex = vsKey;
+        passDesc.mShaders.mPixel  = psKey;
+        passDesc.mLayout = BuildMaterialLayout(&vsResult.mReflection, &psResult.mReflection);
+        passDesc.mState.mDepth.mDepthEnable  = true;
+        passDesc.mState.mDepth.mDepthWrite   = true;
+        passDesc.mState.mDepth.mDepthCompare = Rhi::ERhiCompareOp::GreaterEqual;
 
         Shader::FShaderRasterState rasterState{};
         if (TryParseRasterState(shaderPath, rasterState)) {
-            passDesc.State.ApplyRasterState(rasterState);
+            passDesc.mState.ApplyRasterState(rasterState);
         }
 
         // Renderer default: cull back. Front-cull here can hide the entire scene when winding
         // conventions change across backends.
-        passDesc.State.Raster.mCullMode = Rhi::ERhiRasterCullMode::Back;
+        passDesc.mState.mRaster.mCullMode = Rhi::ERhiRasterCullMode::Back;
 
         templ->SetPassDesc(EMaterialPass::BasePass, Move(passDesc));
 
         // Shadow depth-only pass (Directional CSM).
         RenderCore::FMaterialPassDesc shadowPass{};
-        shadowPass.Shaders.Vertex            = shadowVsKey;
-        shadowPass.Shaders.Pixel             = shadowPsKey;
-        shadowPass.State.Depth.mDepthEnable  = true;
-        shadowPass.State.Depth.mDepthWrite   = true;
-        shadowPass.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::GreaterEqual;
+        shadowPass.mShaders.mVertex            = shadowVsKey;
+        shadowPass.mShaders.mPixel             = shadowPsKey;
+        shadowPass.mState.mDepth.mDepthEnable  = true;
+        shadowPass.mState.mDepth.mDepthWrite   = true;
+        shadowPass.mState.mDepth.mDepthCompare = Rhi::ERhiCompareOp::GreaterEqual;
         // NOTE:
         // Reverse-Z + D32F depth makes the traditional large positive depth-bias values extremely
         // aggressive and can effectively flatten the shadow map to the clear value in some
         // scenes/drivers. Start bias-free for correctness; we can re-introduce tuned bias later.
-        shadowPass.State.Raster.mCullMode             = Rhi::ERhiRasterCullMode::None;
-        shadowPass.State.Raster.mDepthBias            = 0;
-        shadowPass.State.Raster.mSlopeScaledDepthBias = 0.0f;
+        shadowPass.mState.mRaster.mCullMode             = Rhi::ERhiRasterCullMode::None;
+        shadowPass.mState.mRaster.mDepthBias            = 0;
+        shadowPass.mState.mRaster.mSlopeScaledDepthBias = 0.0f;
         templ->SetPassDesc(EMaterialPass::ShadowPass, Move(shadowPass));
 
         FBasicDeferredRenderer::SetDefaultMaterialTemplate(templ);
@@ -547,7 +548,7 @@ namespace AltinaEngine::Rendering {
         FBasicDeferredRenderer::SetSsaoShaderKeys(ssaoVsKey, ssaoPsKey);
         FBasicDeferredRenderer::SetSkyBoxShaderKeys(skyBoxVsKey, skyBoxPsKey);
         LogInfo(TEXT("Deferred lighting shader keys configured: vs='{}' ps='{}'"),
-            lightingVsKey.Name.ToView(), lightingPsKey.Name.ToView());
+            lightingVsKey.mName.ToView(), lightingPsKey.mName.ToView());
         sInitialized = true;
     }
 } // namespace AltinaEngine::Rendering

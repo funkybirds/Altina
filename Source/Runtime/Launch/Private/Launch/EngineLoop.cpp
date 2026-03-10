@@ -1276,17 +1276,19 @@ namespace AltinaEngine::Launch {
                             mMaterialCache, shadowDrawLists[i]);
                     }
                     for (auto& drawList : drawLists) {
-                        for (const auto& batch : drawList.Batches) {
-                            if (batch.Material != nullptr) {
-                                auto* material = const_cast<RenderCore::FMaterial*>(batch.Material);
+                        for (const auto& batch : drawList.mBatches) {
+                            if (batch.mMaterial != nullptr) {
+                                auto* material =
+                                    const_cast<RenderCore::FMaterial*>(batch.mMaterial);
                                 mMaterialCache.PrepareMaterialForRendering(*material);
                             }
                         }
                     }
                     for (auto& drawList : shadowDrawLists) {
-                        for (const auto& batch : drawList.Batches) {
-                            if (batch.Material != nullptr) {
-                                auto* material = const_cast<RenderCore::FMaterial*>(batch.Material);
+                        for (const auto& batch : drawList.mBatches) {
+                            if (batch.mMaterial != nullptr) {
+                                auto* material =
+                                    const_cast<RenderCore::FMaterial*>(batch.mMaterial);
                                 mMaterialCache.PrepareMaterialForRendering(*material);
                             }
                         }
@@ -1301,7 +1303,7 @@ namespace AltinaEngine::Launch {
 
         u32 totalBatches = 0U;
         for (const auto& drawList : drawLists) {
-            totalBatches += static_cast<u32>(drawList.Batches.Size());
+            totalBatches += static_cast<u32>(drawList.mBatches.Size());
         }
 
         if (mDebugGui && mInputSystem) {

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "RenderCoreAPI.h"
-
 #include "Container/Vector.h"
 #include "Geometry/StaticMeshData.h"
 #include "Material/Material.h"
@@ -20,11 +18,11 @@ namespace AltinaEngine::RenderCore::Render {
     };
 
     struct FDrawKey {
-        u64                   PassKey     = 0ULL; // EMaterialPass
-        u64                   PipelineKey = 0ULL; // ShaderKey + Raster/Depth/Blend
-        u64                   MaterialKey = 0ULL; // Material instance / BindGroup
-        u64                   GeometryKey = 0ULL; // Vertex/Index buffers + topology
-        u64                   SectionKey  = 0ULL; // FirstIndex/IndexCount/BaseVertex
+        u64                   mPassKey     = 0ULL; // EMaterialPass
+        u64                   mPipelineKey = 0ULL; // ShaderKey + Raster/Depth/Blend
+        u64                   mMaterialKey = 0ULL; // Material instance / BindGroup
+        u64                   mGeometryKey = 0ULL; // Vertex/Index buffers + topology
+        u64                   mSectionKey  = 0ULL; // FirstIndex/IndexCount/BaseVertex
 
         friend constexpr auto operator==(const FDrawKey& lhs, const FDrawKey& rhs) noexcept
             -> bool = default;
@@ -32,55 +30,55 @@ namespace AltinaEngine::RenderCore::Render {
 
     [[nodiscard]] inline constexpr auto operator<(const FDrawKey& lhs, const FDrawKey& rhs) noexcept
         -> bool {
-        if (lhs.PassKey != rhs.PassKey) {
-            return lhs.PassKey < rhs.PassKey;
+        if (lhs.mPassKey != rhs.mPassKey) {
+            return lhs.mPassKey < rhs.mPassKey;
         }
-        if (lhs.PipelineKey != rhs.PipelineKey) {
-            return lhs.PipelineKey < rhs.PipelineKey;
+        if (lhs.mPipelineKey != rhs.mPipelineKey) {
+            return lhs.mPipelineKey < rhs.mPipelineKey;
         }
-        if (lhs.MaterialKey != rhs.MaterialKey) {
-            return lhs.MaterialKey < rhs.MaterialKey;
+        if (lhs.mMaterialKey != rhs.mMaterialKey) {
+            return lhs.mMaterialKey < rhs.mMaterialKey;
         }
-        if (lhs.GeometryKey != rhs.GeometryKey) {
-            return lhs.GeometryKey < rhs.GeometryKey;
+        if (lhs.mGeometryKey != rhs.mGeometryKey) {
+            return lhs.mGeometryKey < rhs.mGeometryKey;
         }
-        return lhs.SectionKey < rhs.SectionKey;
+        return lhs.mSectionKey < rhs.mSectionKey;
     }
 
     struct FStaticMeshDrawArgs {
-        const Geometry::FStaticMeshData* Mesh         = nullptr;
-        u32                              LodIndex     = 0U;
-        u32                              SectionIndex = 0U;
+        const Geometry::FStaticMeshData* mMesh         = nullptr;
+        u32                              mLodIndex     = 0U;
+        u32                              mSectionIndex = 0U;
     };
 
     struct FDrawInstanceData {
-        Math::FMatrix4x4f World;
-        Math::FMatrix4x4f PrevWorld; // Reserved for motion vectors / TAA.
-        u32               ObjectId = 0U;
+        Math::FMatrix4x4f mWorld;
+        Math::FMatrix4x4f mPrevWorld; // Reserved for motion vectors / TAA.
+        u32               mObjectId = 0U;
     };
 
     struct FDrawItem {
-        EDrawMeshType       MeshType = EDrawMeshType::StaticMesh;
-        EMaterialPass       Pass     = EMaterialPass::BasePass;
-        const FMaterial*    Material = nullptr;
-        FDrawKey            Key;
+        EDrawMeshType       mMeshType = EDrawMeshType::StaticMesh;
+        EMaterialPass       mPass     = EMaterialPass::BasePass;
+        const FMaterial*    mMaterial = nullptr;
+        FDrawKey            mKey;
 
-        FStaticMeshDrawArgs Static;
-        FDrawInstanceData   Instance; // 单实例（当前）
+        FStaticMeshDrawArgs mStatic;
+        FDrawInstanceData   mInstance;
     };
 
     struct FDrawBatch {
-        FDrawKey                   BatchKey;
-        EMaterialPass              Pass     = EMaterialPass::BasePass;
-        const FMaterial*           Material = nullptr;
-        FStaticMeshDrawArgs        Static;
-        TVector<FDrawInstanceData> Instances; // Same Mesh+Material+Section can be instanced.
+        FDrawKey                   mBatchKey;
+        EMaterialPass              mPass     = EMaterialPass::BasePass;
+        const FMaterial*           mMaterial = nullptr;
+        FStaticMeshDrawArgs        mStatic;
+        TVector<FDrawInstanceData> mInstances; // Same Mesh+Material+Section can be instanced.
     };
 
     struct FDrawList {
-        TVector<FDrawBatch> Batches;
+        TVector<FDrawBatch> mBatches;
 
-        void                Clear() noexcept { Batches.Clear(); }
-        [[nodiscard]] auto  IsEmpty() const noexcept -> bool { return Batches.IsEmpty(); }
+        void                Clear() noexcept { mBatches.Clear(); }
+        [[nodiscard]] auto  IsEmpty() const noexcept -> bool { return mBatches.IsEmpty(); }
     };
 } // namespace AltinaEngine::RenderCore::Render

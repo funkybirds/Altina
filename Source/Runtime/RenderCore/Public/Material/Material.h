@@ -22,10 +22,10 @@ namespace AltinaEngine::RenderCore {
     using Container::TVector;
 
     struct FMaterialDesc {
-        u32 ShadingModel = 0U;
-        u32 BlendMode    = 0U;
-        u32 Flags        = 0U;
-        f32 AlphaCutoff  = 0.0f;
+        u32 mShadingModel = 0U;
+        u32 mBlendMode    = 0U;
+        u32 mFlags        = 0U;
+        f32 mAlphaCutoff  = 0.0f;
     };
 
     class AE_RENDER_CORE_API FMaterial final : public FRenderResource {

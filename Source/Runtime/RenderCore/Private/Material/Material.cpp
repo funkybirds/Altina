@@ -46,8 +46,8 @@ namespace AltinaEngine::RenderCore {
         }
 
         auto LayoutHasBindings(const FMaterialLayout& layout) -> bool {
-            return layout.PropertyBag.IsValid() || !layout.TextureBindings.IsEmpty()
-                || !layout.SamplerBindings.IsEmpty();
+            return layout.mPropertyBag.IsValid() || !layout.mTextureBindings.IsEmpty()
+                || !layout.mSamplerBindings.IsEmpty();
         }
 
         auto ToRhiFillMode(Shader::EShaderRasterFillMode mode) noexcept -> Rhi::ERhiRasterFillMode {
@@ -189,16 +189,16 @@ namespace AltinaEngine::RenderCore {
     }
 
     void FMaterialLayout::Reset() {
-        PropertyBag.Reset();
-        TextureNameHashes.Clear();
-        TextureBindings.Clear();
-        SamplerBindings.Clear();
-        PropertyMap.Clear();
+        mPropertyBag.Reset();
+        mTextureNameHashes.Clear();
+        mTextureBindings.Clear();
+        mSamplerBindings.Clear();
+        mPropertyMap.Clear();
     }
 
     void FMaterialLayout::InitFromConstantBuffer(const Shader::FShaderConstantBuffer& cbuffer) {
-        PropertyBag.Init(cbuffer);
-        PropertyMap.Clear();
+        mPropertyBag.Init(cbuffer);
+        mPropertyMap.Clear();
         for (const auto& member : cbuffer.mMembers) {
             Shader::FShaderPropertyBag::FPropertyDesc desc{};
             desc.mOffset        = member.mOffset;
@@ -207,20 +207,20 @@ namespace AltinaEngine::RenderCore {
             desc.mElementStride = member.mElementStride;
             const auto hash     = HashMaterialParamName(member.mName.ToView());
             if (hash != 0U) {
-                PropertyMap[hash] = desc;
+                mPropertyMap[hash] = desc;
             }
         }
     }
 
     void FMaterialLayout::AddTextureBinding(
         FMaterialParamId nameHash, u32 textureBinding, u32 samplerBinding) {
-        TextureNameHashes.PushBack(nameHash);
-        TextureBindings.PushBack(textureBinding);
-        SamplerBindings.PushBack(samplerBinding);
+        mTextureNameHashes.PushBack(nameHash);
+        mTextureBindings.PushBack(textureBinding);
+        mSamplerBindings.PushBack(samplerBinding);
     }
 
     void FMaterialLayout::SortTextureBindings() {
-        const usize count = TextureBindings.Size();
+        const usize count = mTextureBindings.Size();
         if (count == 0U) {
             return;
         }
@@ -234,16 +234,16 @@ namespace AltinaEngine::RenderCore {
         TVector<FEntry> entries;
         entries.Reserve(count);
 
-        const usize samplerCount = SamplerBindings.Size();
-        const usize nameCount    = TextureNameHashes.Size();
+        const usize samplerCount = mSamplerBindings.Size();
+        const usize nameCount    = mTextureNameHashes.Size();
         const usize safeCount    = (nameCount < count) ? nameCount : count;
 
         for (usize i = 0U; i < safeCount; ++i) {
             FEntry entry{};
-            entry.mNameHash       = TextureNameHashes[i];
-            entry.mTextureBinding = TextureBindings[i];
+            entry.mNameHash       = mTextureNameHashes[i];
+            entry.mTextureBinding = mTextureBindings[i];
             entry.mSamplerBinding =
-                (i < samplerCount) ? SamplerBindings[i] : kMaterialInvalidBinding;
+                (i < samplerCount) ? mSamplerBindings[i] : kMaterialInvalidBinding;
             entries.PushBack(entry);
         }
 
@@ -286,51 +286,51 @@ namespace AltinaEngine::RenderCore {
             }
         }
 
-        TextureNameHashes.Clear();
-        TextureBindings.Clear();
-        SamplerBindings.Clear();
-        TextureNameHashes.Reserve(deduplicated.Size());
-        TextureBindings.Reserve(deduplicated.Size());
-        SamplerBindings.Reserve(deduplicated.Size());
+        mTextureNameHashes.Clear();
+        mTextureBindings.Clear();
+        mSamplerBindings.Clear();
+        mTextureNameHashes.Reserve(deduplicated.Size());
+        mTextureBindings.Reserve(deduplicated.Size());
+        mSamplerBindings.Reserve(deduplicated.Size());
 
         for (const auto& entry : deduplicated) {
-            TextureNameHashes.PushBack(entry.mNameHash);
-            TextureBindings.PushBack(entry.mTextureBinding);
-            SamplerBindings.PushBack(entry.mSamplerBinding);
+            mTextureNameHashes.PushBack(entry.mNameHash);
+            mTextureBindings.PushBack(entry.mTextureBinding);
+            mSamplerBindings.PushBack(entry.mSamplerBinding);
         }
     }
 
     auto FMaterialLayout::FindProperty(FMaterialParamId id) const noexcept
         -> const Shader::FShaderPropertyBag::FPropertyDesc* {
-        const auto it = PropertyMap.FindIt(id);
-        if (it == PropertyMap.end()) {
+        const auto it = mPropertyMap.FindIt(id);
+        if (it == mPropertyMap.end()) {
             return nullptr;
         }
         return &it->second;
     }
 
     void FMaterialPassState::ApplyRasterState(const Shader::FShaderRasterState& state) noexcept {
-        Raster.mFillMode             = ToRhiFillMode(state.mFillMode);
-        Raster.mCullMode             = ToRhiCullMode(state.mCullMode);
-        Raster.mFrontFace            = ToRhiFrontFace(state.mFrontFace);
-        Raster.mDepthBias            = state.mDepthBias;
-        Raster.mDepthBiasClamp       = state.mDepthBiasClamp;
-        Raster.mSlopeScaledDepthBias = state.mSlopeScaledDepthBias;
-        Raster.mDepthClip            = state.mDepthClip;
-        Raster.mConservativeRaster   = state.mConservativeRaster;
+        mRaster.mFillMode             = ToRhiFillMode(state.mFillMode);
+        mRaster.mCullMode             = ToRhiCullMode(state.mCullMode);
+        mRaster.mFrontFace            = ToRhiFrontFace(state.mFrontFace);
+        mRaster.mDepthBias            = state.mDepthBias;
+        mRaster.mDepthBiasClamp       = state.mDepthBiasClamp;
+        mRaster.mSlopeScaledDepthBias = state.mSlopeScaledDepthBias;
+        mRaster.mDepthClip            = state.mDepthClip;
+        mRaster.mConservativeRaster   = state.mConservativeRaster;
     }
 
     auto FMaterialShaderMap::Find(EMaterialPass pass) const noexcept
         -> const FMaterialPassShaders* {
-        const auto it = PassShaders.FindIt(pass);
-        if (it == PassShaders.end()) {
+        const auto it = mPassShaders.FindIt(pass);
+        if (it == mPassShaders.end()) {
             return nullptr;
         }
         return &it->second;
     }
 
     auto FMaterialShaderMap::Has(EMaterialPass pass) const noexcept -> bool {
-        return PassShaders.FindIt(pass) != PassShaders.end();
+        return mPassShaders.FindIt(pass) != mPassShaders.end();
     }
 
     void FMaterialTemplate::SetPassDesc(EMaterialPass pass, FMaterialPassDesc desc) {
@@ -354,19 +354,19 @@ namespace AltinaEngine::RenderCore {
     auto FMaterialTemplate::FindLayout(EMaterialPass pass) const noexcept
         -> const FMaterialLayout* {
         const auto* desc = FindPassDesc(pass);
-        return desc ? &desc->Layout : nullptr;
+        return desc ? &desc->mLayout : nullptr;
     }
 
     auto FMaterialTemplate::FindShaders(EMaterialPass pass) const noexcept
         -> const FMaterialPassShaders* {
         const auto* desc = FindPassDesc(pass);
-        return desc ? &desc->Shaders : nullptr;
+        return desc ? &desc->mShaders : nullptr;
     }
 
     auto FMaterialTemplate::FindState(EMaterialPass pass) const noexcept
         -> const FMaterialPassState* {
         const auto* desc = FindPassDesc(pass);
-        return desc ? &desc->State : nullptr;
+        return desc ? &desc->mState : nullptr;
     }
 
     auto FMaterialTemplate::FindOverrides(EMaterialPass pass) const noexcept
@@ -513,11 +513,11 @@ namespace AltinaEngine::RenderCore {
             return;
         }
 
-        const auto& defaultLayout = anyDesc->Layout;
+        const auto& defaultLayout = anyDesc->mLayout;
         bool        recreated     = false;
         bool        uploaded      = false;
 
-        if (!defaultLayout.PropertyBag.IsValid()) {
+        if (!defaultLayout.mPropertyBag.IsValid()) {
             mCBuffer.Reset();
             mCBufferData.Clear();
             mDirtyCBuffer = false;
@@ -544,7 +544,7 @@ namespace AltinaEngine::RenderCore {
         if (!desc) {
             return false;
         }
-        return desc->Type == type;
+        return desc->mType == type;
     }
 
     void FMaterial::UpdateCBuffer(
@@ -552,7 +552,7 @@ namespace AltinaEngine::RenderCore {
         outRecreated = false;
         outUploaded  = false;
 
-        const u32 sizeBytes = layout.PropertyBag.GetSizeBytes();
+        const u32 sizeBytes = layout.mPropertyBag.GetSizeBytes();
         if (sizeBytes == 0U) {
             mCBuffer.Reset();
             mCBufferData.Clear();
@@ -636,13 +636,13 @@ namespace AltinaEngine::RenderCore {
         };
 
         for (const auto& scalar : mParameters.GetScalars()) {
-            applyParam(scalar.NameHash, &scalar.Value, sizeof(scalar.Value));
+            applyParam(scalar.mNameHash, &scalar.mValue, sizeof(scalar.mValue));
         }
         for (const auto& vector : mParameters.GetVectors()) {
-            applyParam(vector.NameHash, vector.Value.mComponents, sizeof(vector.Value));
+            applyParam(vector.mNameHash, vector.mValue.mComponents, sizeof(vector.mValue));
         }
         for (const auto& matrix : mParameters.GetMatrices()) {
-            applyParam(matrix.NameHash, &matrix.Value.mElements[0][0], sizeof(matrix.Value));
+            applyParam(matrix.mNameHash, &matrix.mValue.mElements[0][0], sizeof(matrix.mValue));
         }
 
         auto lock = mCBuffer->Lock(
@@ -668,7 +668,7 @@ namespace AltinaEngine::RenderCore {
         for (const auto& entry : templ.GetPasses()) {
             const auto  pass       = entry.first;
             const auto& passDesc   = entry.second;
-            const auto& passLayout = passDesc.Layout;
+            const auto& passLayout = passDesc.mLayout;
             const auto& layout     = LayoutHasBindings(passLayout) ? passLayout : defaultLayout;
 
             if (!LayoutHasBindings(layout)) {
@@ -676,13 +676,14 @@ namespace AltinaEngine::RenderCore {
             }
 
             Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-            layoutDesc.mSetIndex = layout.PropertyBag.IsValid() ? layout.PropertyBag.GetSet() : 0U;
+            layoutDesc.mSetIndex =
+                layout.mPropertyBag.IsValid() ? layout.mPropertyBag.GetSet() : 0U;
 
             TVector<Rhi::FRhiBindGroupLayoutEntry> layoutEntries;
 
-            if (layout.PropertyBag.IsValid()) {
+            if (layout.mPropertyBag.IsValid()) {
                 Rhi::FRhiBindGroupLayoutEntry entryDesc{};
-                entryDesc.mBinding          = layout.PropertyBag.GetBinding();
+                entryDesc.mBinding          = layout.mPropertyBag.GetBinding();
                 entryDesc.mType             = Rhi::ERhiBindingType::ConstantBuffer;
                 entryDesc.mVisibility       = Rhi::ERhiShaderStageFlags::All;
                 entryDesc.mArrayCount       = 1U;
@@ -690,10 +691,10 @@ namespace AltinaEngine::RenderCore {
                 layoutEntries.PushBack(entryDesc);
             }
 
-            const usize textureCount = layout.TextureBindings.Size();
+            const usize textureCount = layout.mTextureBindings.Size();
             for (usize i = 0U; i < textureCount; ++i) {
                 Rhi::FRhiBindGroupLayoutEntry entryDesc{};
-                entryDesc.mBinding          = layout.TextureBindings[i];
+                entryDesc.mBinding          = layout.mTextureBindings[i];
                 entryDesc.mType             = Rhi::ERhiBindingType::SampledTexture;
                 entryDesc.mVisibility       = Rhi::ERhiShaderStageFlags::All;
                 entryDesc.mArrayCount       = 1U;
@@ -701,13 +702,13 @@ namespace AltinaEngine::RenderCore {
                 layoutEntries.PushBack(entryDesc);
             }
 
-            const usize samplerCount = layout.SamplerBindings.Size();
+            const usize samplerCount = layout.mSamplerBindings.Size();
             for (usize i = 0U; i < samplerCount; ++i) {
-                if (layout.SamplerBindings[i] == kMaterialInvalidBinding) {
+                if (layout.mSamplerBindings[i] == kMaterialInvalidBinding) {
                     continue;
                 }
                 Rhi::FRhiBindGroupLayoutEntry entryDesc{};
-                entryDesc.mBinding          = layout.SamplerBindings[i];
+                entryDesc.mBinding          = layout.mSamplerBindings[i];
                 entryDesc.mType             = Rhi::ERhiBindingType::Sampler;
                 entryDesc.mVisibility       = Rhi::ERhiShaderStageFlags::All;
                 entryDesc.mArrayCount       = 1U;
@@ -737,44 +738,44 @@ namespace AltinaEngine::RenderCore {
                 LogErrorCat(TEXT("RenderCore.Material"),
                                                 "Material pass {} layout context: set={}, hasCBuffer={}, texCount={}, samplerCount={}.",
                                                 static_cast<u32>(pass), layoutDesc.mSetIndex,
-                                                static_cast<u32>(layout.PropertyBag.IsValid()),
-                                                static_cast<u32>(layout.TextureBindings.Size()),
-                                                static_cast<u32>(layout.SamplerBindings.Size()));
+                                                static_cast<u32>(layout.mPropertyBag.IsValid()),
+                                                static_cast<u32>(layout.mTextureBindings.Size()),
+                                                static_cast<u32>(layout.mSamplerBindings.Size()));
             };
 
-            if (layout.PropertyBag.IsValid() && mCBuffer) {
-                if (!groupBuilder.AddBuffer(layout.PropertyBag.GetBinding(), mCBuffer.Get(), 0ULL,
-                        static_cast<u64>(layout.PropertyBag.GetSizeBytes()))) {
+            if (layout.mPropertyBag.IsValid() && mCBuffer) {
+                if (!groupBuilder.AddBuffer(layout.mPropertyBag.GetBinding(), mCBuffer.Get(), 0ULL,
+                        static_cast<u64>(layout.mPropertyBag.GetSizeBytes()))) {
                     LogErrorCat(TEXT("RenderCore.Material"),
                         "Material pass {}: failed to add cbuffer entry (binding={}); skipping pass.",
-                        static_cast<u32>(pass), layout.PropertyBag.GetBinding());
+                        static_cast<u32>(pass), layout.mPropertyBag.GetBinding());
                     logPassLayoutContext();
                     passValid = false;
                 }
             }
 
-            const usize texCount = layout.TextureBindings.Size();
+            const usize texCount = layout.mTextureBindings.Size();
             for (usize i = 0U; i < texCount; ++i) {
                 if (!passValid) {
                     break;
                 }
                 const auto nameHash =
-                    (i < layout.TextureNameHashes.Size()) ? layout.TextureNameHashes[i] : 0U;
+                    (i < layout.mTextureNameHashes.Size()) ? layout.mTextureNameHashes[i] : 0U;
                 const auto* param =
                     (nameHash != 0U) ? mParameters.FindTextureParam(nameHash) : nullptr;
                 LogInfo(TEXT("Material BindGroup pass={} texIndex={} nameHash=0x{:08X} binding={} ")
                             TEXT("samplerBinding={} hasParam={} srv={} sampler={}"),
                     static_cast<u32>(pass), static_cast<u32>(i), nameHash,
-                    layout.TextureBindings[i],
-                    (i < layout.SamplerBindings.Size()) ? layout.SamplerBindings[i]
-                                                        : kMaterialInvalidBinding,
+                    layout.mTextureBindings[i],
+                    (i < layout.mSamplerBindings.Size()) ? layout.mSamplerBindings[i]
+                                                         : kMaterialInvalidBinding,
                     (param != nullptr) ? 1 : 0,
-                    (param && param->SRV) ? static_cast<const void*>(param->SRV.Get()) : nullptr,
-                    (param && param->Sampler) ? static_cast<const void*>(param->Sampler.Get())
-                                              : nullptr);
+                    (param && param->mSrv) ? static_cast<const void*>(param->mSrv.Get()) : nullptr,
+                    (param && param->mSampler) ? static_cast<const void*>(param->mSampler.Get())
+                                               : nullptr);
 
                 Rhi::FRhiTexture* texture =
-                    (param && param->SRV) ? param->SRV->GetTexture() : nullptr;
+                    (param && param->mSrv) ? param->mSrv->GetTexture() : nullptr;
 
                 if (texture == nullptr) {
                     // Bind safe fallbacks for missing textures so the shader doesn't sample null
@@ -805,21 +806,21 @@ namespace AltinaEngine::RenderCore {
                         texture = fb.WhiteTex.Get();
                     }
                 }
-                if (!groupBuilder.AddTexture(layout.TextureBindings[i], texture)) {
+                if (!groupBuilder.AddTexture(layout.mTextureBindings[i], texture)) {
                     LogErrorCat(TEXT("RenderCore.Material"),
                         "Material pass {}: failed to add texture entry (binding={}, texIndex={}, nameHash=0x{:08X}); skipping pass.",
-                        static_cast<u32>(pass), layout.TextureBindings[i], static_cast<u32>(i),
+                        static_cast<u32>(pass), layout.mTextureBindings[i], static_cast<u32>(i),
                         static_cast<u32>(nameHash));
                     logPassLayoutContext();
                     passValid = false;
                     break;
                 }
 
-                if (i < layout.SamplerBindings.Size()) {
-                    const auto samplerBinding = layout.SamplerBindings[i];
+                if (i < layout.mSamplerBindings.Size()) {
+                    const auto samplerBinding = layout.mSamplerBindings[i];
                     if (samplerBinding != kMaterialInvalidBinding) {
-                        Rhi::FRhiSampler* sampler = (param && param->Sampler)
-                            ? param->Sampler.Get()
+                        Rhi::FRhiSampler* sampler = (param && param->mSampler)
+                            ? param->mSampler.Get()
                             : EnsureDefaultMaterialFallbacks().Sampler.Get();
                         if (!groupBuilder.AddSampler(samplerBinding, sampler)) {
                             LogErrorCat(TEXT("RenderCore.Material"),

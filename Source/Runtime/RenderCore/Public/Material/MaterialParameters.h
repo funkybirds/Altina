@@ -22,25 +22,25 @@ namespace AltinaEngine::RenderCore {
     using Container::TVector;
 
     struct FMaterialScalarParam {
-        FMaterialParamId NameHash = 0U;
-        f32              Value    = 0.0f;
+        FMaterialParamId mNameHash = 0U;
+        f32              mValue    = 0.0f;
     };
 
     struct FMaterialVectorParam {
-        FMaterialParamId NameHash = 0U;
-        Math::FVector4f  Value    = Math::FVector4f(0.0f);
+        FMaterialParamId mNameHash = 0U;
+        Math::FVector4f  mValue    = Math::FVector4f(0.0f);
     };
 
     struct FMaterialMatrixParam {
-        FMaterialParamId  NameHash = 0U;
-        Math::FMatrix4x4f Value    = Math::FMatrix4x4f(0.0f);
+        FMaterialParamId  mNameHash = 0U;
+        Math::FMatrix4x4f mValue    = Math::FMatrix4x4f(0.0f);
     };
 
     struct FMaterialTextureParam {
-        FMaterialParamId               NameHash = 0U;
-        Rhi::FRhiShaderResourceViewRef SRV;
-        Rhi::FRhiSamplerRef            Sampler;
-        u32                            SamplerFlags = 0U;
+        FMaterialParamId               mNameHash = 0U;
+        Rhi::FRhiShaderResourceViewRef mSrv;
+        Rhi::FRhiSamplerRef            mSampler;
+        u32                            mSamplerFlags = 0U;
     };
 
     enum class EMaterialParamType : u8 {
@@ -51,8 +51,8 @@ namespace AltinaEngine::RenderCore {
     };
 
     struct FMaterialParamDesc {
-        FMaterialParamId   NameHash = 0U;
-        EMaterialParamType Type     = EMaterialParamType::Scalar;
+        FMaterialParamId   mNameHash = 0U;
+        EMaterialParamType mType     = EMaterialParamType::Scalar;
     };
 
     class AE_RENDER_CORE_API FMaterialSchema final {

@@ -153,7 +153,7 @@ namespace AltinaEngine::Rendering::TemporalAA {
         auto& state = Detail::GetOrCreateViewState(viewKey);
 
         // Camera cut invalidates history + resets jitter.
-        if (view.Camera.bCameraCut) {
+        if (view.Camera.mCameraCut) {
             state.InvalidateHistory();
             state.ResetTemporalIndex();
         }
@@ -161,7 +161,7 @@ namespace AltinaEngine::Rendering::TemporalAA {
         // Persist current view snapshot (equivalent to FViewData::EndFrame(), but cached across
         // frames).
         state.PrevView.bHasValidHistory    = state.bValidHistory;
-        state.PrevView.bCameraCut          = view.Camera.bCameraCut;
+        state.PrevView.bCameraCut          = view.Camera.mCameraCut;
         state.PrevView.FrameIndex          = view.FrameIndex;
         state.PrevView.TemporalSampleIndex = view.TemporalSampleIndex;
         state.PrevView.DeltaTimeSeconds    = view.DeltaTimeSeconds;

@@ -25,8 +25,9 @@ namespace AltinaEngine::RenderCore {
             auto operator()(const FString& a, const FString& b) const noexcept -> bool;
         };
 
-        using FPresetMap = Container::THashMap<FString, FString, FStringHash, FStringEqual>;
-        static FPresetMap sPresets;
+        using FPresetMap = // NOLINT
+            Container::THashMap<FString, FString, FStringHash, FStringEqual>;
+        static FPresetMap sPresets; // NOLINT
     };
 
     AE_RENDER_CORE_API void InitCommonShaders();

@@ -2,6 +2,7 @@
 
 #include "Reflection/Serializer.h"
 #include "Types/Traits.h"
+#include "Rhi/RhiShader.h"
 
 using AltinaEngine::Move;
 
@@ -30,7 +31,7 @@ namespace AltinaEngine::RenderCore {
 
     auto FMaterialSchema::Find(FMaterialParamId id) const noexcept -> const FMaterialParamDesc* {
         for (const auto& entry : mParams) {
-            if (entry.NameHash == id) {
+            if (entry.mNameHash == id) {
                 return &entry;
             }
         }
@@ -51,10 +52,10 @@ namespace AltinaEngine::RenderCore {
 
         bool changed = false;
         for (auto& param : mScalars) {
-            if (param.NameHash == id) {
-                if (param.Value != value) {
-                    param.Value = value;
-                    changed     = true;
+            if (param.mNameHash == id) {
+                if (param.mValue != value) {
+                    param.mValue = value;
+                    changed      = true;
                 }
                 return changed;
             }
@@ -72,17 +73,17 @@ namespace AltinaEngine::RenderCore {
 
         bool changed = false;
         for (auto& param : mVectors) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 bool differs = false;
                 for (u32 i = 0U; i < 4U; ++i) {
-                    if (param.Value.mComponents[i] != value.mComponents[i]) {
+                    if (param.mValue.mComponents[i] != value.mComponents[i]) {
                         differs = true;
                         break;
                     }
                 }
                 if (differs) {
-                    param.Value = value;
-                    changed     = true;
+                    param.mValue = value;
+                    changed      = true;
                 }
                 return changed;
             }
@@ -100,19 +101,19 @@ namespace AltinaEngine::RenderCore {
 
         bool changed = false;
         for (auto& param : mMatrices) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 bool differs = false;
                 for (u32 r = 0U; r < 4U && !differs; ++r) {
                     for (u32 c = 0U; c < 4U; ++c) {
-                        if (param.Value.mElements[r][c] != value.mElements[r][c]) {
+                        if (param.mValue.mElements[r][c] != value.mElements[r][c]) {
                             differs = true;
                             break;
                         }
                     }
                 }
                 if (differs) {
-                    param.Value = value;
-                    changed     = true;
+                    param.mValue = value;
+                    changed      = true;
                 }
                 return changed;
             }
@@ -130,24 +131,24 @@ namespace AltinaEngine::RenderCore {
 
         bool changed = false;
         for (auto& param : mTextures) {
-            if (param.NameHash == id) {
-                const bool sameSrv     = (param.SRV.Get() == srv.Get());
-                const bool sameSampler = (param.Sampler.Get() == sampler.Get());
-                if (!sameSrv || !sameSampler || param.SamplerFlags != samplerFlags) {
-                    param.SRV          = Move(srv);
-                    param.Sampler      = Move(sampler);
-                    param.SamplerFlags = samplerFlags;
-                    changed            = true;
+            if (param.mNameHash == id) {
+                const bool sameSrv     = (param.mSrv.Get() == srv.Get());
+                const bool sameSampler = (param.mSampler.Get() == sampler.Get());
+                if (!sameSrv || !sameSampler || param.mSamplerFlags != samplerFlags) {
+                    param.mSrv          = Move(srv);
+                    param.mSampler      = Move(sampler);
+                    param.mSamplerFlags = samplerFlags;
+                    changed             = true;
                 }
                 return changed;
             }
         }
 
         FMaterialTextureParam param{};
-        param.NameHash     = id;
-        param.SRV          = Move(srv);
-        param.Sampler      = Move(sampler);
-        param.SamplerFlags = samplerFlags;
+        param.mNameHash     = id;
+        param.mSrv          = Move(srv);
+        param.mSampler      = Move(sampler);
+        param.mSamplerFlags = samplerFlags;
         mTextures.PushBack(Move(param));
         return true;
     }
@@ -155,7 +156,7 @@ namespace AltinaEngine::RenderCore {
     auto FMaterialParameterBlock::FindScalarParam(FMaterialParamId id) const noexcept
         -> const FMaterialScalarParam* {
         for (const auto& param : mScalars) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 return &param;
             }
         }
@@ -165,7 +166,7 @@ namespace AltinaEngine::RenderCore {
     auto FMaterialParameterBlock::FindVectorParam(FMaterialParamId id) const noexcept
         -> const FMaterialVectorParam* {
         for (const auto& param : mVectors) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 return &param;
             }
         }
@@ -175,7 +176,7 @@ namespace AltinaEngine::RenderCore {
     auto FMaterialParameterBlock::FindMatrixParam(FMaterialParamId id) const noexcept
         -> const FMaterialMatrixParam* {
         for (const auto& param : mMatrices) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 return &param;
             }
         }
@@ -185,7 +186,7 @@ namespace AltinaEngine::RenderCore {
     auto FMaterialParameterBlock::FindTextureParam(FMaterialParamId id) const noexcept
         -> const FMaterialTextureParam* {
         for (const auto& param : mTextures) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 return &param;
             }
         }
@@ -197,24 +198,24 @@ namespace AltinaEngine::RenderCore {
 
         serializer.Write(static_cast<u32>(mScalars.Size()));
         for (const auto& param : mScalars) {
-            serializer.Write(param.NameHash);
-            serializer.Write(param.Value);
+            serializer.Write(param.mNameHash);
+            serializer.Write(param.mValue);
         }
 
         serializer.Write(static_cast<u32>(mVectors.Size()));
         for (const auto& param : mVectors) {
-            serializer.Write(param.NameHash);
+            serializer.Write(param.mNameHash);
             for (u32 i = 0U; i < 4U; ++i) {
-                serializer.Write(param.Value.mComponents[i]);
+                serializer.Write(param.mValue.mComponents[i]);
             }
         }
 
         serializer.Write(static_cast<u32>(mMatrices.Size()));
         for (const auto& param : mMatrices) {
-            serializer.Write(param.NameHash);
+            serializer.Write(param.mNameHash);
             for (u32 r = 0U; r < 4U; ++r) {
                 for (u32 c = 0U; c < 4U; ++c) {
-                    serializer.Write(param.Value.mElements[r][c]);
+                    serializer.Write(param.mValue.mElements[r][c]);
                 }
             }
         }
@@ -233,8 +234,8 @@ namespace AltinaEngine::RenderCore {
         result.mScalars.Reserve(scalarCount);
         for (u32 i = 0U; i < scalarCount; ++i) {
             FMaterialScalarParam param{};
-            param.NameHash = deserializer.Read<u32>();
-            param.Value    = deserializer.Read<f32>();
+            param.mNameHash = deserializer.Read<u32>();
+            param.mValue    = deserializer.Read<f32>();
             result.mScalars.PushBack(param);
         }
 
@@ -242,9 +243,9 @@ namespace AltinaEngine::RenderCore {
         result.mVectors.Reserve(vectorCount);
         for (u32 i = 0U; i < vectorCount; ++i) {
             FMaterialVectorParam param{};
-            param.NameHash = deserializer.Read<u32>();
+            param.mNameHash = deserializer.Read<u32>();
             for (u32 c = 0U; c < 4U; ++c) {
-                param.Value.mComponents[c] = deserializer.Read<f32>();
+                param.mValue.mComponents[c] = deserializer.Read<f32>();
             }
             result.mVectors.PushBack(param);
         }
@@ -253,10 +254,10 @@ namespace AltinaEngine::RenderCore {
         result.mMatrices.Reserve(matrixCount);
         for (u32 i = 0U; i < matrixCount; ++i) {
             FMaterialMatrixParam param{};
-            param.NameHash = deserializer.Read<u32>();
+            param.mNameHash = deserializer.Read<u32>();
             for (u32 r = 0U; r < 4U; ++r) {
                 for (u32 c = 0U; c < 4U; ++c) {
-                    param.Value.mElements[r][c] = deserializer.Read<f32>();
+                    param.mValue.mElements[r][c] = deserializer.Read<f32>();
                 }
             }
             result.mMatrices.PushBack(param);

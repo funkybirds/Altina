@@ -35,12 +35,12 @@ namespace AltinaEngine::Engine {
             sceneView.CameraId = id;
             sceneView.Target   = params.ViewTarget;
 
-            auto& viewData                 = sceneView.View;
-            viewData.Camera.ProjectionType = RenderCore::View::ECameraProjectionType::Perspective;
-            viewData.Camera.VerticalFovRadians = component.GetFovYRadians();
-            viewData.Camera.NearPlane          = component.GetNearPlane();
-            viewData.Camera.FarPlane           = component.GetFarPlane();
-            viewData.Camera.Transform = world.Object(component.GetOwner()).GetWorldTransform();
+            auto& viewData                  = sceneView.View;
+            viewData.Camera.mProjectionType = RenderCore::View::ECameraProjectionType::Perspective;
+            viewData.Camera.mVerticalFovRadians = component.GetFovYRadians();
+            viewData.Camera.mNearPlane          = component.GetNearPlane();
+            viewData.Camera.mFarPlane           = component.GetFarPlane();
+            viewData.Camera.mTransform = world.Object(component.GetOwner()).GetWorldTransform();
 
             viewData.ViewRect            = params.ViewRect;
             viewData.RenderTargetExtent  = params.RenderTargetExtent;

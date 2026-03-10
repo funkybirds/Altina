@@ -34,7 +34,7 @@ TEST_CASE("RenderCore.MaterialParameters.Serialization.RoundTrip") {
 
     const auto* scalar = decoded.FindScalarParam(roughnessId);
     REQUIRE(scalar != nullptr);
-    REQUIRE(scalar->Value == 0.7f);
+    REQUIRE(scalar->mValue == 0.7f);
 
     const auto* vector = decoded.FindVectorParam(colorId);
     REQUIRE(vector != nullptr);
@@ -48,7 +48,7 @@ TEST_CASE("RenderCore.MaterialParameters.Serialization.RoundTrip") {
     for (u32 i = 0U; i < 4U; ++i) {
         for (u32 j = 0U; j < 4U; ++j) {
             const f32 expected = (i == j) ? (1.0f + static_cast<f32>(i)) : 0.0f;
-            REQUIRE(matrix->Value.mElements[i][j] == expected);
+            REQUIRE(matrix->mValue.mElements[i][j] == expected);
         }
     }
 }

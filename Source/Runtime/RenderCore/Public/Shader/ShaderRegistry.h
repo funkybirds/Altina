@@ -25,11 +25,11 @@ namespace AltinaEngine::RenderCore {
     class AE_RENDER_CORE_API FShaderRegistry {
     public:
         struct FShaderKey {
-            FString              Name;
-            EShaderStage         Stage       = EShaderStage::Vertex;
-            FShaderPermutationId Permutation = {};
+            FString              mName;
+            EShaderStage         mStage       = EShaderStage::Vertex;
+            FShaderPermutationId mPermutation = {};
 
-            [[nodiscard]] auto   IsValid() const noexcept -> bool { return !Name.IsEmptyString(); }
+            [[nodiscard]] auto   IsValid() const noexcept -> bool { return !mName.IsEmptyString(); }
 
             friend auto          operator==(const FShaderKey& lhs, const FShaderKey& rhs) noexcept
                 -> bool = default;
@@ -48,22 +48,22 @@ namespace AltinaEngine::RenderCore {
 
         static auto        MakeKey(FStringView name, EShaderStage stage,
                    FShaderPermutationId permutation = {}) -> FShaderKey;
-        static auto        MakeAssetKey(FStringView assetPath, FStringView entry, EShaderStage stage,
-                   FShaderPermutationId permutation = {}) -> FShaderKey;
+        static auto MakeAssetKey(FStringView assetPath, FStringView entry, EShaderStage stage,
+            FShaderPermutationId permutation = {}) -> FShaderKey;
 
     private:
         struct FShaderKeyHash {
             auto operator()(const FShaderKey& key) const noexcept -> usize {
-                size_t hash = std::hash<FString>{}(key.Name);
-                hash        = HashCombine(hash, static_cast<size_t>(key.Stage));
-                hash        = HashCombine(hash, static_cast<size_t>(key.Permutation.mHash));
+                size_t hash = std::hash<FString>{}(key.mName);
+                hash        = HashCombine(hash, static_cast<size_t>(key.mStage));
+                hash        = HashCombine(hash, static_cast<size_t>(key.mPermutation.mHash));
                 return static_cast<usize>(hash);
             }
 
         private:
             static constexpr auto HashCombine(size_t seed, size_t value) noexcept -> size_t {
                 constexpr size_t kMul = (sizeof(size_t) == 8) ? 0x9e3779b97f4a7c15ULL : 0x9e3779b9U;
-                return seed ^ (value + kMul + (seed << 6) + (seed >> 2));
+                return seed ^ (value + kMul + (seed << 6) + (seed >> 2)); // NOLINT
             }
         };
 
@@ -73,7 +73,7 @@ namespace AltinaEngine::RenderCore {
             }
         };
 
-        using FRegistryMap =
+        using FRegistryMap = // NOLINT
             THashMap<FShaderKey, Rhi::FRhiShaderRef, FShaderKeyHash, FShaderKeyEqual>;
 
         mutable FMutex mMutex;

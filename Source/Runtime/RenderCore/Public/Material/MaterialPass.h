@@ -5,12 +5,10 @@
 #include "Container/HashMap.h"
 #include "Container/StringView.h"
 #include "Container/Vector.h"
-#include "Math/Vector.h"
 #include "Rhi/RhiStructs.h"
 #include "Shader/ShaderPermutation.h"
 #include "Shader/ShaderPropertyBag.h"
 #include "Shader/ShaderReflection.h"
-#include "Shader/ShaderTypes.h"
 #include "Shader/ShaderRegistry.h"
 #include "Types/Aliases.h"
 
@@ -22,7 +20,7 @@ namespace AltinaEngine::RenderCore {
 
     using Shader::FShaderPermutationId;
 
-    using FMaterialParamId = u32; // NameHash
+    using FMaterialParamId = u32; // NOLINT
 
     [[nodiscard]] AE_RENDER_CORE_API auto HashMaterialParamName(FStringView name) noexcept
         -> FMaterialParamId;
@@ -44,22 +42,22 @@ namespace AltinaEngine::RenderCore {
     };
 
     struct FMaterialLayout {
-        Shader::FShaderPropertyBag                                            PropertyBag;
+        Shader::FShaderPropertyBag                                            mPropertyBag;
 
-        TVector<FMaterialParamId>                                             TextureNameHashes;
-        TVector<u32>                                                          TextureBindings;
-        TVector<u32>                                                          SamplerBindings;
+        TVector<FMaterialParamId>                                             mTextureNameHashes;
+        TVector<u32>                                                          mTextureBindings;
+        TVector<u32>                                                          mSamplerBindings;
 
-        THashMap<FMaterialParamId, Shader::FShaderPropertyBag::FPropertyDesc> PropertyMap;
+        THashMap<FMaterialParamId, Shader::FShaderPropertyBag::FPropertyDesc> mPropertyMap;
 
-        AE_RENDER_CORE_API void Reset();
+        AE_RENDER_CORE_API void                                               Reset();
         AE_RENDER_CORE_API void InitFromConstantBuffer(
             const Shader::FShaderConstantBuffer& cbuffer);
         AE_RENDER_CORE_API void AddTextureBinding(FMaterialParamId nameHash, u32 textureBinding,
             u32 samplerBinding = kMaterialInvalidBinding);
         AE_RENDER_CORE_API void SortTextureBindings();
 
-        [[nodiscard]] auto FindProperty(FMaterialParamId id) const noexcept
+        [[nodiscard]] auto      FindProperty(FMaterialParamId id) const noexcept
             -> const Shader::FShaderPropertyBag::FPropertyDesc*;
         [[nodiscard]] auto HasProperty(FMaterialParamId id) const noexcept -> bool {
             return FindProperty(id) != nullptr;
@@ -67,32 +65,31 @@ namespace AltinaEngine::RenderCore {
     };
 
     struct FMaterialPassShaders {
-        RenderCore::FShaderRegistry::FShaderKey Vertex;
-        RenderCore::FShaderRegistry::FShaderKey Pixel;
-        RenderCore::FShaderRegistry::FShaderKey Compute;
-        FShaderPermutationId                    Permutation;
+        FShaderRegistry::FShaderKey mVertex;
+        FShaderRegistry::FShaderKey mPixel;
+        FShaderRegistry::FShaderKey mCompute;
+        FShaderPermutationId        mPermutation;
 
-        [[nodiscard]] auto                      IsValid() const noexcept -> bool {
-            if (Compute.IsValid()) {
+        [[nodiscard]] auto          IsValid() const noexcept -> bool {
+            if (mCompute.IsValid()) {
                 return true;
             }
-            return Vertex.IsValid();
+            return mVertex.IsValid();
         }
     };
 
     struct FMaterialPassState {
-        Rhi::FRhiRasterStateDesc Raster;
-        Rhi::FRhiDepthStateDesc  Depth;
-        Rhi::FRhiBlendStateDesc  Blend;
+        Rhi::FRhiRasterStateDesc mRaster;
+        Rhi::FRhiDepthStateDesc  mDepth;
+        Rhi::FRhiBlendStateDesc  mBlend;
 
-        AE_RENDER_CORE_API void ApplyRasterState(
-            const Shader::FShaderRasterState& state) noexcept;
+        AE_RENDER_CORE_API void  ApplyRasterState(const Shader::FShaderRasterState& state) noexcept;
     };
 
     struct FMaterialPassDesc {
-        FMaterialPassShaders Shaders;
-        FMaterialPassState   State;
-        FMaterialLayout      Layout;
+        FMaterialPassShaders mShaders;
+        FMaterialPassState   mState;
+        FMaterialLayout      mLayout;
     };
 
 } // namespace AltinaEngine::RenderCore

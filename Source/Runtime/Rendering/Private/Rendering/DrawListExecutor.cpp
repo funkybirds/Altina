@@ -109,7 +109,7 @@ namespace AltinaEngine::Rendering {
         static u64 sBasePassExecCount = 0ULL;
         ++sBasePassExecCount;
 
-        if (drawList.Batches.IsEmpty()) {
+        if (drawList.mBatches.IsEmpty()) {
             return;
         }
 
@@ -122,27 +122,27 @@ namespace AltinaEngine::Rendering {
         u32 skippedNullIndex    = 0U;
         u32 skippedZeroInst     = 0U;
 
-        for (const auto& batch : drawList.Batches) {
+        for (const auto& batch : drawList.mBatches) {
             ++batchCount;
-            const auto* mesh = batch.Static.Mesh;
+            const auto* mesh = batch.mStatic.mMesh;
             if (mesh == nullptr) {
                 ++skippedNullMesh;
                 continue;
             }
-            if (batch.Static.LodIndex >= mesh->Lods.Size()) {
+            if (batch.mStatic.mLodIndex >= mesh->Lods.Size()) {
                 ++skippedInvalidLod;
                 continue;
             }
 
-            const auto& lod     = mesh->Lods[batch.Static.LodIndex];
-            const auto* section = GetSection(lod, batch.Static.SectionIndex);
+            const auto& lod     = mesh->Lods[batch.mStatic.mLodIndex];
+            const auto* section = GetSection(lod, batch.mStatic.mSectionIndex);
             if (section == nullptr) {
                 ++skippedNullSection;
                 continue;
             }
 
             const auto* passDesc =
-                (batch.Material != nullptr) ? batch.Material->FindPassDesc(batch.Pass) : nullptr;
+                (batch.mMaterial != nullptr) ? batch.mMaterial->FindPassDesc(batch.mPass) : nullptr;
             if (pipelineResolver != nullptr) {
                 auto* pipeline = pipelineResolver(batch, passDesc, pipelineUserData);
                 if (pipeline == nullptr) {
@@ -157,8 +157,8 @@ namespace AltinaEngine::Rendering {
                 ctx.RHISetBindGroup(bindings.PerFrameSetIndex, bindings.PerFrame, nullptr, 0U);
             }
 
-            if (batch.Material != nullptr) {
-                auto group = batch.Material->GetBindGroup(batch.Pass);
+            if (batch.mMaterial != nullptr) {
+                auto group = batch.mMaterial->GetBindGroup(batch.mPass);
                 if (group) {
                     ctx.RHISetBindGroup(bindings.PerMaterialSetIndex, group.Get(), nullptr, 0U);
                 }
@@ -178,7 +178,7 @@ namespace AltinaEngine::Rendering {
             BindVertexBuffersResolved(ctx, lod, bindings.ResolvedVertexLayout);
             ctx.RHISetIndexBuffer(indexView);
 
-            const u32 instanceCount = static_cast<u32>(batch.Instances.Size());
+            const u32 instanceCount = static_cast<u32>(batch.mInstances.Size());
             if (instanceCount == 0U) {
                 ++skippedZeroInst;
                 continue;

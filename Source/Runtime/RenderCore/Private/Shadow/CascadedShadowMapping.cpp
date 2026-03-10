@@ -41,8 +41,8 @@ namespace AltinaEngine::RenderCore::Shadow {
 
         void               BuildCascadeSplits(
                           f32 nearVS, f32 farVS, u32 cascadeCount, f32 lambda, FCSMData& outCsm) {
-            cascadeCount        = ClampCascadeCount(cascadeCount);
-            outCsm.CascadeCount = cascadeCount;
+            cascadeCount         = ClampCascadeCount(cascadeCount);
+            outCsm.mCascadeCount = cascadeCount;
             if (cascadeCount == 0U) {
                 return;
             }
@@ -58,9 +58,9 @@ namespace AltinaEngine::RenderCore::Shadow {
                 const f32 uniD  = nearD + (farD - nearD) * si;
                 const f32 split = Lerp(uniD, logD, std::clamp(lambda, 0.0f, 1.0f));
 
-                const u32 idx                = i - 1U;
-                outCsm.Cascades[idx].SplitVS = FVector2f(prev, split);
-                prev                         = split;
+                const u32 idx                  = i - 1U;
+                outCsm.mCascades[idx].mSplitVs = FVector2f(prev, split);
+                prev                           = split;
             }
         }
 
@@ -93,22 +93,22 @@ namespace AltinaEngine::RenderCore::Shadow {
             return;
         }
 
-        const u32 cascadeCount = ClampCascadeCount(settings.CascadeCount);
+        const u32 cascadeCount = ClampCascadeCount(settings.mCascadeCount);
         if (cascadeCount == 0U) {
             return;
         }
 
         // View-space distances (positive Z forward for the engine's LH camera convention).
-        const f32 nearVS = std::max(view.Camera.NearPlane, kEps);
+        const f32 nearVS = std::max(view.Camera.mNearPlane, kEps);
         const f32 farVS =
-            std::max(std::min(view.Camera.FarPlane, settings.MaxDistance), nearVS + kEps);
+            std::max(std::min(view.Camera.mFarPlane, settings.mMaxDistance), nearVS + kEps);
 
-        BuildCascadeSplits(nearVS, farVS, cascadeCount, settings.SplitLambda, outCsm);
+        BuildCascadeSplits(nearVS, farVS, cascadeCount, settings.mSplitLambda, outCsm);
 
         const f32 aspect      = (view.ViewRect.Height > 0U)
                  ? (static_cast<f32>(view.ViewRect.Width) / static_cast<f32>(view.ViewRect.Height))
                  : 1.0f;
-        const f32 tanHalfFovY = std::tan(std::max(view.Camera.VerticalFovRadians * 0.5f, 0.001f));
+        const f32 tanHalfFovY = std::tan(std::max(view.Camera.mVerticalFovRadians * 0.5f, 0.001f));
 
         const FVector3f dirWS = SafeNormalize(light.DirectionWS);
 
@@ -116,18 +116,19 @@ namespace AltinaEngine::RenderCore::Shadow {
         if (!sLoggedOnce) {
             sLoggedOnce = true;
             LogInfo(TEXT("CSM Build: cascades={} splitLambda={} maxDist={} shadowMapSize={}"),
-                cascadeCount, settings.SplitLambda, settings.MaxDistance, settings.ShadowMapSize);
+                cascadeCount, settings.mSplitLambda, settings.mMaxDistance,
+                settings.mShadowMapSize);
             LogInfo(TEXT("CSM Light: dirWS=({}, {}, {}) castShadows={}"), dirWS[0], dirWS[1],
                 dirWS[2], light.bCastShadows ? 1 : 0);
             LogInfo(
                 TEXT("CSM View: originWS=({}, {}, {}) nearVS={} farVS={} fovY(rad)={} reverseZ={}"),
                 view.ViewOrigin[0], view.ViewOrigin[1], view.ViewOrigin[2], nearVS, farVS,
-                view.Camera.VerticalFovRadians, view.bReverseZ ? 1 : 0);
+                view.Camera.mVerticalFovRadians, view.bReverseZ ? 1 : 0);
         }
 
         for (u32 cascadeIndex = 0U; cascadeIndex < cascadeCount; ++cascadeIndex) {
-            const f32 splitNear = outCsm.Cascades[cascadeIndex].SplitVS[0];
-            const f32 splitFar  = outCsm.Cascades[cascadeIndex].SplitVS[1];
+            const f32 splitNear = outCsm.mCascades[cascadeIndex].mSplitVs[0];
+            const f32 splitFar  = outCsm.mCascades[cascadeIndex].mSplitVs[1];
 
             FVector3f cornersVS[8] = {
                 FVector3f(0.0f, 0.0f, 0.0f),
@@ -217,7 +218,7 @@ namespace AltinaEngine::RenderCore::Shadow {
             f32       centerX = (minLS[0] + maxLS[0]) * 0.5f;
             f32       centerY = (minLS[1] + maxLS[1]) * 0.5f;
 
-            const u32 smSize = std::max(settings.ShadowMapSize, 1U);
+            const u32 smSize = std::max(settings.mShadowMapSize, 1U);
             const f32 texelX = width / static_cast<f32>(smSize);
             const f32 texelY = height / static_cast<f32>(smSize);
             if (texelX > kEps) {
@@ -236,7 +237,7 @@ namespace AltinaEngine::RenderCore::Shadow {
             const FMatrix4x4f lightProj =
                 View::FViewMatrixInfo::MakeOrthoProjReversedZ(width, height, nearZ, farZ);
 
-            outCsm.Cascades[cascadeIndex].LightViewProj =
+            outCsm.mCascades[cascadeIndex].mLightViewProj =
                 Math::MatMul(lightProj, lightViewCentered);
 
             if (sLoggedOnce) {

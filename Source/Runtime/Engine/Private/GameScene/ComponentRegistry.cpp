@@ -12,12 +12,19 @@ namespace AltinaEngine::GameScene {
             return;
         }
 
-        const bool existed       = mEntries.HasKey(entry.TypeHash);
-        mEntries[entry.TypeHash] = entry;
-
-        if (existed) {
-            LogWarning(TEXT("GameScene component registry: replaced type hash {}"), entry.TypeHash);
+        auto it = mEntries.FindIt(entry.TypeHash);
+        if (it != mEntries.end()) {
+            const bool hasNameConflict = !it->second.TypeName.IsEmpty() && !entry.TypeName.IsEmpty()
+                && it->second.TypeName != entry.TypeName;
+            it->second = entry;
+            if (hasNameConflict) {
+                LogWarning(
+                    TEXT("GameScene component registry: replaced type hash {}"), entry.TypeHash);
+            }
+            return;
         }
+
+        mEntries[entry.TypeHash] = entry;
     }
 
     auto FComponentRegistry::Has(FComponentTypeHash type) const -> bool {

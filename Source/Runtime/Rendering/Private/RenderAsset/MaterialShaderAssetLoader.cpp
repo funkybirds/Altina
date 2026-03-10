@@ -260,7 +260,7 @@ namespace AltinaEngine::Rendering {
             // backend binding index (notably D3D11 register flattening) and cause false
             // conflicts; only fall back to VS when PS has no texture bindings.
             AddTextureBindings(layout, pixel);
-            if (layout.TextureBindings.IsEmpty()) {
+            if (layout.mTextureBindings.IsEmpty()) {
                 AddTextureBindings(layout, vertex);
             }
             layout.SortTextureBindings();
@@ -461,7 +461,7 @@ namespace AltinaEngine::Rendering {
             outKey = RenderCore::FShaderRegistry::MakeKey(keyName.ToView(), stage);
 
             if (!Rendering::FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
-                LogError(TEXT("Failed to register preset shader {}."), outKey.Name.ToView());
+                LogError(TEXT("Failed to register preset shader {}."), outKey.mName.ToView());
                 return false;
             }
 
@@ -674,7 +674,7 @@ namespace AltinaEngine::Rendering {
         outKey =
             RenderCore::FShaderRegistry::MakeAssetKey(desc->VirtualPath.ToView(), entry, stage);
         if (!Rendering::FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
-            LogError(TEXT("Failed to register shader for {}."), outKey.Name.ToView());
+            LogError(TEXT("Failed to register shader for {}."), outKey.mName.ToView());
             return false;
         }
         return true;
@@ -722,23 +722,23 @@ namespace AltinaEngine::Rendering {
                         keyPrefix, key, vertexResult)) {
                     return {};
                 }
-                passDesc.Shaders.Vertex = key;
-                hasVertexResult         = true;
+                passDesc.mShaders.mVertex = key;
+                hasVertexResult           = true;
 
                 if (!CompileShaderFromFile(shaderPath, psEntry, Shader::EShaderStage::Pixel,
                         keyPrefix, key, pixelResult)) {
                     return {};
                 }
-                passDesc.Shaders.Pixel = key;
-                hasPixelResult         = true;
+                passDesc.mShaders.mPixel = key;
+                hasPixelResult           = true;
             } else if (pass.HasVertex) {
                 RenderCore::FShaderRegistry::FShaderKey key{};
                 if (!CompileShaderFromAsset(pass.Vertex.Asset, pass.Vertex.Entry.ToView(),
                         Shader::EShaderStage::Vertex, registry, manager, key, vertexResult)) {
                     return {};
                 }
-                passDesc.Shaders.Vertex = key;
-                hasVertexResult         = true;
+                passDesc.mShaders.mVertex = key;
+                hasVertexResult           = true;
             }
 
             if (pass.Preset.IsEmptyString() && pass.HasPixel) {
@@ -747,8 +747,8 @@ namespace AltinaEngine::Rendering {
                         Shader::EShaderStage::Pixel, registry, manager, key, pixelResult)) {
                     return {};
                 }
-                passDesc.Shaders.Pixel = key;
-                hasPixelResult         = true;
+                passDesc.mShaders.mPixel = key;
+                hasPixelResult           = true;
             }
 
             if (pass.Preset.IsEmptyString() && pass.HasCompute) {
@@ -758,15 +758,15 @@ namespace AltinaEngine::Rendering {
                         Shader::EShaderStage::Compute, registry, manager, key, computeResult)) {
                     return {};
                 }
-                passDesc.Shaders.Compute = key;
+                passDesc.mShaders.mCompute = key;
             }
 
             const Shader::FShaderReflection* vertexReflection =
                 hasVertexResult ? &vertexResult.mReflection : nullptr;
             const Shader::FShaderReflection* pixelReflection =
                 hasPixelResult ? &pixelResult.mReflection : nullptr;
-            passDesc.Layout = BuildMaterialLayout(vertexReflection, pixelReflection);
-            LogMaterialLayout(passDesc.Layout,
+            passDesc.mLayout = BuildMaterialLayout(vertexReflection, pixelReflection);
+            LogMaterialLayout(passDesc.mLayout,
                 SelectMaterialCBuffer(vertexReflection, pixelReflection), pass.Name);
 
             auto* rasterSourceAsset = static_cast<Asset::FShaderAsset*>(nullptr);
@@ -787,17 +787,17 @@ namespace AltinaEngine::Rendering {
             if (passType == RenderCore::EMaterialPass::BasePass
                 || passType == RenderCore::EMaterialPass::DepthPass
                 || passType == RenderCore::EMaterialPass::ShadowPass) {
-                passDesc.State.Depth.mDepthEnable  = true;
-                passDesc.State.Depth.mDepthWrite   = true;
-                passDesc.State.Depth.mDepthCompare = Rhi::ERhiCompareOp::GreaterEqual;
+                passDesc.mState.mDepth.mDepthEnable  = true;
+                passDesc.mState.mDepth.mDepthWrite   = true;
+                passDesc.mState.mDepth.mDepthCompare = Rhi::ERhiCompareOp::GreaterEqual;
             }
 
             if (hasRasterState) {
-                passDesc.State.ApplyRasterState(rasterState);
+                passDesc.mState.ApplyRasterState(rasterState);
             }
 
             if (pass.RasterOverrides.HasAny()) {
-                ApplyRasterOverrides(pass.RasterOverrides, passDesc.State.Raster);
+                ApplyRasterOverrides(pass.RasterOverrides, passDesc.mState.mRaster);
             }
 
             templ->SetPassDesc(passType, Move(passDesc));

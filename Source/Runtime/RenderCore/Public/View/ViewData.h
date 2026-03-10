@@ -111,27 +111,27 @@ namespace AltinaEngine::RenderCore::View {
             const Math::FVector2f& jitterNdc, bool bReverseZ) noexcept {
             JitterNdc = jitterNdc;
 
-            const Math::FMatrix4x4f cameraWorld = camera.Transform.ToMatrix();
+            const Math::FMatrix4x4f cameraWorld = camera.mTransform.ToMatrix();
             View                                = LinAlg::Inverse(cameraWorld);
             InvView                             = cameraWorld;
 
             const f32 viewX = static_cast<f32>(viewRect.Width);
             const f32 viewY = static_cast<f32>(viewRect.Height);
 
-            if (camera.ProjectionType == ECameraProjectionType::Perspective) {
+            if (camera.mProjectionType == ECameraProjectionType::Perspective) {
                 if (bReverseZ) {
-                    ProjUnjittered = LinAlg::FReversedZProjectionMatrixf(
-                        camera.VerticalFovRadians, viewX, viewY, camera.NearPlane, camera.FarPlane);
+                    ProjUnjittered = LinAlg::FReversedZProjectionMatrixf(camera.mVerticalFovRadians,
+                        viewX, viewY, camera.mNearPlane, camera.mFarPlane);
                 } else {
-                    ProjUnjittered = LinAlg::FProjectionMatrixf(
-                        camera.VerticalFovRadians, viewX, viewY, camera.NearPlane, camera.FarPlane);
+                    ProjUnjittered = LinAlg::FProjectionMatrixf(camera.mVerticalFovRadians, viewX,
+                        viewY, camera.mNearPlane, camera.mFarPlane);
                 }
             } else {
                 ProjUnjittered = bReverseZ
-                    ? MakeOrthoProjReversedZ(
-                          camera.OrthoWidth, camera.OrthoHeight, camera.NearPlane, camera.FarPlane)
-                    : MakeOrthoProj(
-                          camera.OrthoWidth, camera.OrthoHeight, camera.NearPlane, camera.FarPlane);
+                    ? MakeOrthoProjReversedZ(camera.mOrthoWidth, camera.mOrthoHeight,
+                          camera.mNearPlane, camera.mFarPlane)
+                    : MakeOrthoProj(camera.mOrthoWidth, camera.mOrthoHeight, camera.mNearPlane,
+                          camera.mFarPlane);
             }
 
             ProjJittered = ApplyJitterToProjection(ProjUnjittered, jitterNdc);
@@ -186,7 +186,7 @@ namespace AltinaEngine::RenderCore::View {
         }
 
         void BeginFrame(const Math::FVector2f& jitterNdc = Math::FVector2f(0.0f)) noexcept {
-            if (Camera.bCameraCut) {
+            if (Camera.mCameraCut) {
                 Previous.Invalidate();
             }
 
@@ -195,7 +195,7 @@ namespace AltinaEngine::RenderCore::View {
 
         void EndFrame() noexcept {
             Previous.bHasValidHistory    = true;
-            Previous.bCameraCut          = Camera.bCameraCut;
+            Previous.bCameraCut          = Camera.mCameraCut;
             Previous.FrameIndex          = FrameIndex;
             Previous.TemporalSampleIndex = TemporalSampleIndex;
             Previous.DeltaTimeSeconds    = DeltaTimeSeconds;

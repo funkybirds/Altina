@@ -17,29 +17,29 @@ namespace AltinaEngine::RenderCore::View {
     };
 
     struct AE_RENDER_CORE_API FCameraData {
-        ECameraProjectionType     ProjectionType = ECameraProjectionType::Perspective;
+        ECameraProjectionType     mProjectionType = ECameraProjectionType::Perspective;
 
-        f32                       VerticalFovRadians = 1.04719755f; // ~60 deg
-        f32                       NearPlane          = 0.1f;
-        f32                       FarPlane           = 10000.0f;
+        f32                       mVerticalFovRadians = 1.04719755f; // ~60 deg
+        f32                       mNearPlane          = 0.1f;
+        f32                       mFarPlane           = 10000.0f;
 
-        f32                       OrthoWidth  = 512.0f;
-        f32                       OrthoHeight = 512.0f;
+        f32                       mOrthoWidth  = 512.0f;
+        f32                       mOrthoHeight = 512.0f;
 
-        LinAlg::FSpatialTransform Transform = LinAlg::FSpatialTransform::Identity();
+        LinAlg::FSpatialTransform mTransform = LinAlg::FSpatialTransform::Identity();
 
-        bool                      bCameraCut = false;
+        bool                      mCameraCut = false;
 
         [[nodiscard]] auto        GetPosition() const noexcept -> const Math::FVector3f& {
-            return Transform.Translation;
+            return mTransform.Translation;
         }
 
         [[nodiscard]] auto GetRotation() const noexcept -> const Math::FQuaternion& {
-            return Transform.Rotation;
+            return mTransform.Rotation;
         }
 
         [[nodiscard]] auto GetScale() const noexcept -> const Math::FVector3f& {
-            return Transform.Scale;
+            return mTransform.Scale;
         }
     };
 

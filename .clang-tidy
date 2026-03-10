@@ -10,7 +10,8 @@ Checks: >
   readability-enum-initial-value,
   readability-simplify-boolean-expr,
   cppcoreguidelines-*,
-  -cppcoreguidelines-avoid-c-arrays
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-avoid-magic-numbers
 WarningsAsErrors: ''
 HeaderFilterRegex: 'Source/.*|Demo/.*'
 FormatStyle: file

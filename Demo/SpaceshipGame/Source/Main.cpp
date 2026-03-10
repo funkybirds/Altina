@@ -337,12 +337,14 @@ namespace {
                 t.Scale = Core::Math::FVector3f(0.000255973f);
                 shipVisualObject.SetLocalTransform(t);
 
-                auto shipModelResult = Engine::GameSceneAsset::FModelAssetInstantiator::Instantiate(
-                    *world, assetManager, shipModelHandle);
+                auto shipModelResult =
+                    Engine::GameSceneAsset::GetPrefabInstantiatorRegistry().Instantiate(
+                        Engine::GameSceneAsset::FModelAssetInstantiator::kLoaderType, *world,
+                        assetManager, shipModelHandle);
                 if (shipModelResult.Root.IsValid()) {
                     world->Object(shipModelResult.Root).SetParent(shipVisualObject.GetId());
 
-                    for (const auto nodeId : shipModelResult.Nodes) {
+                    for (const auto nodeId : shipModelResult.SpawnedNodes) {
                         if (!nodeId.IsValid()) {
                             continue;
                         }
@@ -390,8 +392,10 @@ namespace {
                 t.Scale       = Core::Math::FVector3f(uniformScale);
                 obj.SetWorldTransform(t);
 
-                auto modelResult = Engine::GameSceneAsset::FModelAssetInstantiator::Instantiate(
-                    *world, assetManager, model);
+                auto modelResult =
+                    Engine::GameSceneAsset::GetPrefabInstantiatorRegistry().Instantiate(
+                        Engine::GameSceneAsset::FModelAssetInstantiator::kLoaderType, *world,
+                        assetManager, model);
                 if (!modelResult.Root.IsValid()) {
                     LogWarning(TEXT("[SpaceshipGame] Failed to instantiate model for '{}'."), name);
                     return obj;
@@ -402,7 +406,7 @@ namespace {
                 // Force a single demo material so we can reuse the extracted textures/PBR preset
                 // regardless of the model's embedded material slots.
                 u32 meshNodeCount = 0;
-                for (const auto nodeId : modelResult.Nodes) {
+                for (const auto nodeId : modelResult.SpawnedNodes) {
                     if (!nodeId.IsValid()) {
                         continue;
                     }
@@ -424,7 +428,7 @@ namespace {
                 }
 
                 LogInfo(TEXT("[SpaceshipGame] Instantiated '{}' model: nodes={}, meshNodes={}."),
-                    name, static_cast<u32>(modelResult.Nodes.Size()), meshNodeCount);
+                    name, static_cast<u32>(modelResult.SpawnedNodes.Size()), meshNodeCount);
                 return obj;
             };
 

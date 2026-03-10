@@ -1,8 +1,7 @@
 #pragma once
 
 #include "Engine/EngineAPI.h"
-#include "Engine/GameScene/Ids.h"
-#include "Container/Vector.h"
+#include "Engine/GameSceneAsset/Prefab.h"
 
 namespace AltinaEngine::Asset {
     class FAssetManager;
@@ -14,17 +13,13 @@ namespace AltinaEngine::GameScene {
 } // namespace AltinaEngine::GameScene
 
 namespace AltinaEngine::Engine::GameSceneAsset {
-    namespace Container = Core::Container;
-    using Container::TVector;
-
-    struct AE_ENGINE_API FModelInstantiateResult {
-        GameScene::FGameObjectId          Root{};
-        TVector<GameScene::FGameObjectId> Nodes{};
-    };
-
-    class AE_ENGINE_API FModelAssetInstantiator final {
+    class AE_ENGINE_API FModelAssetInstantiator final : public FBasePrefabInstantiator {
     public:
-        static auto Instantiate(GameScene::FWorld& world, Asset::FAssetManager& manager,
-            const Asset::FAssetHandle& modelHandle) -> FModelInstantiateResult;
+        static constexpr const char* kLoaderType = "engine.prefab.model_asset";
+
+        FModelAssetInstantiator();
+
+        auto Instantiate(GameScene::FWorld& world, Asset::FAssetManager& manager,
+            const Asset::FAssetHandle& modelHandle) -> FPrefabInstantiateResult override;
     };
 } // namespace AltinaEngine::Engine::GameSceneAsset

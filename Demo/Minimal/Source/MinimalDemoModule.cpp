@@ -211,8 +211,9 @@ namespace {
                 }
             }
 
-            auto modelResult = Engine::GameSceneAsset::FModelAssetInstantiator::Instantiate(
-                *world, assetManager, modelHandle);
+            auto modelResult = Engine::GameSceneAsset::GetPrefabInstantiatorRegistry().Instantiate(
+                Engine::GameSceneAsset::FModelAssetInstantiator::kLoaderType, *world, assetManager,
+                modelHandle);
             if (!modelResult.Root.IsValid()) {
                 LogError(TEXT("Failed to instantiate model asset."));
                 return false;

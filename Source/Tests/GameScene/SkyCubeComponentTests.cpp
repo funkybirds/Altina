@@ -8,8 +8,6 @@
 #include "Reflection/BinarySerializer.h"
 #include "Utility/Uuid.h"
 
-#include <array>
-
 namespace {
     using AltinaEngine::FUuid;
     using AltinaEngine::u32;
@@ -38,6 +36,22 @@ namespace {
         }
         return false;
     }
+
+    auto ReadSerializedString(FBinaryDeserializer& deserializer)
+        -> AltinaEngine::Core::Container::FString {
+        const u32 length = deserializer.Read<u32>();
+        if (length == 0U) {
+            return {};
+        }
+
+        AltinaEngine::Core::Container::TVector<TChar> text{};
+        text.Resize(length);
+        for (u32 i = 0U; i < length; ++i) {
+            text[i] = deserializer.Read<TChar>();
+        }
+        return AltinaEngine::Core::Container::FString(
+            text.Data(), static_cast<AltinaEngine::usize>(length));
+    }
 } // namespace
 
 TEST_CASE("GameScene.SkyCubeComponent.ActiveList") {
@@ -64,7 +78,7 @@ TEST_CASE("GameScene.SkyCubeComponent.ActiveList") {
     REQUIRE(Contains(world.GetActiveSkyCubeComponents(), id));
 }
 
-TEST_CASE("GameScene.SkyCubeComponent.Serialization.BinaryRoundTrip") {
+TEST_CASE("GameScene.SkyCubeComponent.Serialization.BinaryV2Raw") {
     AltinaEngine::Engine::RegisterEngineReflection();
 
     FWorld world(7);
@@ -85,12 +99,32 @@ TEST_CASE("GameScene.SkyCubeComponent.Serialization.BinaryRoundTrip") {
 
     FBinaryDeserializer deserializer;
     deserializer.SetBuffer(serializer.GetBuffer());
-    auto loaded = FWorld::Deserialize(deserializer);
-    REQUIRE(static_cast<bool>(loaded));
 
-    const auto loadedCompId = loaded->GetComponent<FSkyCubeComponent>(obj.GetId());
-    REQUIRE(loadedCompId.IsValid());
+    REQUIRE(deserializer.Read<u32>() == 2U);
+    REQUIRE(deserializer.Read<u32>() == world.GetWorldId());
+    REQUIRE(deserializer.Read<u32>() == 1U);
 
-    const auto& loadedComp = loaded->ResolveComponent<FSkyCubeComponent>(loadedCompId);
-    REQUIRE(loadedComp.GetCubeMapAsset() == handle);
+    REQUIRE(deserializer.Read<u8>() == 0U);
+    REQUIRE(deserializer.Read<u32>() == obj.GetId().Index);
+    REQUIRE(deserializer.Read<u32>() == obj.GetId().Generation);
+    REQUIRE(ReadSerializedString(deserializer).ToView() == TEXT("Sky"));
+    REQUIRE(deserializer.Read<bool>() == true);
+    REQUIRE(deserializer.Read<bool>() == false);
+
+    for (u32 i = 0U; i < 10U; ++i) {
+        (void)deserializer.Read<f32>();
+    }
+
+    REQUIRE(deserializer.Read<u32>() == 1U);
+    REQUIRE(deserializer.Read<AltinaEngine::GameScene::FComponentTypeHash>()
+        == AltinaEngine::GameScene::GetComponentTypeHash<FSkyCubeComponent>());
+    REQUIRE(deserializer.Read<bool>() == true);
+
+    const auto serializedType = static_cast<EAssetType>(deserializer.Read<u8>());
+    REQUIRE(serializedType == handle.Type);
+    FUuid::FBytes bytes{};
+    for (u32 i = 0U; i < FUuid::kByteCount; ++i) {
+        bytes[i] = deserializer.Read<u8>();
+    }
+    REQUIRE(FUuid(bytes) == handle.Uuid);
 }

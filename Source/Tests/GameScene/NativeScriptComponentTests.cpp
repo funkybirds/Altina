@@ -10,6 +10,7 @@
 #include "Types/Aliases.h"
 
 using AltinaEngine::i32;
+using AltinaEngine::u32;
 using namespace AltinaEngine::GameScene;
 
 namespace {
@@ -47,9 +48,24 @@ namespace {
         entry.Deserialize = &DeserializeTestNativeScript;
         GetComponentRegistry().Register(entry);
     }
+
+    auto ReadSerializedString(AltinaEngine::Core::Reflection::FBinaryDeserializer& deserializer)
+        -> AltinaEngine::Core::Container::FString {
+        const u32 length = deserializer.Read<u32>();
+        if (length == 0U) {
+            return {};
+        }
+
+        AltinaEngine::Core::Container::TVector<TChar> text{};
+        text.Resize(length);
+        for (u32 i = 0U; i < length; ++i) {
+            text[i] = deserializer.Read<TChar>();
+        }
+        return AltinaEngine::Core::Container::FString(text.Data(), static_cast<usize>(length));
+    }
 } // namespace
 
-TEST_CASE("GameScene.NativeScriptComponent.TickAndSerializationRoundTrip") {
+TEST_CASE("GameScene.NativeScriptComponent.TickAndSerializationV2Raw") {
     AltinaEngine::Engine::RegisterEngineReflection();
     RegisterTestNativeScriptComponent();
 
@@ -75,21 +91,23 @@ TEST_CASE("GameScene.NativeScriptComponent.TickAndSerializationRoundTrip") {
     AltinaEngine::Core::Reflection::FBinaryDeserializer deserializer;
     deserializer.SetBuffer(serializer.GetBuffer());
 
-    // Ensure the type is registered before deserializing the world.
-    RegisterTestNativeScriptComponent();
+    REQUIRE(deserializer.Read<u32>() == 2U);
+    REQUIRE(deserializer.Read<u32>() == world.GetWorldId());
+    REQUIRE(deserializer.Read<u32>() == 1U);
 
-    auto loaded = FWorld::Deserialize(deserializer);
-    REQUIRE(static_cast<bool>(loaded));
+    REQUIRE(deserializer.Read<u8>() == 0U);
+    REQUIRE(deserializer.Read<u32>() == obj.GetId().Index);
+    REQUIRE(deserializer.Read<u32>() == obj.GetId().Generation);
+    REQUIRE(ReadSerializedString(deserializer).ToView() == TEXT("NativeScriptOwner"));
+    REQUIRE(deserializer.Read<bool>() == true);
+    REQUIRE(deserializer.Read<bool>() == false);
 
-    const auto loadedId = loaded->GetComponent<FTestNativeScript>(obj.GetId());
-    REQUIRE(loadedId.IsValid());
+    for (u32 i = 0U; i < 10U; ++i) {
+        (void)deserializer.Read<f32>();
+    }
 
-    auto& loadedScript = loaded->ResolveComponent<FTestNativeScript>(loadedId);
-    REQUIRE_EQ(loadedScript.Value, 1234);
-    REQUIRE_EQ(loadedScript.OnCreateCount, 1);
-    REQUIRE_EQ(loadedScript.OnEnableCount, 1);
-    REQUIRE_EQ(loadedScript.TickCount, 0);
-
-    loaded->Tick(0.016f);
-    REQUIRE_EQ(loadedScript.TickCount, 1);
+    REQUIRE(deserializer.Read<u32>() == 1U);
+    REQUIRE(deserializer.Read<FComponentTypeHash>() == GetComponentTypeHash<FTestNativeScript>());
+    REQUIRE(deserializer.Read<bool>() == true);
+    REQUIRE(deserializer.Read<i32>() == 1234);
 }

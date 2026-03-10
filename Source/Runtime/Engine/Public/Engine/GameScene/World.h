@@ -5,6 +5,7 @@
 #include "Engine/GameScene/ComponentRegistry.h"
 #include "Engine/GameScene/GameObject.h"
 #include "Engine/GameScene/GameObjectView.h"
+#include "Engine/GameSceneAsset/Prefab.h"
 #include "Container/HashMap.h"
 #include "Container/SmartPtr.h"
 #include "Container/Vector.h"
@@ -94,8 +95,15 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto GetActiveSkyCubeComponents() const noexcept
             -> const TVector<FComponentId>&;
 
-        void        Serialize(Core::Reflection::ISerializer& serializer) const;
-        void        SerializeJson(Core::Reflection::ISerializer& serializer) const;
+        void RegisterPrefabRoot(
+            FGameObjectId root, const Engine::GameSceneAsset::FPrefabDescriptor& descriptor);
+        void               UnregisterPrefabRoot(FGameObjectId root);
+        [[nodiscard]] auto TryGetPrefabDescriptor(FGameObjectId root) const
+            -> const Engine::GameSceneAsset::FPrefabDescriptor*;
+        [[nodiscard]] auto IsPrefabRoot(FGameObjectId root) const -> bool;
+
+        void               Serialize(Core::Reflection::ISerializer& serializer) const;
+        void               SerializeJson(Core::Reflection::ISerializer& serializer) const;
         static auto Deserialize(Core::Reflection::IDeserializer& deserializer) -> TOwner<FWorld>;
 
     private:
@@ -327,6 +335,8 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto ResolveComponentBase(FComponentId id) const -> const FComponent*;
 
         [[nodiscard]] auto UpdateTransformRecursive(FGameObjectId id, u32 updateId) -> bool;
+        [[nodiscard]] auto IsDescendantOfPrefabRoot(FGameObjectId id) const -> bool;
+        [[nodiscard]] auto GetSerializableGameObjects() const -> TVector<FGameObjectId>;
 
         [[nodiscard]] auto FindComponentStorage(FComponentTypeHash type) const
             -> FComponentStorageBase*;
@@ -348,7 +358,9 @@ namespace AltinaEngine::GameScene {
         TVector<FComponentId>                              mActiveDirectionalLightComponents{};
         TVector<FComponentId>                              mActivePointLightComponents{};
         TVector<FComponentId>                              mActiveSkyCubeComponents{};
-        u32                                                mTransformUpdateId = 0;
+        THashMap<FGameObjectId, Engine::GameSceneAsset::FPrefabDescriptor, FGameObjectIdHash>
+            mPrefabRoots{};
+        u32 mTransformUpdateId = 0;
     };
 
     namespace Detail {

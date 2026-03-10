@@ -35,6 +35,38 @@ namespace {
         GetComponentRegistry().Register(entry);
     }
 
+    auto ReadSerializedString(FBinaryDeserializer& deserializer) -> Core::Container::FString {
+        const u32 length = deserializer.Read<u32>();
+        if (length == 0U) {
+            return {};
+        }
+
+        Core::Container::TVector<TChar> text{};
+        text.Resize(length);
+        for (u32 i = 0U; i < length; ++i) {
+            text[i] = deserializer.Read<TChar>();
+        }
+        return Core::Container::FString(text.Data(), static_cast<usize>(length));
+    }
+
+    auto ReadSerializedTransform(FBinaryDeserializer& deserializer)
+        -> Core::Math::LinAlg::FSpatialTransform {
+        Core::Math::LinAlg::FSpatialTransform transform{};
+        transform.Rotation.x = deserializer.Read<f32>();
+        transform.Rotation.y = deserializer.Read<f32>();
+        transform.Rotation.z = deserializer.Read<f32>();
+        transform.Rotation.w = deserializer.Read<f32>();
+
+        transform.Translation.mComponents[0] = deserializer.Read<f32>();
+        transform.Translation.mComponents[1] = deserializer.Read<f32>();
+        transform.Translation.mComponents[2] = deserializer.Read<f32>();
+
+        transform.Scale.mComponents[0] = deserializer.Read<f32>();
+        transform.Scale.mComponents[1] = deserializer.Read<f32>();
+        transform.Scale.mComponents[2] = deserializer.Read<f32>();
+        return transform;
+    }
+
     auto RequireTransformEqual(const Core::Math::LinAlg::FSpatialTransform& lhs,
         const Core::Math::LinAlg::FSpatialTransform&                        rhs) -> void {
         REQUIRE(lhs.Rotation.x == rhs.Rotation.x);
@@ -52,7 +84,7 @@ namespace {
     }
 } // namespace
 
-TEST_CASE("GameScene.World.Serialization.RoundTrip") {
+TEST_CASE("GameScene.World.SerializationV2.RawRecords") {
     AltinaEngine::Engine::RegisterEngineReflection();
     RegisterTestComponent();
 
@@ -93,36 +125,40 @@ TEST_CASE("GameScene.World.Serialization.RoundTrip") {
 
     FBinaryDeserializer deserializer;
     deserializer.SetBuffer(serializer.GetBuffer());
-    auto loaded = FWorld::Deserialize(deserializer);
-    REQUIRE(static_cast<bool>(loaded));
 
-    REQUIRE(loaded->GetWorldId() == world.GetWorldId());
-    REQUIRE(loaded->IsAlive(root.GetId()));
-    REQUIRE(loaded->IsAlive(child.GetId()));
+    REQUIRE(deserializer.Read<u32>() == 2U);
+    REQUIRE(deserializer.Read<u32>() == world.GetWorldId());
+    REQUIRE(deserializer.Read<u32>() == 2U);
 
-    const auto loadedRoot  = loaded->Object(root.GetId());
-    const auto loadedChild = loaded->Object(child.GetId());
+    // Root record.
+    REQUIRE(deserializer.Read<u8>() == 0U);
+    REQUIRE(deserializer.Read<u32>() == root.GetId().Index);
+    REQUIRE(deserializer.Read<u32>() == root.GetId().Generation);
+    REQUIRE(ReadSerializedString(deserializer).ToView() == TEXT("Root"));
+    REQUIRE(deserializer.Read<bool>() == true);
+    REQUIRE(deserializer.Read<bool>() == false);
+    RequireTransformEqual(ReadSerializedTransform(deserializer), rootTransform);
+    REQUIRE(deserializer.Read<u32>() == 1U);
+    REQUIRE(deserializer.Read<FComponentTypeHash>() == GetComponentTypeHash<FTestDataComponent>());
+    REQUIRE(deserializer.Read<bool>() == true);
+    REQUIRE(deserializer.Read<i32>() == 7);
+    REQUIRE(deserializer.Read<f32>() == 1.25f);
 
-    REQUIRE(loadedChild.GetParent() == root.GetId());
-    REQUIRE(loadedChild.IsActive() == false);
+    // Child record.
+    REQUIRE(deserializer.Read<u8>() == 0U);
+    REQUIRE(deserializer.Read<u32>() == child.GetId().Index);
+    REQUIRE(deserializer.Read<u32>() == child.GetId().Generation);
+    REQUIRE(ReadSerializedString(deserializer).ToView() == TEXT("Child"));
+    REQUIRE(deserializer.Read<bool>() == false);
+    REQUIRE(deserializer.Read<bool>() == true);
+    REQUIRE(deserializer.Read<u32>() == root.GetId().Index);
+    REQUIRE(deserializer.Read<u32>() == root.GetId().Generation);
+    RequireTransformEqual(ReadSerializedTransform(deserializer), childTransform);
+    REQUIRE(deserializer.Read<u32>() == 1U);
+    REQUIRE(deserializer.Read<FComponentTypeHash>() == GetComponentTypeHash<FTestDataComponent>());
+    REQUIRE(deserializer.Read<bool>() == false);
+    REQUIRE(deserializer.Read<i32>() == -4);
+    REQUIRE(deserializer.Read<f32>() == 9.5f);
 
-    RequireTransformEqual(loadedRoot.GetLocalTransform(), rootTransform);
-    RequireTransformEqual(loadedChild.GetLocalTransform(), childTransform);
-
-    const auto loadedRootComponentId  = loaded->GetComponent<FTestDataComponent>(root.GetId());
-    const auto loadedChildComponentId = loaded->GetComponent<FTestDataComponent>(child.GetId());
-
-    REQUIRE(loadedRootComponentId.IsValid());
-    REQUIRE(loadedChildComponentId.IsValid());
-
-    const auto& loadedRootComp =
-        loaded->ResolveComponent<FTestDataComponent>(loadedRootComponentId);
-    REQUIRE(loadedRootComp.IntValue == 7);
-    REQUIRE(loadedRootComp.FloatValue == 1.25f);
-
-    const auto& loadedChildComp =
-        loaded->ResolveComponent<FTestDataComponent>(loadedChildComponentId);
-    REQUIRE(loadedChildComp.IntValue == -4);
-    REQUIRE(loadedChildComp.FloatValue == 9.5f);
-    REQUIRE(loadedChildComp.IsEnabled() == false);
+    REQUIRE(!deserializer.HasMoreData());
 }

@@ -9,11 +9,26 @@
 
 namespace AltinaEngine::Engine::GameSceneAsset {
     namespace LinAlg = Core::Math::LinAlg;
+    using Container::FNativeString;
+
+    namespace {
+        FModelAssetInstantiator gModelAssetInstantiator{};
+
+        struct FModelAssetInstantiatorRegistryHook final {
+            FModelAssetInstantiatorRegistryHook() {
+                GetPrefabInstantiatorRegistry().Register(gModelAssetInstantiator);
+            }
+        };
+
+        FModelAssetInstantiatorRegistryHook gModelAssetInstantiatorRegistryHook{};
+    } // namespace
+
+    FModelAssetInstantiator::FModelAssetInstantiator() : FBasePrefabInstantiator(kLoaderType) {}
 
     auto FModelAssetInstantiator::Instantiate(GameScene::FWorld& world,
         Asset::FAssetManager& manager, const Asset::FAssetHandle& modelHandle)
-        -> FModelInstantiateResult {
-        FModelInstantiateResult  result{};
+        -> FPrefabInstantiateResult {
+        FPrefabInstantiateResult result{};
 
         Asset::FModelAssetLoader loader(manager);
         auto                     load = loader.Load(modelHandle);
@@ -25,14 +40,14 @@ namespace AltinaEngine::Engine::GameSceneAsset {
         const auto& meshRefs  = load.Model->GetMeshRefs();
         const auto& materials = load.Model->GetMaterialSlots();
 
-        result.Nodes.Resize(nodes.Size());
+        result.SpawnedNodes.Resize(nodes.Size());
         if (nodes.IsEmpty()) {
             return result;
         }
 
         for (usize i = 0; i < nodes.Size(); ++i) {
             auto view = world.CreateGameObject((i == 0) ? TEXT("ModelRoot") : TEXT("ModelNode"));
-            result.Nodes[i] = view.GetId();
+            result.SpawnedNodes[i] = view.GetId();
 
             const auto&               nodeDesc = nodes[i];
             LinAlg::FSpatialTransform transform{};
@@ -48,8 +63,9 @@ namespace AltinaEngine::Engine::GameSceneAsset {
         for (usize i = 0; i < nodes.Size(); ++i) {
             const auto& nodeDesc = nodes[i];
             if (nodeDesc.ParentIndex >= 0
-                && static_cast<usize>(nodeDesc.ParentIndex) < result.Nodes.Size()) {
-                world.Object(result.Nodes[i]).SetParent(result.Nodes[nodeDesc.ParentIndex]);
+                && static_cast<usize>(nodeDesc.ParentIndex) < result.SpawnedNodes.Size()) {
+                world.Object(result.SpawnedNodes[i])
+                    .SetParent(result.SpawnedNodes[nodeDesc.ParentIndex]);
             }
 
             if (nodeDesc.MeshRefIndex < 0
@@ -57,7 +73,7 @@ namespace AltinaEngine::Engine::GameSceneAsset {
                 continue;
             }
 
-            auto view              = world.Object(result.Nodes[i]);
+            auto view              = world.Object(result.SpawnedNodes[i]);
             auto meshComponent     = view.AddComponent<GameScene::FStaticMeshFilterComponent>();
             auto materialComponent = view.AddComponent<GameScene::FMeshMaterialComponent>();
             if (meshComponent.IsValid()) {
@@ -74,7 +90,13 @@ namespace AltinaEngine::Engine::GameSceneAsset {
             }
         }
 
-        result.Root = result.Nodes[0];
+        result.Root = result.SpawnedNodes[0];
+        if (result.Root.IsValid()) {
+            FPrefabDescriptor descriptor{};
+            descriptor.LoaderType  = FNativeString(kLoaderType);
+            descriptor.AssetHandle = modelHandle;
+            world.RegisterPrefabRoot(result.Root, descriptor);
+        }
         return result;
     }
 } // namespace AltinaEngine::Engine::GameSceneAsset

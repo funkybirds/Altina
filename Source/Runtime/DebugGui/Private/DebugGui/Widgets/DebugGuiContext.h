@@ -41,7 +41,7 @@ namespace AltinaEngine::DebugGui::Private {
         }
         [[nodiscard]] auto GetTheme() const noexcept -> const FDebugGuiTheme& { return *mTheme; }
         [[nodiscard]] auto IsMouseHoveringRect(const FRect& rect) const noexcept -> bool {
-            return PointInRect(mInput.MousePos, rect);
+            return PointInRect(mInput.mMousePos, rect);
         }
         [[nodiscard]] auto DebugHashId(FStringView label) const noexcept -> u64 {
             return HashId(label);
@@ -99,19 +99,19 @@ namespace AltinaEngine::DebugGui::Private {
             return mDisplaySize;
         }
         [[nodiscard]] auto GetMousePos() const noexcept -> FVector2f override {
-            return mInput.MousePos;
+            return mInput.mMousePos;
         }
         [[nodiscard]] auto IsMouseDown() const noexcept -> bool override {
-            return mInput.bMouseDown;
+            return mInput.mMouseDown;
         }
         [[nodiscard]] auto WasMousePressed() const noexcept -> bool override {
-            return mInput.bMousePressed;
+            return mInput.mMousePressed;
         }
         [[nodiscard]] auto WasMouseReleased() const noexcept -> bool override {
-            return mInput.bMouseReleased;
+            return mInput.mMouseReleased;
         }
 
-        bool BeginWindow(FStringView title, bool* open) override {
+        auto BeginWindow(FStringView title, bool* open) -> bool override {
             if (title.IsEmpty()) {
                 return false;
             }
@@ -145,43 +145,43 @@ namespace AltinaEngine::DebugGui::Private {
             mCurrentWindowTitle.Assign(title);
             const u64 windowKey = HashWindowKey(title);
             auto&     state     = (*mWindows)[windowKey];
-            if (!state.bInitialized) {
-                state.bInitialized = true;
-                state.Size         = th.WindowDefaultSize;
-                state.Pos          = th.WindowDefaultPos;
+            if (!state.mInitialized) {
+                state.mInitialized = true;
+                state.mSize        = th.mWindowDefaultSize;
+                state.mPos         = th.mWindowDefaultPos;
 
                 // Built-in panels: keep Console hidden by default, and start Stats/CVars in a
                 // collapsed state to reduce screen clutter on first launch.
                 if (title == FStringView(TEXT("DebugGui Stats"))
                     || title == FStringView(TEXT("DebugGui CVars"))) {
-                    state.bCollapsed = true;
+                    state.mCollapsed = true;
                 }
 
                 if (mWindowOrder != nullptr) {
                     // Place windows in columns if the display height is too small for pure
                     // vertical stacking.
-                    const f32 cellW   = state.Size.X() + th.WindowSpacing;
-                    const f32 cellH   = state.Size.Y() + th.WindowSpacing;
-                    const f32 usableH = (mDisplaySize.Y() > th.WindowDefaultPos.Y())
-                        ? (mDisplaySize.Y() - th.WindowDefaultPos.Y())
+                    const f32 cellW   = state.mSize.X() + th.mWindowSpacing;
+                    const f32 cellH   = state.mSize.Y() + th.mWindowSpacing;
+                    const f32 usableH = (mDisplaySize.Y() > th.mWindowDefaultPos.Y())
+                        ? (mDisplaySize.Y() - th.mWindowDefaultPos.Y())
                         : 0.0f;
                     const u32 perCol  = (usableH > cellH) ? static_cast<u32>(usableH / cellH) : 1U;
 
                     const u32 col = static_cast<u32>(windowIndex) / perCol;
                     const u32 row = static_cast<u32>(windowIndex) % perCol;
-                    state.Pos = FVector2f(th.WindowDefaultPos.X() + static_cast<f32>(col) * cellW,
-                        th.WindowDefaultPos.Y() + static_cast<f32>(row) * cellH);
+                    state.mPos = FVector2f(th.mWindowDefaultPos.X() + static_cast<f32>(col) * cellW,
+                        th.mWindowDefaultPos.Y() + static_cast<f32>(row) * cellH);
                 }
             }
 
-            mWindowPos  = state.Pos;
-            mWindowSize = state.Size;
+            mWindowPos  = state.mPos;
+            mWindowSize = state.mSize;
 
-            const f32 titleBarH = th.TitleBarHeight;
+            const f32 titleBarH = th.mTitleBarHeight;
 
             // Title bar collapse button (right side).
-            const f32 kTitlePadX = th.CollapseButtonPadX;
-            const f32 kBtnSize   = th.CollapseButtonSize;
+            const f32 kTitlePadX = th.mCollapseButtonPadX;
+            const f32 kBtnSize   = th.mCollapseButtonSize;
 
             f32       drawH = 0.0f;
             FRect     windowRect{};
@@ -189,102 +189,104 @@ namespace AltinaEngine::DebugGui::Private {
             FVector2f btnMin(0.0f, 0.0f);
             FRect     btnRect{};
 
-            auto      BuildRects = [&]() {
-                drawH      = state.bCollapsed ? (titleBarH + 2.0f) : mWindowSize.Y();
-                windowRect = { mWindowPos,
-                    FVector2f(mWindowPos.X() + mWindowSize.X(), mWindowPos.Y() + drawH) };
-                titleRect  = { mWindowPos,
-                     FVector2f(mWindowPos.X() + mWindowSize.X(), mWindowPos.Y() + titleBarH) };
+            auto      buildRects = [&]() -> void {
+                drawH      = state.mCollapsed ? (titleBarH + 2.0f) : mWindowSize.Y();
+                windowRect = { .Min = mWindowPos,
+                         .Max = FVector2f(mWindowPos.X() + mWindowSize.X(), mWindowPos.Y() + drawH) };
+                titleRect  = { .Min = mWindowPos,
+                          .Max =
+                         FVector2f(mWindowPos.X() + mWindowSize.X(), mWindowPos.Y() + titleBarH) };
                 btnMin  = FVector2f(mWindowPos.X() + mWindowSize.X() - kTitlePadX - kBtnSize,
-                          mWindowPos.Y() + th.CollapseButtonOffsetY);
-                btnRect = { btnMin, FVector2f(btnMin.X() + kBtnSize, btnMin.Y() + kBtnSize) };
+                          mWindowPos.Y() + th.mCollapseButtonOffsetY);
+                btnRect = { .Min = btnMin,
+                         .Max         = FVector2f(btnMin.X() + kBtnSize, btnMin.Y() + kBtnSize) };
                 mWindowRect = windowRect;
             };
 
-            BuildRects();
+            buildRects();
 
             // Collapse toggle interaction.
             const u64  collapseId = HashId(TEXT("##WindowCollapse"));
-            const bool btnHovered = PointInRect(mInput.MousePos, btnRect);
+            const bool btnHovered = PointInRect(mInput.mMousePos, btnRect);
             if (btnHovered) {
-                mUi->HotId              = collapseId;
-                mUi->bWantsCaptureMouse = true;
+                mUi->mHotId             = collapseId;
+                mUi->mWantsCaptureMouse = true;
             }
-            if (btnHovered && mInput.bMousePressed) {
-                mUi->ActiveId = collapseId;
-                mUi->FocusId  = collapseId;
+            if (btnHovered && mInput.mMousePressed) {
+                mUi->mActiveId = collapseId;
+                mUi->mFocusId  = collapseId;
             }
-            if (mUi->ActiveId == collapseId && mInput.bMouseReleased) {
+            if (mUi->mActiveId == collapseId && mInput.mMouseReleased) {
                 if (btnHovered) {
-                    state.bCollapsed = !state.bCollapsed;
+                    state.mCollapsed = !state.mCollapsed;
                 }
-                mUi->ActiveId = 0ULL;
+                mUi->mActiveId = 0ULL;
             }
 
             // Drag interaction (on title bar excluding collapse button).
             const u64  dragId = HashId(TEXT("##WindowDrag"));
             const bool titleHovered =
-                PointInRect(mInput.MousePos, titleRect) && !PointInRect(mInput.MousePos, btnRect);
-            if (titleHovered && mInput.bMousePressed) {
-                mUi->ActiveId           = dragId;
-                mUi->FocusId            = dragId;
-                mUi->bWantsCaptureMouse = true;
+                PointInRect(mInput.mMousePos, titleRect) && !PointInRect(mInput.mMousePos, btnRect);
+            if (titleHovered && mInput.mMousePressed) {
+                mUi->mActiveId          = dragId;
+                mUi->mFocusId           = dragId;
+                mUi->mWantsCaptureMouse = true;
                 if (mDraggingWindowKey != nullptr) {
                     *mDraggingWindowKey = windowKey;
                 }
                 if (mDragOffset != nullptr) {
-                    *mDragOffset = mInput.MousePos - state.Pos;
+                    *mDragOffset = mInput.mMousePos - state.mPos;
                 }
             }
-            if (mUi->ActiveId == dragId && mInput.bMouseDown && mDraggingWindowKey != nullptr
+            if (mUi->mActiveId == dragId && mInput.mMouseDown && mDraggingWindowKey != nullptr
                 && *mDraggingWindowKey == windowKey && mDragOffset != nullptr) {
-                state.Pos  = mInput.MousePos - *mDragOffset;
-                mWindowPos = state.Pos;
+                state.mPos = mInput.mMousePos - *mDragOffset;
+                mWindowPos = state.mPos;
             }
-            if (mUi->ActiveId == dragId && mInput.bMouseReleased) {
-                mUi->ActiveId = 0ULL;
+            if (mUi->mActiveId == dragId && mInput.mMouseReleased) {
+                mUi->mActiveId = 0ULL;
                 if (mDraggingWindowKey != nullptr) {
                     *mDraggingWindowKey = 0ULL;
                 }
             }
 
             // Update rects after drag/collapse changes for correct visuals this frame.
-            BuildRects();
+            buildRects();
 
-            const bool btnHoveredDraw = PointInRect(mInput.MousePos, btnRect);
+            const bool btnHoveredDraw = PointInRect(mInput.mMousePos, btnRect);
 
-            DrawRectFilled(windowRect, th.WindowBg);
-            DrawRect(windowRect, th.WindowBorder, 1.0f);
-            DrawRectFilled(titleRect, th.TitleBarBg);
-            DrawText(
-                FVector2f(mWindowPos.X() + th.WindowPadding, mWindowPos.Y() + th.TitleTextOffsetY),
-                th.TitleText, title);
+            DrawRectFilled(windowRect, th.mWindowBg);
+            DrawRect(windowRect, th.mWindowBorder, 1.0f);
+            DrawRectFilled(titleRect, th.mTitleBarBg);
+            DrawText(FVector2f(
+                         mWindowPos.X() + th.mWindowPadding, mWindowPos.Y() + th.mTitleTextOffsetY),
+                th.mTitleText, title);
 
             // Collapse button visuals.
-            const bool     btnActive = (mUi->ActiveId == collapseId);
+            const bool     btnActive = (mUi->mActiveId == collapseId);
             const FColor32 btnBg     = btnActive
-                    ? th.CollapseButtonActiveBg
-                    : (btnHoveredDraw ? th.CollapseButtonHoverBg : th.CollapseButtonBg);
+                    ? th.mCollapseButtonActiveBg
+                    : (btnHoveredDraw ? th.mCollapseButtonHoverBg : th.mCollapseButtonBg);
             DrawRectFilled(btnRect, btnBg);
-            DrawRect(btnRect, th.CollapseButtonBorder, 1.0f);
+            DrawRect(btnRect, th.mCollapseButtonBorder, 1.0f);
             // Triangle icon (no font dependency).
             const FVector2f c((btnRect.Min.X() + btnRect.Max.X()) * 0.5f,
                 (btnRect.Min.Y() + btnRect.Max.Y()) * 0.5f);
-            const f32       hw = th.CollapseIconHalfWidth;
-            const f32       hh = th.CollapseIconHalfHeight;
-            if (state.bCollapsed) {
+            const f32       hw = th.mCollapseIconHalfWidth;
+            const f32       hh = th.mCollapseIconHalfHeight;
+            if (state.mCollapsed) {
                 // Down triangle.
                 DrawTriangleFilled(FVector2f(c.X() - hw, c.Y() - hh),
                     FVector2f(c.X() + hw, c.Y() - hh), FVector2f(c.X(), c.Y() + hh),
-                    th.CollapseIcon);
+                    th.mCollapseIcon);
             } else {
                 // Up triangle.
                 DrawTriangleFilled(FVector2f(c.X() - hw, c.Y() + hh),
                     FVector2f(c.X() + hw, c.Y() + hh), FVector2f(c.X(), c.Y() - hh),
-                    th.CollapseIcon);
+                    th.mCollapseIcon);
             }
 
-            const f32       pad = th.WindowPadding;
+            const f32       pad = th.mWindowPadding;
             const FVector2f contentMin(mWindowPos.X() + pad, mWindowPos.Y() + titleBarH + pad);
             const FVector2f contentMax(
                 mWindowPos.X() + mWindowSize.X() - pad, mWindowPos.Y() + mWindowSize.Y() - pad);
@@ -294,16 +296,16 @@ namespace AltinaEngine::DebugGui::Private {
             mCursor     = contentMin;
 
             // Basic capture rules: if the mouse is over the window and interacting, capture it.
-            if (PointInRect(mInput.MousePos, windowRect)
-                && (mInput.bMouseDown || mInput.bMousePressed || mInput.MouseWheelDelta != 0.0f)) {
-                mUi->bWantsCaptureMouse = true;
+            if (PointInRect(mInput.mMousePos, windowRect)
+                && (mInput.mMouseDown || mInput.mMousePressed || mInput.mMouseWheelDelta != 0.0f)) {
+                mUi->mWantsCaptureMouse = true;
             }
 
-            if (state.bCollapsed) {
+            if (state.mCollapsed) {
                 return false;
             }
 
-            PushClipRect({ contentMin, contentMax });
+            PushClipRect({ .Min = contentMin, .Max = contentMax });
             return true;
         }
 
@@ -317,42 +319,44 @@ namespace AltinaEngine::DebugGui::Private {
                 AdvanceLine();
                 return;
             }
-            DrawText(mCursor, mTheme->Text, text);
+            DrawText(mCursor, mTheme->mText, text);
             AdvanceLine();
         }
 
         void Separator() override {
-            const f32       y = mCursor.Y() + mTheme->SeparatorPaddingY;
+            const f32       y = mCursor.Y() + mTheme->mSeparatorPaddingY;
             const FVector2f a(mContentMin.X(), y);
             const FVector2f b(mContentMax.X(), y);
-            DrawLine(a, b, mTheme->Separator, 1.0f);
-            mCursor = FVector2f(mCursor.X(), y + mTheme->SeparatorPaddingY + 2.0f);
+            DrawLine(a, b, mTheme->mSeparator, 1.0f);
+            mCursor = FVector2f(mCursor.X(), y + mTheme->mSeparatorPaddingY + 2.0f);
         }
 
-        [[nodiscard]] bool Button(FStringView label) override;
-        [[nodiscard]] bool Checkbox(FStringView label, bool& value) override;
-        [[nodiscard]] bool SliderFloat(
-            FStringView label, f32& value, f32 minValue, f32 maxValue) override;
-        [[nodiscard]] bool InputText(FStringView label, Container::FString& value) override;
-        [[nodiscard]] bool Gizmo(FStringView label, FVector2f& value) override;
+        [[nodiscard]] auto Button(FStringView label) -> bool override;
+        [[nodiscard]] auto Checkbox(FStringView label, bool& value) -> bool override;
+        [[nodiscard]] auto SliderFloat(FStringView label, f32& value, f32 minValue, f32 maxValue)
+            -> bool override;
+        [[nodiscard]] auto InputText(FStringView label, Container::FString& value) -> bool override;
+        [[nodiscard]] auto Gizmo(FStringView label, FVector2f& value) -> bool override;
 
     private:
         void AdvanceLine() {
             mCursor = FVector2f(mContentMin.X(),
-                mCursor.Y() + static_cast<f32>(FFontAtlas::kDrawGlyphH) + mTheme->ItemSpacingY);
+                mCursor.Y() + static_cast<f32>(FFontAtlas::kDrawGlyphH) + mTheme->mItemSpacingY);
         }
 
         void AdvanceItem(const FVector2f& itemSize) {
-            mCursor = FVector2f(mContentMin.X(), mCursor.Y() + itemSize.Y() + mTheme->ItemSpacingY);
+            mCursor =
+                FVector2f(mContentMin.X(), mCursor.Y() + itemSize.Y() + mTheme->mItemSpacingY);
         }
 
-        [[nodiscard]] auto CalcTextWidth(FStringView s) const noexcept -> f32 {
+        static [[nodiscard]] auto CalcTextWidth(FStringView s) noexcept -> f32 {
             return static_cast<f32>(s.Length()) * static_cast<f32>(FFontAtlas::kDrawGlyphW);
         }
 
         [[nodiscard]] auto CalcButtonSize(FStringView label) const noexcept -> FVector2f {
-            const f32 w = CalcTextWidth(label) + mTheme->ButtonPaddingX * 2.0f;
-            const f32 h = static_cast<f32>(FFontAtlas::kDrawGlyphH) + mTheme->ButtonPaddingY * 2.0f;
+            const f32 w = CalcTextWidth(label) + mTheme->mButtonPaddingX * 2.0f;
+            const f32 h =
+                static_cast<f32>(FFontAtlas::kDrawGlyphH) + mTheme->mButtonPaddingY * 2.0f;
             return FVector2f(w, h);
         }
 
@@ -361,14 +365,14 @@ namespace AltinaEngine::DebugGui::Private {
             constexpr u64 kOffset = 1469598103934665603ULL;
             constexpr u64 kPrime  = 1099511628211ULL;
             u64           h       = kOffset;
-            auto          MixView = [&](FStringView v) {
+            auto          mixView = [&](FStringView v) -> void {
                 for (usize i = 0; i < v.Length(); ++i) {
                     h ^= static_cast<u64>(static_cast<u32>(v[i]));
                     h *= kPrime;
                 }
             };
-            MixView(mCurrentWindowTitle.ToView());
-            MixView(label);
+            mixView(mCurrentWindowTitle.ToView());
+            mixView(label);
             return h;
         }
 
@@ -384,28 +388,28 @@ namespace AltinaEngine::DebugGui::Private {
         }
 
         void BeginCmdIfNeeded(u64 textureId) {
-            if (mDrawData->Cmds.IsEmpty()) {
+            if (mDrawData->mCmds.IsEmpty()) {
                 FDrawCmd cmd{};
-                cmd.IndexOffset = 0U;
-                cmd.IndexCount  = 0U;
-                cmd.TextureId   = textureId;
-                cmd.ClipRect    = mClip->Current(mDisplaySize);
-                mDrawData->Cmds.PushBack(cmd);
+                cmd.mIndexOffset = 0U;
+                cmd.mIndexCount  = 0U;
+                cmd.mTextureId   = textureId;
+                cmd.mClipRect    = mClip->Current(mDisplaySize);
+                mDrawData->mCmds.PushBack(cmd);
                 return;
             }
 
             const FRect cur  = mClip->Current(mDisplaySize);
-            const FRect last = mDrawData->Cmds.Back().ClipRect;
+            const FRect last = mDrawData->mCmds.Back().mClipRect;
             const bool  same = (cur.Min.X() == last.Min.X()) && (cur.Min.Y() == last.Min.Y())
                 && (cur.Max.X() == last.Max.X()) && (cur.Max.Y() == last.Max.Y());
-            const bool sameTexture = (mDrawData->Cmds.Back().TextureId == textureId);
+            const bool sameTexture = (mDrawData->mCmds.Back().mTextureId == textureId);
             if (!same || !sameTexture) {
                 FDrawCmd cmd{};
-                cmd.IndexOffset = static_cast<u32>(mDrawData->Indices.Size());
-                cmd.IndexCount  = 0U;
-                cmd.TextureId   = textureId;
-                cmd.ClipRect    = cur;
-                mDrawData->Cmds.PushBack(cmd);
+                cmd.mIndexOffset = static_cast<u32>(mDrawData->mIndices.Size());
+                cmd.mIndexCount  = 0U;
+                cmd.mTextureId   = textureId;
+                cmd.mClipRect    = cur;
+                mDrawData->mCmds.PushBack(cmd);
             }
         }
 
@@ -413,37 +417,44 @@ namespace AltinaEngine::DebugGui::Private {
             const FVector2f& p3, f32 u0, f32 v0, f32 u1, f32 v1, FColor32 color,
             u64 textureId = 0ULL) {
             BeginCmdIfNeeded(textureId);
-            const u32 base = static_cast<u32>(mDrawData->Vertices.Size());
-            mDrawData->Vertices.PushBack({ p0.X(), p0.Y(), u0, v0, color });
-            mDrawData->Vertices.PushBack({ p1.X(), p1.Y(), u1, v0, color });
-            mDrawData->Vertices.PushBack({ p2.X(), p2.Y(), u1, v1, color });
-            mDrawData->Vertices.PushBack({ p3.X(), p3.Y(), u0, v1, color });
+            const u32 base = static_cast<u32>(mDrawData->mVertices.Size());
+            mDrawData->mVertices.PushBack(
+                { .mX = p0.X(), .mY = p0.Y(), .mU = u0, .mV = v0, .mColor = color });
+            mDrawData->mVertices.PushBack(
+                { .mX = p1.X(), .mY = p1.Y(), .mU = u1, .mV = v0, .mColor = color });
+            mDrawData->mVertices.PushBack(
+                { .mX = p2.X(), .mY = p2.Y(), .mU = u1, .mV = v1, .mColor = color });
+            mDrawData->mVertices.PushBack(
+                { .mX = p3.X(), .mY = p3.Y(), .mU = u0, .mV = v1, .mColor = color });
 
-            mDrawData->Indices.PushBack(base + 0U);
-            mDrawData->Indices.PushBack(base + 1U);
-            mDrawData->Indices.PushBack(base + 2U);
-            mDrawData->Indices.PushBack(base + 0U);
-            mDrawData->Indices.PushBack(base + 2U);
-            mDrawData->Indices.PushBack(base + 3U);
+            mDrawData->mIndices.PushBack(base + 0U);
+            mDrawData->mIndices.PushBack(base + 1U);
+            mDrawData->mIndices.PushBack(base + 2U);
+            mDrawData->mIndices.PushBack(base + 0U);
+            mDrawData->mIndices.PushBack(base + 2U);
+            mDrawData->mIndices.PushBack(base + 3U);
 
-            mDrawData->Cmds.Back().IndexCount += 6U;
+            mDrawData->mCmds.Back().mIndexCount += 6U;
         }
 
         void AddTriangleFilled(
             const FVector2f& p0, const FVector2f& p1, const FVector2f& p2, FColor32 color) {
             BeginCmdIfNeeded(0ULL);
-            const u32 base = static_cast<u32>(mDrawData->Vertices.Size());
+            const u32 base = static_cast<u32>(mDrawData->mVertices.Size());
             const f32 u    = (mSolidU0 + mSolidU1) * 0.5f;
             const f32 v    = (mSolidV0 + mSolidV1) * 0.5f;
-            mDrawData->Vertices.PushBack({ p0.X(), p0.Y(), u, v, color });
-            mDrawData->Vertices.PushBack({ p1.X(), p1.Y(), u, v, color });
-            mDrawData->Vertices.PushBack({ p2.X(), p2.Y(), u, v, color });
+            mDrawData->mVertices.PushBack(
+                { .mX = p0.X(), .mY = p0.Y(), .mU = u, .mV = v, .mColor = color });
+            mDrawData->mVertices.PushBack(
+                { .mX = p1.X(), .mY = p1.Y(), .mU = u, .mV = v, .mColor = color });
+            mDrawData->mVertices.PushBack(
+                { .mX = p2.X(), .mY = p2.Y(), .mU = u, .mV = v, .mColor = color });
 
-            mDrawData->Indices.PushBack(base + 0U);
-            mDrawData->Indices.PushBack(base + 1U);
-            mDrawData->Indices.PushBack(base + 2U);
+            mDrawData->mIndices.PushBack(base + 0U);
+            mDrawData->mIndices.PushBack(base + 1U);
+            mDrawData->mIndices.PushBack(base + 2U);
 
-            mDrawData->Cmds.Back().IndexCount += 3U;
+            mDrawData->mCmds.Back().mIndexCount += 3U;
         }
 
         void AddRectFilled(const FRect& rect, FColor32 color) {
@@ -454,13 +465,15 @@ namespace AltinaEngine::DebugGui::Private {
 
         void AddRect(const FRect& rect, FColor32 color, f32 thickness) {
             const f32 t = (thickness > 0.0f) ? thickness : 1.0f;
-            AddRectFilled({ rect.Min, FVector2f(rect.Max.X(), rect.Min.Y() + t) }, color);
-            AddRectFilled({ FVector2f(rect.Min.X(), rect.Max.Y() - t), rect.Max }, color);
-            AddRectFilled({ FVector2f(rect.Min.X(), rect.Min.Y() + t),
-                              FVector2f(rect.Min.X() + t, rect.Max.Y() - t) },
+            AddRectFilled(
+                { .Min = rect.Min, .Max = FVector2f(rect.Max.X(), rect.Min.Y() + t) }, color);
+            AddRectFilled(
+                { .Min = FVector2f(rect.Min.X(), rect.Max.Y() - t), .Max = rect.Max }, color);
+            AddRectFilled({ .Min   = FVector2f(rect.Min.X(), rect.Min.Y() + t),
+                              .Max = FVector2f(rect.Min.X() + t, rect.Max.Y() - t) },
                 color);
-            AddRectFilled({ FVector2f(rect.Max.X() - t, rect.Min.Y() + t),
-                              FVector2f(rect.Max.X(), rect.Max.Y() - t) },
+            AddRectFilled({ .Min   = FVector2f(rect.Max.X() - t, rect.Min.Y() + t),
+                              .Max = FVector2f(rect.Max.X(), rect.Max.Y() - t) },
                 color);
         }
 
@@ -542,11 +555,17 @@ namespace AltinaEngine::DebugGui::Private {
             const f32 maxY = rect.Max.Y();
 
             // 5 non-overlapping quads + 4 corner sectors.
-            AddRectFilled({ FVector2f(minX + r, minY + r), FVector2f(maxX - r, maxY - r) }, color);
-            AddRectFilled({ FVector2f(minX + r, minY), FVector2f(maxX - r, minY + r) }, color);
-            AddRectFilled({ FVector2f(minX + r, maxY - r), FVector2f(maxX - r, maxY) }, color);
-            AddRectFilled({ FVector2f(minX, minY + r), FVector2f(minX + r, maxY - r) }, color);
-            AddRectFilled({ FVector2f(maxX - r, minY + r), FVector2f(maxX, maxY - r) }, color);
+            AddRectFilled(
+                { .Min = FVector2f(minX + r, minY + r), .Max = FVector2f(maxX - r, maxY - r) },
+                color);
+            AddRectFilled(
+                { .Min = FVector2f(minX + r, minY), .Max = FVector2f(maxX - r, minY + r) }, color);
+            AddRectFilled(
+                { .Min = FVector2f(minX + r, maxY - r), .Max = FVector2f(maxX - r, maxY) }, color);
+            AddRectFilled(
+                { .Min = FVector2f(minX, minY + r), .Max = FVector2f(minX + r, maxY - r) }, color);
+            AddRectFilled(
+                { .Min = FVector2f(maxX - r, minY + r), .Max = FVector2f(maxX, maxY - r) }, color);
 
             constexpr f32 kPi   = Core::Math::kPiF;
             const u32     seg90 = CalcArcSegments90(r);

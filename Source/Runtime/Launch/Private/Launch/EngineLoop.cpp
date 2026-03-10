@@ -1308,9 +1308,9 @@ namespace AltinaEngine::Launch {
 
         if (mDebugGui && mInputSystem) {
             DebugGui::FDebugGuiExternalStats stats{};
-            stats.FrameIndex      = frameIndex;
-            stats.ViewCount       = static_cast<u32>(renderScene.Views.Size());
-            stats.SceneBatchCount = totalBatches;
+            stats.mFrameIndex      = frameIndex;
+            stats.mViewCount       = static_cast<u32>(renderScene.Views.Size());
+            stats.mSceneBatchCount = totalBatches;
             mDebugGui->SetExternalStats(stats);
             mDebugGui->TickGameThread(
                 *mInputSystem.Get(), mLastDeltaTimeSeconds, windowWidth, windowHeight);

@@ -38,10 +38,10 @@ TEST_CASE("RenderCore.MaterialParameters.Serialization.RoundTrip") {
 
     const auto* vector = decoded.FindVectorParam(colorId);
     REQUIRE(vector != nullptr);
-    REQUIRE(vector->Value.mComponents[0] == 0.1f);
-    REQUIRE(vector->Value.mComponents[1] == 0.2f);
-    REQUIRE(vector->Value.mComponents[2] == 0.3f);
-    REQUIRE(vector->Value.mComponents[3] == 1.0f);
+    REQUIRE(vector->mValue.mComponents[0] == 0.1f);
+    REQUIRE(vector->mValue.mComponents[1] == 0.2f);
+    REQUIRE(vector->mValue.mComponents[2] == 0.3f);
+    REQUIRE(vector->mValue.mComponents[3] == 1.0f);
 
     const auto* matrix = decoded.FindMatrixParam(matrixId);
     REQUIRE(matrix != nullptr);

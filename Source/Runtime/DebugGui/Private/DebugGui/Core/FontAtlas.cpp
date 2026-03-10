@@ -6,9 +6,9 @@ namespace AltinaEngine::DebugGui::Private {
 #include "DebugGui/FontAtlas32x32.inl"
 
     void FFontAtlas::Build() {
-        Pixels.Resize(static_cast<usize>(kAtlasW) * static_cast<usize>(kAtlasH) * 4U);
-        for (usize i = 0; i < Pixels.Size(); ++i) {
-            Pixels[i] = 0U;
+        mPixels.Resize(static_cast<usize>(kAtlasW) * static_cast<usize>(kAtlasH) * 4U);
+        for (usize i = 0; i < mPixels.Size(); ++i) {
+            mPixels[i] = 0U;
         }
 
         for (u32 ch = kFirstChar; ch <= kLastChar; ++ch) {
@@ -21,14 +21,14 @@ namespace AltinaEngine::DebugGui::Private {
             const u8* glyph = GetFont32x32Glyph(static_cast<u8>(ch));
             for (u32 y = 0U; y < kAtlasGlyphH; ++y) {
                 for (u32 x = 0U; x < kAtlasGlyphW; ++x) {
-                    const u8    a    = glyph ? glyph[y * kAtlasGlyphW + x] : 0U;
-                    const u32   px   = baseX + x;
-                    const u32   py   = baseY + y;
-                    const usize idx  = (static_cast<usize>(py) * kAtlasW + px) * 4U;
-                    Pixels[idx + 0U] = 255U;
-                    Pixels[idx + 1U] = 255U;
-                    Pixels[idx + 2U] = 255U;
-                    Pixels[idx + 3U] = a;
+                    const u8    a     = glyph ? glyph[y * kAtlasGlyphW + x] : 0U;
+                    const u32   px    = baseX + x;
+                    const u32   py    = baseY + y;
+                    const usize idx   = (static_cast<usize>(py) * kAtlasW + px) * 4U;
+                    mPixels[idx + 0U] = 255U;
+                    mPixels[idx + 1U] = 255U;
+                    mPixels[idx + 2U] = 255U;
+                    mPixels[idx + 3U] = a;
                 }
             }
         }
@@ -38,13 +38,13 @@ namespace AltinaEngine::DebugGui::Private {
                 const u32   px  = kSolidTexelX + x;
                 const u32   py  = kSolidTexelY + y;
                 const usize idx = (static_cast<usize>(py) * kAtlasW + px) * 4U;
-                if (idx + 3U >= Pixels.Size()) {
+                if (idx + 3U >= mPixels.Size()) {
                     continue;
                 }
-                Pixels[idx + 0U] = 255U;
-                Pixels[idx + 1U] = 255U;
-                Pixels[idx + 2U] = 255U;
-                Pixels[idx + 3U] = 255U;
+                mPixels[idx + 0U] = 255U;
+                mPixels[idx + 1U] = 255U;
+                mPixels[idx + 2U] = 255U;
+                mPixels[idx + 3U] = 255U;
             }
         }
     }

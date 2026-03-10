@@ -156,8 +156,8 @@ namespace AltinaEngine::DebugGui::Private {
 
         Rhi::FRhiCmdContextAdapter ctx(*commandContext.Get(), *ops);
 
-        const bool                 hasDrawData =
-            !drawData.Cmds.IsEmpty() && !drawData.Vertices.IsEmpty() && !drawData.Indices.IsEmpty();
+        const bool hasDrawData = !drawData.mCmds.IsEmpty() && !drawData.mVertices.IsEmpty()
+            && !drawData.mIndices.IsEmpty();
         if (!hasDrawData) {
             Rhi::FRhiTransitionInfo toPresent{};
             toPresent.mResource = backBuffer;
@@ -250,25 +250,25 @@ namespace AltinaEngine::DebugGui::Private {
         Rhi::FRhiBindGroup* currentBindGroup = nullptr;
 
         u32                 idxOffset = 0U;
-        for (const auto& cmd : drawData.Cmds) {
+        for (const auto& cmd : drawData.mCmds) {
             Rhi::FRhiBindGroupRef imageBindGroup;
-            if (cmd.TextureId == 0ULL) {
+            if (cmd.mTextureId == 0ULL) {
                 imageBindGroup = mBindGroup;
             } else {
-                auto* texturePtr = mExternalTextures.Find(cmd.TextureId);
+                auto* texturePtr = mExternalTextures.Find(cmd.mTextureId);
                 if (texturePtr == nullptr || *texturePtr == nullptr) {
-                    idxOffset += cmd.IndexCount;
+                    idxOffset += cmd.mIndexCount;
                     continue;
                 }
                 if (!EnsureBindGroupForTexture(
-                        device, cmd.TextureId, *texturePtr, imageBindGroup)) {
-                    idxOffset += cmd.IndexCount;
+                        device, cmd.mTextureId, *texturePtr, imageBindGroup)) {
+                    idxOffset += cmd.mIndexCount;
                     continue;
                 }
             }
 
             if (!imageBindGroup) {
-                idxOffset += cmd.IndexCount;
+                idxOffset += cmd.mIndexCount;
                 continue;
             }
             if (currentBindGroup != imageBindGroup.Get()) {
@@ -276,14 +276,14 @@ namespace AltinaEngine::DebugGui::Private {
                 ctx.RHISetBindGroup(0U, currentBindGroup, nullptr, 0U);
             }
 
-            const i32 sx = static_cast<i32>(cmd.ClipRect.Min.X());
-            const i32 sy = static_cast<i32>(cmd.ClipRect.Min.Y());
-            const i32 ex = static_cast<i32>(cmd.ClipRect.Max.X());
-            const i32 ey = static_cast<i32>(cmd.ClipRect.Max.Y());
+            const i32 sx = static_cast<i32>(cmd.mClipRect.Min.X());
+            const i32 sy = static_cast<i32>(cmd.mClipRect.Min.Y());
+            const i32 ex = static_cast<i32>(cmd.mClipRect.Max.X());
+            const i32 ey = static_cast<i32>(cmd.mClipRect.Max.Y());
             const u32 sw = (ex > sx) ? static_cast<u32>(ex - sx) : 0U;
             const u32 sh = (ey > sy) ? static_cast<u32>(ey - sy) : 0U;
             if (sw == 0U || sh == 0U) {
-                idxOffset += cmd.IndexCount;
+                idxOffset += cmd.mIndexCount;
                 continue;
             }
 
@@ -293,8 +293,8 @@ namespace AltinaEngine::DebugGui::Private {
             sc.mWidth  = sw;
             sc.mHeight = sh;
             ctx.RHISetScissor(sc);
-            ctx.RHIDrawIndexed(cmd.IndexCount, 1U, idxOffset, 0, 0U);
-            idxOffset += cmd.IndexCount;
+            ctx.RHIDrawIndexed(cmd.mIndexCount, 1U, idxOffset, 0, 0U);
+            idxOffset += cmd.mIndexCount;
         }
 
         ctx.RHIEndRenderPass();
@@ -339,7 +339,7 @@ namespace AltinaEngine::DebugGui::Private {
             const u32                   rowPitch   = FFontAtlas::kAtlasW * 4U;
             const u32                   slicePitch = rowPitch * FFontAtlas::kAtlasH;
             device.UpdateTextureSubresource(
-                mFontTexture.Get(), sub, atlas.Pixels.Data(), rowPitch, slicePitch);
+                mFontTexture.Get(), sub, atlas.mPixels.Data(), rowPitch, slicePitch);
 
             Rhi::FRhiShaderResourceViewDesc srv{};
             srv.mDebugName.Assign(TEXT("DebugGui.FontAtlas.SRV"));
@@ -665,8 +665,8 @@ namespace AltinaEngine::DebugGui::Private {
 
     bool FDebugGuiRendererD3D11::EnsureGeometryBuffers(
         Rhi::FRhiDevice& device, const FDrawData& drawData) {
-        const u64 vbBytes = static_cast<u64>(drawData.Vertices.Size()) * sizeof(FDrawVertex);
-        const u64 ibBytes = static_cast<u64>(drawData.Indices.Size()) * sizeof(u32);
+        const u64 vbBytes = static_cast<u64>(drawData.mVertices.Size()) * sizeof(FDrawVertex);
+        const u64 ibBytes = static_cast<u64>(drawData.mIndices.Size()) * sizeof(u32);
         if (vbBytes == 0ULL || ibBytes == 0ULL) {
             return false;
         }
@@ -696,8 +696,8 @@ namespace AltinaEngine::DebugGui::Private {
             return false;
         }
 
-        UploadDynamicBuffer(mVertexBuffer.Get(), drawData.Vertices.Data(), vbBytes);
-        UploadDynamicBuffer(mIndexBuffer.Get(), drawData.Indices.Data(), ibBytes);
+        UploadDynamicBuffer(mVertexBuffer.Get(), drawData.mVertices.Data(), vbBytes);
+        UploadDynamicBuffer(mIndexBuffer.Get(), drawData.mIndices.Data(), ibBytes);
         return true;
     }
 

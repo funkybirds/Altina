@@ -9,8 +9,12 @@
 #include "Reflection/BinarySerializer.h"
 #include "Types/Aliases.h"
 
+using AltinaEngine::f32;
 using AltinaEngine::i32;
+using AltinaEngine::TChar;
 using AltinaEngine::u32;
+using AltinaEngine::u8;
+using AltinaEngine::usize;
 using namespace AltinaEngine::GameScene;
 
 namespace {

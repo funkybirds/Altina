@@ -13,62 +13,62 @@ namespace AltinaEngine::DebugGui::Private {
     using Core::Math::FVector2f;
 
     struct FDrawVertex {
-        f32 X     = 0.0f;
-        f32 Y     = 0.0f;
-        f32 U     = 0.0f;
-        f32 V     = 0.0f;
-        u32 Color = 0U; // RGBA8
+        f32 mX     = 0.0f;
+        f32 mY     = 0.0f;
+        f32 mU     = 0.0f;
+        f32 mV     = 0.0f;
+        u32 mColor = 0U; // RGBA8
     };
 
     struct FDrawCmd {
-        u32   IndexCount  = 0U;
-        u32   IndexOffset = 0U;
-        u64   TextureId   = 0ULL; // 0 = internal font/solid texture.
-        FRect ClipRect{};
+        u32   mIndexCount  = 0U;
+        u32   mIndexOffset = 0U;
+        u64   mTextureId   = 0ULL; // 0 = internal font/solid texture.
+        FRect mClipRect{};
     };
 
     struct FDrawData {
-        TVector<FDrawVertex> Vertices;
-        TVector<u32>         Indices;
-        TVector<FDrawCmd>    Cmds;
+        TVector<FDrawVertex> mVertices;
+        TVector<u32>         mIndices;
+        TVector<FDrawCmd>    mCmds;
 
         void                 Clear() {
-            Vertices.Clear();
-            Indices.Clear();
-            Cmds.Clear();
+            mVertices.Clear();
+            mIndices.Clear();
+            mCmds.Clear();
         }
     };
 
     struct FClipRectStack {
-        TVector<FRect> Stack;
+        TVector<FRect> mStack;
 
-        void           Clear() { Stack.Clear(); }
-        void           Push(const FRect& r) { Stack.PushBack(r); }
+        void           Clear() { mStack.Clear(); }
+        void           Push(const FRect& r) { mStack.PushBack(r); }
         void           Pop() {
-            if (!Stack.IsEmpty()) {
-                Stack.PopBack();
+            if (!mStack.IsEmpty()) {
+                mStack.PopBack();
             }
         }
 
         [[nodiscard]] auto Current(const FVector2f& displaySize) const noexcept -> FRect {
-            if (Stack.IsEmpty()) {
-                return { FVector2f(0.0f, 0.0f), displaySize };
+            if (mStack.IsEmpty()) {
+                return { .Min = FVector2f(0.0f, 0.0f), .Max = displaySize };
             }
-            return Stack.Back();
+            return mStack.Back();
         }
     };
 
     struct FUIState {
-        u64  HotId                 = 0ULL;
-        u64  ActiveId              = 0ULL;
-        u64  FocusId               = 0ULL;
-        bool bWantsCaptureMouse    = false;
-        bool bWantsCaptureKeyboard = false;
+        u64  mHotId                = 0ULL;
+        u64  mActiveId             = 0ULL;
+        u64  mFocusId              = 0ULL;
+        bool mWantsCaptureMouse    = false;
+        bool mWantsCaptureKeyboard = false;
 
         void ClearTransient() noexcept {
-            HotId                 = 0ULL;
-            bWantsCaptureMouse    = false;
-            bWantsCaptureKeyboard = false;
+            mHotId                = 0ULL;
+            mWantsCaptureMouse    = false;
+            mWantsCaptureKeyboard = false;
         }
     };
 
@@ -81,26 +81,26 @@ namespace AltinaEngine::DebugGui::Private {
         const f32 minY = (a.Min.Y() > b.Min.Y()) ? a.Min.Y() : b.Min.Y();
         const f32 maxX = (a.Max.X() < b.Max.X()) ? a.Max.X() : b.Max.X();
         const f32 maxY = (a.Max.Y() < b.Max.Y()) ? a.Max.Y() : b.Max.Y();
-        return { FVector2f(minX, minY), FVector2f(maxX, maxY) };
+        return { .Min = FVector2f(minX, minY), .Max = FVector2f(maxX, maxY) };
     }
 
     struct FGuiInput {
-        const Input::FInputSystem* Input                = nullptr;
-        FVector2f                  MousePos             = FVector2f(0.0f, 0.0f);
-        i32                        MouseDeltaX          = 0;
-        i32                        MouseDeltaY          = 0;
-        bool                       bMouseDown           = false;
-        bool                       bMousePressed        = false;
-        bool                       bMouseReleased       = false;
-        f32                        MouseWheelDelta      = 0.0f;
-        bool                       bKeyEnterPressed     = false;
-        bool                       bKeyBackspacePressed = false;
+        const Input::FInputSystem* mInput               = nullptr;
+        FVector2f                  mMousePos            = FVector2f(0.0f, 0.0f);
+        i32                        mMouseDeltaX         = 0;
+        i32                        mMouseDeltaY         = 0;
+        bool                       mMouseDown           = false;
+        bool                       mMousePressed        = false;
+        bool                       mMouseReleased       = false;
+        f32                        mMouseWheelDelta     = 0.0f;
+        bool                       mKeyEnterPressed     = false;
+        bool                       mKeyBackspacePressed = false;
     };
 
     struct FWindowState {
-        bool      bInitialized = false;
-        bool      bCollapsed   = false;
-        FVector2f Pos          = FVector2f(10.0f, 10.0f);
-        FVector2f Size         = FVector2f(460.0f, 260.0f);
+        bool      mInitialized = false;
+        bool      mCollapsed   = false;
+        FVector2f mPos         = FVector2f(10.0f, 10.0f);
+        FVector2f mSize        = FVector2f(460.0f, 260.0f);
     };
 } // namespace AltinaEngine::DebugGui::Private

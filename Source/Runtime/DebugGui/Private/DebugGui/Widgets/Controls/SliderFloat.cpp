@@ -10,23 +10,23 @@ namespace AltinaEngine::DebugGui::Private {
         Text(label);
         const u64   id = HashId(label);
         const f32   w  = mContentMax.X() - mContentMin.X();
-        const f32   h  = mTheme->SliderHeight;
+        const f32   h  = mTheme->mSliderHeight;
         const FRect r{ mCursor, FVector2f(mCursor.X() + w, mCursor.Y() + h) };
 
-        const bool  hovered = PointInRect(mInput.MousePos, r);
+        const bool  hovered = PointInRect(mInput.mMousePos, r);
         if (hovered) {
-            mUi->HotId              = id;
-            mUi->bWantsCaptureMouse = true;
+            mUi->mHotId             = id;
+            mUi->mWantsCaptureMouse = true;
         }
 
-        if (hovered && mInput.bMousePressed) {
-            mUi->ActiveId = id;
-            mUi->FocusId  = id;
+        if (hovered && mInput.mMousePressed) {
+            mUi->mActiveId = id;
+            mUi->mFocusId  = id;
         }
 
         bool changed = false;
-        if (mUi->ActiveId == id && mInput.bMouseDown) {
-            const f32 t        = (mInput.MousePos.X() - r.Min.X()) / (r.Max.X() - r.Min.X());
+        if (mUi->mActiveId == id && mInput.mMouseDown) {
+            const f32 t        = (mInput.mMousePos.X() - r.Min.X()) / (r.Max.X() - r.Min.X());
             const f32 tt       = (t < 0.0f) ? 0.0f : ((t > 1.0f) ? 1.0f : t);
             const f32 newValue = minValue + tt * (maxValue - minValue);
             if (newValue != value) {
@@ -34,18 +34,18 @@ namespace AltinaEngine::DebugGui::Private {
                 changed = true;
             }
         }
-        if (mUi->ActiveId == id && mInput.bMouseReleased) {
-            mUi->ActiveId = 0ULL;
+        if (mUi->mActiveId == id && mInput.mMouseReleased) {
+            mUi->mActiveId = 0ULL;
         }
 
-        DrawRectFilled(r, mTheme->SliderBg);
-        DrawRect(r, mTheme->SliderBorder, 1.0f);
+        DrawRectFilled(r, mTheme->mSliderBg);
+        DrawRect(r, mTheme->mSliderBorder, 1.0f);
         const f32   norm  = (value - minValue) / (maxValue - minValue);
         const f32   fillW = (norm < 0.0f) ? 0.0f : ((norm > 1.0f) ? 1.0f : norm);
         const FRect fill{ r.Min, FVector2f(r.Min.X() + w * fillW, r.Max.Y()) };
-        DrawRectFilled(fill, mTheme->SliderFill);
+        DrawRectFilled(fill, mTheme->mSliderFill);
 
-        AdvanceItem(FVector2f(w, h + mTheme->SliderBottomSpacingY));
+        AdvanceItem(FVector2f(w, h + mTheme->mSliderBottomSpacingY));
         return changed;
     }
 } // namespace AltinaEngine::DebugGui::Private

@@ -19,7 +19,7 @@ namespace AltinaEngine::DebugGui::Private {
         static constexpr u32         kSolidTexelX = (kCols - 1U) * kAtlasGlyphW;
         static constexpr u32         kSolidTexelY = (kRows - 1U) * kAtlasGlyphH;
 
-        Core::Container::TVector<u8> Pixels;
+        Core::Container::TVector<u8> mPixels;
 
         void                         Build();
         void GetGlyphUV(u32 ch, f32& outU0, f32& outV0, f32& outU1, f32& outV1) const noexcept;

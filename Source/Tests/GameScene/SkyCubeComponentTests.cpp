@@ -6,10 +6,13 @@
 #include "Engine/EngineReflection.h"
 #include "Reflection/BinaryDeserializer.h"
 #include "Reflection/BinarySerializer.h"
+#include "Types/Aliases.h"
 #include "Utility/Uuid.h"
 
 namespace {
+    using AltinaEngine::f32;
     using AltinaEngine::FUuid;
+    using AltinaEngine::TChar;
     using AltinaEngine::u32;
     using AltinaEngine::u8;
     using AltinaEngine::Asset::EAssetType;

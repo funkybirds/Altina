@@ -16,7 +16,7 @@ namespace AltinaEngine::Rhi {
 
 namespace AltinaEngine::DebugGui {
     using Core::Container::TFunction;
-    using FPanelFn = TFunction<void(IDebugGui&)>;
+    using FPanelFn = TFunction<void(IDebugGui&)>; // NOLINT
 
     class AE_DEBUGGUI_API IDebugGuiSystem {
     public:

@@ -6,36 +6,36 @@ namespace AltinaEngine::DebugGui::Private {
         const FVector2f size = CalcButtonSize(label);
         const FRect     r{ mCursor, FVector2f(mCursor.X() + size.X(), mCursor.Y() + size.Y()) };
 
-        const bool      hovered = PointInRect(mInput.MousePos, r);
+        const bool      hovered = PointInRect(mInput.mMousePos, r);
         if (hovered) {
-            mUi->HotId              = id;
-            mUi->bWantsCaptureMouse = true;
+            mUi->mHotId             = id;
+            mUi->mWantsCaptureMouse = true;
         }
 
         bool pressed = false;
-        if (hovered && mInput.bMousePressed) {
-            mUi->ActiveId = id;
-            mUi->FocusId  = id;
+        if (hovered && mInput.mMousePressed) {
+            mUi->mActiveId = id;
+            mUi->mFocusId  = id;
         }
-        if (mUi->ActiveId == id) {
-            if (mInput.bMouseReleased) {
+        if (mUi->mActiveId == id) {
+            if (mInput.mMouseReleased) {
                 if (hovered) {
                     pressed = true;
                 }
-                mUi->ActiveId = 0ULL;
+                mUi->mActiveId = 0ULL;
             }
         }
 
-        FColor32 bg = hovered ? mTheme->ButtonHoveredBg : mTheme->ButtonBg;
-        if (mUi->ActiveId == id) {
-            bg = mTheme->ButtonActiveBg;
+        FColor32 bg = hovered ? mTheme->mButtonHoveredBg : mTheme->mButtonBg;
+        if (mUi->mActiveId == id) {
+            bg = mTheme->mButtonActiveBg;
         }
         DrawRectFilled(r, bg);
-        DrawRect(r, mTheme->ButtonBorder, 1.0f);
+        DrawRect(r, mTheme->mButtonBorder, 1.0f);
 
         const FVector2f textPos(
-            r.Min.X() + mTheme->ButtonPaddingX, r.Min.Y() + mTheme->ButtonPaddingY);
-        DrawText(textPos, mTheme->ButtonText, label);
+            r.Min.X() + mTheme->mButtonPaddingX, r.Min.Y() + mTheme->mButtonPaddingY);
+        DrawText(textPos, mTheme->mButtonText, label);
 
         AdvanceItem(size);
         return pressed;

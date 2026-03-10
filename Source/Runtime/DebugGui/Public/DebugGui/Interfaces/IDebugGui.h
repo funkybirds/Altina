@@ -29,8 +29,7 @@ namespace AltinaEngine::DebugGui {
         virtual void DrawTriangleFilled(
             const FVector2f& p0, const FVector2f& p1, const FVector2f& p2, FColor32 color) = 0;
         virtual void DrawText(const FVector2f& pos, FColor32 color, FStringView text)      = 0;
-        virtual void DrawImage(
-            const FRect& rect, u64 imageId, FColor32 tint = MakeColor32(255, 255, 255, 255)) = 0;
+        virtual void DrawImage(const FRect& rect, u64 imageId, FColor32 tint)              = 0;
 
         [[nodiscard]] virtual auto GetDisplaySize() const noexcept -> FVector2f = 0;
         [[nodiscard]] virtual auto GetMousePos() const noexcept -> FVector2f    = 0;
@@ -39,17 +38,18 @@ namespace AltinaEngine::DebugGui {
         [[nodiscard]] virtual auto WasMouseReleased() const noexcept -> bool    = 0;
 
         // Widgets.
-        virtual bool               BeginWindow(FStringView title, bool* open = nullptr) = 0;
-        virtual void               EndWindow()                                          = 0;
+        virtual auto               BeginWindow(FStringView title, bool* open) -> bool = 0;
+        virtual void               EndWindow()                                        = 0;
 
         virtual void               Text(FStringView text) = 0;
         virtual void               Separator()            = 0;
 
-        [[nodiscard]] virtual bool Button(FStringView label)                = 0;
-        [[nodiscard]] virtual bool Checkbox(FStringView label, bool& value) = 0;
-        [[nodiscard]] virtual bool SliderFloat(
-            FStringView label, f32& value, f32 minValue, f32 maxValue)                     = 0;
-        [[nodiscard]] virtual bool InputText(FStringView label, Container::FString& value) = 0;
-        [[nodiscard]] virtual bool Gizmo(FStringView label, FVector2f& value)              = 0;
+        [[nodiscard]] virtual auto Button(FStringView label) -> bool                = 0;
+        [[nodiscard]] virtual auto Checkbox(FStringView label, bool& value) -> bool = 0;
+        [[nodiscard]] virtual auto SliderFloat(
+            FStringView label, f32& value, f32 minValue, f32 maxValue) -> bool = 0;
+        [[nodiscard]] virtual auto InputText(FStringView label, Container::FString& value)
+            -> bool                                                                   = 0;
+        [[nodiscard]] virtual auto Gizmo(FStringView label, FVector2f& value) -> bool = 0;
     };
 } // namespace AltinaEngine::DebugGui

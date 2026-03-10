@@ -184,17 +184,17 @@ namespace AltinaEngine::DebugGui {
                 EnsureLogSink();
 
                 FGuiInput guiInput{};
-                guiInput.Input    = &input;
-                guiInput.MousePos = FVector2f(
+                guiInput.mInput    = &input;
+                guiInput.mMousePos = FVector2f(
                     static_cast<f32>(input.GetMouseX()), static_cast<f32>(input.GetMouseY()));
-                guiInput.MouseDeltaX          = input.GetMouseDeltaX();
-                guiInput.MouseDeltaY          = input.GetMouseDeltaY();
-                guiInput.bMouseDown           = input.IsMouseButtonDown(0U);
-                guiInput.bMousePressed        = input.WasMouseButtonPressed(0U);
-                guiInput.bMouseReleased       = input.WasMouseButtonReleased(0U);
-                guiInput.MouseWheelDelta      = input.GetMouseWheelDelta();
-                guiInput.bKeyEnterPressed     = input.WasKeyPressed(Input::EKey::Enter);
-                guiInput.bKeyBackspacePressed = input.WasKeyPressed(Input::EKey::Backspace);
+                guiInput.mMouseDeltaX         = input.GetMouseDeltaX();
+                guiInput.mMouseDeltaY         = input.GetMouseDeltaY();
+                guiInput.mMouseDown           = input.IsMouseButtonDown(0U);
+                guiInput.mMousePressed        = input.WasMouseButtonPressed(0U);
+                guiInput.mMouseReleased       = input.WasMouseButtonReleased(0U);
+                guiInput.mMouseWheelDelta     = input.GetMouseWheelDelta();
+                guiInput.mKeyEnterPressed     = input.WasKeyPressed(Input::EKey::Enter);
+                guiInput.mKeyBackspacePressed = input.WasKeyPressed(Input::EKey::Backspace);
 
                 FDebugGuiContext ctx(mPending, mClip, guiInput, mUi, displaySize, mFont, theme,
                     mWindowOrder, mWindows, mDraggingWindowKey, mWindowDragOffset);
@@ -235,8 +235,8 @@ namespace AltinaEngine::DebugGui {
                     }
                 }
 
-                if (mUi.ActiveId != 0ULL) {
-                    mUi.bWantsCaptureMouse = true;
+                if (mUi.mActiveId != 0ULL) {
+                    mUi.mWantsCaptureMouse = true;
                 }
 
                 ctx.PopClipRect();
@@ -261,10 +261,10 @@ namespace AltinaEngine::DebugGui {
             }
 
             [[nodiscard]] auto WantsCaptureKeyboard() const noexcept -> bool override {
-                return mUi.bWantsCaptureKeyboard;
+                return mUi.mWantsCaptureKeyboard;
             }
             [[nodiscard]] auto WantsCaptureMouse() const noexcept -> bool override {
-                return mUi.bWantsCaptureMouse;
+                return mUi.mWantsCaptureMouse;
             }
 
             [[nodiscard]] auto GetLastFrameStats() const noexcept -> FDebugGuiFrameStats override {
@@ -352,7 +352,7 @@ namespace AltinaEngine::DebugGui {
                 const f32 fps = (dtSeconds > 0.0f) ? (1.0f / dtSeconds) : 0.0f;
                 FString   line;
                 line.Assign(TEXT("Frame: "));
-                line.AppendNumber(ext.FrameIndex);
+                line.AppendNumber(ext.mFrameIndex);
                 gui.Text(line.ToView());
 
                 line.Clear();
@@ -364,19 +364,19 @@ namespace AltinaEngine::DebugGui {
 
                 line.Clear();
                 line.Assign(TEXT("Views: "));
-                line.AppendNumber(ext.ViewCount);
+                line.AppendNumber(ext.mViewCount);
                 line.Append(TEXT("  SceneBatches: "));
-                line.AppendNumber(ext.SceneBatchCount);
+                line.AppendNumber(ext.mSceneBatchCount);
                 gui.Text(line.ToView());
 
                 const auto draw = GetLastFrameStats();
                 line.Clear();
                 line.Assign(TEXT("Draw: vtx="));
-                line.AppendNumber(draw.VertexCount);
+                line.AppendNumber(draw.mVertexCount);
                 line.Append(TEXT(" idx="));
-                line.AppendNumber(draw.IndexCount);
+                line.AppendNumber(draw.mIndexCount);
                 line.Append(TEXT(" cmd="));
-                line.AppendNumber(draw.CmdCount);
+                line.AppendNumber(draw.mCmdCount);
                 gui.Text(line.ToView());
 
                 gui.EndWindow();
@@ -390,10 +390,10 @@ namespace AltinaEngine::DebugGui {
                 (void)gui.InputText(TEXT("Filter"), mConsoleFilter);
                 gui.Separator();
 
-                if (gui.IsMouseHoveringRect(gui.GetContentRect()) && input.MouseWheelDelta != 0.0f
-                    && mUi.ActiveId == 0ULL) {
+                if (gui.IsMouseHoveringRect(gui.GetContentRect()) && input.mMouseWheelDelta != 0.0f
+                    && mUi.mActiveId == 0ULL) {
                     const i32 step = 3;
-                    if (input.MouseWheelDelta > 0.0f) {
+                    if (input.mMouseWheelDelta > 0.0f) {
                         mConsoleScrollOffset += step;
                     } else {
                         mConsoleScrollOffset -= step;
@@ -451,12 +451,12 @@ namespace AltinaEngine::DebugGui {
                 (void)gui.InputText(TEXT("Command"), mConsoleInput);
 
                 const u64 commandId = gui.DebugHashId(TEXT("Command"));
-                if (input.bKeyEnterPressed && mUi.ActiveId == commandId
+                if (input.mKeyEnterPressed && mUi.mActiveId == commandId
                     && !mConsoleInput.IsEmptyString()) {
                     mConsoleScrollOffset = 0;
                     ExecuteConsoleCommand(mConsoleInput);
                     mConsoleInput.Clear();
-                    mUi.ActiveId = 0ULL;
+                    mUi.mActiveId = 0ULL;
                 }
 
                 gui.EndWindow();
@@ -555,16 +555,16 @@ namespace AltinaEngine::DebugGui {
                 const bool      listHovered = gui.IsMouseHoveringRect(listRect);
 
                 // Mouse wheel scroll (only when no widget is active).
-                if (listHovered && input.MouseWheelDelta != 0.0f && mUi.ActiveId == 0ULL) {
+                if (listHovered && input.mMouseWheelDelta != 0.0f && mUi.mActiveId == 0ULL) {
                     const i32 step = 3;
-                    if (input.MouseWheelDelta > 0.0f) {
+                    if (input.mMouseWheelDelta > 0.0f) {
                         mCVarsScrollIndex -= step;
                     } else {
                         mCVarsScrollIndex += step;
                     }
                 }
 
-                const f32 itemHf       = th.InputHeight;
+                const f32 itemHf       = th.mInputHeight;
                 const f32 listHf       = listRect.Max.Y() - listRect.Min.Y();
                 const u32 visibleCount = (listHf > itemHf) ? static_cast<u32>(listHf / itemHf) : 1U;
                 const u32 totalCount   = static_cast<u32>(filtered.Size());
@@ -578,8 +578,8 @@ namespace AltinaEngine::DebugGui {
                 }
 
                 // Scroll bar (optional).
-                const f32  kScrollBarW    = th.ScrollBarWidth;
-                const f32  kScrollBarPad  = th.ScrollBarPadding;
+                const f32  kScrollBarW    = th.mScrollBarWidth;
+                const f32  kScrollBarPad  = th.mScrollBarPadding;
                 const bool needsScrollBar = (totalCount > visibleCount);
 
                 FVector2f  textMax = listRect.Max;
@@ -597,7 +597,7 @@ namespace AltinaEngine::DebugGui {
 
                 if (needsScrollBar) {
                     const f32 trackH    = scrollTrackRect.Max.Y() - scrollTrackRect.Min.Y();
-                    const f32 thumbMinH = th.ScrollBarThumbMinHeight;
+                    const f32 thumbMinH = th.mScrollBarThumbMinHeight;
                     f32       thumbH =
                         trackH * (static_cast<f32>(visibleCount) / static_cast<f32>(totalCount));
                     if (thumbH < thumbMinH) {
@@ -617,22 +617,22 @@ namespace AltinaEngine::DebugGui {
                     const u64   sbId         = gui.DebugHashId(TEXT("##CVarsScrollBar"));
                     const bool  trackHovered = gui.IsMouseHoveringRect(scrollTrackRect);
                     const bool  thumbHovered = gui.IsMouseHoveringRect(thumbRect);
-                    const bool  sbActive     = (mUi.ActiveId == sbId);
+                    const bool  sbActive     = (mUi.mActiveId == sbId);
 
-                    if ((trackHovered || thumbHovered) && input.bMousePressed) {
-                        mUi.ActiveId           = sbId;
-                        mUi.FocusId            = sbId;
-                        mUi.bWantsCaptureMouse = true;
+                    if ((trackHovered || thumbHovered) && input.mMousePressed) {
+                        mUi.mActiveId          = sbId;
+                        mUi.mFocusId           = sbId;
+                        mUi.mWantsCaptureMouse = true;
                         if (thumbHovered) {
-                            mCVarsScrollDragOffsetY = input.MousePos.Y() - thumbRect.Min.Y();
+                            mCVarsScrollDragOffsetY = input.mMousePos.Y() - thumbRect.Min.Y();
                         } else {
                             mCVarsScrollDragOffsetY = thumbH * 0.5f;
                         }
                     }
 
-                    if (sbActive && input.bMouseDown) {
-                        mUi.bWantsCaptureMouse  = true;
-                        const f32 desiredThumbY = input.MousePos.Y() - mCVarsScrollDragOffsetY;
+                    if (sbActive && input.mMouseDown) {
+                        mUi.mWantsCaptureMouse  = true;
+                        const f32 desiredThumbY = input.mMousePos.Y() - mCVarsScrollDragOffsetY;
                         const f32 minY          = scrollTrackRect.Min.Y();
                         const f32 maxY          = scrollTrackRect.Max.Y() - thumbH;
                         const f32 clampedY      = (desiredThumbY < minY)
@@ -645,18 +645,18 @@ namespace AltinaEngine::DebugGui {
                         mCVarsScrollIndex =
                             (newStart < 0) ? 0 : ((newStart > maxStart) ? maxStart : newStart);
                     }
-                    if (sbActive && input.bMouseReleased) {
-                        mUi.ActiveId = 0ULL;
+                    if (sbActive && input.mMouseReleased) {
+                        mUi.mActiveId = 0ULL;
                     }
 
                     // Draw track + thumb.
-                    gui.DrawRectFilled(scrollTrackRect, th.ScrollBarTrackBg);
-                    gui.DrawRect(scrollTrackRect, th.ScrollBarTrackBorder, 1.0f);
+                    gui.DrawRectFilled(scrollTrackRect, th.mScrollBarTrackBg);
+                    gui.DrawRect(scrollTrackRect, th.mScrollBarTrackBorder, 1.0f);
                     const FColor32 thumbCol = sbActive
-                        ? th.ScrollBarThumbActiveBg
-                        : (thumbHovered ? th.ScrollBarThumbHoverBg : th.ScrollBarThumbBg);
+                        ? th.mScrollBarThumbActiveBg
+                        : (thumbHovered ? th.mScrollBarThumbHoverBg : th.mScrollBarThumbBg);
                     gui.DrawRectFilled(thumbRect, thumbCol);
-                    gui.DrawRect(thumbRect, th.ScrollBarThumbBorder, 1.0f);
+                    gui.DrawRect(thumbRect, th.mScrollBarThumbBorder, 1.0f);
                 }
 
                 // List drawing + hit-test.
@@ -675,32 +675,32 @@ namespace AltinaEngine::DebugGui {
                     const u64   id      = gui.DebugHashId(name.ToView());
                     const bool  hovered = gui.IsMouseHoveringRect(r);
                     if (hovered) {
-                        mUi.HotId              = id;
-                        mUi.bWantsCaptureMouse = true;
+                        mUi.mHotId             = id;
+                        mUi.mWantsCaptureMouse = true;
                     }
-                    if (hovered && input.bMousePressed) {
-                        mUi.ActiveId = id;
-                        mUi.FocusId  = id;
+                    if (hovered && input.mMousePressed) {
+                        mUi.mActiveId = id;
+                        mUi.mFocusId  = id;
                     }
 
                     bool clicked = false;
-                    if (mUi.ActiveId == id && input.bMouseReleased) {
+                    if (mUi.mActiveId == id && input.mMouseReleased) {
                         if (hovered) {
                             clicked = true;
                         }
-                        mUi.ActiveId = 0ULL;
+                        mUi.mActiveId = 0ULL;
                     }
 
                     const bool     selected = (!mSelectedCVarName.IsEmptyString()
                         && mSelectedCVarName.ToView() == name.ToView());
                     const FColor32 bg =
-                        selected ? th.SelectedRowBg : (hovered ? th.HoveredRowBg : 0U);
+                        selected ? th.mSelectedRowBg : (hovered ? th.mHoveredRowBg : 0U);
                     if ((bg >> 24U) != 0U) {
                         gui.DrawRectFilled(r, bg);
                     }
-                    gui.DrawText(
-                        FVector2f(r.Min.X() + th.InputTextOffsetX, r.Min.Y() + th.InputTextOffsetY),
-                        th.Text, name.ToView());
+                    gui.DrawText(FVector2f(r.Min.X() + th.mInputTextOffsetX,
+                                     r.Min.Y() + th.mInputTextOffsetY),
+                        th.mText, name.ToView());
 
                     if (clicked) {
                         mSelectedCVarName = name;
@@ -721,11 +721,11 @@ namespace AltinaEngine::DebugGui {
 
             void PublishPendingDrawData(bool enabled) {
                 FScopedLock lock(mMutex);
-                mLastStats.VertexCount = static_cast<u32>(mPending.Vertices.Size());
-                mLastStats.IndexCount  = static_cast<u32>(mPending.Indices.Size());
-                mLastStats.CmdCount    = static_cast<u32>(mPending.Cmds.Size());
-                mRender                = Move(mPending);
-                mEnabledRenderThread   = enabled;
+                mLastStats.mVertexCount = static_cast<u32>(mPending.mVertices.Size());
+                mLastStats.mIndexCount  = static_cast<u32>(mPending.mIndices.Size());
+                mLastStats.mCmdCount    = static_cast<u32>(mPending.mCmds.Size());
+                mRender                 = Move(mPending);
+                mEnabledRenderThread    = enabled;
             }
 
             mutable FMutex                           mMutex;

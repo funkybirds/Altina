@@ -37,9 +37,9 @@ TEST_CASE("DebugGui builds overlay when enabled") {
 
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
     const auto stats = sys->GetLastFrameStats();
-    REQUIRE(stats.VertexCount > 0U);
-    REQUIRE(stats.IndexCount > 0U);
-    REQUIRE(stats.CmdCount > 0U);
+    REQUIRE(stats.mVertexCount > 0U);
+    REQUIRE(stats.mIndexCount > 0U);
+    REQUIRE(stats.mCmdCount > 0U);
 
     DestroyDebugGuiSystem(sys);
 }
@@ -67,9 +67,9 @@ TEST_CASE("DebugGui panel drawing increases draw stats") {
     sys->TickGameThread(input, 1.0f / 60.0f, 640, 480);
     const auto withPanel = sys->GetLastFrameStats();
 
-    REQUIRE(withPanel.VertexCount > baseline.VertexCount);
-    REQUIRE(withPanel.IndexCount > baseline.IndexCount);
-    REQUIRE(withPanel.CmdCount >= baseline.CmdCount);
+    REQUIRE(withPanel.mVertexCount > baseline.mVertexCount);
+    REQUIRE(withPanel.mIndexCount > baseline.mIndexCount);
+    REQUIRE(withPanel.mCmdCount >= baseline.mCmdCount);
 
     DestroyDebugGuiSystem(sys);
 }
@@ -105,9 +105,9 @@ TEST_CASE("DebugGui primitives: RoundedRect/Capsule increase draw stats") {
     sys->TickGameThread(input, 1.0f / 60.0f, 640, 480);
     const auto withPanel = sys->GetLastFrameStats();
 
-    REQUIRE(withPanel.VertexCount > baseline.VertexCount);
-    REQUIRE(withPanel.IndexCount > baseline.IndexCount);
-    REQUIRE(withPanel.CmdCount >= baseline.CmdCount);
+    REQUIRE(withPanel.mVertexCount > baseline.mVertexCount);
+    REQUIRE(withPanel.mIndexCount > baseline.mIndexCount);
+    REQUIRE(withPanel.mCmdCount >= baseline.mCmdCount);
 
     DestroyDebugGuiSystem(sys);
 }
@@ -128,8 +128,8 @@ TEST_CASE("DebugGui toggles off with F1") {
     PrepareInput(input, 800, 600, 10, 10);
     sys->TickGameThread(input, 1.0f / 60.0f, 800, 600);
     const auto stats = sys->GetLastFrameStats();
-    REQUIRE_EQ(stats.VertexCount, 0U);
-    REQUIRE_EQ(stats.IndexCount, 0U);
+    REQUIRE_EQ(stats.mVertexCount, 0U);
+    REQUIRE_EQ(stats.mIndexCount, 0U);
 
     DestroyDebugGuiSystem(sys);
 }
@@ -175,21 +175,21 @@ TEST_CASE("DebugGui widgets: Button/Checkbox/Slider/InputText basic interactions
     constexpr AltinaEngine::i32       kGlyphH = 11; // FFontAtlas::kDrawGlyphH (private to module).
 
     const AltinaEngine::i32           buttonH =
-        kGlyphH + static_cast<AltinaEngine::i32>(theme.ButtonPaddingY * 2.0f);
+        kGlyphH + static_cast<AltinaEngine::i32>(theme.mButtonPaddingY * 2.0f);
     const AltinaEngine::i32 afterBtnY =
-        contentY + buttonH + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+        contentY + buttonH + static_cast<AltinaEngine::i32>(theme.mItemSpacingY);
     const AltinaEngine::i32 afterCbY = afterBtnY
-        + static_cast<AltinaEngine::i32>(theme.CheckboxBoxSize)
-        + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+        + static_cast<AltinaEngine::i32>(theme.mCheckboxBoxSize)
+        + static_cast<AltinaEngine::i32>(theme.mItemSpacingY);
 
     const AltinaEngine::i32 sliderTopY =
-        afterCbY + kGlyphH + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+        afterCbY + kGlyphH + static_cast<AltinaEngine::i32>(theme.mItemSpacingY);
     const AltinaEngine::i32 afterSliderY = sliderTopY
-        + static_cast<AltinaEngine::i32>(theme.SliderHeight + theme.SliderBottomSpacingY)
-        + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+        + static_cast<AltinaEngine::i32>(theme.mSliderHeight + theme.mSliderBottomSpacingY)
+        + static_cast<AltinaEngine::i32>(theme.mItemSpacingY);
 
     const AltinaEngine::i32 inputTopY =
-        afterSliderY + kGlyphH + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+        afterSliderY + kGlyphH + static_cast<AltinaEngine::i32>(theme.mItemSpacingY);
 
     // Button click (press then release).
     PrepareInput(input, kW, kH, contentX + 10, contentY + 5);
@@ -262,14 +262,14 @@ TEST_CASE("DebugGui widget: Gizmo drag updates value") {
     const AltinaEngine::i32           contentX = 10 + 8;
     const AltinaEngine::i32           contentY = 10 + 18 + 8;
     const AltinaEngine::i32           gizmoTopY =
-        contentY + kGlyphH + static_cast<AltinaEngine::i32>(theme.ItemSpacingY);
+        contentY + kGlyphH + static_cast<AltinaEngine::i32>(theme.mItemSpacingY);
 
     const AltinaEngine::i32 centerX =
-        contentX + static_cast<AltinaEngine::i32>(theme.GizmoSize * 0.5f);
+        contentX + static_cast<AltinaEngine::i32>(theme.mGizmoSize * 0.5f);
     const AltinaEngine::i32 centerY =
-        gizmoTopY + static_cast<AltinaEngine::i32>(theme.GizmoSize * 0.5f);
+        gizmoTopY + static_cast<AltinaEngine::i32>(theme.mGizmoSize * 0.5f);
     const AltinaEngine::i32 pressX =
-        centerX + static_cast<AltinaEngine::i32>(theme.GizmoSize * 0.25f);
+        centerX + static_cast<AltinaEngine::i32>(theme.mGizmoSize * 0.25f);
     const AltinaEngine::i32 pressY = centerY;
 
     // Press on X axis handle.
@@ -356,25 +356,26 @@ TEST_CASE("DebugGui window collapse toggle reduces draw stats") {
     // Make draw stats stable across frames by freezing the external stats that are printed in
     // the Stats window.
     AltinaEngine::DebugGui::FDebugGuiExternalStats ext{};
-    ext.FrameIndex      = 0ULL;
-    ext.ViewCount       = 0U;
-    ext.SceneBatchCount = 0U;
+    ext.mFrameIndex      = 0ULL;
+    ext.mViewCount       = 0U;
+    ext.mSceneBatchCount = 0U;
     sys->SetExternalStats(ext);
 
     const auto              theme = sys->GetTheme();
 
     // Stats window is the first window (index 0): pos=(10,10), size=(WindowDefaultSize).
     // Compute a safe click point inside the collapse button rect.
-    const AltinaEngine::i32 btnX = static_cast<AltinaEngine::i32>(theme.WindowDefaultPos.X()
-        + theme.WindowDefaultSize.X() - theme.CollapseButtonPadX - theme.CollapseButtonSize * 0.5f);
-    const AltinaEngine::i32 btnY = static_cast<AltinaEngine::i32>(
-        theme.WindowDefaultPos.Y() + theme.CollapseButtonOffsetY + theme.CollapseButtonSize * 0.5f);
+    const AltinaEngine::i32 btnX =
+        static_cast<AltinaEngine::i32>(theme.mWindowDefaultPos.X() + theme.mWindowDefaultSize.X()
+            - theme.mCollapseButtonPadX - theme.mCollapseButtonSize * 0.5f);
+    const AltinaEngine::i32 btnY = static_cast<AltinaEngine::i32>(theme.mWindowDefaultPos.Y()
+        + theme.mCollapseButtonOffsetY + theme.mCollapseButtonSize * 0.5f);
 
     // Frame 0: baseline (may be collapsed by default).
     PrepareInput(input, 1280, 720, 20, 20);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
     const auto a = sys->GetLastFrameStats();
-    REQUIRE(a.VertexCount > 0U);
+    REQUIRE(a.mVertexCount > 0U);
 
     // Toggle once.
     PrepareInput(input, 1280, 720, btnX, btnY);
@@ -384,7 +385,7 @@ TEST_CASE("DebugGui window collapse toggle reduces draw stats") {
     input.OnMouseButtonUp(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
     const auto b = sys->GetLastFrameStats();
-    REQUIRE(b.VertexCount != a.VertexCount);
+    REQUIRE(b.mVertexCount != a.mVertexCount);
 
     // Toggle back.
     PrepareInput(input, 1280, 720, btnX, btnY);
@@ -395,10 +396,10 @@ TEST_CASE("DebugGui window collapse toggle reduces draw stats") {
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
     const auto c = sys->GetLastFrameStats();
 
-    const auto minV = (a.VertexCount < b.VertexCount) ? a.VertexCount : b.VertexCount;
-    const auto maxV = (a.VertexCount < b.VertexCount) ? b.VertexCount : a.VertexCount;
+    const auto minV = (a.mVertexCount < b.mVertexCount) ? a.mVertexCount : b.mVertexCount;
+    const auto maxV = (a.mVertexCount < b.mVertexCount) ? b.mVertexCount : a.mVertexCount;
     REQUIRE(maxV > minV);
-    REQUIRE(c.VertexCount == a.VertexCount);
+    REQUIRE(c.mVertexCount == a.mVertexCount);
 
     DestroyDebugGuiSystem(sys);
 }
@@ -449,7 +450,7 @@ TEST_CASE("DebugGui DrawImage emits additional draw geometry") {
     sys->RegisterPanel(TEXT("ImagePanel"), [&](IDebugGui& gui) {
         if (drawImage) {
             const FRect rect{ FVector2f(10.0f, 10.0f), FVector2f(120.0f, 80.0f) };
-            gui.DrawImage(rect, 0x1234ULL);
+            gui.DrawImage(rect, 0x1234ULL, MakeColor32(0, 0, 0, 0));
         }
     });
 
@@ -464,8 +465,8 @@ TEST_CASE("DebugGui DrawImage emits additional draw geometry") {
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
     const auto withImage = sys->GetLastFrameStats();
 
-    REQUIRE(withImage.VertexCount > withoutImage.VertexCount);
-    REQUIRE(withImage.IndexCount > withoutImage.IndexCount);
+    REQUIRE(withImage.mVertexCount > withoutImage.mVertexCount);
+    REQUIRE(withImage.mIndexCount > withoutImage.mIndexCount);
 
     DestroyDebugGuiSystem(sys);
 }

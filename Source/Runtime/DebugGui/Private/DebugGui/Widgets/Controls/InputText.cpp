@@ -7,25 +7,25 @@ namespace AltinaEngine::DebugGui::Private {
         Text(label);
         const u64   id = HashId(label);
         const f32   w  = mContentMax.X() - mContentMin.X();
-        const f32   h  = mTheme->InputHeight;
+        const f32   h  = mTheme->mInputHeight;
         const FRect r{ mCursor, FVector2f(mCursor.X() + w, mCursor.Y() + h) };
 
-        const bool  hovered = PointInRect(mInput.MousePos, r);
+        const bool  hovered = PointInRect(mInput.mMousePos, r);
         if (hovered) {
-            mUi->HotId              = id;
-            mUi->bWantsCaptureMouse = true;
+            mUi->mHotId             = id;
+            mUi->mWantsCaptureMouse = true;
         }
-        if (hovered && mInput.bMousePressed) {
-            mUi->ActiveId = id;
-            mUi->FocusId  = id;
+        if (hovered && mInput.mMousePressed) {
+            mUi->mActiveId = id;
+            mUi->mFocusId  = id;
         }
 
         bool changed = false;
-        if (mUi->ActiveId == id) {
-            mUi->FocusId               = id;
-            mUi->bWantsCaptureKeyboard = true;
-            if (mInput.Input != nullptr) {
-                const auto& chars = mInput.Input->GetCharInputs();
+        if (mUi->mActiveId == id) {
+            mUi->mFocusId              = id;
+            mUi->mWantsCaptureKeyboard = true;
+            if (mInput.mInput != nullptr) {
+                const auto& chars = mInput.mInput->GetCharInputs();
                 for (const auto code : chars) {
                     if (code == 0U || code < 32U) {
                         continue;
@@ -35,11 +35,11 @@ namespace AltinaEngine::DebugGui::Private {
                 }
 
                 if (chars.IsEmpty()) {
-                    const bool shift = mInput.Input->IsKeyDown(Input::EKey::LeftShift)
-                        || mInput.Input->IsKeyDown(Input::EKey::RightShift);
+                    const bool shift = mInput.mInput->IsKeyDown(Input::EKey::LeftShift)
+                        || mInput.mInput->IsKeyDown(Input::EKey::RightShift);
 
                     auto TryAppendAlpha = [&](Input::EKey key, char lower) {
-                        if (!mInput.Input->WasKeyPressed(key)) {
+                        if (!mInput.mInput->WasKeyPressed(key)) {
                             return;
                         }
                         const char c = shift ? static_cast<char>(lower - ('a' - 'A')) : lower;
@@ -75,7 +75,7 @@ namespace AltinaEngine::DebugGui::Private {
                     TryAppendAlpha(Input::EKey::Z, 'z');
 
                     auto TryAppendDigit = [&](Input::EKey key, char digit) {
-                        if (!mInput.Input->WasKeyPressed(key)) {
+                        if (!mInput.mInput->WasKeyPressed(key)) {
                             return;
                         }
                         value.Append(static_cast<TChar>(digit));
@@ -93,29 +93,29 @@ namespace AltinaEngine::DebugGui::Private {
                     TryAppendDigit(Input::EKey::Num8, '8');
                     TryAppendDigit(Input::EKey::Num9, '9');
 
-                    if (mInput.Input->WasKeyPressed(Input::EKey::Space)) {
+                    if (mInput.mInput->WasKeyPressed(Input::EKey::Space)) {
                         value.Append(static_cast<TChar>(' '));
                         changed = true;
                     }
                 }
             }
 
-            if (mInput.bKeyBackspacePressed && !value.IsEmptyString()) {
+            if (mInput.mKeyBackspacePressed && !value.IsEmptyString()) {
                 value.PopBack();
                 changed = true;
             }
 
-            if (mInput.bMousePressed && !hovered) {
-                mUi->ActiveId = 0ULL;
+            if (mInput.mMousePressed && !hovered) {
+                mUi->mActiveId = 0ULL;
             }
         }
 
-        const bool active = (mUi->ActiveId == id);
-        DrawRectFilled(r, active ? mTheme->InputActiveBg : mTheme->InputBg);
-        DrawRect(r, active ? mTheme->InputActiveBorder : mTheme->InputBorder, 1.0f);
+        const bool active = (mUi->mActiveId == id);
+        DrawRectFilled(r, active ? mTheme->mInputActiveBg : mTheme->mInputBg);
+        DrawRect(r, active ? mTheme->mInputActiveBorder : mTheme->mInputBorder, 1.0f);
         DrawText(
-            FVector2f(r.Min.X() + mTheme->InputTextOffsetX, r.Min.Y() + mTheme->InputTextOffsetY),
-            mTheme->InputText, value.ToView());
+            FVector2f(r.Min.X() + mTheme->mInputTextOffsetX, r.Min.Y() + mTheme->mInputTextOffsetY),
+            mTheme->mInputText, value.ToView());
 
         AdvanceItem(FVector2f(w, h));
         return changed;

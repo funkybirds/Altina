@@ -22,14 +22,14 @@ namespace AltinaEngine::DebugGui {
     }
 
     struct FDebugGuiFrameStats {
-        u32 VertexCount = 0U;
-        u32 IndexCount  = 0U;
-        u32 CmdCount    = 0U;
+        u32 mVertexCount = 0U;
+        u32 mIndexCount  = 0U;
+        u32 mCmdCount    = 0U;
     };
 
     struct FDebugGuiExternalStats {
-        u64 FrameIndex      = 0ULL;
-        u32 ViewCount       = 0U;
-        u32 SceneBatchCount = 0U;
+        u64 mFrameIndex      = 0ULL;
+        u32 mViewCount       = 0U;
+        u32 mSceneBatchCount = 0U;
     };
 } // namespace AltinaEngine::DebugGui

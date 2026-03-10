@@ -5,7 +5,6 @@
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/PointLightComponent.h"
 #include "Engine/GameScene/SkyCubeComponent.h"
-#include "Engine/GameScene/ScriptComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Reflection/Serializer.h"
 #include "Utility/Assert.h"
@@ -25,7 +24,6 @@ namespace AltinaEngine::GameScene {
             GetComponentTypeHash<FStaticMeshFilterComponent>();
         const FComponentTypeHash kMeshMaterialComponentType =
             GetComponentTypeHash<FMeshMaterialComponent>();
-        const FComponentTypeHash kScriptComponentType = GetComponentTypeHash<FScriptComponent>();
         const FComponentTypeHash kDirectionalLightComponentType =
             GetComponentTypeHash<FDirectionalLightComponent>();
         const FComponentTypeHash kPointLightComponentType =
@@ -122,97 +120,6 @@ namespace AltinaEngine::GameScene {
             serializer.WriteFieldName(TEXT("uuid"));
             const auto uuidText = handle.Uuid.ToString();
             serializer.WriteString(uuidText.ToView());
-            serializer.EndObject();
-        }
-
-        auto WriteCameraComponentJson(
-            Core::Reflection::ISerializer& serializer, const FCameraComponent& component) -> void {
-            serializer.BeginObject({});
-            serializer.WriteFieldName(TEXT("fovYRadians"));
-            serializer.Write(component.GetFovYRadians());
-            serializer.WriteFieldName(TEXT("nearPlane"));
-            serializer.Write(component.GetNearPlane());
-            serializer.WriteFieldName(TEXT("farPlane"));
-            serializer.Write(component.GetFarPlane());
-            serializer.EndObject();
-        }
-
-        auto WriteStaticMeshComponentJson(Core::Reflection::ISerializer& serializer,
-            const FStaticMeshFilterComponent&                            component) -> void {
-            const auto& mesh = component.GetStaticMesh();
-            serializer.BeginObject({});
-            serializer.WriteFieldName(TEXT("asset"));
-            WriteAssetHandleJson(serializer, component.GetStaticMeshAsset());
-            serializer.WriteFieldName(TEXT("lodCount"));
-            serializer.Write(mesh.GetLodCount());
-            serializer.WriteFieldName(TEXT("valid"));
-            serializer.Write(mesh.IsValid());
-            serializer.WriteFieldName(TEXT("lods"));
-            serializer.BeginArray(mesh.Lods.Size());
-            for (const auto& lod : mesh.Lods) {
-                serializer.BeginObject({});
-                serializer.WriteFieldName(TEXT("vertexCount"));
-                serializer.Write(lod.GetVertexCount());
-                serializer.WriteFieldName(TEXT("indexCount"));
-                serializer.Write(lod.GetIndexCount());
-                serializer.WriteFieldName(TEXT("sectionCount"));
-                serializer.Write(static_cast<u32>(lod.Sections.Size()));
-                serializer.WriteFieldName(TEXT("screenSize"));
-                serializer.Write(lod.ScreenSize);
-                serializer.EndObject();
-            }
-            serializer.EndArray();
-            serializer.EndObject();
-        }
-
-        auto WriteMeshMaterialComponentJson(Core::Reflection::ISerializer& serializer,
-            const FMeshMaterialComponent&                                  component) -> void {
-            const auto& materials = component.GetMaterials();
-            serializer.BeginObject({});
-            serializer.WriteFieldName(TEXT("slotCount"));
-            serializer.Write(static_cast<u32>(materials.Size()));
-            serializer.WriteFieldName(TEXT("slots"));
-            serializer.BeginArray(materials.Size());
-            for (const auto& slot : materials) {
-                serializer.BeginObject({});
-                serializer.WriteFieldName(TEXT("template"));
-                WriteAssetHandleJson(serializer, slot.Template);
-                serializer.WriteFieldName(TEXT("paramCounts"));
-                serializer.BeginObject({});
-                serializer.WriteFieldName(TEXT("scalars"));
-                serializer.Write(static_cast<u32>(slot.Parameters.GetScalars().Size()));
-                serializer.WriteFieldName(TEXT("vectors"));
-                serializer.Write(static_cast<u32>(slot.Parameters.GetVectors().Size()));
-                serializer.WriteFieldName(TEXT("matrices"));
-                serializer.Write(static_cast<u32>(slot.Parameters.GetMatrices().Size()));
-                serializer.WriteFieldName(TEXT("textures"));
-                serializer.Write(static_cast<u32>(slot.Parameters.GetTextures().Size()));
-                serializer.WriteFieldName(TEXT("hash"));
-                serializer.Write(slot.Parameters.GetHash());
-                serializer.EndObject();
-                serializer.EndObject();
-            }
-            serializer.EndArray();
-            serializer.EndObject();
-        }
-
-        auto WriteScriptComponentJson(
-            Core::Reflection::ISerializer& serializer, const FScriptComponent& component) -> void {
-            serializer.BeginObject({});
-            serializer.WriteFieldName(TEXT("assemblyPath"));
-            WriteNativeStringJson(serializer, component.GetAssemblyPath());
-            serializer.WriteFieldName(TEXT("typeName"));
-            WriteNativeStringJson(serializer, component.GetTypeName());
-            serializer.WriteFieldName(TEXT("scriptAsset"));
-            WriteAssetHandleJson(serializer, component.GetScriptAsset());
-            serializer.EndObject();
-        }
-
-        auto WriteSkyCubeComponentJson(
-            Core::Reflection::ISerializer& serializer, const FSkyCubeComponent& component) -> void {
-            serializer.BeginObject({});
-            serializer.WriteFieldName(TEXT("cubeMapAsset"));
-            WriteAssetHandleJson(serializer, component.GetCubeMapAsset());
             serializer.EndObject();
         }
 
@@ -621,6 +528,8 @@ namespace AltinaEngine::GameScene {
     }
 
     void FWorld::SerializeJson(Core::Reflection::ISerializer& serializer) const {
+        auto& registry = GetComponentRegistry();
+
         serializer.BeginObject({});
         serializer.WriteFieldName(TEXT("version"));
         serializer.Write(kWorldSerializationVersion);
@@ -692,11 +601,23 @@ namespace AltinaEngine::GameScene {
                 continue;
             }
 
-            const auto serializableComponents = obj->GetAllComponents();
+            TVector<FComponentId> serializableComponents;
+            for (const auto& componentId : obj->GetAllComponents()) {
+                const auto* entry = registry.Find(componentId.Type);
+                if (entry == nullptr) {
+                    continue;
+                }
+                serializableComponents.PushBack(componentId);
+            }
 
             serializer.WriteFieldName(TEXT("components"));
             serializer.BeginArray(static_cast<usize>(serializableComponents.Size()));
             for (const auto& componentId : serializableComponents) {
+                const auto* entry = registry.Find(componentId.Type);
+                if (entry == nullptr) {
+                    continue;
+                }
+
                 const auto* component = ResolveComponentBase(componentId);
                 const bool  enabled   = component ? component->IsEnabled() : true;
 
@@ -704,37 +625,16 @@ namespace AltinaEngine::GameScene {
                 serializer.WriteFieldName(TEXT("type"));
                 serializer.Write(componentId.Type);
                 serializer.WriteFieldName(TEXT("typeName"));
-                if (componentId.Type == kCameraComponentType) {
-                    serializer.WriteString(TEXT("CameraComponent"));
-                } else if (componentId.Type == kStaticMeshComponentType) {
-                    serializer.WriteString(TEXT("StaticMeshFilterComponent"));
-                } else if (componentId.Type == kMeshMaterialComponentType) {
-                    serializer.WriteString(TEXT("MeshMaterialComponent"));
-                } else if (componentId.Type == kScriptComponentType) {
-                    serializer.WriteString(TEXT("ScriptComponent"));
-                } else if (componentId.Type == kSkyCubeComponentType) {
-                    serializer.WriteString(TEXT("SkyCubeComponent"));
-                } else {
+                if (entry->TypeName.IsEmpty()) {
                     serializer.WriteString(TEXT("UnknownComponent"));
+                } else {
+                    WriteNativeStringJson(serializer, entry->TypeName);
                 }
                 serializer.WriteFieldName(TEXT("enabled"));
                 serializer.Write(enabled);
                 serializer.WriteFieldName(TEXT("data"));
-                if (componentId.Type == kCameraComponentType) {
-                    WriteCameraComponentJson(
-                        serializer, ResolveComponent<FCameraComponent>(componentId));
-                } else if (componentId.Type == kStaticMeshComponentType) {
-                    WriteStaticMeshComponentJson(
-                        serializer, ResolveComponent<FStaticMeshFilterComponent>(componentId));
-                } else if (componentId.Type == kMeshMaterialComponentType) {
-                    WriteMeshMaterialComponentJson(
-                        serializer, ResolveComponent<FMeshMaterialComponent>(componentId));
-                } else if (componentId.Type == kScriptComponentType) {
-                    WriteScriptComponentJson(
-                        serializer, ResolveComponent<FScriptComponent>(componentId));
-                } else if (componentId.Type == kSkyCubeComponentType) {
-                    WriteSkyCubeComponentJson(
-                        serializer, ResolveComponent<FSkyCubeComponent>(componentId));
+                if (entry->SerializeJson != nullptr) {
+                    registry.SerializeJson(const_cast<FWorld&>(*this), componentId, serializer);
                 } else {
                     serializer.BeginObject({});
                     serializer.EndObject();

@@ -4,13 +4,17 @@
 #include "Engine/GameScene/Component.h"
 #include "Engine/GameScene/Ids.h"
 #include "Container/HashMap.h"
+#include "Container/StringView.h"
 #include "Reflection/Serializer.h"
 #include "Reflection/Serialization.h"
+#include "Types/Meta.h"
 #include "Types/Traits.h"
 
 using AltinaEngine::CClassBaseOf;
 namespace AltinaEngine::GameScene {
     namespace Container = Core::Container;
+    namespace TypeMeta  = Core::TypeMeta;
+    using Container::FNativeStringView;
     using Container::THashMap;
 
     class FWorld;
@@ -23,20 +27,23 @@ namespace AltinaEngine::GameScene {
         FGameObjectId Owner{};
     };
 
-    using FnCreate      = FComponentId (*)(FComponentCreateContext&);
-    using FnDestroy     = void (*)(FWorld&, FComponentId);
-    using FnSerialize   = void (*)(FWorld&, FComponentId, Core::Reflection::ISerializer&);
-    using FnDeserialize = void (*)(FWorld&, FComponentId, Core::Reflection::IDeserializer&);
+    using FnCreate        = FComponentId (*)(FComponentCreateContext&);
+    using FnDestroy       = void (*)(FWorld&, FComponentId);
+    using FnSerialize     = void (*)(FWorld&, FComponentId, Core::Reflection::ISerializer&);
+    using FnSerializeJson = void (*)(FWorld&, FComponentId, Core::Reflection::ISerializer&);
+    using FnDeserialize   = void (*)(FWorld&, FComponentId, Core::Reflection::IDeserializer&);
 
     /**
      * @brief Registry entry describing a component type.
      */
     struct FComponentTypeEntry {
-        FComponentTypeHash TypeHash    = 0;
-        FnCreate           Create      = nullptr;
-        FnDestroy          Destroy     = nullptr;
-        FnSerialize        Serialize   = nullptr;
-        FnDeserialize      Deserialize = nullptr;
+        FComponentTypeHash TypeHash = 0;
+        FNativeStringView  TypeName{};
+        FnCreate           Create        = nullptr;
+        FnDestroy          Destroy       = nullptr;
+        FnSerialize        Serialize     = nullptr;
+        FnSerializeJson    SerializeJson = nullptr;
+        FnDeserialize      Deserialize   = nullptr;
     };
 
     /**
@@ -53,6 +60,7 @@ namespace AltinaEngine::GameScene {
             -> FComponentId;
         void Destroy(FWorld& world, FComponentId id) const;
         void Serialize(FWorld& world, FComponentId id, Core::Reflection::ISerializer& s) const;
+        void SerializeJson(FWorld& world, FComponentId id, Core::Reflection::ISerializer& s) const;
         void Deserialize(FWorld& world, FComponentId id, Core::Reflection::IDeserializer& d) const;
 
     private:
@@ -78,11 +86,13 @@ namespace AltinaEngine::GameScene {
         static_assert(CClassBaseOf<FComponent, T>, "Component types must derive from FComponent.");
 
         FComponentTypeEntry entry{};
-        entry.TypeHash    = GetComponentTypeHash<T>();
-        entry.Create      = &Detail::CreateComponentThunk<T>;
-        entry.Destroy     = &Detail::DestroyComponentThunk<T>;
-        entry.Serialize   = &Detail::SerializeComponentThunk<T>;
-        entry.Deserialize = &Detail::DeserializeComponentThunk<T>;
+        entry.TypeHash      = GetComponentTypeHash<T>();
+        entry.TypeName      = TypeMeta::TMetaTypeInfo<T>::kName;
+        entry.Create        = &Detail::CreateComponentThunk<T>;
+        entry.Destroy       = &Detail::DestroyComponentThunk<T>;
+        entry.Serialize     = &Detail::SerializeComponentThunk<T>;
+        entry.SerializeJson = nullptr;
+        entry.Deserialize   = &Detail::DeserializeComponentThunk<T>;
         return entry;
     }
 

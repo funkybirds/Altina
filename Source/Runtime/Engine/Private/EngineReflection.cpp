@@ -5,8 +5,9 @@ namespace AltinaEngine::Core::Reflection {
 }
 
 namespace AltinaEngine::GameScene {
-    void RegisterComponent_AltinaEngineEngine(); // NOLINT
-}
+    void RegisterComponent_AltinaEngineEngine();     // NOLINT
+    void RegisterComponentJson_AltinaEngineEngine(); // NOLINT
+} // namespace AltinaEngine::GameScene
 
 namespace AltinaEngine::Engine {
     void RegisterEngineReflection() {
@@ -17,5 +18,6 @@ namespace AltinaEngine::Engine {
         gRegistered = true;
         Core::Reflection::RegisterReflection_AltinaEngineEngine();
         GameScene::RegisterComponent_AltinaEngineEngine();
+        GameScene::RegisterComponentJson_AltinaEngineEngine();
     }
 } // namespace AltinaEngine::Engine

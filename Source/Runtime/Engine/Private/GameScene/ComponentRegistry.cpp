@@ -58,6 +58,15 @@ namespace AltinaEngine::GameScene {
         entry->Serialize(world, id, s);
     }
 
+    void FComponentRegistry::SerializeJson(
+        FWorld& world, FComponentId id, Core::Reflection::ISerializer& s) const {
+        const auto* entry = Find(id.Type);
+        if (entry == nullptr || entry->SerializeJson == nullptr) {
+            return;
+        }
+        entry->SerializeJson(world, id, s);
+    }
+
     void FComponentRegistry::Deserialize(
         FWorld& world, FComponentId id, Core::Reflection::IDeserializer& d) const {
         const auto* entry = Find(id.Type);

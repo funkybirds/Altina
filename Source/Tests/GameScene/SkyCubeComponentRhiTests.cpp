@@ -80,16 +80,16 @@ namespace {
         }
 
         FAssetBlobHeader header{};
-        header.Type     = static_cast<u8>(EAssetType::CubeMap);
-        header.Flags    = MakeAssetBlobFlags(srgb);
-        header.DescSize = static_cast<u32>(sizeof(FCubeMapBlobDesc));
-        header.DataSize = static_cast<u32>(total);
+        header.mType     = static_cast<u8>(EAssetType::CubeMap);
+        header.mFlags    = MakeAssetBlobFlags(srgb);
+        header.mDescSize = static_cast<u32>(sizeof(FCubeMapBlobDesc));
+        header.mDataSize = static_cast<u32>(total);
 
         FCubeMapBlobDesc blobDesc{};
-        blobDesc.Size     = size;
-        blobDesc.Format   = format;
-        blobDesc.MipCount = mipCount;
-        blobDesc.RowPitch = size * bytesPerPixel;
+        blobDesc.mSize     = size;
+        blobDesc.Format    = format;
+        blobDesc.mMipCount = mipCount;
+        blobDesc.mRowPitch = size * bytesPerPixel;
 
         TVector<u8> cooked;
         cooked.Resize(sizeof(header) + sizeof(blobDesc) + static_cast<usize>(total));
@@ -140,10 +140,10 @@ TEST_CASE("GameScene.SkyCubeComponent.AssetToRhi") {
 
     Asset::FAssetRegistry registry;
     Asset::FAssetDesc     desc{};
-    desc.Handle.Uuid      = MakeUuid(0x42U);
-    desc.Handle.Type      = Asset::EAssetType::CubeMap;
-    desc.VirtualPath      = TEXT("test/sky");
-    desc.CookedPath       = ToFString(cookedPath);
+    desc.mHandle.Uuid     = MakeUuid(0x42U);
+    desc.mHandle.Type     = Asset::EAssetType::CubeMap;
+    desc.mVirtualPath     = TEXT("test/sky");
+    desc.mCookedPath      = ToFString(cookedPath);
     desc.CubeMap.Size     = 4U;
     desc.CubeMap.MipCount = 2U;
     desc.CubeMap.Format   = Asset::kTextureFormatRGBA8;
@@ -222,7 +222,7 @@ TEST_CASE("GameScene.SkyCubeComponent.AssetToRhi") {
     };
 
     GameScene::FSkyCubeComponent component;
-    component.SetCubeMapAsset(desc.Handle);
+    component.SetCubeMapAsset(desc.mHandle);
 
     const auto& rhi = component.GetCubeMapRhi();
     REQUIRE(rhi.IsValid());

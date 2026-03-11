@@ -9,12 +9,12 @@ namespace AltinaEngine::Asset {
     using Container::TVector;
 
     struct AE_ASSET_API FAudioRuntimeDesc {
-        u32 Codec          = 0;
-        u32 SampleFormat   = 0;
-        u32 Channels       = 0;
-        u32 SampleRate     = 0;
-        u32 FrameCount     = 0;
-        u32 FramesPerChunk = 0;
+        u32 mCodec          = 0;
+        u32 mSampleFormat   = 0;
+        u32 mChannels       = 0;
+        u32 mSampleRate     = 0;
+        u32 mFrameCount     = 0;
+        u32 mFramesPerChunk = 0;
     };
 
     class AE_ASSET_API FAudioAsset final : public IAsset {

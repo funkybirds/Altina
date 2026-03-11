@@ -56,27 +56,27 @@ namespace AltinaEngine::Tools::AssetPipeline {
         }
 
         Asset::FTexture2DBlobDesc blobDesc{};
-        blobDesc.Width    = image.GetWidth();
-        blobDesc.Height   = image.GetHeight();
-        blobDesc.Format   = static_cast<u32>(image.GetFormat());
-        blobDesc.MipCount = 1;
-        blobDesc.RowPitch = image.GetRowPitch();
+        blobDesc.mWidth    = image.GetWidth();
+        blobDesc.mHeight   = image.GetHeight();
+        blobDesc.mFormat   = static_cast<u32>(image.GetFormat());
+        blobDesc.mMipCount = 1;
+        blobDesc.mRowPitch = image.GetRowPitch();
 
-        const u32 bytesPerPixel = Asset::GetTextureBytesPerPixel(blobDesc.Format);
-        if (bytesPerPixel == 0 || blobDesc.RowPitch < blobDesc.Width * bytesPerPixel) {
+        const u32 bytesPerPixel = Asset::GetTextureBytesPerPixel(blobDesc.mFormat);
+        if (bytesPerPixel == 0 || blobDesc.mRowPitch < blobDesc.mWidth * bytesPerPixel) {
             return false;
         }
 
-        const u64 expectedSize = static_cast<u64>(blobDesc.RowPitch) * blobDesc.Height;
+        const u64 expectedSize = static_cast<u64>(blobDesc.mRowPitch) * blobDesc.mHeight;
         if (expectedSize != dataSize) {
             return false;
         }
 
         Asset::FAssetBlobHeader header{};
-        header.Type     = static_cast<u8>(Asset::EAssetType::Texture2D);
-        header.Flags    = Asset::MakeAssetBlobFlags(srgb);
-        header.DescSize = static_cast<u32>(sizeof(Asset::FTexture2DBlobDesc));
-        header.DataSize = static_cast<u32>(dataSize);
+        header.mType     = static_cast<u8>(Asset::EAssetType::Texture2D);
+        header.mFlags    = Asset::MakeAssetBlobFlags(srgb);
+        header.mDescSize = static_cast<u32>(sizeof(Asset::FTexture2DBlobDesc));
+        header.mDataSize = static_cast<u32>(dataSize);
 
         const usize totalSize =
             sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FTexture2DBlobDesc) + dataSize;
@@ -89,10 +89,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             outCooked.data() + sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FTexture2DBlobDesc),
             image.GetData(), dataSize);
 
-        outDesc.Width    = blobDesc.Width;
-        outDesc.Height   = blobDesc.Height;
-        outDesc.Format   = blobDesc.Format;
-        outDesc.MipCount = blobDesc.MipCount;
+        outDesc.Width    = blobDesc.mWidth;
+        outDesc.Height   = blobDesc.mHeight;
+        outDesc.Format   = blobDesc.mFormat;
+        outDesc.MipCount = blobDesc.mMipCount;
         outDesc.SRGB     = srgb;
 
         return true;

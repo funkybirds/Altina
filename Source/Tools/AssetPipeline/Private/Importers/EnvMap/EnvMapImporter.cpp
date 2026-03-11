@@ -859,17 +859,17 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             Asset::FTexture2DBlobDesc blobDesc{};
-            blobDesc.Width    = baseW;
-            blobDesc.Height   = baseH;
-            blobDesc.Format   = Asset::kTextureFormatRGBA8;
-            blobDesc.MipCount = mipCount;
-            blobDesc.RowPitch = baseW * 4U;
+            blobDesc.mWidth    = baseW;
+            blobDesc.mHeight   = baseH;
+            blobDesc.mFormat   = Asset::kTextureFormatRGBA8;
+            blobDesc.mMipCount = mipCount;
+            blobDesc.mRowPitch = baseW * 4U;
 
             Asset::FAssetBlobHeader header{};
-            header.Type     = static_cast<u8>(Asset::EAssetType::Texture2D);
-            header.Flags    = Asset::MakeAssetBlobFlags(srgb);
-            header.DescSize = static_cast<u32>(sizeof(Asset::FTexture2DBlobDesc));
-            header.DataSize = static_cast<u32>(totalBytes);
+            header.mType     = static_cast<u8>(Asset::EAssetType::Texture2D);
+            header.mFlags    = Asset::MakeAssetBlobFlags(srgb);
+            header.mDescSize = static_cast<u32>(sizeof(Asset::FTexture2DBlobDesc));
+            header.mDataSize = static_cast<u32>(totalBytes);
 
             const size_t totalSize = sizeof(Asset::FAssetBlobHeader)
                 + sizeof(Asset::FTexture2DBlobDesc) + static_cast<size_t>(totalBytes);
@@ -903,10 +903,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 h = (h > 1U) ? (h >> 1U) : 1U;
             }
 
-            outDesc.Width    = blobDesc.Width;
-            outDesc.Height   = blobDesc.Height;
-            outDesc.Format   = blobDesc.Format;
-            outDesc.MipCount = blobDesc.MipCount;
+            outDesc.Width    = blobDesc.mWidth;
+            outDesc.Height   = blobDesc.mHeight;
+            outDesc.Format   = blobDesc.mFormat;
+            outDesc.MipCount = blobDesc.mMipCount;
             outDesc.SRGB     = srgb;
             return true;
         }
@@ -925,17 +925,17 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             Asset::FTexture2DBlobDesc blobDesc{};
-            blobDesc.Width    = width;
-            blobDesc.Height   = height;
-            blobDesc.Format   = Asset::kTextureFormatRGBA8;
-            blobDesc.MipCount = 1;
-            blobDesc.RowPitch = width * 4U;
+            blobDesc.mWidth    = width;
+            blobDesc.mHeight   = height;
+            blobDesc.mFormat   = Asset::kTextureFormatRGBA8;
+            blobDesc.mMipCount = 1;
+            blobDesc.mRowPitch = width * 4U;
 
             Asset::FAssetBlobHeader header{};
-            header.Type     = static_cast<u8>(Asset::EAssetType::Texture2D);
-            header.Flags    = Asset::MakeAssetBlobFlags(srgb);
-            header.DescSize = static_cast<u32>(sizeof(Asset::FTexture2DBlobDesc));
-            header.DataSize = static_cast<u32>(rgba.size());
+            header.mType     = static_cast<u8>(Asset::EAssetType::Texture2D);
+            header.mFlags    = Asset::MakeAssetBlobFlags(srgb);
+            header.mDescSize = static_cast<u32>(sizeof(Asset::FTexture2DBlobDesc));
+            header.mDataSize = static_cast<u32>(rgba.size());
 
             outCooked.resize(sizeof(header) + sizeof(blobDesc) + rgba.size());
             u8* write = outCooked.data();
@@ -945,10 +945,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             write += sizeof(blobDesc);
             std::memcpy(write, rgba.data(), rgba.size());
 
-            outDesc.Width    = blobDesc.Width;
-            outDesc.Height   = blobDesc.Height;
-            outDesc.Format   = blobDesc.Format;
-            outDesc.MipCount = blobDesc.MipCount;
+            outDesc.Width    = blobDesc.mWidth;
+            outDesc.Height   = blobDesc.mHeight;
+            outDesc.Format   = blobDesc.mFormat;
+            outDesc.MipCount = blobDesc.mMipCount;
             outDesc.SRGB     = srgb;
             return true;
         }
@@ -989,16 +989,16 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             Asset::FCubeMapBlobDesc blobDesc{};
-            blobDesc.Size     = size;
-            blobDesc.Format   = format;
-            blobDesc.MipCount = mipCount;
-            blobDesc.RowPitch = size * bpp;
+            blobDesc.mSize     = size;
+            blobDesc.mFormat   = format;
+            blobDesc.mMipCount = mipCount;
+            blobDesc.mRowPitch = size * bpp;
 
             Asset::FAssetBlobHeader header{};
-            header.Type     = static_cast<u8>(Asset::EAssetType::CubeMap);
-            header.Flags    = Asset::MakeAssetBlobFlags(false);
-            header.DescSize = static_cast<u32>(sizeof(Asset::FCubeMapBlobDesc));
-            header.DataSize = static_cast<u32>(totalBytes);
+            header.mType     = static_cast<u8>(Asset::EAssetType::CubeMap);
+            header.mFlags    = Asset::MakeAssetBlobFlags(false);
+            header.mDescSize = static_cast<u32>(sizeof(Asset::FCubeMapBlobDesc));
+            header.mDataSize = static_cast<u32>(totalBytes);
 
             const size_t totalSize =
                 sizeof(header) + sizeof(blobDesc) + static_cast<size_t>(totalBytes);
@@ -1039,9 +1039,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 }
             }
 
-            outDesc.Size     = blobDesc.Size;
-            outDesc.MipCount = blobDesc.MipCount;
-            outDesc.Format   = blobDesc.Format;
+            outDesc.Size     = blobDesc.mSize;
+            outDesc.MipCount = blobDesc.mMipCount;
+            outDesc.Format   = blobDesc.mFormat;
             outDesc.SRGB     = false;
             return true;
         }
@@ -1080,7 +1080,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             };
 
             Asset::FAssetDesc desc{};
-            desc.Texture = expectedDesc;
+            desc.mTexture = expectedDesc;
             FMemoryAssetStream      stream(cookedBytes);
             Asset::FTexture2DLoader loader;
             return static_cast<bool>(loader.Load(desc, stream));
@@ -1359,7 +1359,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             const std::string& derivedVirtualPath, const std::vector<u8>& cookedBytes,
             const Asset::FTexture2DDesc& desc, std::vector<FGeneratedAsset>& outGenerated,
             std::string& outError) -> bool {
-            if (!baseHandle.IsValid() || baseHandle.Type == Asset::EAssetType::Unknown) {
+            if (!baseHandle.IsValid() || baseHandle.mType == Asset::EAssetType::Unknown) {
                 outError = "Invalid base handle.";
                 return false;
             }
@@ -1368,10 +1368,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            const FUuid         derivedUuid = MakeDerivedUuid(baseHandle.Uuid, derivedVirtualPath);
+            const FUuid         derivedUuid = MakeDerivedUuid(baseHandle.mUuid, derivedVirtualPath);
             Asset::FAssetHandle handle{};
-            handle.Uuid = derivedUuid;
-            handle.Type = Asset::EAssetType::Texture2D;
+            handle.mUuid = derivedUuid;
+            handle.mType = Asset::EAssetType::Texture2D;
 
             FGeneratedAsset gen{};
             gen.Handle      = handle;
@@ -1387,7 +1387,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             const std::string& derivedVirtualPath, const std::vector<u8>& cookedBytes,
             const Asset::FCubeMapDesc& desc, std::vector<FGeneratedAsset>& outGenerated,
             std::string& outError) -> bool {
-            if (!baseHandle.IsValid() || baseHandle.Type == Asset::EAssetType::Unknown) {
+            if (!baseHandle.IsValid() || baseHandle.mType == Asset::EAssetType::Unknown) {
                 outError = "Invalid base handle.";
                 return false;
             }
@@ -1396,10 +1396,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            const FUuid         derivedUuid = MakeDerivedUuid(baseHandle.Uuid, derivedVirtualPath);
+            const FUuid         derivedUuid = MakeDerivedUuid(baseHandle.mUuid, derivedVirtualPath);
             Asset::FAssetHandle handle{};
-            handle.Uuid = derivedUuid;
-            handle.Type = Asset::EAssetType::CubeMap;
+            handle.mUuid = derivedUuid;
+            handle.mType = Asset::EAssetType::CubeMap;
 
             FGeneratedAsset gen{};
             gen.Handle      = handle;
@@ -1466,7 +1466,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         outResult = {};
         outError.clear();
 
-        if (!baseHandle.IsValid() || baseHandle.Type != Asset::EAssetType::Texture2D) {
+        if (!baseHandle.IsValid() || baseHandle.mType != Asset::EAssetType::Texture2D) {
             outError = "Base handle must be a valid Texture2D handle.";
             return false;
         }
@@ -1754,7 +1754,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         outResult = {};
         outError.clear();
 
-        if (!baseHandle.IsValid() || baseHandle.Type != Asset::EAssetType::CubeMap) {
+        if (!baseHandle.IsValid() || baseHandle.mType != Asset::EAssetType::CubeMap) {
             outError = "Base handle must be a valid CubeMap handle.";
             return false;
         }
@@ -1999,7 +1999,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         outResult = {};
         outError.clear();
 
-        if (!baseHandle.IsValid() || baseHandle.Type != Asset::EAssetType::CubeMap) {
+        if (!baseHandle.IsValid() || baseHandle.mType != Asset::EAssetType::CubeMap) {
             outError = "Base handle must be a valid CubeMap handle.";
             return false;
         }

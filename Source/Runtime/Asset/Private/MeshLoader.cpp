@@ -34,15 +34,15 @@ namespace AltinaEngine::Asset {
                 return false;
             }
 
-            if (outHeader.Magic != kAssetBlobMagic || outHeader.Version != kAssetBlobVersion) {
+            if (outHeader.mMagic != kAssetBlobMagic || outHeader.mVersion != kAssetBlobVersion) {
                 return false;
             }
 
-            if (outHeader.Type != static_cast<u8>(EAssetType::Mesh)) {
+            if (outHeader.mType != static_cast<u8>(EAssetType::Mesh)) {
                 return false;
             }
 
-            if (outHeader.DescSize != sizeof(FMeshBlobDesc)) {
+            if (outHeader.mDescSize != sizeof(FMeshBlobDesc)) {
                 return false;
             }
 
@@ -89,60 +89,60 @@ namespace AltinaEngine::Asset {
             return {};
         }
 
-        if (blobDesc.VertexCount == 0U || blobDesc.IndexCount == 0U
-            || blobDesc.VertexStride == 0U) {
+        if (blobDesc.mVertexCount == 0U || blobDesc.mIndexCount == 0U
+            || blobDesc.mVertexStride == 0U) {
             return {};
         }
 
-        const u32 indexStride = GetMeshIndexStride(blobDesc.IndexType);
+        const u32 indexStride = GetMeshIndexStride(blobDesc.mIndexType);
         if (indexStride == 0U) {
             return {};
         }
 
         u64 expectedVertexSize = 0;
-        if (!TryComputeBytes(blobDesc.VertexCount, blobDesc.VertexStride, expectedVertexSize)) {
+        if (!TryComputeBytes(blobDesc.mVertexCount, blobDesc.mVertexStride, expectedVertexSize)) {
             return {};
         }
-        if (expectedVertexSize != blobDesc.VertexDataSize) {
+        if (expectedVertexSize != blobDesc.mVertexDataSize) {
             return {};
         }
 
         u64 expectedIndexSize = 0;
-        if (!TryComputeBytes(blobDesc.IndexCount, indexStride, expectedIndexSize)) {
+        if (!TryComputeBytes(blobDesc.mIndexCount, indexStride, expectedIndexSize)) {
             return {};
         }
-        if (expectedIndexSize != blobDesc.IndexDataSize) {
+        if (expectedIndexSize != blobDesc.mIndexDataSize) {
             return {};
         }
 
-        const u64 dataSize  = header.DataSize;
+        const u64 dataSize  = header.mDataSize;
         u64       attrBytes = 0;
         if (!TryComputeBytes(
-                blobDesc.AttributeCount, sizeof(FMeshVertexAttributeDesc), attrBytes)) {
+                blobDesc.mAttributeCount, sizeof(FMeshVertexAttributeDesc), attrBytes)) {
             return {};
         }
         u64 subMeshBytes = 0;
-        if (!TryComputeBytes(blobDesc.SubMeshCount, sizeof(FMeshSubMeshDesc), subMeshBytes)) {
+        if (!TryComputeBytes(blobDesc.mSubMeshCount, sizeof(FMeshSubMeshDesc), subMeshBytes)) {
             return {};
         }
 
-        if (!RangeWithin(blobDesc.AttributesOffset, attrBytes, dataSize)) {
+        if (!RangeWithin(blobDesc.mAttributesOffset, attrBytes, dataSize)) {
             return {};
         }
-        if (!RangeWithin(blobDesc.SubMeshesOffset, subMeshBytes, dataSize)) {
+        if (!RangeWithin(blobDesc.mSubMeshesOffset, subMeshBytes, dataSize)) {
             return {};
         }
-        if (!RangeWithin(blobDesc.VertexDataOffset, blobDesc.VertexDataSize, dataSize)) {
+        if (!RangeWithin(blobDesc.mVertexDataOffset, blobDesc.mVertexDataSize, dataSize)) {
             return {};
         }
-        if (!RangeWithin(blobDesc.IndexDataOffset, blobDesc.IndexDataSize, dataSize)) {
+        if (!RangeWithin(blobDesc.mIndexDataOffset, blobDesc.mIndexDataSize, dataSize)) {
             return {};
         }
 
-        if (desc.Mesh.SubMeshCount != 0U && desc.Mesh.SubMeshCount != blobDesc.SubMeshCount) {
+        if (desc.mMesh.SubMeshCount != 0U && desc.mMesh.SubMeshCount != blobDesc.mSubMeshCount) {
             return {};
         }
-        if (desc.Mesh.IndexFormat != 0U && desc.Mesh.IndexFormat != blobDesc.IndexType) {
+        if (desc.mMesh.IndexFormat != 0U && desc.mMesh.IndexFormat != blobDesc.mIndexType) {
             return {};
         }
 
@@ -154,18 +154,18 @@ namespace AltinaEngine::Asset {
         }
 
         TVector<FMeshVertexAttributeDesc> attributes;
-        if (blobDesc.AttributeCount > 0U) {
-            attributes.Resize(static_cast<usize>(blobDesc.AttributeCount));
-            stream.Seek(baseOffset + static_cast<usize>(blobDesc.AttributesOffset));
+        if (blobDesc.mAttributeCount > 0U) {
+            attributes.Resize(static_cast<usize>(blobDesc.mAttributeCount));
+            stream.Seek(baseOffset + static_cast<usize>(blobDesc.mAttributesOffset));
             if (!ReadExact(stream, attributes.Data(), static_cast<usize>(attrBytes))) {
                 return {};
             }
         }
 
         TVector<FMeshSubMeshDesc> subMeshes;
-        if (blobDesc.SubMeshCount > 0U) {
-            subMeshes.Resize(static_cast<usize>(blobDesc.SubMeshCount));
-            stream.Seek(baseOffset + static_cast<usize>(blobDesc.SubMeshesOffset));
+        if (blobDesc.mSubMeshCount > 0U) {
+            subMeshes.Resize(static_cast<usize>(blobDesc.mSubMeshCount));
+            stream.Seek(baseOffset + static_cast<usize>(blobDesc.mSubMeshesOffset));
             if (!ReadExact(stream, subMeshes.Data(), static_cast<usize>(subMeshBytes))) {
                 return {};
             }
@@ -173,40 +173,41 @@ namespace AltinaEngine::Asset {
 
         for (const auto& subMesh : subMeshes) {
             const u64 endIndex =
-                static_cast<u64>(subMesh.IndexStart) + static_cast<u64>(subMesh.IndexCount);
-            if (endIndex > blobDesc.IndexCount) {
+                static_cast<u64>(subMesh.mIndexStart) + static_cast<u64>(subMesh.mIndexCount);
+            if (endIndex > blobDesc.mIndexCount) {
                 return {};
             }
         }
 
         TVector<u8> vertexData;
-        vertexData.Resize(static_cast<usize>(blobDesc.VertexDataSize));
-        stream.Seek(baseOffset + static_cast<usize>(blobDesc.VertexDataOffset));
-        if (blobDesc.VertexDataSize > 0U
-            && !ReadExact(stream, vertexData.Data(), static_cast<usize>(blobDesc.VertexDataSize))) {
+        vertexData.Resize(static_cast<usize>(blobDesc.mVertexDataSize));
+        stream.Seek(baseOffset + static_cast<usize>(blobDesc.mVertexDataOffset));
+        if (blobDesc.mVertexDataSize > 0U
+            && !ReadExact(
+                stream, vertexData.Data(), static_cast<usize>(blobDesc.mVertexDataSize))) {
             return {};
         }
 
         TVector<u8> indexData;
-        indexData.Resize(static_cast<usize>(blobDesc.IndexDataSize));
-        stream.Seek(baseOffset + static_cast<usize>(blobDesc.IndexDataOffset));
-        if (blobDesc.IndexDataSize > 0U
-            && !ReadExact(stream, indexData.Data(), static_cast<usize>(blobDesc.IndexDataSize))) {
+        indexData.Resize(static_cast<usize>(blobDesc.mIndexDataSize));
+        stream.Seek(baseOffset + static_cast<usize>(blobDesc.mIndexDataOffset));
+        if (blobDesc.mIndexDataSize > 0U
+            && !ReadExact(stream, indexData.Data(), static_cast<usize>(blobDesc.mIndexDataSize))) {
             return {};
         }
 
         FMeshRuntimeDesc runtimeDesc{};
-        runtimeDesc.VertexCount  = blobDesc.VertexCount;
-        runtimeDesc.IndexCount   = blobDesc.IndexCount;
-        runtimeDesc.VertexStride = blobDesc.VertexStride;
-        runtimeDesc.IndexType    = blobDesc.IndexType;
-        runtimeDesc.Flags        = blobDesc.Flags;
-        runtimeDesc.BoundsMin[0] = blobDesc.BoundsMin[0];
-        runtimeDesc.BoundsMin[1] = blobDesc.BoundsMin[1];
-        runtimeDesc.BoundsMin[2] = blobDesc.BoundsMin[2];
-        runtimeDesc.BoundsMax[0] = blobDesc.BoundsMax[0];
-        runtimeDesc.BoundsMax[1] = blobDesc.BoundsMax[1];
-        runtimeDesc.BoundsMax[2] = blobDesc.BoundsMax[2];
+        runtimeDesc.mVertexCount  = blobDesc.mVertexCount;
+        runtimeDesc.mIndexCount   = blobDesc.mIndexCount;
+        runtimeDesc.mVertexStride = blobDesc.mVertexStride;
+        runtimeDesc.mIndexType    = blobDesc.mIndexType;
+        runtimeDesc.mFlags        = blobDesc.mFlags;
+        runtimeDesc.mBoundsMin[0] = blobDesc.mBoundsMin[0];
+        runtimeDesc.mBoundsMin[1] = blobDesc.mBoundsMin[1];
+        runtimeDesc.mBoundsMin[2] = blobDesc.mBoundsMin[2];
+        runtimeDesc.mBoundsMax[0] = blobDesc.mBoundsMax[0];
+        runtimeDesc.mBoundsMax[1] = blobDesc.mBoundsMax[1];
+        runtimeDesc.mBoundsMax[2] = blobDesc.mBoundsMax[2];
 
         return MakeSharedAsset<FMeshAsset>(
             runtimeDesc, Move(attributes), Move(subMeshes), Move(vertexData), Move(indexData));

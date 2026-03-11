@@ -225,7 +225,7 @@ namespace AltinaEngine::GameScene {
         if (!mScriptAsset.IsValid()) {
             return false;
         }
-        if (mScriptAsset.Type != AltinaEngine::Asset::EAssetType::Script) {
+        if (mScriptAsset.mType != AltinaEngine::Asset::EAssetType::Script) {
             if (!mLoggedResolveFailure) {
                 mLoggedResolveFailure = true;
                 LogWarningCat(

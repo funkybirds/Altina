@@ -9,9 +9,9 @@ namespace AltinaEngine::Asset {
     using Container::TVector;
 
     struct AE_ASSET_API FModelRuntimeDesc {
-        u32 NodeCount         = 0;
-        u32 MeshRefCount      = 0;
-        u32 MaterialSlotCount = 0;
+        u32 mNodeCount         = 0;
+        u32 mMeshRefCount      = 0;
+        u32 mMaterialSlotCount = 0;
     };
 
     class AE_ASSET_API FModelAsset final : public IAsset {

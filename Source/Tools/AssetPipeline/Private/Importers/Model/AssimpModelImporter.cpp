@@ -182,36 +182,37 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             Asset::FMeshBlobDesc blobDesc{};
-            blobDesc.VertexCount    = mesh.VertexCount;
-            blobDesc.IndexCount     = mesh.IndexCount;
-            blobDesc.VertexStride   = mesh.VertexStride;
-            blobDesc.IndexType      = mesh.IndexType;
-            blobDesc.AttributeCount = static_cast<u32>(mesh.Attributes.size());
-            blobDesc.SubMeshCount   = static_cast<u32>(mesh.SubMeshes.size());
-            blobDesc.VertexDataSize = static_cast<u32>(mesh.VertexData.size());
-            blobDesc.IndexDataSize  = static_cast<u32>(mesh.IndexData.size());
-            blobDesc.BoundsMin[0]   = mesh.BoundsMin[0];
-            blobDesc.BoundsMin[1]   = mesh.BoundsMin[1];
-            blobDesc.BoundsMin[2]   = mesh.BoundsMin[2];
-            blobDesc.BoundsMax[0]   = mesh.BoundsMax[0];
-            blobDesc.BoundsMax[1]   = mesh.BoundsMax[1];
-            blobDesc.BoundsMax[2]   = mesh.BoundsMax[2];
-            blobDesc.Flags          = 1U;
+            blobDesc.mVertexCount    = mesh.VertexCount;
+            blobDesc.mIndexCount     = mesh.IndexCount;
+            blobDesc.mVertexStride   = mesh.VertexStride;
+            blobDesc.mIndexType      = mesh.IndexType;
+            blobDesc.mAttributeCount = static_cast<u32>(mesh.Attributes.size());
+            blobDesc.mSubMeshCount   = static_cast<u32>(mesh.SubMeshes.size());
+            blobDesc.mVertexDataSize = static_cast<u32>(mesh.VertexData.size());
+            blobDesc.mIndexDataSize  = static_cast<u32>(mesh.IndexData.size());
+            blobDesc.mBoundsMin[0]   = mesh.BoundsMin[0];
+            blobDesc.mBoundsMin[1]   = mesh.BoundsMin[1];
+            blobDesc.mBoundsMin[2]   = mesh.BoundsMin[2];
+            blobDesc.mBoundsMax[0]   = mesh.BoundsMax[0];
+            blobDesc.mBoundsMax[1]   = mesh.BoundsMax[1];
+            blobDesc.mBoundsMax[2]   = mesh.BoundsMax[2];
+            blobDesc.mFlags          = 1U;
 
-            const u32 attrBytes = blobDesc.AttributeCount * sizeof(Asset::FMeshVertexAttributeDesc);
-            const u32 subMeshBytes = blobDesc.SubMeshCount * sizeof(Asset::FMeshSubMeshDesc);
+            const u32 attrBytes =
+                blobDesc.mAttributeCount * sizeof(Asset::FMeshVertexAttributeDesc);
+            const u32 subMeshBytes = blobDesc.mSubMeshCount * sizeof(Asset::FMeshSubMeshDesc);
 
-            blobDesc.AttributesOffset = 0;
-            blobDesc.SubMeshesOffset  = blobDesc.AttributesOffset + attrBytes;
-            blobDesc.VertexDataOffset = blobDesc.SubMeshesOffset + subMeshBytes;
-            blobDesc.IndexDataOffset  = blobDesc.VertexDataOffset + blobDesc.VertexDataSize;
+            blobDesc.mAttributesOffset = 0;
+            blobDesc.mSubMeshesOffset  = blobDesc.mAttributesOffset + attrBytes;
+            blobDesc.mVertexDataOffset = blobDesc.mSubMeshesOffset + subMeshBytes;
+            blobDesc.mIndexDataOffset  = blobDesc.mVertexDataOffset + blobDesc.mVertexDataSize;
 
-            const u32               dataSize = blobDesc.IndexDataOffset + blobDesc.IndexDataSize;
+            const u32               dataSize = blobDesc.mIndexDataOffset + blobDesc.mIndexDataSize;
 
             Asset::FAssetBlobHeader header{};
-            header.Type     = static_cast<u8>(Asset::EAssetType::Mesh);
-            header.DescSize = static_cast<u32>(sizeof(Asset::FMeshBlobDesc));
-            header.DataSize = dataSize;
+            header.mType     = static_cast<u8>(Asset::EAssetType::Mesh);
+            header.mDescSize = static_cast<u32>(sizeof(Asset::FMeshBlobDesc));
+            header.mDataSize = dataSize;
 
             const usize totalSize =
                 sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FMeshBlobDesc) + dataSize;
@@ -225,24 +226,24 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             if (!mesh.Attributes.empty()) {
                 std::memcpy(
-                    writePtr + blobDesc.AttributesOffset, mesh.Attributes.data(), attrBytes);
+                    writePtr + blobDesc.mAttributesOffset, mesh.Attributes.data(), attrBytes);
             }
             if (!mesh.SubMeshes.empty()) {
                 std::memcpy(
-                    writePtr + blobDesc.SubMeshesOffset, mesh.SubMeshes.data(), subMeshBytes);
+                    writePtr + blobDesc.mSubMeshesOffset, mesh.SubMeshes.data(), subMeshBytes);
             }
             if (!mesh.VertexData.empty()) {
-                std::memcpy(writePtr + blobDesc.VertexDataOffset, mesh.VertexData.data(),
+                std::memcpy(writePtr + blobDesc.mVertexDataOffset, mesh.VertexData.data(),
                     mesh.VertexData.size());
             }
             if (!mesh.IndexData.empty()) {
-                std::memcpy(writePtr + blobDesc.IndexDataOffset, mesh.IndexData.data(),
+                std::memcpy(writePtr + blobDesc.mIndexDataOffset, mesh.IndexData.data(),
                     mesh.IndexData.size());
             }
 
             outDesc.VertexFormat = mesh.VertexFormatMask;
             outDesc.IndexFormat  = mesh.IndexType;
-            outDesc.SubMeshCount = blobDesc.SubMeshCount;
+            outDesc.SubMeshCount = blobDesc.mSubMeshCount;
             return true;
         }
         auto BuildMeshFromAssimp(const aiMesh* mesh, FMeshBuildResult& outMesh, bool flipTexCoordV)
@@ -259,36 +260,36 @@ namespace AltinaEngine::Tools::AssetPipeline {
             outMesh.Attributes.clear();
             {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic      = Asset::kMeshSemanticPosition;
-                attr.Format        = Asset::kMeshVertexFormatR32G32B32Float;
-                attr.AlignedOffset = offset;
+                attr.mSemantic      = Asset::kMeshSemanticPosition;
+                attr.mFormat        = Asset::kMeshVertexFormatR32G32B32Float;
+                attr.mAlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 12;
                 outMesh.VertexFormatMask |= Asset::kMeshVertexMaskPosition;
             }
             if (hasNormals) {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic      = Asset::kMeshSemanticNormal;
-                attr.Format        = Asset::kMeshVertexFormatR32G32B32Float;
-                attr.AlignedOffset = offset;
+                attr.mSemantic      = Asset::kMeshSemanticNormal;
+                attr.mFormat        = Asset::kMeshVertexFormatR32G32B32Float;
+                attr.mAlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 12;
                 outMesh.VertexFormatMask |= Asset::kMeshVertexMaskNormal;
             }
             if (hasTangents) {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic      = Asset::kMeshSemanticTangent;
-                attr.Format        = Asset::kMeshVertexFormatR32G32B32Float;
-                attr.AlignedOffset = offset;
+                attr.mSemantic      = Asset::kMeshSemanticTangent;
+                attr.mFormat        = Asset::kMeshVertexFormatR32G32B32Float;
+                attr.mAlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 12;
             }
             if (hasTexcoords) {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic      = Asset::kMeshSemanticTexCoord;
-                attr.SemanticIndex = 0;
-                attr.Format        = Asset::kMeshVertexFormatR32G32Float;
-                attr.AlignedOffset = offset;
+                attr.mSemantic      = Asset::kMeshSemanticTexCoord;
+                attr.mSemanticIndex = 0;
+                attr.mFormat        = Asset::kMeshVertexFormatR32G32Float;
+                attr.mAlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 8;
                 outMesh.VertexFormatMask |= Asset::kMeshVertexMaskTexCoord0;
@@ -377,11 +378,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             Asset::FMeshSubMeshDesc subMesh{};
-            subMesh.IndexStart   = 0;
-            subMesh.IndexCount   = outMesh.IndexCount;
-            subMesh.BaseVertex   = 0;
-            subMesh.MaterialSlot = 0;
-            outMesh.SubMeshes    = { subMesh };
+            subMesh.mIndexStart   = 0;
+            subMesh.mIndexCount   = outMesh.IndexCount;
+            subMesh.mBaseVertex   = 0;
+            subMesh.mMaterialSlot = 0;
+            outMesh.SubMeshes     = { subMesh };
             return true;
         }
 
@@ -444,24 +445,24 @@ namespace AltinaEngine::Tools::AssetPipeline {
             const std::vector<Asset::FAssetHandle>& materialSlots, std::vector<u8>& outCooked,
             Asset::FModelDesc& outDesc) -> bool {
             Asset::FModelBlobDesc blobDesc{};
-            blobDesc.NodeCount         = static_cast<u32>(nodes.size());
-            blobDesc.MeshRefCount      = static_cast<u32>(meshRefs.size());
-            blobDesc.MaterialSlotCount = static_cast<u32>(materialSlots.size());
+            blobDesc.mNodeCount         = static_cast<u32>(nodes.size());
+            blobDesc.mMeshRefCount      = static_cast<u32>(meshRefs.size());
+            blobDesc.mMaterialSlotCount = static_cast<u32>(materialSlots.size());
 
-            const u32 nodesBytes    = blobDesc.NodeCount * sizeof(Asset::FModelNodeDesc);
-            const u32 meshRefBytes  = blobDesc.MeshRefCount * sizeof(Asset::FModelMeshRef);
-            const u32 materialBytes = blobDesc.MaterialSlotCount * sizeof(Asset::FAssetHandle);
+            const u32 nodesBytes    = blobDesc.mNodeCount * sizeof(Asset::FModelNodeDesc);
+            const u32 meshRefBytes  = blobDesc.mMeshRefCount * sizeof(Asset::FModelMeshRef);
+            const u32 materialBytes = blobDesc.mMaterialSlotCount * sizeof(Asset::FAssetHandle);
 
-            blobDesc.NodesOffset         = 0;
-            blobDesc.MeshRefsOffset      = blobDesc.NodesOffset + nodesBytes;
-            blobDesc.MaterialSlotsOffset = blobDesc.MeshRefsOffset + meshRefBytes;
+            blobDesc.mNodesOffset         = 0;
+            blobDesc.mMeshRefsOffset      = blobDesc.mNodesOffset + nodesBytes;
+            blobDesc.mMaterialSlotsOffset = blobDesc.mMeshRefsOffset + meshRefBytes;
 
-            const u32               dataSize = blobDesc.MaterialSlotsOffset + materialBytes;
+            const u32               dataSize = blobDesc.mMaterialSlotsOffset + materialBytes;
 
             Asset::FAssetBlobHeader header{};
-            header.Type     = static_cast<u8>(Asset::EAssetType::Model);
-            header.DescSize = static_cast<u32>(sizeof(Asset::FModelBlobDesc));
-            header.DataSize = dataSize;
+            header.mType     = static_cast<u8>(Asset::EAssetType::Model);
+            header.mDescSize = static_cast<u32>(sizeof(Asset::FModelBlobDesc));
+            header.mDataSize = dataSize;
 
             const usize totalSize =
                 sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FModelBlobDesc) + dataSize;
@@ -474,19 +475,19 @@ namespace AltinaEngine::Tools::AssetPipeline {
             writePtr += sizeof(blobDesc);
 
             if (!nodes.empty()) {
-                std::memcpy(writePtr + blobDesc.NodesOffset, nodes.data(), nodesBytes);
+                std::memcpy(writePtr + blobDesc.mNodesOffset, nodes.data(), nodesBytes);
             }
             if (!meshRefs.empty()) {
-                std::memcpy(writePtr + blobDesc.MeshRefsOffset, meshRefs.data(), meshRefBytes);
+                std::memcpy(writePtr + blobDesc.mMeshRefsOffset, meshRefs.data(), meshRefBytes);
             }
             if (!materialSlots.empty()) {
                 std::memcpy(
-                    writePtr + blobDesc.MaterialSlotsOffset, materialSlots.data(), materialBytes);
+                    writePtr + blobDesc.mMaterialSlotsOffset, materialSlots.data(), materialBytes);
             }
 
-            outDesc.NodeCount         = blobDesc.NodeCount;
-            outDesc.MeshRefCount      = blobDesc.MeshRefCount;
-            outDesc.MaterialSlotCount = blobDesc.MaterialSlotCount;
+            outDesc.NodeCount         = blobDesc.mNodeCount;
+            outDesc.MeshRefCount      = blobDesc.mMeshRefCount;
+            outDesc.MaterialSlotCount = blobDesc.mMaterialSlotCount;
             return true;
         }
 
@@ -509,8 +510,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
         auto ToAssetHandle(const FUuid& uuid, Asset::EAssetType type) -> Asset::FAssetHandle {
             Asset::FAssetHandle handle{};
-            handle.Uuid = uuid;
-            handle.Type = type;
+            handle.mUuid = uuid;
+            handle.mType = type;
             return handle;
         }
 
@@ -648,7 +649,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             const std::string matVirtual = NormalizeVirtualPath(basePath + "/materials/" + matName);
-            const FUuid       matUuid    = MakeDerivedUuid(baseHandle.Uuid, matVirtual);
+            const FUuid       matUuid    = MakeDerivedUuid(baseHandle.mUuid, matVirtual);
 
             Asset::FAssetHandle matHandle =
                 ToAssetHandle(matUuid, Asset::EAssetType::MaterialTemplate);
@@ -804,11 +805,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     NormalizeVirtualPath(basePath + "/textures/" + texName);
                 if (const auto it = textureByVirtual.find(texVirtual);
                     it != textureByVirtual.end()) {
-                    const std::string uuidText = ToStdString(it->second.Uuid.ToNativeString());
+                    const std::string uuidText = ToStdString(it->second.mUuid.ToNativeString());
                     textureOverrides.push_back({ paramName, uuidText });
                     return;
                 }
-                const FUuid           texUuid = MakeDerivedUuid(baseHandle.Uuid, texVirtual);
+                const FUuid           texUuid = MakeDerivedUuid(baseHandle.mUuid, texVirtual);
 
                 Asset::FTexture2DDesc texDesc{};
                 std::vector<u8>       cookedTex;
@@ -889,18 +890,18 @@ namespace AltinaEngine::Tools::AssetPipeline {
             transform.Decompose(scaling, rotation, translation);
 
             Asset::FModelNodeDesc node{};
-            node.ParentIndex    = parentIndex;
-            node.MeshRefIndex   = meshRefIndex;
-            node.Translation[0] = translation.x;
-            node.Translation[1] = translation.y;
-            node.Translation[2] = translation.z;
-            node.Rotation[0]    = rotation.x;
-            node.Rotation[1]    = rotation.y;
-            node.Rotation[2]    = rotation.z;
-            node.Rotation[3]    = rotation.w;
-            node.Scale[0]       = scaling.x;
-            node.Scale[1]       = scaling.y;
-            node.Scale[2]       = scaling.z;
+            node.mParentIndex    = parentIndex;
+            node.mMeshRefIndex   = meshRefIndex;
+            node.mTranslation[0] = translation.x;
+            node.mTranslation[1] = translation.y;
+            node.mTranslation[2] = translation.z;
+            node.mRotation[0]    = rotation.x;
+            node.mRotation[1]    = rotation.y;
+            node.mRotation[2]    = rotation.z;
+            node.mRotation[3]    = rotation.w;
+            node.mScale[0]       = scaling.x;
+            node.mScale[1]       = scaling.y;
+            node.mScale[2]       = scaling.z;
             nodes.push_back(node);
             return static_cast<i32>(nodes.size() - 1);
         };
@@ -936,7 +937,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             SanitizeName(GetMeshName(mesh, meshIndex), "mesh");
                         const std::string meshVirtual =
                             NormalizeVirtualPath(basePath + "/meshes/" + meshName);
-                        const FUuid     meshUuid = MakeDerivedUuid(baseHandle.Uuid, meshVirtual);
+                        const FUuid     meshUuid = MakeDerivedUuid(baseHandle.mUuid, meshVirtual);
 
                         FGeneratedAsset meshAsset{};
                         meshAsset.Handle      = ToAssetHandle(meshUuid, Asset::EAssetType::Mesh);
@@ -947,10 +948,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         generated.push_back(Move(meshAsset));
 
                         Asset::FModelMeshRef meshRef{};
-                        meshRef.Mesh = ToAssetHandle(meshUuid, Asset::EAssetType::Mesh);
-                        meshRef.MaterialSlotOffset = static_cast<u32>(materialSlots.size());
-                        meshRef.MaterialSlotCount  = 1U;
-                        const u32 materialIndex    = mesh->mMaterialIndex;
+                        meshRef.mMesh = ToAssetHandle(meshUuid, Asset::EAssetType::Mesh);
+                        meshRef.mMaterialSlotOffset = static_cast<u32>(materialSlots.size());
+                        meshRef.mMaterialSlotCount  = 1U;
+                        const u32 materialIndex     = mesh->mMaterialIndex;
                         if (materialIndex < materialHandles.size()) {
                             materialSlots.push_back(materialHandles[materialIndex]);
                         } else {
@@ -964,7 +965,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
                     if (meshRefIndex >= 0) {
                         if (i == 0) {
-                            nodes[static_cast<size_t>(nodeIndex)].MeshRefIndex = meshRefIndex;
+                            nodes[static_cast<size_t>(nodeIndex)].mMeshRefIndex = meshRefIndex;
                         } else {
                             AddNode(nodeIndex, aiMatrix4x4(), meshRefIndex);
                         }
@@ -987,8 +988,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
         outResult.Generated = Move(generated);
         outResult.ModelDependencies.reserve(meshRefs.size() + materialHandles.size());
         for (const auto& meshRef : meshRefs) {
-            if (meshRef.Mesh.IsValid()) {
-                outResult.ModelDependencies.push_back(meshRef.Mesh);
+            if (meshRef.mMesh.IsValid()) {
+                outResult.ModelDependencies.push_back(meshRef.mMesh);
             }
         }
         for (const auto& handle : materialHandles) {

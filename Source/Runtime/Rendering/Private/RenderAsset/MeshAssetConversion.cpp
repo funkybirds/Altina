@@ -19,7 +19,7 @@ namespace AltinaEngine::Rendering {
             const Core::Container::TVector<FMeshVertexAttributeDesc>& attributes, u32 semantic,
             u32 semanticIndex) -> FAttributeView {
             for (const auto& attr : attributes) {
-                if (attr.Semantic == semantic && attr.SemanticIndex == semanticIndex) {
+                if (attr.mSemantic == semantic && attr.mSemanticIndex == semanticIndex) {
                     return { true, attr };
                 }
             }
@@ -30,7 +30,7 @@ namespace AltinaEngine::Rendering {
             const Core::Container::TVector<FMeshVertexAttributeDesc>& attributes, u32 semantic)
             -> FAttributeView {
             for (const auto& attr : attributes) {
-                if (attr.Semantic == semantic) {
+                if (attr.mSemantic == semantic) {
                     return { true, attr };
                 }
             }
@@ -122,25 +122,25 @@ namespace AltinaEngine::Rendering {
         const auto& vertexData = asset.GetVertexData();
         const auto& indexData  = asset.GetIndexData();
 
-        if (desc.VertexCount == 0U || desc.IndexCount == 0U || desc.VertexStride == 0U) {
+        if (desc.mVertexCount == 0U || desc.mIndexCount == 0U || desc.mVertexStride == 0U) {
             return false;
         }
 
         const u64 expectedVertexBytes =
-            static_cast<u64>(desc.VertexCount) * static_cast<u64>(desc.VertexStride);
+            static_cast<u64>(desc.mVertexCount) * static_cast<u64>(desc.mVertexStride);
         if (vertexData.Size() < static_cast<usize>(expectedVertexBytes)) {
             return false;
         }
 
         Rhi::ERhiIndexType indexType = Rhi::ERhiIndexType::Uint16;
-        if (!ResolveIndexType(desc.IndexType, indexType)) {
+        if (!ResolveIndexType(desc.mIndexType, indexType)) {
             return false;
         }
 
         const u32 indexStride =
             RenderCore::Geometry::FStaticMeshLodData::GetIndexStrideBytes(indexType);
         const u64 expectedIndexBytes =
-            static_cast<u64>(desc.IndexCount) * static_cast<u64>(indexStride);
+            static_cast<u64>(desc.mIndexCount) * static_cast<u64>(indexStride);
         if (indexData.Size() < static_cast<usize>(expectedIndexBytes)) {
             return false;
         }
@@ -162,8 +162,8 @@ namespace AltinaEngine::Rendering {
             if (!attr.Valid) {
                 return;
             }
-            const u32 sizeBytes = GetFormatSizeBytes(attr.Desc.Format);
-            if (sizeBytes == 0U || (attr.Desc.AlignedOffset + sizeBytes) > desc.VertexStride) {
+            const u32 sizeBytes = GetFormatSizeBytes(attr.Desc.mFormat);
+            if (sizeBytes == 0U || (attr.Desc.mAlignedOffset + sizeBytes) > desc.mVertexStride) {
                 attr.Valid = false;
             }
         };
@@ -174,15 +174,15 @@ namespace AltinaEngine::Rendering {
         NormalizeOptionalAttr(uv1Attr);
 
         {
-            const u32 sizeBytes = GetFormatSizeBytes(positionAttr.Desc.Format);
+            const u32 sizeBytes = GetFormatSizeBytes(positionAttr.Desc.mFormat);
             if (sizeBytes == 0U
-                || (positionAttr.Desc.AlignedOffset + sizeBytes) > desc.VertexStride) {
+                || (positionAttr.Desc.mAlignedOffset + sizeBytes) > desc.mVertexStride) {
                 return false;
             }
         }
 
         Core::Container::TVector<Core::Math::FVector3f> positions;
-        positions.Reserve(static_cast<usize>(desc.VertexCount));
+        positions.Reserve(static_cast<usize>(desc.mVertexCount));
 
         // NOTE:
         // Base-pass VS consumes slot1 as NORMAL(float3). Keep slot1 stream as tightly packed
@@ -190,7 +190,7 @@ namespace AltinaEngine::Rendering {
         const bool                                      hasNormals  = normalAttr.Valid;
         const bool                                      hasTangents = tangentAttr.Valid;
         Core::Container::TVector<Core::Math::FVector3f> packedNormals;
-        packedNormals.Reserve(static_cast<usize>(desc.VertexCount));
+        packedNormals.Reserve(static_cast<usize>(desc.mVertexCount));
 
         // NOTE:
         // Our base-pass pipeline always expects a TEXCOORD0 stream (input slot 2). If a mesh asset
@@ -199,22 +199,22 @@ namespace AltinaEngine::Rendering {
         // zero UV0 buffer when missing.
         const bool                                      hasUv0 = uv0Attr.Valid;
         Core::Container::TVector<Core::Math::FVector2f> uv0;
-        uv0.Reserve(static_cast<usize>(desc.VertexCount));
+        uv0.Reserve(static_cast<usize>(desc.mVertexCount));
 
         const bool                                      hasUv1 = uv1Attr.Valid;
         Core::Container::TVector<Core::Math::FVector2f> uv1;
         if (hasUv1) {
-            uv1.Reserve(static_cast<usize>(desc.VertexCount));
+            uv1.Reserve(static_cast<usize>(desc.mVertexCount));
         }
 
         const u8* base = vertexData.Data();
-        for (u32 i = 0U; i < desc.VertexCount; ++i) {
-            const u8* vertex = base + static_cast<usize>(i) * desc.VertexStride;
+        for (u32 i = 0U; i < desc.mVertexCount; ++i) {
+            const u8* vertex = base + static_cast<usize>(i) * desc.mVertexStride;
 
             {
                 f32 values[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-                if (!ReadFloats(vertex + positionAttr.Desc.AlignedOffset, positionAttr.Desc.Format,
-                        values, 3U)) {
+                if (!ReadFloats(vertex + positionAttr.Desc.mAlignedOffset,
+                        positionAttr.Desc.mFormat, values, 3U)) {
                     return false;
                 }
                 positions.PushBack(Core::Math::FVector3f(values[0], values[1], values[2]));
@@ -223,13 +223,13 @@ namespace AltinaEngine::Rendering {
             {
                 f32 values[4] = { 0.0f, 0.0f, 1.0f, 0.0f };
                 if (hasNormals) {
-                    if (!ReadFloats(vertex + normalAttr.Desc.AlignedOffset, normalAttr.Desc.Format,
-                            values, 3U)) {
+                    if (!ReadFloats(vertex + normalAttr.Desc.mAlignedOffset,
+                            normalAttr.Desc.mFormat, values, 3U)) {
                         return false;
                     }
                 } else if (hasTangents) {
-                    if (!ReadFloats(vertex + tangentAttr.Desc.AlignedOffset,
-                            tangentAttr.Desc.Format, values, 3U)) {
+                    if (!ReadFloats(vertex + tangentAttr.Desc.mAlignedOffset,
+                            tangentAttr.Desc.mFormat, values, 3U)) {
                         return false;
                     }
                 }
@@ -239,7 +239,7 @@ namespace AltinaEngine::Rendering {
             if (hasUv0) {
                 f32 values[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
                 if (!ReadFloats(
-                        vertex + uv0Attr.Desc.AlignedOffset, uv0Attr.Desc.Format, values, 2U)) {
+                        vertex + uv0Attr.Desc.mAlignedOffset, uv0Attr.Desc.mFormat, values, 2U)) {
                     return false;
                 }
                 uv0.PushBack(Core::Math::FVector2f(values[0], values[1]));
@@ -250,7 +250,7 @@ namespace AltinaEngine::Rendering {
             if (hasUv1) {
                 f32 values[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
                 if (!ReadFloats(
-                        vertex + uv1Attr.Desc.AlignedOffset, uv1Attr.Desc.Format, values, 2U)) {
+                        vertex + uv1Attr.Desc.mAlignedOffset, uv1Attr.Desc.mFormat, values, 2U)) {
                     return false;
                 }
                 uv1.PushBack(Core::Math::FVector2f(values[0], values[1]));
@@ -259,38 +259,38 @@ namespace AltinaEngine::Rendering {
 
         RenderCore::Geometry::FStaticMeshLodData lod{};
         lod.ScreenSize = 1.0f;
-        lod.SetPositions(positions.Data(), desc.VertexCount);
+        lod.SetPositions(positions.Data(), desc.mVertexCount);
         lod.TangentBuffer.SetData(packedNormals.Data(),
-            desc.VertexCount * static_cast<u32>(sizeof(Core::Math::FVector3f)),
+            desc.mVertexCount * static_cast<u32>(sizeof(Core::Math::FVector3f)),
             static_cast<u32>(sizeof(Core::Math::FVector3f)));
         // Always provide UV0 (see note above).
-        lod.SetUV0(uv0.Data(), desc.VertexCount);
+        lod.SetUV0(uv0.Data(), desc.mVertexCount);
         if (!uv1.IsEmpty()) {
-            lod.SetUV1(uv1.Data(), desc.VertexCount);
+            lod.SetUV1(uv1.Data(), desc.mVertexCount);
         }
 
-        lod.SetIndices(indexData.Data(), desc.IndexCount, indexType);
+        lod.SetIndices(indexData.Data(), desc.mIndexCount, indexType);
         lod.PrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
 
         lod.Bounds.Min =
-            Core::Math::FVector3f(desc.BoundsMin[0], desc.BoundsMin[1], desc.BoundsMin[2]);
+            Core::Math::FVector3f(desc.mBoundsMin[0], desc.mBoundsMin[1], desc.mBoundsMin[2]);
         lod.Bounds.Max =
-            Core::Math::FVector3f(desc.BoundsMax[0], desc.BoundsMax[1], desc.BoundsMax[2]);
+            Core::Math::FVector3f(desc.mBoundsMax[0], desc.mBoundsMax[1], desc.mBoundsMax[2]);
 
         if (!subMeshes.IsEmpty()) {
             lod.Sections.Reserve(subMeshes.Size());
             for (const auto& subMesh : subMeshes) {
                 RenderCore::Geometry::FStaticMeshSection section{};
-                section.FirstIndex   = subMesh.IndexStart;
-                section.IndexCount   = subMesh.IndexCount;
-                section.BaseVertex   = subMesh.BaseVertex;
-                section.MaterialSlot = subMesh.MaterialSlot;
+                section.FirstIndex   = subMesh.mIndexStart;
+                section.IndexCount   = subMesh.mIndexCount;
+                section.BaseVertex   = subMesh.mBaseVertex;
+                section.MaterialSlot = subMesh.mMaterialSlot;
                 lod.Sections.PushBack(section);
             }
         } else {
             RenderCore::Geometry::FStaticMeshSection section{};
             section.FirstIndex   = 0U;
-            section.IndexCount   = desc.IndexCount;
+            section.IndexCount   = desc.mIndexCount;
             section.BaseVertex   = 0;
             section.MaterialSlot = 0U;
             lod.Sections.PushBack(section);

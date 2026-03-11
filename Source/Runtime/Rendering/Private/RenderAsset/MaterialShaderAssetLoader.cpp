@@ -73,8 +73,8 @@ namespace AltinaEngine::Rendering {
 
         void ApplyRasterOverrides(const Asset::FMaterialRasterStateOverrides& overrides,
             Rhi::FRhiRasterStateDesc&                                         outRaster) noexcept {
-            if (overrides.HasFillMode) {
-                switch (overrides.FillMode) {
+            if (overrides.mHasFillMode) {
+                switch (overrides.mFillMode) {
                     case Asset::EMaterialRasterFillMode::Wireframe:
                         outRaster.mFillMode = Rhi::ERhiRasterFillMode::Wireframe;
                         break;
@@ -85,8 +85,8 @@ namespace AltinaEngine::Rendering {
                 }
             }
 
-            if (overrides.HasCullMode) {
-                switch (overrides.CullMode) {
+            if (overrides.mHasCullMode) {
+                switch (overrides.mCullMode) {
                     case Asset::EMaterialRasterCullMode::None:
                         outRaster.mCullMode = Rhi::ERhiRasterCullMode::None;
                         break;
@@ -100,8 +100,8 @@ namespace AltinaEngine::Rendering {
                 }
             }
 
-            if (overrides.HasFrontFace) {
-                switch (overrides.FrontFace) {
+            if (overrides.mHasFrontFace) {
+                switch (overrides.mFrontFace) {
                     case Asset::EMaterialRasterFrontFace::CW:
                         outRaster.mFrontFace = Rhi::ERhiRasterFrontFace::CW;
                         break;
@@ -112,20 +112,20 @@ namespace AltinaEngine::Rendering {
                 }
             }
 
-            if (overrides.HasDepthBias) {
-                outRaster.mDepthBias = overrides.DepthBias;
+            if (overrides.mHasDepthBias) {
+                outRaster.mDepthBias = overrides.mDepthBias;
             }
-            if (overrides.HasDepthBiasClamp) {
-                outRaster.mDepthBiasClamp = overrides.DepthBiasClamp;
+            if (overrides.mHasDepthBiasClamp) {
+                outRaster.mDepthBiasClamp = overrides.mDepthBiasClamp;
             }
-            if (overrides.HasSlopeScaledDepthBias) {
-                outRaster.mSlopeScaledDepthBias = overrides.SlopeScaledDepthBias;
+            if (overrides.mHasSlopeScaledDepthBias) {
+                outRaster.mSlopeScaledDepthBias = overrides.mSlopeScaledDepthBias;
             }
-            if (overrides.HasDepthClip) {
-                outRaster.mDepthClip = overrides.DepthClip;
+            if (overrides.mHasDepthClip) {
+                outRaster.mDepthClip = overrides.mDepthClip;
             }
-            if (overrides.HasConservativeRaster) {
-                outRaster.mConservativeRaster = overrides.ConservativeRaster;
+            if (overrides.mHasConservativeRaster) {
+                outRaster.mConservativeRaster = overrides.mConservativeRaster;
             }
         }
 
@@ -589,13 +589,13 @@ namespace AltinaEngine::Rendering {
             -> RenderCore::FMaterialParameterBlock {
             RenderCore::FMaterialParameterBlock block;
             for (const auto& scalar : overrides.GetScalars()) {
-                block.SetScalar(scalar.NameHash, scalar.Value);
+                block.SetScalar(scalar.mNameHash, scalar.mValue);
             }
             for (const auto& vector : overrides.GetVectors()) {
-                block.SetVector(vector.NameHash, vector.Value);
+                block.SetVector(vector.mNameHash, vector.mValue);
             }
             for (const auto& matrix : overrides.GetMatrices()) {
-                block.SetMatrix(matrix.NameHash, matrix.Value);
+                block.SetMatrix(matrix.mNameHash, matrix.mValue);
             }
             return block;
         }
@@ -630,7 +630,7 @@ namespace AltinaEngine::Rendering {
         }
 
         Core::Utility::Filesystem::FPath tempPath;
-        if (!WriteTempShaderFile(shaderAsset->GetSource(), handle.Uuid, language, tempPath)) {
+        if (!WriteTempShaderFile(shaderAsset->GetSource(), handle.mUuid, language, tempPath)) {
             LogError(TEXT("Failed to write temp shader file."));
             return false;
         }
@@ -672,7 +672,7 @@ namespace AltinaEngine::Rendering {
         }
 
         outKey =
-            RenderCore::FShaderRegistry::MakeAssetKey(desc->VirtualPath.ToView(), entry, stage);
+            RenderCore::FShaderRegistry::MakeAssetKey(desc->mVirtualPath.ToView(), entry, stage);
         if (!Rendering::FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
             LogError(TEXT("Failed to register shader for {}."), outKey.mName.ToView());
             return false;
@@ -687,7 +687,7 @@ namespace AltinaEngine::Rendering {
 
         for (const auto& pass : asset.GetPasses()) {
             RenderCore::EMaterialPass passType{};
-            if (!TryParseMaterialPass(pass.Name.ToView(), passType)) {
+            if (!TryParseMaterialPass(pass.mName.ToView(), passType)) {
                 continue;
             }
 
@@ -699,11 +699,11 @@ namespace AltinaEngine::Rendering {
             Shader::FShaderRasterState           rasterState{};
             bool                                 hasRasterState = false;
 
-            if (!pass.Preset.IsEmptyString()) {
+            if (!pass.mPreset.IsEmptyString()) {
                 const auto* presetPath =
-                    RenderCore::FShaderPresetRegistry::FindPreset(pass.Preset.ToView());
+                    RenderCore::FShaderPresetRegistry::FindPreset(pass.mPreset.ToView());
                 if (presetPath == nullptr) {
-                    LogError(TEXT("Shader preset not found: {}"), pass.Preset.ToView());
+                    LogError(TEXT("Shader preset not found: {}"), pass.mPreset.ToView());
                     return {};
                 }
 
@@ -712,12 +712,12 @@ namespace AltinaEngine::Rendering {
                 const auto vsEntry    = SelectPresetEntry(passType, Shader::EShaderStage::Vertex);
                 const auto psEntry    = SelectPresetEntry(passType, Shader::EShaderStage::Pixel);
                 if (vsEntry.IsEmpty() || psEntry.IsEmpty()) {
-                    LogError(TEXT("Shader preset pass not supported: {}"), pass.Preset.ToView());
+                    LogError(TEXT("Shader preset pass not supported: {}"), pass.mPreset.ToView());
                     return {};
                 }
 
                 RenderCore::FShaderRegistry::FShaderKey key{};
-                const FStringView                       keyPrefix = pass.Preset.ToView();
+                const FStringView                       keyPrefix = pass.mPreset.ToView();
                 if (!CompileShaderFromFile(shaderPath, vsEntry, Shader::EShaderStage::Vertex,
                         keyPrefix, key, vertexResult)) {
                     return {};
@@ -731,9 +731,9 @@ namespace AltinaEngine::Rendering {
                 }
                 passDesc.mShaders.mPixel = key;
                 hasPixelResult           = true;
-            } else if (pass.HasVertex) {
+            } else if (pass.mHasVertex) {
                 RenderCore::FShaderRegistry::FShaderKey key{};
-                if (!CompileShaderFromAsset(pass.Vertex.Asset, pass.Vertex.Entry.ToView(),
+                if (!CompileShaderFromAsset(pass.mVertex.mAsset, pass.mVertex.mEntry.ToView(),
                         Shader::EShaderStage::Vertex, registry, manager, key, vertexResult)) {
                     return {};
                 }
@@ -741,9 +741,9 @@ namespace AltinaEngine::Rendering {
                 hasVertexResult           = true;
             }
 
-            if (pass.Preset.IsEmptyString() && pass.HasPixel) {
+            if (pass.mPreset.IsEmptyString() && pass.mHasPixel) {
                 RenderCore::FShaderRegistry::FShaderKey key{};
-                if (!CompileShaderFromAsset(pass.Pixel.Asset, pass.Pixel.Entry.ToView(),
+                if (!CompileShaderFromAsset(pass.mPixel.mAsset, pass.mPixel.mEntry.ToView(),
                         Shader::EShaderStage::Pixel, registry, manager, key, pixelResult)) {
                     return {};
                 }
@@ -751,10 +751,10 @@ namespace AltinaEngine::Rendering {
                 hasPixelResult           = true;
             }
 
-            if (pass.Preset.IsEmptyString() && pass.HasCompute) {
+            if (pass.mPreset.IsEmptyString() && pass.mHasCompute) {
                 RenderCore::FShaderRegistry::FShaderKey key{};
                 ShaderCompiler::FShaderCompileResult    computeResult{};
-                if (!CompileShaderFromAsset(pass.Compute.Asset, pass.Compute.Entry.ToView(),
+                if (!CompileShaderFromAsset(pass.mCompute.mAsset, pass.mCompute.mEntry.ToView(),
                         Shader::EShaderStage::Compute, registry, manager, key, computeResult)) {
                     return {};
                 }
@@ -767,16 +767,16 @@ namespace AltinaEngine::Rendering {
                 hasPixelResult ? &pixelResult.mReflection : nullptr;
             passDesc.mLayout = BuildMaterialLayout(vertexReflection, pixelReflection);
             LogMaterialLayout(passDesc.mLayout,
-                SelectMaterialCBuffer(vertexReflection, pixelReflection), pass.Name);
+                SelectMaterialCBuffer(vertexReflection, pixelReflection), pass.mName);
 
             auto* rasterSourceAsset = static_cast<Asset::FShaderAsset*>(nullptr);
-            if (pass.HasPixel) {
-                auto assetRef = manager.Load(pass.Pixel.Asset);
+            if (pass.mHasPixel) {
+                auto assetRef = manager.Load(pass.mPixel.mAsset);
                 rasterSourceAsset =
                     assetRef ? static_cast<Asset::FShaderAsset*>(assetRef.Get()) : nullptr;
             }
-            if (rasterSourceAsset == nullptr && pass.HasVertex) {
-                auto assetRef = manager.Load(pass.Vertex.Asset);
+            if (rasterSourceAsset == nullptr && pass.mHasVertex) {
+                auto assetRef = manager.Load(pass.mVertex.mAsset);
                 rasterSourceAsset =
                     assetRef ? static_cast<Asset::FShaderAsset*>(assetRef.Get()) : nullptr;
             }
@@ -796,13 +796,13 @@ namespace AltinaEngine::Rendering {
                 passDesc.mState.ApplyRasterState(rasterState);
             }
 
-            if (pass.RasterOverrides.HasAny()) {
-                ApplyRasterOverrides(pass.RasterOverrides, passDesc.mState.mRaster);
+            if (pass.mRasterOverrides.HasAny()) {
+                ApplyRasterOverrides(pass.mRasterOverrides, passDesc.mState.mRaster);
             }
 
             templ->SetPassDesc(passType, Move(passDesc));
 
-            const auto overrideBlock = BuildTemplateOverrides(pass.Overrides);
+            const auto overrideBlock = BuildTemplateOverrides(pass.mOverrides);
             if (HasTemplateOverrides(overrideBlock)) {
                 templ->SetPassOverrides(passType, overrideBlock);
             }
@@ -817,7 +817,7 @@ namespace AltinaEngine::Rendering {
         const Asset::FMeshMaterialParameterBlock& parameters, Asset::FAssetRegistry& registry,
         Asset::FAssetManager& manager) -> RenderCore::FMaterial {
         RenderCore::FMaterial material;
-        if (!handle.IsValid() || handle.Type != Asset::EAssetType::MaterialTemplate) {
+        if (!handle.IsValid() || handle.mType != Asset::EAssetType::MaterialTemplate) {
             return material;
         }
 
@@ -863,33 +863,33 @@ namespace AltinaEngine::Rendering {
         };
 
         for (const auto& param : parameters.GetScalars()) {
-            ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Scalar);
+            ensureSchema(param.mNameHash, RenderCore::EMaterialParamType::Scalar);
         }
         for (const auto& param : parameters.GetVectors()) {
-            ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Vector);
+            ensureSchema(param.mNameHash, RenderCore::EMaterialParamType::Vector);
         }
         for (const auto& param : parameters.GetMatrices()) {
-            ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Matrix);
+            ensureSchema(param.mNameHash, RenderCore::EMaterialParamType::Matrix);
         }
         for (const auto& param : parameters.GetTextures()) {
-            ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Texture);
+            ensureSchema(param.mNameHash, RenderCore::EMaterialParamType::Texture);
         }
         material.SetSchema(schema);
 
         for (const auto& param : parameters.GetScalars()) {
-            material.SetScalar(param.NameHash, param.Value);
+            material.SetScalar(param.mNameHash, param.mValue);
         }
         for (const auto& param : parameters.GetVectors()) {
-            material.SetVector(param.NameHash, param.Value);
+            material.SetVector(param.mNameHash, param.mValue);
         }
         for (const auto& param : parameters.GetMatrices()) {
-            material.SetMatrix(param.NameHash, param.Value);
+            material.SetMatrix(param.mNameHash, param.mValue);
         }
         for (const auto& param : parameters.GetTextures()) {
             Rhi::FRhiShaderResourceViewRef srv{};
-            if (param.Texture.IsValid()
-                && param.Type == Asset::EMeshMaterialTextureType::Texture2D) {
-                auto  textureAssetRef = manager.Load(param.Texture);
+            if (param.mTexture.IsValid()
+                && param.mType == Asset::EMeshMaterialTextureType::Texture2D) {
+                auto  textureAssetRef = manager.Load(param.mTexture);
                 auto* textureAsset    = textureAssetRef
                        ? static_cast<Asset::FTexture2DAsset*>(textureAssetRef.Get())
                        : nullptr;
@@ -901,17 +901,17 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiSamplerDesc samplerDesc{};
             samplerDesc.mDebugName.Assign(TEXT("MeshMaterialSampler"));
             auto sampler = Rhi::RHICreateSampler(samplerDesc);
-            material.SetTexture(param.NameHash, Move(srv), Move(sampler), param.SamplerFlags);
+            material.SetTexture(param.mNameHash, Move(srv), Move(sampler), param.mSamplerFlags);
         }
 
         auto applyOverrideTexture = [&](const Asset::FMeshMaterialTextureParam& param) {
-            if (material.GetParameters().FindTextureParam(param.NameHash) != nullptr) {
+            if (material.GetParameters().FindTextureParam(param.mNameHash) != nullptr) {
                 return;
             }
             Rhi::FRhiShaderResourceViewRef srv{};
-            if (param.Texture.IsValid()
-                && param.Type == Asset::EMeshMaterialTextureType::Texture2D) {
-                auto  textureAssetRef = manager.Load(param.Texture);
+            if (param.mTexture.IsValid()
+                && param.mType == Asset::EMeshMaterialTextureType::Texture2D) {
+                auto  textureAssetRef = manager.Load(param.mTexture);
                 auto* textureAsset    = textureAssetRef
                        ? static_cast<Asset::FTexture2DAsset*>(textureAssetRef.Get())
                        : nullptr;
@@ -923,42 +923,42 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiSamplerDesc samplerDesc{};
             samplerDesc.mDebugName.Assign(TEXT("MeshMaterialSampler"));
             auto sampler = Rhi::RHICreateSampler(samplerDesc);
-            material.SetTexture(param.NameHash, Move(srv), Move(sampler), param.SamplerFlags);
+            material.SetTexture(param.mNameHash, Move(srv), Move(sampler), param.mSamplerFlags);
         };
 
         auto applyOverrides = [&](const Asset::FMeshMaterialParameterBlock& overrides) {
             for (const auto& param : overrides.GetScalars()) {
-                if (material.GetParameters().FindScalarParam(param.NameHash) != nullptr) {
+                if (material.GetParameters().FindScalarParam(param.mNameHash) != nullptr) {
                     continue;
                 }
-                ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Scalar);
-                material.SetScalar(param.NameHash, param.Value);
+                ensureSchema(param.mNameHash, RenderCore::EMaterialParamType::Scalar);
+                material.SetScalar(param.mNameHash, param.mValue);
             }
             for (const auto& param : overrides.GetVectors()) {
-                if (material.GetParameters().FindVectorParam(param.NameHash) != nullptr) {
+                if (material.GetParameters().FindVectorParam(param.mNameHash) != nullptr) {
                     continue;
                 }
-                ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Vector);
-                material.SetVector(param.NameHash, param.Value);
+                ensureSchema(param.mNameHash, RenderCore::EMaterialParamType::Vector);
+                material.SetVector(param.mNameHash, param.mValue);
             }
             for (const auto& param : overrides.GetMatrices()) {
-                if (material.GetParameters().FindMatrixParam(param.NameHash) != nullptr) {
+                if (material.GetParameters().FindMatrixParam(param.mNameHash) != nullptr) {
                     continue;
                 }
-                ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Matrix);
-                material.SetMatrix(param.NameHash, param.Value);
+                ensureSchema(param.mNameHash, RenderCore::EMaterialParamType::Matrix);
+                material.SetMatrix(param.mNameHash, param.mValue);
             }
             for (const auto& param : overrides.GetTextures()) {
-                if (material.GetParameters().FindTextureParam(param.NameHash) != nullptr) {
+                if (material.GetParameters().FindTextureParam(param.mNameHash) != nullptr) {
                     continue;
                 }
-                ensureSchema(param.NameHash, RenderCore::EMaterialParamType::Texture);
+                ensureSchema(param.mNameHash, RenderCore::EMaterialParamType::Texture);
                 applyOverrideTexture(param);
             }
         };
 
         for (const auto& pass : materialAsset->GetPasses()) {
-            applyOverrides(pass.Overrides);
+            applyOverrides(pass.mOverrides);
         }
 
         return material;

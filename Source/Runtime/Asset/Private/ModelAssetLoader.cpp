@@ -6,7 +6,7 @@ using AltinaEngine::Move;
 namespace AltinaEngine::Asset {
     auto FModelAssetLoader::Load(const FAssetHandle& handle) const -> FModelAssetLoadResult {
         FModelAssetLoadResult result{};
-        if (mManager == nullptr || !handle.IsValid() || handle.Type != EAssetType::Model) {
+        if (mManager == nullptr || !handle.IsValid() || handle.mType != EAssetType::Model) {
             return result;
         }
 
@@ -20,8 +20,8 @@ namespace AltinaEngine::Asset {
             return result;
         }
 
-        result.Asset = Move(asset);
-        result.Model = model;
+        result.mAsset = Move(asset);
+        result.mModel = model;
         return result;
     }
 } // namespace AltinaEngine::Asset

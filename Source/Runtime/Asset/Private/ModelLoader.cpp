@@ -34,15 +34,15 @@ namespace AltinaEngine::Asset {
                 return false;
             }
 
-            if (outHeader.Magic != kAssetBlobMagic || outHeader.Version != kAssetBlobVersion) {
+            if (outHeader.mMagic != kAssetBlobMagic || outHeader.mVersion != kAssetBlobVersion) {
                 return false;
             }
 
-            if (outHeader.Type != static_cast<u8>(EAssetType::Model)) {
+            if (outHeader.mType != static_cast<u8>(EAssetType::Model)) {
                 return false;
             }
 
-            if (outHeader.DescSize != sizeof(FModelBlobDesc)) {
+            if (outHeader.mDescSize != sizeof(FModelBlobDesc)) {
                 return false;
             }
 
@@ -90,37 +90,37 @@ namespace AltinaEngine::Asset {
         }
 
         u64 nodesBytes = 0;
-        if (!TryComputeBytes(blobDesc.NodeCount, sizeof(FModelNodeDesc), nodesBytes)) {
+        if (!TryComputeBytes(blobDesc.mNodeCount, sizeof(FModelNodeDesc), nodesBytes)) {
             return {};
         }
         u64 meshRefBytes = 0;
-        if (!TryComputeBytes(blobDesc.MeshRefCount, sizeof(FModelMeshRef), meshRefBytes)) {
+        if (!TryComputeBytes(blobDesc.mMeshRefCount, sizeof(FModelMeshRef), meshRefBytes)) {
             return {};
         }
         u64 materialBytes = 0;
-        if (!TryComputeBytes(blobDesc.MaterialSlotCount, sizeof(FAssetHandle), materialBytes)) {
+        if (!TryComputeBytes(blobDesc.mMaterialSlotCount, sizeof(FAssetHandle), materialBytes)) {
             return {};
         }
 
-        const u64 dataSize = header.DataSize;
-        if (!RangeWithin(blobDesc.NodesOffset, nodesBytes, dataSize)) {
+        const u64 dataSize = header.mDataSize;
+        if (!RangeWithin(blobDesc.mNodesOffset, nodesBytes, dataSize)) {
             return {};
         }
-        if (!RangeWithin(blobDesc.MeshRefsOffset, meshRefBytes, dataSize)) {
+        if (!RangeWithin(blobDesc.mMeshRefsOffset, meshRefBytes, dataSize)) {
             return {};
         }
-        if (!RangeWithin(blobDesc.MaterialSlotsOffset, materialBytes, dataSize)) {
+        if (!RangeWithin(blobDesc.mMaterialSlotsOffset, materialBytes, dataSize)) {
             return {};
         }
 
-        if (desc.Model.NodeCount != 0U && desc.Model.NodeCount != blobDesc.NodeCount) {
+        if (desc.mModel.NodeCount != 0U && desc.mModel.NodeCount != blobDesc.mNodeCount) {
             return {};
         }
-        if (desc.Model.MeshRefCount != 0U && desc.Model.MeshRefCount != blobDesc.MeshRefCount) {
+        if (desc.mModel.MeshRefCount != 0U && desc.mModel.MeshRefCount != blobDesc.mMeshRefCount) {
             return {};
         }
-        if (desc.Model.MaterialSlotCount != 0U
-            && desc.Model.MaterialSlotCount != blobDesc.MaterialSlotCount) {
+        if (desc.mModel.MaterialSlotCount != 0U
+            && desc.mModel.MaterialSlotCount != blobDesc.mMaterialSlotCount) {
             return {};
         }
 
@@ -132,36 +132,36 @@ namespace AltinaEngine::Asset {
         }
 
         TVector<FModelNodeDesc> nodes;
-        if (blobDesc.NodeCount > 0U) {
-            nodes.Resize(static_cast<usize>(blobDesc.NodeCount));
-            stream.Seek(baseOffset + static_cast<usize>(blobDesc.NodesOffset));
+        if (blobDesc.mNodeCount > 0U) {
+            nodes.Resize(static_cast<usize>(blobDesc.mNodeCount));
+            stream.Seek(baseOffset + static_cast<usize>(blobDesc.mNodesOffset));
             if (!ReadExact(stream, nodes.Data(), static_cast<usize>(nodesBytes))) {
                 return {};
             }
         }
 
         TVector<FModelMeshRef> meshRefs;
-        if (blobDesc.MeshRefCount > 0U) {
-            meshRefs.Resize(static_cast<usize>(blobDesc.MeshRefCount));
-            stream.Seek(baseOffset + static_cast<usize>(blobDesc.MeshRefsOffset));
+        if (blobDesc.mMeshRefCount > 0U) {
+            meshRefs.Resize(static_cast<usize>(blobDesc.mMeshRefCount));
+            stream.Seek(baseOffset + static_cast<usize>(blobDesc.mMeshRefsOffset));
             if (!ReadExact(stream, meshRefs.Data(), static_cast<usize>(meshRefBytes))) {
                 return {};
             }
         }
 
         TVector<FAssetHandle> materialSlots;
-        if (blobDesc.MaterialSlotCount > 0U) {
-            materialSlots.Resize(static_cast<usize>(blobDesc.MaterialSlotCount));
-            stream.Seek(baseOffset + static_cast<usize>(blobDesc.MaterialSlotsOffset));
+        if (blobDesc.mMaterialSlotCount > 0U) {
+            materialSlots.Resize(static_cast<usize>(blobDesc.mMaterialSlotCount));
+            stream.Seek(baseOffset + static_cast<usize>(blobDesc.mMaterialSlotsOffset));
             if (!ReadExact(stream, materialSlots.Data(), static_cast<usize>(materialBytes))) {
                 return {};
             }
         }
 
         FModelRuntimeDesc runtimeDesc{};
-        runtimeDesc.NodeCount         = blobDesc.NodeCount;
-        runtimeDesc.MeshRefCount      = blobDesc.MeshRefCount;
-        runtimeDesc.MaterialSlotCount = blobDesc.MaterialSlotCount;
+        runtimeDesc.mNodeCount         = blobDesc.mNodeCount;
+        runtimeDesc.mMeshRefCount      = blobDesc.mMeshRefCount;
+        runtimeDesc.mMaterialSlotCount = blobDesc.mMaterialSlotCount;
 
         return MakeSharedAsset<FModelAsset>(
             runtimeDesc, Move(nodes), Move(meshRefs), Move(materialSlots));

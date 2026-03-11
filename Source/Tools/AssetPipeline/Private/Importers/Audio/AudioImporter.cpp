@@ -351,24 +351,24 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             Asset::FAssetBlobHeader header{};
-            header.Type     = static_cast<u8>(Asset::EAssetType::Audio);
-            header.DescSize = static_cast<u32>(sizeof(Asset::FAudioBlobDesc));
-            header.DataSize = static_cast<u32>(blobDataSize);
+            header.mType     = static_cast<u8>(Asset::EAssetType::Audio);
+            header.mDescSize = static_cast<u32>(sizeof(Asset::FAudioBlobDesc));
+            header.mDataSize = static_cast<u32>(blobDataSize);
 
             Asset::FAudioBlobDesc blobDesc{};
-            blobDesc.Codec            = codec;
-            blobDesc.SampleFormat     = sampleFormat;
-            blobDesc.Channels         = channels;
-            blobDesc.SampleRate       = sampleRate;
-            blobDesc.FrameCount       = frameCount;
-            blobDesc.ChunkCount       = static_cast<u32>(chunks.size());
-            blobDesc.FramesPerChunk   = framesPerChunk;
-            blobDesc.ChunkTableOffset = 0U;
-            blobDesc.DataOffset       = static_cast<u32>(chunkTableBytes);
-            blobDesc.DataSize         = static_cast<u32>(dataSize);
+            blobDesc.mCodec            = codec;
+            blobDesc.mSampleFormat     = sampleFormat;
+            blobDesc.mChannels         = channels;
+            blobDesc.mSampleRate       = sampleRate;
+            blobDesc.mFrameCount       = frameCount;
+            blobDesc.mChunkCount       = static_cast<u32>(chunks.size());
+            blobDesc.mFramesPerChunk   = framesPerChunk;
+            blobDesc.mChunkTableOffset = 0U;
+            blobDesc.mDataOffset       = static_cast<u32>(chunkTableBytes);
+            blobDesc.mDataSize         = static_cast<u32>(dataSize);
 
             const usize totalSize =
-                sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FAudioBlobDesc) + header.DataSize;
+                sizeof(Asset::FAssetBlobHeader) + sizeof(Asset::FAudioBlobDesc) + header.mDataSize;
             outCooked.resize(totalSize);
 
             u8* writePtr = outCooked.data();
@@ -378,10 +378,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             writePtr += sizeof(blobDesc);
 
             if (!chunks.empty()) {
-                std::memcpy(writePtr + blobDesc.ChunkTableOffset, chunks.data(),
+                std::memcpy(writePtr + blobDesc.mChunkTableOffset, chunks.data(),
                     chunks.size() * sizeof(Asset::FAudioChunkDesc));
             }
-            std::memcpy(writePtr + blobDesc.DataOffset, data.data(), dataSize);
+            std::memcpy(writePtr + blobDesc.mDataOffset, data.data(), dataSize);
             return true;
         }
     } // namespace
@@ -459,8 +459,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     remainingFrames < framesPerChunk ? remainingFrames : framesPerChunk;
                 const u32              chunkBytes = takeFrames * bytesPerFrame;
                 Asset::FAudioChunkDesc chunk{};
-                chunk.Offset = 0U; // filled after table size known.
-                chunk.Size   = chunkBytes;
+                chunk.mOffset = 0U; // filled after table size known.
+                chunk.mSize   = chunkBytes;
                 chunks.push_back(chunk);
                 remainingFrames -= takeFrames;
             }
@@ -482,8 +482,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 const u32 takeBytes =
                     remainingBytes < kTargetChunkBytes ? remainingBytes : kTargetChunkBytes;
                 Asset::FAudioChunkDesc chunk{};
-                chunk.Offset = 0U; // filled after table size known.
-                chunk.Size   = takeBytes;
+                chunk.mOffset = 0U; // filled after table size known.
+                chunk.mSize   = takeBytes;
                 chunks.push_back(chunk);
                 remainingBytes -= takeBytes;
             }
@@ -497,8 +497,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
         const u32 dataOffset    = static_cast<u32>(chunkTableBytes);
         u32       runningOffset = 0U;
         for (auto& chunk : chunks) {
-            chunk.Offset = dataOffset + runningOffset;
-            runningOffset += chunk.Size;
+            chunk.mOffset = dataOffset + runningOffset;
+            runningOffset += chunk.mSize;
         }
         if (runningOffset != static_cast<u32>(data.size())) {
             return false;

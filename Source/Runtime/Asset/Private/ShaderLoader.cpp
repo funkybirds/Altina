@@ -60,6 +60,6 @@ namespace AltinaEngine::Asset {
             source.Append(reinterpret_cast<const char*>(bytes.Data()), bytes.Size());
         }
 
-        return MakeSharedAsset<FShaderAsset>(desc.Shader.Language, Move(source));
+        return MakeSharedAsset<FShaderAsset>(desc.mShader.Language, Move(source));
     }
 } // namespace AltinaEngine::Asset

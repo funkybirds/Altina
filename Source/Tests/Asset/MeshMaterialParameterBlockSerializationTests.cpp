@@ -30,30 +30,30 @@ namespace {
         REQUIRE(lhs.GetTextures().Size() == rhs.GetTextures().Size());
 
         for (usize i = 0U; i < lhs.GetScalars().Size(); ++i) {
-            REQUIRE(lhs.GetScalars()[i].NameHash == rhs.GetScalars()[i].NameHash);
-            REQUIRE(lhs.GetScalars()[i].Value == rhs.GetScalars()[i].Value);
+            REQUIRE(lhs.GetScalars()[i].mNameHash == rhs.GetScalars()[i].mNameHash);
+            REQUIRE(lhs.GetScalars()[i].mValue == rhs.GetScalars()[i].mValue);
         }
         for (usize i = 0U; i < lhs.GetVectors().Size(); ++i) {
-            REQUIRE(lhs.GetVectors()[i].NameHash == rhs.GetVectors()[i].NameHash);
+            REQUIRE(lhs.GetVectors()[i].mNameHash == rhs.GetVectors()[i].mNameHash);
             for (u32 c = 0U; c < 4U; ++c) {
-                REQUIRE(lhs.GetVectors()[i].Value.mComponents[c]
-                    == rhs.GetVectors()[i].Value.mComponents[c]);
+                REQUIRE(lhs.GetVectors()[i].mValue.mComponents[c]
+                    == rhs.GetVectors()[i].mValue.mComponents[c]);
             }
         }
         for (usize i = 0U; i < lhs.GetMatrices().Size(); ++i) {
             REQUIRE(lhs.GetMatrices()[i].NameHash == rhs.GetMatrices()[i].NameHash);
             for (u32 r = 0U; r < 4U; ++r) {
                 for (u32 c = 0U; c < 4U; ++c) {
-                    REQUIRE(lhs.GetMatrices()[i].Value.mElements[r][c]
-                        == rhs.GetMatrices()[i].Value.mElements[r][c]);
+                    REQUIRE(lhs.GetMatrices()[i].mValue.mElements[r][c]
+                        == rhs.GetMatrices()[i].mValue.mElements[r][c]);
                 }
             }
         }
         for (usize i = 0U; i < lhs.GetTextures().Size(); ++i) {
-            REQUIRE(lhs.GetTextures()[i].NameHash == rhs.GetTextures()[i].NameHash);
-            REQUIRE(lhs.GetTextures()[i].Type == rhs.GetTextures()[i].Type);
-            REQUIRE(lhs.GetTextures()[i].Texture == rhs.GetTextures()[i].Texture);
-            REQUIRE(lhs.GetTextures()[i].SamplerFlags == rhs.GetTextures()[i].SamplerFlags);
+            REQUIRE(lhs.GetTextures()[i].mNameHash == rhs.GetTextures()[i].mNameHash);
+            REQUIRE(lhs.GetTextures()[i].mType == rhs.GetTextures()[i].mType);
+            REQUIRE(lhs.GetTextures()[i].mTexture == rhs.GetTextures()[i].mTexture);
+            REQUIRE(lhs.GetTextures()[i].mSamplerFlags == rhs.GetTextures()[i].mSamplerFlags);
         }
     }
 } // namespace

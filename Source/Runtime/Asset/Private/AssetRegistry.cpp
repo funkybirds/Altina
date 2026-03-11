@@ -90,55 +90,55 @@ namespace AltinaEngine::Asset {
         }
 
         void ReadDescFields(const FJsonValue& descObject, FAssetDesc& desc) {
-            switch (desc.Handle.Type) {
+            switch (desc.mHandle.mType) {
                 case EAssetType::Texture2D:
-                    ReadU32Field(descObject, "Width", desc.Texture.Width);
-                    ReadU32Field(descObject, "Height", desc.Texture.Height);
-                    ReadU32Field(descObject, "MipCount", desc.Texture.MipCount);
-                    ReadU32Field(descObject, "Format", desc.Texture.Format);
-                    ReadBoolField(descObject, "SRGB", desc.Texture.SRGB);
+                    ReadU32Field(descObject, "Width", desc.mTexture.Width);
+                    ReadU32Field(descObject, "Height", desc.mTexture.Height);
+                    ReadU32Field(descObject, "MipCount", desc.mTexture.MipCount);
+                    ReadU32Field(descObject, "Format", desc.mTexture.Format);
+                    ReadBoolField(descObject, "SRGB", desc.mTexture.SRGB);
                     break;
                 case EAssetType::CubeMap:
-                    ReadU32Field(descObject, "Size", desc.CubeMap.Size);
-                    ReadU32Field(descObject, "MipCount", desc.CubeMap.MipCount);
-                    ReadU32Field(descObject, "Format", desc.CubeMap.Format);
-                    ReadBoolField(descObject, "SRGB", desc.CubeMap.SRGB);
+                    ReadU32Field(descObject, "Size", desc.mCubeMap.Size);
+                    ReadU32Field(descObject, "MipCount", desc.mCubeMap.MipCount);
+                    ReadU32Field(descObject, "Format", desc.mCubeMap.Format);
+                    ReadBoolField(descObject, "SRGB", desc.mCubeMap.SRGB);
                     break;
                 case EAssetType::Mesh:
-                    ReadU32Field(descObject, "VertexFormat", desc.Mesh.VertexFormat);
-                    ReadU32Field(descObject, "IndexFormat", desc.Mesh.IndexFormat);
-                    ReadU32Field(descObject, "SubMeshCount", desc.Mesh.SubMeshCount);
+                    ReadU32Field(descObject, "VertexFormat", desc.mMesh.VertexFormat);
+                    ReadU32Field(descObject, "IndexFormat", desc.mMesh.IndexFormat);
+                    ReadU32Field(descObject, "SubMeshCount", desc.mMesh.SubMeshCount);
                     break;
                 case EAssetType::MaterialTemplate:
-                    ReadU32Field(descObject, "PassCount", desc.Material.PassCount);
-                    ReadU32Field(descObject, "ShaderCount", desc.Material.ShaderCount);
-                    ReadU32Field(descObject, "VariantCount", desc.Material.VariantCount);
+                    ReadU32Field(descObject, "PassCount", desc.mMaterial.PassCount);
+                    ReadU32Field(descObject, "ShaderCount", desc.mMaterial.ShaderCount);
+                    ReadU32Field(descObject, "VariantCount", desc.mMaterial.VariantCount);
                     break;
                 case EAssetType::Shader:
-                    ReadU32Field(descObject, "Language", desc.Shader.Language);
+                    ReadU32Field(descObject, "Language", desc.mShader.Language);
                     break;
                 case EAssetType::Model:
-                    ReadU32Field(descObject, "NodeCount", desc.Model.NodeCount);
-                    ReadU32Field(descObject, "MeshRefCount", desc.Model.MeshRefCount);
-                    ReadU32Field(descObject, "MaterialSlotCount", desc.Model.MaterialSlotCount);
+                    ReadU32Field(descObject, "NodeCount", desc.mModel.NodeCount);
+                    ReadU32Field(descObject, "MeshRefCount", desc.mModel.MeshRefCount);
+                    ReadU32Field(descObject, "MaterialSlotCount", desc.mModel.MaterialSlotCount);
                     break;
                 case EAssetType::Audio:
-                    ReadU32Field(descObject, "Codec", desc.Audio.Codec);
-                    ReadU32Field(descObject, "Channels", desc.Audio.Channels);
-                    ReadU32Field(descObject, "SampleRate", desc.Audio.SampleRate);
-                    ReadFloatField(descObject, "Duration", desc.Audio.DurationSeconds);
+                    ReadU32Field(descObject, "Codec", desc.mAudio.Codec);
+                    ReadU32Field(descObject, "Channels", desc.mAudio.Channels);
+                    ReadU32Field(descObject, "SampleRate", desc.mAudio.SampleRate);
+                    ReadFloatField(descObject, "Duration", desc.mAudio.DurationSeconds);
                     break;
                 case EAssetType::Script:
                 {
                     FNativeString assemblyText;
                     if (GetStringValue(
                             FindObjectValueInsensitive(descObject, "AssemblyPath"), assemblyText)) {
-                        desc.Script.AssemblyPath.Assign(assemblyText);
+                        desc.mScript.mAssemblyPath.Assign(assemblyText);
                     }
                     FNativeString typeText;
                     if (GetStringValue(
                             FindObjectValueInsensitive(descObject, "TypeName"), typeText)) {
-                        desc.Script.TypeName.Assign(typeText);
+                        desc.mScript.mTypeName.Assign(typeText);
                     }
                     break;
                 }
@@ -263,16 +263,16 @@ namespace AltinaEngine::Asset {
                 }
 
                 FAssetDesc desc;
-                desc.Handle.Uuid = uuid;
-                desc.Handle.Type = type;
-                desc.VirtualPath = Core::Utility::String::FromUtf8(virtualPathText);
+                desc.mHandle.mUuid = uuid;
+                desc.mHandle.mType = type;
+                desc.mVirtualPath  = Core::Utility::String::FromUtf8(virtualPathText);
 
                 if (GetStringValue(
                         FindObjectValueInsensitive(*assetValue, "CookedPath"), cookedPathText)) {
-                    desc.CookedPath = Core::Utility::String::FromUtf8(cookedPathText);
+                    desc.mCookedPath = Core::Utility::String::FromUtf8(cookedPathText);
                 }
 
-                if (!ParseDependencies(*assetValue, desc.Dependencies)) {
+                if (!ParseDependencies(*assetValue, desc.mDependencies)) {
                     outError = "Asset Dependencies invalid.";
                     return false;
                 }
@@ -282,7 +282,7 @@ namespace AltinaEngine::Asset {
                     ReadDescFields(*descValue, desc);
                 }
 
-                desc.VirtualPath.ToLower();
+                desc.mVirtualPath.ToLower();
                 outAssets.PushBack(Move(desc));
             }
 
@@ -321,10 +321,10 @@ namespace AltinaEngine::Asset {
                     }
 
                     FAssetRedirector redirector;
-                    redirector.OldUuid        = oldUuid;
-                    redirector.NewUuid        = newUuid;
-                    redirector.OldVirtualPath = Core::Utility::String::FromUtf8(oldPathText);
-                    redirector.OldVirtualPath.ToLower();
+                    redirector.mOldUuid        = oldUuid;
+                    redirector.mNewUuid        = newUuid;
+                    redirector.mOldVirtualPath = Core::Utility::String::FromUtf8(oldPathText);
+                    redirector.mOldVirtualPath.ToLower();
                     outRedirectors.PushBack(Move(redirector));
                 }
             }
@@ -386,25 +386,26 @@ namespace AltinaEngine::Asset {
     }
 
     void FAssetRegistry::AddAsset(FAssetDesc desc) {
-        desc.VirtualPath.ToLower();
+        desc.mVirtualPath.ToLower();
         mAssets.PushBack(Move(desc));
     }
 
     void FAssetRegistry::AddRedirector(FAssetRedirector redirector) {
-        redirector.OldVirtualPath.ToLower();
+        redirector.mOldVirtualPath.ToLower();
         mRedirectors.PushBack(Move(redirector));
     }
 
     auto FAssetRegistry::FindByPath(FStringView path) const noexcept -> FAssetHandle {
         for (const auto& asset : mAssets) {
-            if (Core::Utility::String::EqualsIgnoreCase(path, asset.VirtualPath.ToView())) {
-                return asset.Handle;
+            if (Core::Utility::String::EqualsIgnoreCase(path, asset.mVirtualPath.ToView())) {
+                return asset.mHandle;
             }
         }
 
         for (const auto& redirector : mRedirectors) {
-            if (Core::Utility::String::EqualsIgnoreCase(path, redirector.OldVirtualPath.ToView())) {
-                return FindByUuid(redirector.NewUuid);
+            if (Core::Utility::String::EqualsIgnoreCase(
+                    path, redirector.mOldVirtualPath.ToView())) {
+                return FindByUuid(redirector.mNewUuid);
             }
         }
 
@@ -417,8 +418,8 @@ namespace AltinaEngine::Asset {
         }
 
         for (const auto& asset : mAssets) {
-            if (asset.Handle.Uuid == uuid) {
-                return asset.Handle;
+            if (asset.mHandle.mUuid == uuid) {
+                return asset.mHandle;
             }
         }
 
@@ -431,8 +432,8 @@ namespace AltinaEngine::Asset {
         }
 
         for (const auto& asset : mAssets) {
-            if (asset.Handle.Uuid == handle.Uuid) {
-                if (handle.Type == EAssetType::Unknown || asset.Handle.Type == handle.Type) {
+            if (asset.mHandle.mUuid == handle.mUuid) {
+                if (handle.mType == EAssetType::Unknown || asset.mHandle.mType == handle.mType) {
                     return &asset;
                 }
             }
@@ -448,7 +449,7 @@ namespace AltinaEngine::Asset {
             return nullptr;
         }
 
-        return &desc->Dependencies;
+        return &desc->mDependencies;
     }
 
     auto FAssetRegistry::ResolveRedirector(const FAssetHandle& handle) const noexcept
@@ -458,13 +459,13 @@ namespace AltinaEngine::Asset {
         }
 
         for (const auto& redirector : mRedirectors) {
-            if (redirector.OldUuid == handle.Uuid) {
-                FAssetHandle resolved = FindByUuid(redirector.NewUuid);
+            if (redirector.mOldUuid == handle.mUuid) {
+                FAssetHandle resolved = FindByUuid(redirector.mNewUuid);
                 if (resolved.IsValid()) {
                     return resolved;
                 }
 
-                return { redirector.NewUuid, handle.Type };
+                return { redirector.mNewUuid, handle.mType };
             }
         }
 

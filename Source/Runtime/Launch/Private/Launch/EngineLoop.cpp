@@ -431,8 +431,8 @@ namespace AltinaEngine::Launch {
                     h = HashCombine(h, HashPointer(view.Target.Viewport));
                     break;
                 case ETargetType::TextureAsset:
-                    h = HashCombine(h, HashUuid(view.Target.Texture.Uuid));
-                    h = HashCombine(h, static_cast<u64>(view.Target.Texture.Type));
+                    h = HashCombine(h, HashUuid(view.Target.Texture.mUuid));
+                    h = HashCombine(h, static_cast<u64>(view.Target.Texture.mType));
                     break;
                 default:
                     break;
@@ -560,9 +560,9 @@ namespace AltinaEngine::Launch {
 
             if (bHasSkyCube && assetRegistry != nullptr && assetManager != nullptr) {
                 const auto* baseDesc = assetRegistry->GetDesc(scene.SkyCubeAsset);
-                if (baseDesc != nullptr && !baseDesc->VirtualPath.IsEmpty()) {
+                if (baseDesc != nullptr && !baseDesc->mVirtualPath.IsEmpty()) {
                     auto MakeDerivedPath = [&](const TChar* suffix) -> Container::FString {
-                        Container::FString out = baseDesc->VirtualPath;
+                        Container::FString out = baseDesc->mVirtualPath;
                         out.Append(TEXT("/"));
                         out.Append(suffix);
                         return out;
@@ -605,16 +605,16 @@ namespace AltinaEngine::Launch {
 
                         const auto* specDesc = assetRegistry->GetDesc(specularHandle);
                         if (specDesc != nullptr
-                            && specDesc->Handle.Type == Asset::EAssetType::CubeMap
-                            && specDesc->CubeMap.MipCount > 0U) {
-                            specularMaxLod = static_cast<float>(specDesc->CubeMap.MipCount - 1U);
+                            && specDesc->mHandle.mType == Asset::EAssetType::CubeMap
+                            && specDesc->mCubeMap.MipCount > 0U) {
+                            specularMaxLod = static_cast<float>(specDesc->mCubeMap.MipCount - 1U);
                         }
                     }
 
                     if (brdfHandle.IsValid()) {
                         const auto* brdfDesc = assetRegistry->GetDesc(brdfHandle);
                         if (brdfDesc == nullptr
-                            || brdfDesc->Handle.Type != Asset::EAssetType::Texture2D) {
+                            || brdfDesc->mHandle.mType != Asset::EAssetType::Texture2D) {
                             // Ignore invalid derived assets.
                         } else if (!sHasBrdfLutTexture || sBrdfLutAsset != brdfHandle) {
                             sBrdfLutAsset      = brdfHandle;

@@ -116,9 +116,9 @@ namespace AltinaEngine::GameScene {
             serializer.WriteFieldName(TEXT("valid"));
             serializer.Write(handle.IsValid());
             serializer.WriteFieldName(TEXT("type"));
-            serializer.Write(static_cast<u8>(handle.Type));
+            serializer.Write(static_cast<u8>(handle.mType));
             serializer.WriteFieldName(TEXT("uuid"));
-            const auto uuidText = handle.Uuid.ToString();
+            const auto uuidText = handle.mUuid.ToString();
             serializer.WriteString(uuidText.ToView());
             serializer.EndObject();
         }

@@ -33,15 +33,15 @@ namespace AltinaEngine::Asset {
                 return false;
             }
 
-            if (outHeader.Magic != kAssetBlobMagic || outHeader.Version != kAssetBlobVersion) {
+            if (outHeader.mMagic != kAssetBlobMagic || outHeader.mVersion != kAssetBlobVersion) {
                 return false;
             }
 
-            if (outHeader.Type != static_cast<u8>(EAssetType::Audio)) {
+            if (outHeader.mType != static_cast<u8>(EAssetType::Audio)) {
                 return false;
             }
 
-            if (outHeader.DescSize != sizeof(FAudioBlobDesc)) {
+            if (outHeader.mDescSize != sizeof(FAudioBlobDesc)) {
                 return false;
             }
 
@@ -73,53 +73,54 @@ namespace AltinaEngine::Asset {
             return {};
         }
 
-        if (blobDesc.Channels == 0U || blobDesc.SampleRate == 0U) {
+        if (blobDesc.mChannels == 0U || blobDesc.mSampleRate == 0U) {
             return {};
         }
 
-        if (blobDesc.DataSize == 0U || blobDesc.FrameCount == 0U) {
+        if (blobDesc.mDataSize == 0U || blobDesc.mFrameCount == 0U) {
             return {};
         }
 
-        const u32 bytesPerSample = GetAudioBytesPerSample(blobDesc.SampleFormat);
+        const u32 bytesPerSample = GetAudioBytesPerSample(blobDesc.mSampleFormat);
         if (bytesPerSample == 0U) {
             return {};
         }
 
-        if (blobDesc.ChunkCount > 0U && blobDesc.FramesPerChunk == 0U) {
+        if (blobDesc.mChunkCount > 0U && blobDesc.mFramesPerChunk == 0U) {
             return {};
         }
 
-        const u64 dataSize        = header.DataSize;
-        const u64 chunkTableBytes = static_cast<u64>(blobDesc.ChunkCount) * sizeof(FAudioChunkDesc);
-        if (blobDesc.ChunkCount > 0U) {
-            if (!RangeWithin(blobDesc.ChunkTableOffset, chunkTableBytes, dataSize)) {
+        const u64 dataSize = header.mDataSize;
+        const u64 chunkTableBytes =
+            static_cast<u64>(blobDesc.mChunkCount) * sizeof(FAudioChunkDesc);
+        if (blobDesc.mChunkCount > 0U) {
+            if (!RangeWithin(blobDesc.mChunkTableOffset, chunkTableBytes, dataSize)) {
                 return {};
             }
-            if (blobDesc.DataOffset < blobDesc.ChunkTableOffset + chunkTableBytes) {
-                return {};
-            }
-        }
-
-        if (!RangeWithin(blobDesc.DataOffset, blobDesc.DataSize, dataSize)) {
-            return {};
-        }
-
-        if (blobDesc.Codec == kAudioCodecPcm) {
-            const u64 expectedSize = static_cast<u64>(blobDesc.FrameCount)
-                * static_cast<u64>(blobDesc.Channels) * bytesPerSample;
-            if (expectedSize != blobDesc.DataSize) {
+            if (blobDesc.mDataOffset < blobDesc.mChunkTableOffset + chunkTableBytes) {
                 return {};
             }
         }
 
-        if (desc.Audio.Codec != 0U && desc.Audio.Codec != blobDesc.Codec) {
+        if (!RangeWithin(blobDesc.mDataOffset, blobDesc.mDataSize, dataSize)) {
             return {};
         }
-        if (desc.Audio.Channels != 0U && desc.Audio.Channels != blobDesc.Channels) {
+
+        if (blobDesc.mCodec == kAudioCodecPcm) {
+            const u64 expectedSize = static_cast<u64>(blobDesc.mFrameCount)
+                * static_cast<u64>(blobDesc.mChannels) * bytesPerSample;
+            if (expectedSize != blobDesc.mDataSize) {
+                return {};
+            }
+        }
+
+        if (desc.mAudio.Codec != 0U && desc.mAudio.Codec != blobDesc.mCodec) {
             return {};
         }
-        if (desc.Audio.SampleRate != 0U && desc.Audio.SampleRate != blobDesc.SampleRate) {
+        if (desc.mAudio.Channels != 0U && desc.mAudio.Channels != blobDesc.mChannels) {
+            return {};
+        }
+        if (desc.mAudio.SampleRate != 0U && desc.mAudio.SampleRate != blobDesc.mSampleRate) {
             return {};
         }
 
@@ -131,19 +132,19 @@ namespace AltinaEngine::Asset {
         }
 
         TVector<FAudioChunkDesc> chunks;
-        if (blobDesc.ChunkCount > 0U) {
-            chunks.Resize(static_cast<usize>(blobDesc.ChunkCount));
-            stream.Seek(baseOffset + static_cast<usize>(blobDesc.ChunkTableOffset));
+        if (blobDesc.mChunkCount > 0U) {
+            chunks.Resize(static_cast<usize>(blobDesc.mChunkCount));
+            stream.Seek(baseOffset + static_cast<usize>(blobDesc.mChunkTableOffset));
             if (!ReadExact(stream, chunks.Data(), static_cast<usize>(chunkTableBytes))) {
                 return {};
             }
 
-            const u64 dataStart       = blobDesc.DataOffset;
-            const u64 dataEnd         = blobDesc.DataOffset + blobDesc.DataSize;
+            const u64 dataStart       = blobDesc.mDataOffset;
+            const u64 dataEnd         = blobDesc.mDataOffset + blobDesc.mDataSize;
             u64       totalChunkBytes = 0U;
             for (const auto& chunk : chunks) {
-                const u64 offset = chunk.Offset;
-                const u64 size   = chunk.Size;
+                const u64 offset = chunk.mOffset;
+                const u64 size   = chunk.mSize;
                 if (size == 0U) {
                     return {};
                 }
@@ -151,29 +152,29 @@ namespace AltinaEngine::Asset {
                     return {};
                 }
                 totalChunkBytes += size;
-                if (totalChunkBytes > blobDesc.DataSize) {
+                if (totalChunkBytes > blobDesc.mDataSize) {
                     return {};
                 }
             }
-            if (blobDesc.Codec == kAudioCodecPcm && totalChunkBytes != blobDesc.DataSize) {
+            if (blobDesc.mCodec == kAudioCodecPcm && totalChunkBytes != blobDesc.mDataSize) {
                 return {};
             }
         }
 
         TVector<u8> data;
-        data.Resize(static_cast<usize>(blobDesc.DataSize));
-        stream.Seek(baseOffset + static_cast<usize>(blobDesc.DataOffset));
-        if (!ReadExact(stream, data.Data(), static_cast<usize>(blobDesc.DataSize))) {
+        data.Resize(static_cast<usize>(blobDesc.mDataSize));
+        stream.Seek(baseOffset + static_cast<usize>(blobDesc.mDataOffset));
+        if (!ReadExact(stream, data.Data(), static_cast<usize>(blobDesc.mDataSize))) {
             return {};
         }
 
         FAudioRuntimeDesc runtimeDesc{};
-        runtimeDesc.Codec          = blobDesc.Codec;
-        runtimeDesc.SampleFormat   = blobDesc.SampleFormat;
-        runtimeDesc.Channels       = blobDesc.Channels;
-        runtimeDesc.SampleRate     = blobDesc.SampleRate;
-        runtimeDesc.FrameCount     = blobDesc.FrameCount;
-        runtimeDesc.FramesPerChunk = blobDesc.FramesPerChunk;
+        runtimeDesc.mCodec          = blobDesc.mCodec;
+        runtimeDesc.mSampleFormat   = blobDesc.mSampleFormat;
+        runtimeDesc.mChannels       = blobDesc.mChannels;
+        runtimeDesc.mSampleRate     = blobDesc.mSampleRate;
+        runtimeDesc.mFrameCount     = blobDesc.mFrameCount;
+        runtimeDesc.mFramesPerChunk = blobDesc.mFramesPerChunk;
 
         return MakeSharedAsset<FAudioAsset>(runtimeDesc, Move(chunks), Move(data));
     }

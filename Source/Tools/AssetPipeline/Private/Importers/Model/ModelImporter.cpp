@@ -41,9 +41,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
             Asset::FAssetBlobHeader header{};
             std::memcpy(&header, sourceBytes.data(), sizeof(header));
 
-            if (header.Magic != Asset::kAssetBlobMagic || header.Version != Asset::kAssetBlobVersion
-                || header.Type != static_cast<u8>(Asset::EAssetType::Model)
-                || header.DescSize != sizeof(Asset::FModelBlobDesc)) {
+            if (header.mMagic != Asset::kAssetBlobMagic
+                || header.mVersion != Asset::kAssetBlobVersion
+                || header.mType != static_cast<u8>(Asset::EAssetType::Model)
+                || header.mDescSize != sizeof(Asset::FModelBlobDesc)) {
                 return false;
             }
 
@@ -70,24 +71,24 @@ namespace AltinaEngine::Tools::AssetPipeline {
             };
 
             u64 nodesBytes = 0;
-            if (!TryComputeBytes(blobDesc.NodeCount, sizeof(Asset::FModelNodeDesc), nodesBytes)) {
+            if (!TryComputeBytes(blobDesc.mNodeCount, sizeof(Asset::FModelNodeDesc), nodesBytes)) {
                 return false;
             }
             u64 meshRefBytes = 0;
             if (!TryComputeBytes(
-                    blobDesc.MeshRefCount, sizeof(Asset::FModelMeshRef), meshRefBytes)) {
+                    blobDesc.mMeshRefCount, sizeof(Asset::FModelMeshRef), meshRefBytes)) {
                 return false;
             }
             u64 materialBytes = 0;
             if (!TryComputeBytes(
-                    blobDesc.MaterialSlotCount, sizeof(Asset::FAssetHandle), materialBytes)) {
+                    blobDesc.mMaterialSlotCount, sizeof(Asset::FAssetHandle), materialBytes)) {
                 return false;
             }
 
-            const u64 dataSize = header.DataSize;
-            if (!RangeWithin(blobDesc.NodesOffset, nodesBytes, dataSize)
-                || !RangeWithin(blobDesc.MeshRefsOffset, meshRefBytes, dataSize)
-                || !RangeWithin(blobDesc.MaterialSlotsOffset, materialBytes, dataSize)) {
+            const u64 dataSize = header.mDataSize;
+            if (!RangeWithin(blobDesc.mNodesOffset, nodesBytes, dataSize)
+                || !RangeWithin(blobDesc.mMeshRefsOffset, meshRefBytes, dataSize)
+                || !RangeWithin(blobDesc.mMaterialSlotsOffset, materialBytes, dataSize)) {
                 return false;
             }
 
@@ -97,9 +98,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 return false;
             }
 
-            outResult.Desc.NodeCount         = blobDesc.NodeCount;
-            outResult.Desc.MeshRefCount      = blobDesc.MeshRefCount;
-            outResult.Desc.MaterialSlotCount = blobDesc.MaterialSlotCount;
+            outResult.Desc.NodeCount         = blobDesc.mNodeCount;
+            outResult.Desc.MeshRefCount      = blobDesc.mMeshRefCount;
+            outResult.Desc.MaterialSlotCount = blobDesc.mMaterialSlotCount;
             outResult.CookedBytes            = sourceBytes;
             outResult.CookKeyExtras          = sourceBytes;
             return true;

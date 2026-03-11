@@ -27,8 +27,8 @@ namespace AltinaEngine::Asset {
 
     private:
         struct FCacheEntry {
-            FAssetHandle    Handle;
-            TShared<IAsset> Asset;
+            FAssetHandle    mHandle;
+            TShared<IAsset> mAsset;
         };
 
         [[nodiscard]] auto     FindLoader(EAssetType type) const noexcept -> IAssetLoader*;

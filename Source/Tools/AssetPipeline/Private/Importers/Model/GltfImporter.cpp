@@ -158,28 +158,28 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
             {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic      = Asset::kMeshSemanticPosition;
-                attr.Format        = Asset::kMeshVertexFormatR32G32B32Float;
-                attr.AlignedOffset = offset;
+                attr.mSemantic      = Asset::kMeshSemanticPosition;
+                attr.mFormat        = Asset::kMeshVertexFormatR32G32B32Float;
+                attr.mAlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 12;
                 outMesh.VertexFormatMask |= Asset::kMeshVertexMaskPosition;
             }
             if (includeNormals) {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic      = Asset::kMeshSemanticNormal;
-                attr.Format        = Asset::kMeshVertexFormatR32G32B32Float;
-                attr.AlignedOffset = offset;
+                attr.mSemantic      = Asset::kMeshSemanticNormal;
+                attr.mFormat        = Asset::kMeshVertexFormatR32G32B32Float;
+                attr.mAlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 12;
                 outMesh.VertexFormatMask |= Asset::kMeshVertexMaskNormal;
             }
             if (includeUv0) {
                 Asset::FMeshVertexAttributeDesc attr{};
-                attr.Semantic      = Asset::kMeshSemanticTexCoord;
-                attr.SemanticIndex = 0;
-                attr.Format        = Asset::kMeshVertexFormatR32G32Float;
-                attr.AlignedOffset = offset;
+                attr.mSemantic      = Asset::kMeshSemanticTexCoord;
+                attr.mSemanticIndex = 0;
+                attr.mFormat        = Asset::kMeshVertexFormatR32G32Float;
+                attr.mAlignedOffset = offset;
                 outMesh.Attributes.push_back(attr);
                 offset += 8;
                 outMesh.VertexFormatMask |= Asset::kMeshVertexMaskTexCoord0;
@@ -267,11 +267,11 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             Asset::FMeshSubMeshDesc subMesh{};
-            subMesh.IndexStart   = 0;
-            subMesh.IndexCount   = outMesh.IndexCount;
-            subMesh.BaseVertex   = 0;
-            subMesh.MaterialSlot = 0;
-            outMesh.SubMeshes    = { subMesh };
+            subMesh.mIndexStart   = 0;
+            subMesh.mIndexCount   = outMesh.IndexCount;
+            subMesh.mBaseVertex   = 0;
+            subMesh.mMaterialSlot = 0;
+            outMesh.SubMeshes     = { subMesh };
             return true;
         }
     } // namespace

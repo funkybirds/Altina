@@ -612,8 +612,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         return false;
                     }
 
-                    shaderRef.Handle.Uuid = record->Uuid;
-                    shaderRef.Handle.Type = record->Type;
+                    shaderRef.Handle.mUuid = record->Uuid;
+                    shaderRef.Handle.mType = record->Type;
                     ++shaderCount;
 
                     const std::string uuidText = ToStdString(record->Uuid.ToNativeString());
@@ -639,8 +639,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             outError = "Material texture asset invalid: " + param.TextureAssetPath;
                             return false;
                         }
-                        param.TextureHandle.Uuid   = record->Uuid;
-                        param.TextureHandle.Type   = record->Type;
+                        param.TextureHandle.mUuid  = record->Uuid;
+                        param.TextureHandle.mType  = record->Type;
                         const std::string uuidText = ToStdString(record->Uuid.ToNativeString());
                         if (seen.insert(uuidText).second) {
                             outDeps.push_back(param.TextureHandle);
@@ -686,10 +686,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         if (!emit) {
                             return;
                         }
-                        const std::string uuidText = ToStdString(ref.Handle.Uuid.ToNativeString());
+                        const std::string uuidText = ToStdString(ref.Handle.mUuid.ToNativeString());
                         stream << "        \"" << key << "\": { \"Uuid\": \""
                                << EscapeJson(uuidText) << "\", \"Type\": \""
-                               << AssetTypeToString(ref.Handle.Type) << "\", \"Entry\": \""
+                               << AssetTypeToString(ref.Handle.mType) << "\", \"Entry\": \""
                                << EscapeJson(ref.Entry) << "\" }";
                         if (!isLast) {
                             stream << ",";
@@ -781,9 +781,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         stream << "\"Value\": ";
                         if (overrideParam.IsTexture) {
                             const std::string uuidText =
-                                ToStdString(overrideParam.TextureHandle.Uuid.ToNativeString());
+                                ToStdString(overrideParam.TextureHandle.mUuid.ToNativeString());
                             stream << "{ \"Uuid\": \"" << EscapeJson(uuidText) << "\", \"Type\": \""
-                                   << AssetTypeToString(overrideParam.TextureHandle.Type) << "\" }";
+                                   << AssetTypeToString(overrideParam.TextureHandle.mType)
+                                   << "\" }";
                         } else if (overrideParam.IsScalar && !overrideParam.Values.empty()) {
                             stream << overrideParam.Values[0];
                         } else {

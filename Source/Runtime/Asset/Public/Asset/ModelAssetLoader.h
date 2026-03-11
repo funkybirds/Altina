@@ -7,8 +7,8 @@
 
 namespace AltinaEngine::Asset {
     struct AE_ASSET_API FModelAssetLoadResult {
-        Core::Container::TShared<IAsset> Asset{};
-        FModelAsset*                     Model = nullptr;
+        TShared<IAsset> mAsset{};
+        FModelAsset*    mModel = nullptr;
     };
 
     class AE_ASSET_API FModelAssetLoader final {

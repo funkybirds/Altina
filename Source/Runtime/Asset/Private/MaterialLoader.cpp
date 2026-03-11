@@ -114,8 +114,8 @@ namespace AltinaEngine::Asset {
                 return false;
             }
 
-            outHandle.Uuid = uuid;
-            outHandle.Type = type;
+            outHandle.mUuid = uuid;
+            outHandle.mType = type;
             return outHandle.IsValid();
         }
 
@@ -145,10 +145,10 @@ namespace AltinaEngine::Asset {
                 return false;
             }
 
-            out.Asset.Uuid = uuid;
-            out.Asset.Type = type;
-            out.Entry      = Core::Utility::String::FromUtf8(entryText);
-            return out.Asset.IsValid() && !out.Entry.IsEmptyString();
+            out.mAsset.mUuid = uuid;
+            out.mAsset.mType = type;
+            out.mEntry       = Core::Utility::String::FromUtf8(entryText);
+            return out.mAsset.IsValid() && !out.mEntry.IsEmptyString();
         }
 
         constexpr u32 kFnvOffset32 = 2166136261u;
@@ -276,8 +276,8 @@ namespace AltinaEngine::Asset {
                     if (!Core::Utility::String::ParseUuid(valueNode->String, uuid)) {
                         return false;
                     }
-                    handle.Uuid = uuid;
-                    handle.Type = EAssetType::Texture2D;
+                    handle.mUuid = uuid;
+                    handle.mType = EAssetType::Texture2D;
                 } else {
                     return false;
                 }
@@ -409,8 +409,8 @@ namespace AltinaEngine::Asset {
                     if (KeyEquals(key, "fillmode")) {
                         EMaterialRasterFillMode mode{};
                         if (TryParseRasterFillMode(text, mode)) {
-                            outOverrides.HasFillMode = true;
-                            outOverrides.FillMode    = mode;
+                            outOverrides.mHasFillMode = true;
+                            outOverrides.mFillMode    = mode;
                         }
                         continue;
                     }
@@ -418,8 +418,8 @@ namespace AltinaEngine::Asset {
                     if (KeyEquals(key, "cullmode") || KeyEquals(key, "cull")) {
                         EMaterialRasterCullMode mode{};
                         if (TryParseRasterCullMode(text, mode)) {
-                            outOverrides.HasCullMode = true;
-                            outOverrides.CullMode    = mode;
+                            outOverrides.mHasCullMode = true;
+                            outOverrides.mCullMode    = mode;
                         }
                         continue;
                     }
@@ -427,8 +427,8 @@ namespace AltinaEngine::Asset {
                     if (KeyEquals(key, "frontface") || KeyEquals(key, "front")) {
                         EMaterialRasterFrontFace mode{};
                         if (TryParseRasterFrontFace(text, mode)) {
-                            outOverrides.HasFrontFace = true;
-                            outOverrides.FrontFace    = mode;
+                            outOverrides.mHasFrontFace = true;
+                            outOverrides.mFrontFace    = mode;
                         }
                         continue;
                     }
@@ -441,20 +441,20 @@ namespace AltinaEngine::Asset {
                     }
 
                     if (KeyEquals(key, "depthbias")) {
-                        outOverrides.HasDepthBias = true;
-                        outOverrides.DepthBias    = static_cast<i32>(number);
+                        outOverrides.mHasDepthBias = true;
+                        outOverrides.mDepthBias    = static_cast<i32>(number);
                         continue;
                     }
 
                     if (KeyEquals(key, "depthbiasclamp")) {
-                        outOverrides.HasDepthBiasClamp = true;
-                        outOverrides.DepthBiasClamp    = static_cast<f32>(number);
+                        outOverrides.mHasDepthBiasClamp = true;
+                        outOverrides.mDepthBiasClamp    = static_cast<f32>(number);
                         continue;
                     }
 
                     if (KeyEquals(key, "slopescaleddepthbias")) {
-                        outOverrides.HasSlopeScaledDepthBias = true;
-                        outOverrides.SlopeScaledDepthBias    = static_cast<f32>(number);
+                        outOverrides.mHasSlopeScaledDepthBias = true;
+                        outOverrides.mSlopeScaledDepthBias    = static_cast<f32>(number);
                         continue;
                     }
                 }
@@ -466,14 +466,14 @@ namespace AltinaEngine::Asset {
                     }
 
                     if (KeyEquals(key, "depthclip")) {
-                        outOverrides.HasDepthClip = true;
-                        outOverrides.DepthClip    = flag;
+                        outOverrides.mHasDepthClip = true;
+                        outOverrides.mDepthClip    = flag;
                         continue;
                     }
 
                     if (KeyEquals(key, "conservativeraster")) {
-                        outOverrides.HasConservativeRaster = true;
-                        outOverrides.ConservativeRaster    = flag;
+                        outOverrides.mHasConservativeRaster = true;
+                        outOverrides.mConservativeRaster    = flag;
                         continue;
                     }
                 }
@@ -499,17 +499,17 @@ namespace AltinaEngine::Asset {
                 }
 
                 FMaterialPassTemplate pass{};
-                pass.Name = Core::Utility::String::FromUtf8(pair.Key);
-                if (pass.Name.IsEmptyString()) {
+                pass.mName = Core::Utility::String::FromUtf8(pair.Key);
+                if (pass.mName.IsEmptyString()) {
                     continue;
                 }
 
                 const FJsonValue* presetValue = FindObjectValueInsensitive(*pair.Value, "Preset");
                 if (presetValue != nullptr && presetValue->Type == EJsonType::String) {
-                    pass.Preset = Core::Utility::String::FromUtf8(presetValue->String);
+                    pass.mPreset = Core::Utility::String::FromUtf8(presetValue->String);
                 }
 
-                const bool        hasPreset    = !pass.Preset.IsEmptyString();
+                const bool        hasPreset    = !pass.mPreset.IsEmptyString();
                 const FJsonValue* shadersValue = FindObjectValueInsensitive(*pair.Value, "Shaders");
                 if (!hasPreset) {
                     if (shadersValue == nullptr || shadersValue->Type != EJsonType::Object) {
@@ -520,29 +520,29 @@ namespace AltinaEngine::Asset {
                 if (shadersValue != nullptr && shadersValue->Type == EJsonType::Object) {
                     if (const FJsonValue* vsValue =
                             FindObjectValueInsensitive(*shadersValue, "vs")) {
-                        pass.HasVertex = ParseShaderSource(*vsValue, pass.Vertex);
+                        pass.mHasVertex = ParseShaderSource(*vsValue, pass.mVertex);
                     }
                     if (const FJsonValue* psValue =
                             FindObjectValueInsensitive(*shadersValue, "ps")) {
-                        pass.HasPixel = ParseShaderSource(*psValue, pass.Pixel);
+                        pass.mHasPixel = ParseShaderSource(*psValue, pass.mPixel);
                     }
                     if (const FJsonValue* csValue =
                             FindObjectValueInsensitive(*shadersValue, "cs")) {
-                        pass.HasCompute = ParseShaderSource(*csValue, pass.Compute);
+                        pass.mHasCompute = ParseShaderSource(*csValue, pass.mCompute);
                     }
                 }
 
-                if (!hasPreset && !pass.HasVertex && !pass.HasCompute) {
+                if (!hasPreset && !pass.mHasVertex && !pass.mHasCompute) {
                     return false;
                 }
 
                 if (const FJsonValue* overridesValue =
                         FindObjectValueInsensitive(*pair.Value, "Overrides")) {
-                    ParseOverridesObject(*overridesValue, pass.Overrides);
+                    ParseOverridesObject(*overridesValue, pass.mOverrides);
                 }
 
                 if (const FJsonValue* rasterValue = FindRasterOverridesValue(*pair.Value)) {
-                    ParseRasterOverridesObject(*rasterValue, pass.RasterOverrides);
+                    ParseRasterOverridesObject(*rasterValue, pass.mRasterOverrides);
                 }
 
                 outPasses.PushBack(Move(pass));

@@ -172,11 +172,11 @@ TEST_CASE("Asset.Texture2D.EngineFormat.Load") {
     REQUIRE(texture != nullptr);
 
     const auto& desc = texture->GetDesc();
-    REQUIRE_EQ(desc.Width, registryDesc->Texture.Width);
-    REQUIRE_EQ(desc.Height, registryDesc->Texture.Height);
-    REQUIRE_EQ(desc.MipCount, registryDesc->Texture.MipCount);
-    REQUIRE_EQ(desc.Format, registryDesc->Texture.Format);
-    REQUIRE_EQ(desc.SRGB, registryDesc->Texture.SRGB);
+    REQUIRE_EQ(desc.Width, registryDesc->mTexture.Width);
+    REQUIRE_EQ(desc.Height, registryDesc->mTexture.Height);
+    REQUIRE_EQ(desc.MipCount, registryDesc->mTexture.MipCount);
+    REQUIRE_EQ(desc.Format, registryDesc->mTexture.Format);
+    REQUIRE_EQ(desc.SRGB, registryDesc->mTexture.SRGB);
 
     const u64 expectedSize = ComputePackedMipSize(desc);
     REQUIRE(expectedSize > 0U);
@@ -213,22 +213,22 @@ TEST_CASE("Asset.Mesh.EngineFormat.Load") {
     REQUIRE(mesh != nullptr);
 
     const auto& desc = mesh->GetDesc();
-    REQUIRE(desc.VertexCount > 0U);
-    REQUIRE(desc.IndexCount > 0U);
-    REQUIRE(desc.VertexStride > 0U);
+    REQUIRE(desc.mVertexCount > 0U);
+    REQUIRE(desc.mIndexCount > 0U);
+    REQUIRE(desc.mVertexStride > 0U);
 
-    const u32 indexStride = GetMeshIndexStride(desc.IndexType);
+    const u32 indexStride = GetMeshIndexStride(desc.mIndexType);
     REQUIRE(indexStride > 0U);
 
     REQUIRE_EQ(mesh->GetVertexData().Size(),
-        static_cast<usize>(desc.VertexCount) * static_cast<usize>(desc.VertexStride));
+        static_cast<usize>(desc.mVertexCount) * static_cast<usize>(desc.mVertexStride));
     REQUIRE_EQ(mesh->GetIndexData().Size(),
-        static_cast<usize>(desc.IndexCount) * static_cast<usize>(indexStride));
+        static_cast<usize>(desc.mIndexCount) * static_cast<usize>(indexStride));
 
     REQUIRE(!mesh->GetSubMeshes().IsEmpty());
     if (!mesh->GetSubMeshes().IsEmpty()) {
         const auto& subMesh = mesh->GetSubMeshes().Front();
-        REQUIRE_EQ(subMesh.IndexCount, desc.IndexCount);
+        REQUIRE_EQ(subMesh.mIndexCount, desc.mIndexCount);
     }
 
     manager.UnregisterLoader(&loader);
@@ -273,25 +273,25 @@ TEST_CASE("Asset.MaterialTemplate.Json.Load") {
     const auto& passes = material->GetPasses();
     REQUIRE_EQ(passes.Size(), static_cast<usize>(1));
     const auto& pass = passes[0];
-    REQUIRE_EQ(pass.Name, FString(TEXT("BasePass")));
-    REQUIRE(pass.HasVertex);
-    REQUIRE(pass.HasPixel);
-    REQUIRE_EQ(pass.Vertex.Asset.Uuid, shaderUuid);
-    REQUIRE_EQ(pass.Vertex.Asset.Type, AltinaEngine::Asset::EAssetType::Shader);
-    REQUIRE_EQ(pass.Vertex.Entry, FString(TEXT("VSMain")));
-    REQUIRE_EQ(pass.Pixel.Asset.Uuid, shaderUuid);
-    REQUIRE_EQ(pass.Pixel.Asset.Type, AltinaEngine::Asset::EAssetType::Shader);
-    REQUIRE_EQ(pass.Pixel.Entry, FString(TEXT("PSMain")));
+    REQUIRE_EQ(pass.mName, FString(TEXT("BasePass")));
+    REQUIRE(pass.mHasVertex);
+    REQUIRE(pass.mHasPixel);
+    REQUIRE_EQ(pass.mVertex.mAsset.Uuid, shaderUuid);
+    REQUIRE_EQ(pass.mVertex.mAsset.Type, AltinaEngine::Asset::EAssetType::Shader);
+    REQUIRE_EQ(pass.mVertex.mEntry, FString(TEXT("VSMain")));
+    REQUIRE_EQ(pass.mPixel.mAsset.Uuid, shaderUuid);
+    REQUIRE_EQ(pass.mPixel.mAsset.Type, AltinaEngine::Asset::EAssetType::Shader);
+    REQUIRE_EQ(pass.mPixel.mEntry, FString(TEXT("PSMain")));
 
-    REQUIRE(pass.RasterOverrides.HasAny());
-    REQUIRE(pass.RasterOverrides.HasCullMode);
-    REQUIRE_EQ(pass.RasterOverrides.CullMode, AltinaEngine::Asset::EMaterialRasterCullMode::None);
-    REQUIRE(pass.RasterOverrides.HasFrontFace);
-    REQUIRE_EQ(pass.RasterOverrides.FrontFace, AltinaEngine::Asset::EMaterialRasterFrontFace::CW);
-    REQUIRE(pass.RasterOverrides.HasDepthBias);
-    REQUIRE_EQ(pass.RasterOverrides.DepthBias, 2);
-    REQUIRE(pass.RasterOverrides.HasDepthClip);
-    REQUIRE(!pass.RasterOverrides.DepthClip);
+    REQUIRE(pass.mRasterOverrides.HasAny());
+    REQUIRE(pass.mRasterOverrides.HasCullMode);
+    REQUIRE_EQ(pass.mRasterOverrides.mCullMode, AltinaEngine::Asset::EMaterialRasterCullMode::None);
+    REQUIRE(pass.mRasterOverrides.HasFrontFace);
+    REQUIRE_EQ(pass.mRasterOverrides.mFrontFace, AltinaEngine::Asset::EMaterialRasterFrontFace::CW);
+    REQUIRE(pass.mRasterOverrides.HasDepthBias);
+    REQUIRE_EQ(pass.mRasterOverrides.mDepthBias, 2);
+    REQUIRE(pass.mRasterOverrides.HasDepthClip);
+    REQUIRE(!pass.mRasterOverrides.mDepthClip);
 
     const auto& variants = material->GetPrecompileVariants();
     REQUIRE_EQ(variants.Size(), static_cast<usize>(1));
@@ -321,8 +321,8 @@ TEST_CASE("Asset.Bundle.RoundTrip") {
         REQUIRE(file.good());
 
         AltinaEngine::Asset::FBundleHeader header{};
-        header.Magic   = AltinaEngine::Asset::kBundleMagic;
-        header.Version = AltinaEngine::Asset::kBundleVersion;
+        header.mMagic   = AltinaEngine::Asset::kBundleMagic;
+        header.mVersion = AltinaEngine::Asset::kBundleVersion;
 
         file.write(
             reinterpret_cast<const char*>(&header), static_cast<std::streamsize>(sizeof(header)));
@@ -330,32 +330,32 @@ TEST_CASE("Asset.Bundle.RoundTrip") {
         AltinaEngine::Asset::FBundleIndexEntry entry{};
         const auto&                            bytes = assetUuid.GetBytes();
         for (usize index = 0; index < AltinaEngine::FUuid::kByteCount; ++index) {
-            entry.Uuid[index] = bytes[index];
+            entry.mUuid[index] = bytes[index];
         }
-        entry.Type             = static_cast<u32>(AltinaEngine::Asset::EAssetType::Texture2D);
-        entry.Compression      = static_cast<u32>(AltinaEngine::Asset::EBundleCompression::None);
-        entry.Offset           = sizeof(header);
-        entry.Size             = static_cast<u64>(payload.Size());
-        entry.RawSize          = static_cast<u64>(payload.Size());
-        entry.ChunkCount       = 0;
-        entry.ChunkTableOffset = 0;
+        entry.mType             = static_cast<u32>(AltinaEngine::Asset::EAssetType::Texture2D);
+        entry.mCompression      = static_cast<u32>(AltinaEngine::Asset::EBundleCompression::None);
+        entry.mOffset           = sizeof(header);
+        entry.mSize             = static_cast<u64>(payload.Size());
+        entry.mRawSize          = static_cast<u64>(payload.Size());
+        entry.mChunkCount       = 0;
+        entry.mChunkTableOffset = 0;
 
         file.write(reinterpret_cast<const char*>(payload.Data()),
             static_cast<std::streamsize>(payload.Size()));
 
-        const u64                               indexOffset = entry.Offset + entry.Size;
+        const u64                               indexOffset = entry.mOffset + entry.mSize;
         AltinaEngine::Asset::FBundleIndexHeader indexHeader{};
-        indexHeader.EntryCount      = 1;
-        indexHeader.StringTableSize = 0;
+        indexHeader.mEntryCount      = 1;
+        indexHeader.mStringTableSize = 0;
 
         file.write(reinterpret_cast<const char*>(&indexHeader),
             static_cast<std::streamsize>(sizeof(indexHeader)));
         file.write(
             reinterpret_cast<const char*>(&entry), static_cast<std::streamsize>(sizeof(entry)));
 
-        header.IndexOffset = indexOffset;
-        header.IndexSize   = sizeof(indexHeader) + sizeof(entry);
-        header.BundleSize  = header.IndexOffset + header.IndexSize;
+        header.mIndexOffset = indexOffset;
+        header.mIndexSize   = sizeof(indexHeader) + sizeof(entry);
+        header.mBundleSize  = header.mIndexOffset + header.mIndexSize;
 
         file.seekp(0, std::ios::beg);
         file.write(
@@ -367,7 +367,7 @@ TEST_CASE("Asset.Bundle.RoundTrip") {
 
     AltinaEngine::Asset::FBundleIndexEntry readEntry{};
     REQUIRE(reader.GetEntry(assetUuid, readEntry));
-    REQUIRE_EQ(readEntry.Size, static_cast<u64>(payload.Size()));
+    REQUIRE_EQ(readEntry.mSize, static_cast<u64>(payload.Size()));
 
     TVector<u8> outBytes;
     REQUIRE(reader.ReadEntry(readEntry, outBytes));
@@ -394,24 +394,24 @@ TEST_CASE("Asset.Audio.EngineFormat.Load") {
     const u32 chunkTableBytes = chunkCount * sizeof(AltinaEngine::Asset::FAudioChunkDesc);
 
     AltinaEngine::Asset::FAudioBlobDesc blobDesc{};
-    blobDesc.Codec            = AltinaEngine::Asset::kAudioCodecPcm;
-    blobDesc.SampleFormat     = sampleFormat;
-    blobDesc.Channels         = channels;
-    blobDesc.SampleRate       = sampleRate;
-    blobDesc.FrameCount       = frameCount;
-    blobDesc.ChunkCount       = chunkCount;
-    blobDesc.FramesPerChunk   = framesPerChunk;
-    blobDesc.ChunkTableOffset = 0;
-    blobDesc.DataOffset       = chunkTableBytes;
-    blobDesc.DataSize         = dataSize;
+    blobDesc.mCodec            = AltinaEngine::Asset::kAudioCodecPcm;
+    blobDesc.mSampleFormat     = sampleFormat;
+    blobDesc.mChannels         = channels;
+    blobDesc.mSampleRate       = sampleRate;
+    blobDesc.mFrameCount       = frameCount;
+    blobDesc.mChunkCount       = chunkCount;
+    blobDesc.mFramesPerChunk   = framesPerChunk;
+    blobDesc.mChunkTableOffset = 0;
+    blobDesc.mDataOffset       = chunkTableBytes;
+    blobDesc.mDataSize         = dataSize;
 
     AltinaEngine::Asset::FAssetBlobHeader header{};
-    header.Type     = static_cast<u8>(AltinaEngine::Asset::EAssetType::Audio);
-    header.DescSize = static_cast<u32>(sizeof(AltinaEngine::Asset::FAudioBlobDesc));
-    header.DataSize = blobDesc.DataOffset + blobDesc.DataSize;
+    header.mType     = static_cast<u8>(AltinaEngine::Asset::EAssetType::Audio);
+    header.mDescSize = static_cast<u32>(sizeof(AltinaEngine::Asset::FAudioBlobDesc));
+    header.mDataSize = blobDesc.mDataOffset + blobDesc.mDataSize;
 
     TVector<u8> cooked;
-    cooked.Resize(sizeof(header) + sizeof(blobDesc) + header.DataSize);
+    cooked.Resize(sizeof(header) + sizeof(blobDesc) + header.mDataSize);
 
     u8* writePtr = cooked.Data();
     std::memcpy(writePtr, &header, sizeof(header));
@@ -420,22 +420,22 @@ TEST_CASE("Asset.Audio.EngineFormat.Load") {
     writePtr += sizeof(blobDesc);
 
     AltinaEngine::Asset::FAudioChunkDesc chunks[2]{};
-    chunks[0].Offset = blobDesc.DataOffset;
-    chunks[0].Size   = dataSize / 2;
-    chunks[1].Offset = blobDesc.DataOffset + chunks[0].Size;
-    chunks[1].Size   = dataSize - chunks[0].Size;
-    std::memcpy(writePtr + blobDesc.ChunkTableOffset, chunks, sizeof(chunks));
+    chunks[0].mOffset = blobDesc.mDataOffset;
+    chunks[0].mSize   = dataSize / 2;
+    chunks[1].mOffset = blobDesc.mDataOffset + chunks[0].mSize;
+    chunks[1].mSize   = dataSize - chunks[0].mSize;
+    std::memcpy(writePtr + blobDesc.mChunkTableOffset, chunks, sizeof(chunks));
 
     const u16 samples[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
-    std::memcpy(writePtr + blobDesc.DataOffset, samples, sizeof(samples));
+    std::memcpy(writePtr + blobDesc.mDataOffset, samples, sizeof(samples));
 
     FTestAssetStream stream(cooked);
     FAudioLoader     loader;
 
     FAssetDesc       desc{};
-    desc.Audio.Codec      = AltinaEngine::Asset::kAudioCodecPcm;
-    desc.Audio.Channels   = channels;
-    desc.Audio.SampleRate = sampleRate;
+    desc.mAudio.Codec      = AltinaEngine::Asset::kAudioCodecPcm;
+    desc.mAudio.Channels   = channels;
+    desc.mAudio.SampleRate = sampleRate;
 
     auto asset = loader.Load(desc, stream);
     REQUIRE(asset);
@@ -444,12 +444,12 @@ TEST_CASE("Asset.Audio.EngineFormat.Load") {
     REQUIRE(audio != nullptr);
 
     const auto& runtime = audio->GetDesc();
-    REQUIRE_EQ(runtime.Codec, blobDesc.Codec);
-    REQUIRE_EQ(runtime.SampleFormat, blobDesc.SampleFormat);
-    REQUIRE_EQ(runtime.Channels, blobDesc.Channels);
-    REQUIRE_EQ(runtime.SampleRate, blobDesc.SampleRate);
-    REQUIRE_EQ(runtime.FrameCount, blobDesc.FrameCount);
-    REQUIRE_EQ(runtime.FramesPerChunk, blobDesc.FramesPerChunk);
+    REQUIRE_EQ(runtime.mCodec, blobDesc.mCodec);
+    REQUIRE_EQ(runtime.mSampleFormat, blobDesc.mSampleFormat);
+    REQUIRE_EQ(runtime.mChannels, blobDesc.mChannels);
+    REQUIRE_EQ(runtime.mSampleRate, blobDesc.mSampleRate);
+    REQUIRE_EQ(runtime.mFrameCount, blobDesc.mFrameCount);
+    REQUIRE_EQ(runtime.mFramesPerChunk, blobDesc.mFramesPerChunk);
 
     REQUIRE_EQ(audio->GetChunks().Size(), static_cast<usize>(chunkCount));
     REQUIRE_EQ(audio->GetData().Size(), static_cast<usize>(dataSize));
@@ -502,16 +502,16 @@ TEST_CASE("Asset.Audio.EngineFormat.LoadFromRegistry") {
     }
 
     const auto& runtime = audio->GetDesc();
-    REQUIRE_EQ(runtime.Codec, registryDesc->Audio.Codec);
-    REQUIRE_EQ(runtime.Channels, registryDesc->Audio.Channels);
-    REQUIRE_EQ(runtime.SampleRate, registryDesc->Audio.SampleRate);
-    REQUIRE(runtime.FrameCount > 0U);
+    REQUIRE_EQ(runtime.mCodec, registryDesc->mAudio.Codec);
+    REQUIRE_EQ(runtime.mChannels, registryDesc->mAudio.Channels);
+    REQUIRE_EQ(runtime.mSampleRate, registryDesc->mAudio.SampleRate);
+    REQUIRE(runtime.mFrameCount > 0U);
     REQUIRE(!audio->GetData().IsEmpty());
 
-    if (registryDesc->Audio.DurationSeconds > 0.0f) {
+    if (registryDesc->mAudio.DurationSeconds > 0.0f) {
         const float duration =
-            static_cast<float>(runtime.FrameCount) / static_cast<float>(runtime.SampleRate);
-        REQUIRE(std::abs(duration - registryDesc->Audio.DurationSeconds) < 0.02f);
+            static_cast<float>(runtime.mFrameCount) / static_cast<float>(runtime.mSampleRate);
+        REQUIRE(std::abs(duration - registryDesc->mAudio.DurationSeconds) < 0.02f);
     }
 
     manager.UnregisterLoader(&loader);

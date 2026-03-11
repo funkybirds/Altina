@@ -21,132 +21,132 @@ namespace AltinaEngine::Asset {
     }
 
     struct AE_ASSET_API FAssetBlobHeader {
-        u32 Magic    = kAssetBlobMagic;
-        u16 Version  = kAssetBlobVersion;
-        u8  Type     = static_cast<u8>(EAssetType::Unknown);
-        u8  Flags    = 0;
-        u32 DescSize = 0;
-        u32 DataSize = 0;
+        u32 mMagic    = kAssetBlobMagic;
+        u16 mVersion  = kAssetBlobVersion;
+        u8  mType     = static_cast<u8>(EAssetType::Unknown);
+        u8  mFlags    = 0;
+        u32 mDescSize = 0;
+        u32 mDataSize = 0;
     };
 
     struct AE_ASSET_API FTexture2DBlobDesc {
-        u32 Width    = 0;
-        u32 Height   = 0;
-        u32 Format   = 0;
-        u32 MipCount = 0;
-        u32 RowPitch = 0;
+        u32 mWidth    = 0;
+        u32 mHeight   = 0;
+        u32 mFormat   = 0;
+        u32 mMipCount = 0;
+        u32 mRowPitch = 0;
     };
 
     struct AE_ASSET_API FCubeMapBlobDesc {
-        u32 Size     = 0;
-        u32 Format   = 0;
-        u32 MipCount = 0;
-        u32 RowPitch = 0; // Row pitch for mip 0 (tightly packed).
+        u32 mSize     = 0;
+        u32 mFormat   = 0;
+        u32 mMipCount = 0;
+        u32 mRowPitch = 0; // Row pitch for mip 0 (tightly packed).
     };
 
     struct AE_ASSET_API FMeshBlobDesc {
-        u32 VertexCount      = 0;
-        u32 IndexCount       = 0;
-        u32 VertexStride     = 0;
-        u32 IndexType        = 0;
-        u32 AttributeCount   = 0;
-        u32 SubMeshCount     = 0;
-        u32 AttributesOffset = 0;
-        u32 SubMeshesOffset  = 0;
-        u32 VertexDataOffset = 0;
-        u32 IndexDataOffset  = 0;
-        u32 VertexDataSize   = 0;
-        u32 IndexDataSize    = 0;
-        f32 BoundsMin[3]     = { 0.0f, 0.0f, 0.0f };
-        f32 BoundsMax[3]     = { 0.0f, 0.0f, 0.0f };
-        u32 Flags            = 0;
+        u32 mVertexCount      = 0;
+        u32 mIndexCount       = 0;
+        u32 mVertexStride     = 0;
+        u32 mIndexType        = 0;
+        u32 mAttributeCount   = 0;
+        u32 mSubMeshCount     = 0;
+        u32 mAttributesOffset = 0;
+        u32 mSubMeshesOffset  = 0;
+        u32 mVertexDataOffset = 0;
+        u32 mIndexDataOffset  = 0;
+        u32 mVertexDataSize   = 0;
+        u32 mIndexDataSize    = 0;
+        f32 mBoundsMin[3]     = { 0.0f, 0.0f, 0.0f };
+        f32 mBoundsMax[3]     = { 0.0f, 0.0f, 0.0f };
+        u32 mFlags            = 0;
     };
 
     struct AE_ASSET_API FMeshVertexAttributeDesc {
-        u32 Semantic         = 0;
-        u32 SemanticIndex    = 0;
-        u32 Format           = 0;
-        u32 InputSlot        = 0;
-        u32 AlignedOffset    = 0;
-        u32 PerInstance      = 0;
-        u32 InstanceStepRate = 0;
+        u32 mSemantic         = 0;
+        u32 mSemanticIndex    = 0;
+        u32 mFormat           = 0;
+        u32 mInputSlot        = 0;
+        u32 mAlignedOffset    = 0;
+        u32 mPerInstance      = 0;
+        u32 mInstanceStepRate = 0;
     };
 
     struct AE_ASSET_API FMeshSubMeshDesc {
-        u32 IndexStart   = 0;
-        u32 IndexCount   = 0;
-        i32 BaseVertex   = 0;
-        u32 MaterialSlot = 0;
+        u32 mIndexStart   = 0;
+        u32 mIndexCount   = 0;
+        i32 mBaseVertex   = 0;
+        u32 mMaterialSlot = 0;
     };
 
     struct AE_ASSET_API FAudioBlobDesc {
-        u32 Codec            = 0;
-        u32 SampleFormat     = 0;
-        u32 Channels         = 0;
-        u32 SampleRate       = 0;
-        u32 FrameCount       = 0;
-        u32 ChunkCount       = 0;
-        u32 FramesPerChunk   = 0;
-        u32 ChunkTableOffset = 0;
-        u32 DataOffset       = 0;
-        u32 DataSize         = 0;
+        u32 mCodec            = 0;
+        u32 mSampleFormat     = 0;
+        u32 mChannels         = 0;
+        u32 mSampleRate       = 0;
+        u32 mFrameCount       = 0;
+        u32 mChunkCount       = 0;
+        u32 mFramesPerChunk   = 0;
+        u32 mChunkTableOffset = 0;
+        u32 mDataOffset       = 0;
+        u32 mDataSize         = 0;
     };
 
     struct AE_ASSET_API FAudioChunkDesc {
-        u32 Offset = 0;
-        u32 Size   = 0;
+        u32 mOffset = 0;
+        u32 mSize   = 0;
     };
 
     struct AE_ASSET_API FMaterialBlobDesc {
-        u32 ShadingModel   = 0;
-        u32 BlendMode      = 0;
-        u32 Flags          = 0;
-        f32 AlphaCutoff    = 0.0f;
-        u32 ScalarCount    = 0;
-        u32 VectorCount    = 0;
-        u32 TextureCount   = 0;
-        u32 ScalarsOffset  = 0;
-        u32 VectorsOffset  = 0;
-        u32 TexturesOffset = 0;
+        u32 mShadingModel   = 0;
+        u32 mBlendMode      = 0;
+        u32 mFlags          = 0;
+        f32 mAlphaCutoff    = 0.0f;
+        u32 mScalarCount    = 0;
+        u32 mVectorCount    = 0;
+        u32 mTextureCount   = 0;
+        u32 mScalarsOffset  = 0;
+        u32 mVectorsOffset  = 0;
+        u32 mTexturesOffset = 0;
     };
 
     struct AE_ASSET_API FMaterialScalarParam {
-        u32 NameHash = 0;
-        f32 Value    = 0.0f;
+        u32 mNameHash = 0;
+        f32 mValue    = 0.0f;
     };
 
     struct AE_ASSET_API FMaterialVectorParam {
-        u32 NameHash = 0;
-        f32 Value[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        u32 mNameHash = 0;
+        f32 mValue[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     };
 
     struct AE_ASSET_API FMaterialTextureParam {
-        u32          NameHash = 0;
-        FAssetHandle Texture;
-        u32          SamplerFlags = 0;
+        u32          mNameHash = 0;
+        FAssetHandle mTexture;
+        u32          mSamplerFlags = 0;
     };
 
     struct AE_ASSET_API FModelBlobDesc {
-        u32 NodeCount           = 0;
-        u32 MeshRefCount        = 0;
-        u32 MaterialSlotCount   = 0;
-        u32 NodesOffset         = 0;
-        u32 MeshRefsOffset      = 0;
-        u32 MaterialSlotsOffset = 0;
+        u32 mNodeCount           = 0;
+        u32 mMeshRefCount        = 0;
+        u32 mMaterialSlotCount   = 0;
+        u32 mNodesOffset         = 0;
+        u32 mMeshRefsOffset      = 0;
+        u32 mMaterialSlotsOffset = 0;
     };
 
     struct AE_ASSET_API FModelNodeDesc {
-        i32 ParentIndex    = -1;
-        i32 MeshRefIndex   = -1;
-        f32 Translation[3] = { 0.0f, 0.0f, 0.0f };
-        f32 Rotation[4]    = { 0.0f, 0.0f, 0.0f, 1.0f };
-        f32 Scale[3]       = { 1.0f, 1.0f, 1.0f };
+        i32 mParentIndex    = -1;
+        i32 mMeshRefIndex   = -1;
+        f32 mTranslation[3] = { 0.0f, 0.0f, 0.0f };
+        f32 mRotation[4]    = { 0.0f, 0.0f, 0.0f, 1.0f };
+        f32 mScale[3]       = { 1.0f, 1.0f, 1.0f };
     };
 
     struct AE_ASSET_API FModelMeshRef {
-        FAssetHandle Mesh;
-        u32          MaterialSlotOffset = 0;
-        u32          MaterialSlotCount  = 0;
+        FAssetHandle mMesh;
+        u32          mMaterialSlotOffset = 0;
+        u32          mMaterialSlotCount  = 0;
     };
 
     constexpr u32                kMeshSemanticPosition = 0;

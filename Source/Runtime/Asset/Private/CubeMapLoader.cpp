@@ -40,8 +40,8 @@ namespace AltinaEngine::Asset {
                 return true;
             }
 
-            return desc.Size == blobDesc.Size && desc.MipCount == blobDesc.MipCount
-                && desc.Format == blobDesc.Format && desc.SRGB == srgb;
+            return desc.Size == blobDesc.mSize && desc.MipCount == blobDesc.mMipCount
+                && desc.Format == blobDesc.mFormat && desc.SRGB == srgb;
         }
 
         auto ComputeTightlyPackedSize(
@@ -50,13 +50,13 @@ namespace AltinaEngine::Asset {
                 return false;
             }
 
-            u32 size = blobDesc.Size;
-            if (size == 0U || blobDesc.MipCount == 0U) {
+            u32 size = blobDesc.mSize;
+            if (size == 0U || blobDesc.mMipCount == 0U) {
                 return false;
             }
 
             u64 total = 0;
-            for (u32 mip = 0; mip < blobDesc.MipCount; ++mip) {
+            for (u32 mip = 0; mip < blobDesc.mMipCount; ++mip) {
                 const u64 rowPitch    = static_cast<u64>(size) * static_cast<u64>(bytesPerPixel);
                 const u64 faceMipSize = rowPitch * static_cast<u64>(size);
                 if (rowPitch == 0U || faceMipSize / rowPitch != size) {
@@ -86,15 +86,15 @@ namespace AltinaEngine::Asset {
                 return false;
             }
 
-            if (outHeader.Magic != kAssetBlobMagic || outHeader.Version != kAssetBlobVersion) {
+            if (outHeader.mMagic != kAssetBlobMagic || outHeader.mVersion != kAssetBlobVersion) {
                 return false;
             }
 
-            if (outHeader.Type != static_cast<u8>(EAssetType::CubeMap)) {
+            if (outHeader.mType != static_cast<u8>(EAssetType::CubeMap)) {
                 return false;
             }
 
-            if (outHeader.DescSize != sizeof(FCubeMapBlobDesc)) {
+            if (outHeader.mDescSize != sizeof(FCubeMapBlobDesc)) {
                 return false;
             }
 
@@ -122,13 +122,13 @@ namespace AltinaEngine::Asset {
             return {};
         }
 
-        const u32 bytesPerPixel = GetTextureBytesPerPixel(blobDesc.Format);
-        if (bytesPerPixel == 0U || blobDesc.Size == 0U || blobDesc.MipCount == 0U) {
+        const u32 bytesPerPixel = GetTextureBytesPerPixel(blobDesc.mFormat);
+        if (bytesPerPixel == 0U || blobDesc.mSize == 0U || blobDesc.mMipCount == 0U) {
             return {};
         }
 
-        const u64 minRowPitch = static_cast<u64>(blobDesc.Size) * static_cast<u64>(bytesPerPixel);
-        if (static_cast<u64>(blobDesc.RowPitch) != minRowPitch) {
+        const u64 minRowPitch = static_cast<u64>(blobDesc.mSize) * static_cast<u64>(bytesPerPixel);
+        if (static_cast<u64>(blobDesc.mRowPitch) != minRowPitch) {
             return {};
         }
 
@@ -140,25 +140,25 @@ namespace AltinaEngine::Asset {
             return {};
         }
 
-        if (static_cast<u64>(header.DataSize) != expectedSize) {
+        if (static_cast<u64>(header.mDataSize) != expectedSize) {
             return {};
         }
 
-        const bool srgb = HasAssetBlobFlag(header.Flags, EAssetBlobFlags::SRGB);
-        if (!MatchesRegistryDesc(blobDesc, desc.CubeMap, srgb)) {
+        const bool srgb = HasAssetBlobFlag(header.mFlags, EAssetBlobFlags::SRGB);
+        if (!MatchesRegistryDesc(blobDesc, desc.mCubeMap, srgb)) {
             return {};
         }
 
         TVector<u8> pixels;
-        pixels.Resize(static_cast<usize>(header.DataSize));
-        if (header.DataSize > 0 && !ReadExact(stream, pixels.Data(), header.DataSize)) {
+        pixels.Resize(static_cast<usize>(header.mDataSize));
+        if (header.mDataSize > 0 && !ReadExact(stream, pixels.Data(), header.mDataSize)) {
             return {};
         }
 
         FCubeMapDesc cubeDesc{};
-        cubeDesc.Size     = blobDesc.Size;
-        cubeDesc.MipCount = blobDesc.MipCount;
-        cubeDesc.Format   = blobDesc.Format;
+        cubeDesc.Size     = blobDesc.mSize;
+        cubeDesc.MipCount = blobDesc.mMipCount;
+        cubeDesc.Format   = blobDesc.mFormat;
         cubeDesc.SRGB     = srgb;
 
         return MakeSharedAsset<FCubeMapAsset>(cubeDesc, Move(pixels));

@@ -32,46 +32,47 @@ namespace AltinaEngine::Asset {
     // Optional per-pass overrides for rasterizer-related pipeline state.
     // Defaults match RHI defaults; only fields with Has* = true are applied.
     struct AE_ASSET_API FMaterialRasterStateOverrides {
-        bool                     HasFillMode             = false;
-        bool                     HasCullMode             = false;
-        bool                     HasFrontFace            = false;
-        bool                     HasDepthBias            = false;
-        bool                     HasDepthBiasClamp       = false;
-        bool                     HasSlopeScaledDepthBias = false;
-        bool                     HasDepthClip            = false;
-        bool                     HasConservativeRaster   = false;
+        bool                     mHasFillMode             = false;
+        bool                     mHasCullMode             = false;
+        bool                     mHasFrontFace            = false;
+        bool                     mHasDepthBias            = false;
+        bool                     mHasDepthBiasClamp       = false;
+        bool                     mHasSlopeScaledDepthBias = false;
+        bool                     mHasDepthClip            = false;
+        bool                     mHasConservativeRaster   = false;
 
-        EMaterialRasterFillMode  FillMode             = EMaterialRasterFillMode::Solid;
-        EMaterialRasterCullMode  CullMode             = EMaterialRasterCullMode::Back;
-        EMaterialRasterFrontFace FrontFace            = EMaterialRasterFrontFace::CCW;
-        i32                      DepthBias            = 0;
-        f32                      DepthBiasClamp       = 0.0f;
-        f32                      SlopeScaledDepthBias = 0.0f;
-        bool                     DepthClip            = true;
-        bool                     ConservativeRaster   = false;
+        EMaterialRasterFillMode  mFillMode             = EMaterialRasterFillMode::Solid;
+        EMaterialRasterCullMode  mCullMode             = EMaterialRasterCullMode::Back;
+        EMaterialRasterFrontFace mFrontFace            = EMaterialRasterFrontFace::CCW;
+        i32                      mDepthBias            = 0;
+        f32                      mDepthBiasClamp       = 0.0f;
+        f32                      mSlopeScaledDepthBias = 0.0f;
+        bool                     mDepthClip            = true;
+        bool                     mConservativeRaster   = false;
 
         [[nodiscard]] auto       HasAny() const noexcept -> bool {
-            return HasFillMode || HasCullMode || HasFrontFace || HasDepthBias || HasDepthBiasClamp
-                || HasSlopeScaledDepthBias || HasDepthClip || HasConservativeRaster;
+            return mHasFillMode || mHasCullMode || mHasFrontFace || mHasDepthBias
+                || mHasDepthBiasClamp || mHasSlopeScaledDepthBias || mHasDepthClip
+                || mHasConservativeRaster;
         }
     };
 
     struct AE_ASSET_API FMaterialShaderSource {
-        FAssetHandle Asset{};
-        FString      Entry;
+        FAssetHandle mAsset{};
+        FString      mEntry;
     };
 
     struct AE_ASSET_API FMaterialPassTemplate {
-        FString                       Name;
-        FString                       Preset;
-        bool                          HasVertex  = false;
-        bool                          HasPixel   = false;
-        bool                          HasCompute = false;
-        FMaterialShaderSource         Vertex;
-        FMaterialShaderSource         Pixel;
-        FMaterialShaderSource         Compute;
-        FMeshMaterialParameterBlock   Overrides;
-        FMaterialRasterStateOverrides RasterOverrides;
+        FString                       mName;
+        FString                       mPreset;
+        bool                          mHasVertex  = false;
+        bool                          mHasPixel   = false;
+        bool                          mHasCompute = false;
+        FMaterialShaderSource         mVertex;
+        FMaterialShaderSource         mPixel;
+        FMaterialShaderSource         mCompute;
+        FMeshMaterialParameterBlock   mOverrides;
+        FMaterialRasterStateOverrides mRasterOverrides;
     };
 
     class AE_ASSET_API FMaterialAsset final : public IAsset {

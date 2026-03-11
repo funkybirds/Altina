@@ -9,13 +9,13 @@ namespace AltinaEngine::Asset {
     using Container::TVector;
 
     struct AE_ASSET_API FMeshRuntimeDesc {
-        u32 VertexCount  = 0;
-        u32 IndexCount   = 0;
-        u32 VertexStride = 0;
-        u32 IndexType    = 0;
-        u32 Flags        = 0;
-        f32 BoundsMin[3] = { 0.0f, 0.0f, 0.0f };
-        f32 BoundsMax[3] = { 0.0f, 0.0f, 0.0f };
+        u32 mVertexCount  = 0;
+        u32 mIndexCount   = 0;
+        u32 mVertexStride = 0;
+        u32 mIndexType    = 0;
+        u32 mFlags        = 0;
+        f32 mBoundsMin[3] = { 0.0f, 0.0f, 0.0f };
+        f32 mBoundsMax[3] = { 0.0f, 0.0f, 0.0f };
     };
 
     class AE_ASSET_API FMeshAsset final : public IAsset {

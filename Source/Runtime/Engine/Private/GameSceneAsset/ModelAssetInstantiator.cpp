@@ -32,13 +32,13 @@ namespace AltinaEngine::Engine::GameSceneAsset {
 
         Asset::FModelAssetLoader loader(manager);
         auto                     load = loader.Load(modelHandle);
-        if (load.Model == nullptr) {
+        if (load.mModel == nullptr) {
             return result;
         }
 
-        const auto& nodes     = load.Model->GetNodes();
-        const auto& meshRefs  = load.Model->GetMeshRefs();
-        const auto& materials = load.Model->GetMaterialSlots();
+        const auto& nodes     = load.mModel->GetNodes();
+        const auto& meshRefs  = load.mModel->GetMeshRefs();
+        const auto& materials = load.mModel->GetMaterialSlots();
 
         result.SpawnedNodes.Resize(nodes.Size());
         if (nodes.IsEmpty()) {
@@ -52,24 +52,24 @@ namespace AltinaEngine::Engine::GameSceneAsset {
             const auto&               nodeDesc = nodes[i];
             LinAlg::FSpatialTransform transform{};
             transform.Translation = Core::Math::FVector3f(
-                nodeDesc.Translation[0], nodeDesc.Translation[1], nodeDesc.Translation[2]);
-            transform.Rotation = Core::Math::FQuaternion(nodeDesc.Rotation[0], nodeDesc.Rotation[1],
-                nodeDesc.Rotation[2], nodeDesc.Rotation[3]);
+                nodeDesc.mTranslation[0], nodeDesc.mTranslation[1], nodeDesc.mTranslation[2]);
+            transform.Rotation = Core::Math::FQuaternion(nodeDesc.mRotation[0],
+                nodeDesc.mRotation[1], nodeDesc.mRotation[2], nodeDesc.mRotation[3]);
             transform.Scale =
-                Core::Math::FVector3f(nodeDesc.Scale[0], nodeDesc.Scale[1], nodeDesc.Scale[2]);
+                Core::Math::FVector3f(nodeDesc.mScale[0], nodeDesc.mScale[1], nodeDesc.mScale[2]);
             view.SetLocalTransform(transform);
         }
 
         for (usize i = 0; i < nodes.Size(); ++i) {
             const auto& nodeDesc = nodes[i];
-            if (nodeDesc.ParentIndex >= 0
-                && static_cast<usize>(nodeDesc.ParentIndex) < result.SpawnedNodes.Size()) {
+            if (nodeDesc.mParentIndex >= 0
+                && static_cast<usize>(nodeDesc.mParentIndex) < result.SpawnedNodes.Size()) {
                 world.Object(result.SpawnedNodes[i])
-                    .SetParent(result.SpawnedNodes[nodeDesc.ParentIndex]);
+                    .SetParent(result.SpawnedNodes[nodeDesc.mParentIndex]);
             }
 
-            if (nodeDesc.MeshRefIndex < 0
-                || static_cast<usize>(nodeDesc.MeshRefIndex) >= meshRefs.Size()) {
+            if (nodeDesc.mMeshRefIndex < 0
+                || static_cast<usize>(nodeDesc.mMeshRefIndex) >= meshRefs.Size()) {
                 continue;
             }
 
@@ -77,12 +77,12 @@ namespace AltinaEngine::Engine::GameSceneAsset {
             auto meshComponent     = view.AddComponent<GameScene::FStaticMeshFilterComponent>();
             auto materialComponent = view.AddComponent<GameScene::FMeshMaterialComponent>();
             if (meshComponent.IsValid()) {
-                meshComponent.Get().SetStaticMeshAsset(meshRefs[nodeDesc.MeshRefIndex].Mesh);
+                meshComponent.Get().SetStaticMeshAsset(meshRefs[nodeDesc.mMeshRefIndex].mMesh);
             }
             if (materialComponent.IsValid()) {
-                const auto& meshRef = meshRefs[nodeDesc.MeshRefIndex];
-                for (u32 slot = 0; slot < meshRef.MaterialSlotCount; ++slot) {
-                    const u32 index = meshRef.MaterialSlotOffset + slot;
+                const auto& meshRef = meshRefs[nodeDesc.mMeshRefIndex];
+                for (u32 slot = 0; slot < meshRef.mMaterialSlotCount; ++slot) {
+                    const u32 index = meshRef.mMaterialSlotOffset + slot;
                     if (index < materials.Size()) {
                         materialComponent.Get().SetMaterialTemplate(slot, materials[index]);
                     }

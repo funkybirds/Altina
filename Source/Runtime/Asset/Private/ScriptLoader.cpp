@@ -21,10 +21,10 @@ namespace AltinaEngine::Asset {
     }
 
     auto FScriptLoader::Load(const FAssetDesc& desc, IAssetStream& /*stream*/) -> TShared<IAsset> {
-        if (desc.Script.TypeName.IsEmptyString()) {
+        if (desc.mScript.mTypeName.IsEmptyString()) {
             return {};
         }
 
-        return MakeSharedAsset<FScriptAsset>(desc.Script.AssemblyPath, desc.Script.TypeName);
+        return MakeSharedAsset<FScriptAsset>(desc.mScript.mAssemblyPath, desc.mScript.mTypeName);
     }
 } // namespace AltinaEngine::Asset

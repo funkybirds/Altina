@@ -24,7 +24,7 @@ namespace AltinaEngine::Asset {
         auto UuidMatches(const FBundleIndexEntry& entry, const FUuid& uuid) noexcept -> bool {
             const auto& bytes = uuid.GetBytes();
             for (usize index = 0; index < FUuid::kByteCount; ++index) {
-                if (entry.Uuid[index] != bytes[index]) {
+                if (entry.mUuid[index] != bytes[index]) {
                     return false;
                 }
             }
@@ -57,44 +57,45 @@ namespace AltinaEngine::Asset {
             return false;
         }
 
-        if (mHeader.Magic != kBundleMagic || mHeader.Version != kBundleVersion) {
+        if (mHeader.mMagic != kBundleMagic || mHeader.mVersion != kBundleVersion) {
             Close();
             return false;
         }
 
-        if (mHeader.BundleSize == 0U) {
-            mHeader.BundleSize = mFileSize;
+        if (mHeader.mBundleSize == 0U) {
+            mHeader.mBundleSize = mFileSize;
         }
-        if (mHeader.BundleSize > mFileSize) {
+        if (mHeader.mBundleSize > mFileSize) {
             Close();
             return false;
         }
 
-        if (mHeader.IndexOffset == 0U || mHeader.IndexSize == 0U) {
+        if (mHeader.mIndexOffset == 0U || mHeader.mIndexSize == 0U) {
             Close();
             return false;
         }
-        if (mHeader.IndexOffset + mHeader.IndexSize > mHeader.BundleSize) {
+        if (mHeader.mIndexOffset + mHeader.mIndexSize > mHeader.mBundleSize) {
             Close();
             return false;
         }
 
-        mFile.seekg(static_cast<std::streamoff>(mHeader.IndexOffset), std::ios::beg);
+        mFile.seekg(static_cast<std::streamoff>(mHeader.mIndexOffset), std::ios::beg);
         FBundleIndexHeader indexHeader{};
         if (!ReadExact(mFile, &indexHeader, sizeof(FBundleIndexHeader))) {
             Close();
             return false;
         }
 
-        const u64 entryBytes = static_cast<u64>(indexHeader.EntryCount) * sizeof(FBundleIndexEntry);
-        if (sizeof(FBundleIndexHeader) + entryBytes > mHeader.IndexSize) {
+        const u64 entryBytes =
+            static_cast<u64>(indexHeader.mEntryCount) * sizeof(FBundleIndexEntry);
+        if (sizeof(FBundleIndexHeader) + entryBytes > mHeader.mIndexSize) {
             Close();
             return false;
         }
 
         mEntries.Clear();
-        if (indexHeader.EntryCount > 0U) {
-            mEntries.Resize(static_cast<usize>(indexHeader.EntryCount));
+        if (indexHeader.mEntryCount > 0U) {
+            mEntries.Resize(static_cast<usize>(indexHeader.mEntryCount));
             if (!ReadExact(mFile, mEntries.Data(), static_cast<usize>(entryBytes))) {
                 Close();
                 return false;
@@ -134,23 +135,23 @@ namespace AltinaEngine::Asset {
             return false;
         }
 
-        if (entry.Compression != static_cast<u32>(EBundleCompression::None)) {
+        if (entry.mCompression != static_cast<u32>(EBundleCompression::None)) {
             return false;
         }
-        if (entry.ChunkCount != 0U) {
+        if (entry.mChunkCount != 0U) {
             return false;
         }
-        if (entry.Offset + entry.Size > mHeader.BundleSize) {
+        if (entry.mOffset + entry.mSize > mHeader.mBundleSize) {
             return false;
         }
-        if (entry.Size > static_cast<u64>(TNumericProperty<usize>::Max)) {
+        if (entry.mSize > static_cast<u64>(TNumericProperty<usize>::Max)) {
             return false;
         }
 
-        outBytes.Resize(static_cast<usize>(entry.Size));
+        outBytes.Resize(static_cast<usize>(entry.mSize));
         mFile.clear();
-        mFile.seekg(static_cast<std::streamoff>(entry.Offset), std::ios::beg);
-        if (!ReadExact(mFile, outBytes.Data(), static_cast<usize>(entry.Size))) {
+        mFile.seekg(static_cast<std::streamoff>(entry.mOffset), std::ios::beg);
+        if (!ReadExact(mFile, outBytes.Data(), static_cast<usize>(entry.mSize))) {
             outBytes.Clear();
             return false;
         }

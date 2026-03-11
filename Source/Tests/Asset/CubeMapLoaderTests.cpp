@@ -76,15 +76,15 @@ TEST_CASE("Asset.CubeMap.Loader.Basic") {
     REQUIRE(payloadSize > 0ULL);
 
     FAssetBlobHeader header{};
-    header.Type     = static_cast<u8>(EAssetType::CubeMap);
-    header.DescSize = static_cast<u32>(sizeof(FCubeMapBlobDesc));
-    header.DataSize = static_cast<u32>(payloadSize);
+    header.mType     = static_cast<u8>(EAssetType::CubeMap);
+    header.mDescSize = static_cast<u32>(sizeof(FCubeMapBlobDesc));
+    header.mDataSize = static_cast<u32>(payloadSize);
 
     FCubeMapBlobDesc blobDesc{};
-    blobDesc.Size     = size;
-    blobDesc.Format   = format;
-    blobDesc.MipCount = mipCount;
-    blobDesc.RowPitch = size * bytesPerPixel;
+    blobDesc.mSize     = size;
+    blobDesc.Format    = format;
+    blobDesc.mMipCount = mipCount;
+    blobDesc.mRowPitch = size * bytesPerPixel;
 
     TVector<u8> cooked;
     cooked.Resize(sizeof(header) + sizeof(blobDesc) + static_cast<usize>(payloadSize));

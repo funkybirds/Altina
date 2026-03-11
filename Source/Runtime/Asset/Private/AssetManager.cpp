@@ -44,7 +44,7 @@ namespace AltinaEngine::Asset {
         };
 
         auto HandlesMatch(const FAssetHandle& left, const FAssetHandle& right) -> bool {
-            return left.Uuid == right.Uuid && left.Type == right.Type;
+            return left.mUuid == right.mUuid && left.mType == right.mType;
         }
     } // namespace
 
@@ -98,17 +98,17 @@ namespace AltinaEngine::Asset {
             return {};
         }
 
-        IAssetLoader* loader = FindLoader(desc->Handle.Type);
+        IAssetLoader* loader = FindLoader(desc->mHandle.mType);
         if (loader == nullptr) {
             return {};
         }
 
         TVector<u8> bytes;
-        if (!desc->CookedPath.IsEmptyString()) {
-            if (!ReadFileBytes(desc->CookedPath, bytes)) {
+        if (!desc->mCookedPath.IsEmptyString()) {
+            if (!ReadFileBytes(desc->mCookedPath, bytes)) {
                 return {};
             }
-        } else if (desc->Handle.Type != EAssetType::Script) {
+        } else if (desc->mHandle.mType != EAssetType::Script) {
             return {};
         }
 
@@ -143,7 +143,7 @@ namespace AltinaEngine::Asset {
             return {};
         }
 
-        return mCache[static_cast<usize>(index)].Asset;
+        return mCache[static_cast<usize>(index)].mAsset;
     }
 
     auto FAssetManager::FindLoader(EAssetType type) const noexcept -> IAssetLoader* {
@@ -162,7 +162,7 @@ namespace AltinaEngine::Asset {
         }
 
         for (usize index = 0; index < mCache.Size(); ++index) {
-            if (HandlesMatch(mCache[index].Handle, handle)) {
+            if (HandlesMatch(mCache[index].mHandle, handle)) {
                 return static_cast<isize>(index);
             }
         }

@@ -11,8 +11,8 @@ namespace AltinaEngine::GameScene {
             auto&      component = world.ResolveComponent<FSkyCubeComponent>(id);
             const auto handle    = component.GetCubeMapAsset();
 
-            serializer.Write(static_cast<u8>(handle.Type));
-            const auto& bytes = handle.Uuid.GetBytes();
+            serializer.Write(static_cast<u8>(handle.mType));
+            const auto& bytes = handle.mUuid.GetBytes();
             for (usize i = 0U; i < AltinaEngine::FUuid::kByteCount; ++i) {
                 serializer.Write(bytes[i]);
             }
@@ -23,13 +23,13 @@ namespace AltinaEngine::GameScene {
             auto&               component = world.ResolveComponent<FSkyCubeComponent>(id);
 
             Asset::FAssetHandle handle{};
-            handle.Type = static_cast<Asset::EAssetType>(deserializer.Read<u8>());
+            handle.mType = static_cast<Asset::EAssetType>(deserializer.Read<u8>());
 
             FUuid::FBytes bytes{};
             for (usize i = 0U; i < FUuid::kByteCount; ++i) {
                 bytes[i] = deserializer.Read<u8>();
             }
-            handle.Uuid = FUuid(bytes);
+            handle.mUuid = FUuid(bytes);
 
             component.SetCubeMapAsset(handle);
         }

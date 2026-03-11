@@ -52,12 +52,12 @@ namespace AltinaEngine::Engine {
                 constexpr u64 kFnvPrime64  = 1099511628211ULL;
 
                 u64           hash  = kFnvOffset64;
-                const auto*   bytes = key.Handle.Uuid.Data();
+                const auto*   bytes = key.Handle.mUuid.Data();
                 for (usize i = 0U; i < FUuid::kByteCount; ++i) {
                     hash ^= bytes[i];
                     hash *= kFnvPrime64;
                 }
-                hash ^= static_cast<u8>(key.Handle.Type);
+                hash ^= static_cast<u8>(key.Handle.mType);
                 hash *= kFnvPrime64;
                 hash ^= key.ParamHash;
                 hash *= kFnvPrime64;

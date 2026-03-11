@@ -41,8 +41,8 @@ namespace AltinaEngine::Asset {
                 return true;
             }
 
-            return desc.Width == blobDesc.Width && desc.Height == blobDesc.Height
-                && desc.MipCount == blobDesc.MipCount && desc.Format == blobDesc.Format
+            return desc.Width == blobDesc.mWidth && desc.Height == blobDesc.mHeight
+                && desc.MipCount == blobDesc.mMipCount && desc.Format == blobDesc.mFormat
                 && desc.SRGB == srgb;
         }
 
@@ -52,14 +52,14 @@ namespace AltinaEngine::Asset {
                 return false;
             }
 
-            u32 width  = blobDesc.Width;
-            u32 height = blobDesc.Height;
-            if (width == 0U || height == 0U || blobDesc.MipCount == 0U) {
+            u32 width  = blobDesc.mWidth;
+            u32 height = blobDesc.mHeight;
+            if (width == 0U || height == 0U || blobDesc.mMipCount == 0U) {
                 return false;
             }
 
             u64 total = 0;
-            for (u32 mip = 0; mip < blobDesc.MipCount; ++mip) {
+            for (u32 mip = 0; mip < blobDesc.mMipCount; ++mip) {
                 const u64 rowPitch = static_cast<u64>(width) * bytesPerPixel;
                 const u64 mipSize  = rowPitch * static_cast<u64>(height);
                 if (rowPitch == 0U || mipSize / rowPitch != height) {
@@ -83,15 +83,15 @@ namespace AltinaEngine::Asset {
                 return false;
             }
 
-            if (outHeader.Magic != kAssetBlobMagic || outHeader.Version != kAssetBlobVersion) {
+            if (outHeader.mMagic != kAssetBlobMagic || outHeader.mVersion != kAssetBlobVersion) {
                 return false;
             }
 
-            if (outHeader.Type != static_cast<u8>(EAssetType::Texture2D)) {
+            if (outHeader.mType != static_cast<u8>(EAssetType::Texture2D)) {
                 return false;
             }
 
-            if (outHeader.DescSize != sizeof(FTexture2DBlobDesc)) {
+            if (outHeader.mDescSize != sizeof(FTexture2DBlobDesc)) {
                 return false;
             }
 
@@ -119,14 +119,14 @@ namespace AltinaEngine::Asset {
             return {};
         }
 
-        const u32 bytesPerPixel = GetTextureBytesPerPixel(blobDesc.Format);
-        if (bytesPerPixel == 0 || blobDesc.Width == 0 || blobDesc.Height == 0
-            || blobDesc.MipCount == 0) {
+        const u32 bytesPerPixel = GetTextureBytesPerPixel(blobDesc.mFormat);
+        if (bytesPerPixel == 0 || blobDesc.mWidth == 0 || blobDesc.mHeight == 0
+            || blobDesc.mMipCount == 0) {
             return {};
         }
 
-        const u64 minRowPitch = static_cast<u64>(blobDesc.Width) * bytesPerPixel;
-        if (blobDesc.RowPitch != minRowPitch) {
+        const u64 minRowPitch = static_cast<u64>(blobDesc.mWidth) * bytesPerPixel;
+        if (blobDesc.mRowPitch != minRowPitch) {
             return {};
         }
 
@@ -138,26 +138,26 @@ namespace AltinaEngine::Asset {
             return {};
         }
 
-        if (header.DataSize != expectedSize) {
+        if (header.mDataSize != expectedSize) {
             return {};
         }
 
-        const bool srgb = HasAssetBlobFlag(header.Flags, EAssetBlobFlags::SRGB);
-        if (!MatchesRegistryDesc(blobDesc, desc.Texture, srgb)) {
+        const bool srgb = HasAssetBlobFlag(header.mFlags, EAssetBlobFlags::SRGB);
+        if (!MatchesRegistryDesc(blobDesc, desc.mTexture, srgb)) {
             return {};
         }
 
         TVector<u8> pixels;
-        pixels.Resize(static_cast<usize>(header.DataSize));
-        if (header.DataSize > 0 && !ReadExact(stream, pixels.Data(), header.DataSize)) {
+        pixels.Resize(static_cast<usize>(header.mDataSize));
+        if (header.mDataSize > 0 && !ReadExact(stream, pixels.Data(), header.mDataSize)) {
             return {};
         }
 
         FTexture2DDesc textureDesc{};
-        textureDesc.Width    = blobDesc.Width;
-        textureDesc.Height   = blobDesc.Height;
-        textureDesc.MipCount = blobDesc.MipCount;
-        textureDesc.Format   = blobDesc.Format;
+        textureDesc.Width    = blobDesc.mWidth;
+        textureDesc.Height   = blobDesc.mHeight;
+        textureDesc.MipCount = blobDesc.mMipCount;
+        textureDesc.Format   = blobDesc.mFormat;
         textureDesc.SRGB     = srgb;
 
         return MakeSharedAsset<FTexture2DAsset>(textureDesc, Move(pixels));

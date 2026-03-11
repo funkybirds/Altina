@@ -44,10 +44,10 @@ namespace AltinaEngine::Asset {
 
         bool changed = false;
         for (auto& param : mScalars) {
-            if (param.NameHash == id) {
-                if (param.Value != value) {
-                    param.Value = value;
-                    changed     = true;
+            if (param.mNameHash == id) {
+                if (param.mValue != value) {
+                    param.mValue = value;
+                    changed      = true;
                 }
                 return changed;
             }
@@ -65,17 +65,17 @@ namespace AltinaEngine::Asset {
 
         bool changed = false;
         for (auto& param : mVectors) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 bool differs = false;
                 for (u32 i = 0U; i < 4U; ++i) {
-                    if (param.Value.mComponents[i] != value.mComponents[i]) {
+                    if (param.mValue.mComponents[i] != value.mComponents[i]) {
                         differs = true;
                         break;
                     }
                 }
                 if (differs) {
-                    param.Value = value;
-                    changed     = true;
+                    param.mValue = value;
+                    changed      = true;
                 }
                 return changed;
             }
@@ -93,19 +93,19 @@ namespace AltinaEngine::Asset {
 
         bool changed = false;
         for (auto& param : mMatrices) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 bool differs = false;
                 for (u32 r = 0U; r < 4U && !differs; ++r) {
                     for (u32 c = 0U; c < 4U; ++c) {
-                        if (param.Value.mElements[r][c] != value.mElements[r][c]) {
+                        if (param.mValue.mElements[r][c] != value.mElements[r][c]) {
                             differs = true;
                             break;
                         }
                     }
                 }
                 if (differs) {
-                    param.Value = value;
-                    changed     = true;
+                    param.mValue = value;
+                    changed      = true;
                 }
                 return changed;
             }
@@ -123,23 +123,23 @@ namespace AltinaEngine::Asset {
 
         bool changed = false;
         for (auto& param : mTextures) {
-            if (param.NameHash == id) {
-                if (param.Texture != texture || param.SamplerFlags != samplerFlags
-                    || param.Type != type) {
-                    param.Texture      = Move(texture);
-                    param.SamplerFlags = samplerFlags;
-                    param.Type         = type;
-                    changed            = true;
+            if (param.mNameHash == id) {
+                if (param.mTexture != texture || param.mSamplerFlags != samplerFlags
+                    || param.mType != type) {
+                    param.mTexture      = Move(texture);
+                    param.mSamplerFlags = samplerFlags;
+                    param.mType         = type;
+                    changed             = true;
                 }
                 return changed;
             }
         }
 
         FMeshMaterialTextureParam param{};
-        param.NameHash     = id;
-        param.Type         = type;
-        param.Texture      = Move(texture);
-        param.SamplerFlags = samplerFlags;
+        param.mNameHash     = id;
+        param.mType         = type;
+        param.mTexture      = Move(texture);
+        param.mSamplerFlags = samplerFlags;
         mTextures.PushBack(Move(param));
         return true;
     }
@@ -147,7 +147,7 @@ namespace AltinaEngine::Asset {
     auto FMeshMaterialParameterBlock::FindScalarParam(FMaterialParamId id) const noexcept
         -> const FMeshMaterialScalarParam* {
         for (const auto& param : mScalars) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 return &param;
             }
         }
@@ -157,7 +157,7 @@ namespace AltinaEngine::Asset {
     auto FMeshMaterialParameterBlock::FindVectorParam(FMaterialParamId id) const noexcept
         -> const FMeshMaterialVectorParam* {
         for (const auto& param : mVectors) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 return &param;
             }
         }
@@ -167,7 +167,7 @@ namespace AltinaEngine::Asset {
     auto FMeshMaterialParameterBlock::FindMatrixParam(FMaterialParamId id) const noexcept
         -> const FMeshMaterialMatrixParam* {
         for (const auto& param : mMatrices) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 return &param;
             }
         }
@@ -177,7 +177,7 @@ namespace AltinaEngine::Asset {
     auto FMeshMaterialParameterBlock::FindTextureParam(FMaterialParamId id) const noexcept
         -> const FMeshMaterialTextureParam* {
         for (const auto& param : mTextures) {
-            if (param.NameHash == id) {
+            if (param.mNameHash == id) {
                 return &param;
             }
         }
@@ -188,32 +188,32 @@ namespace AltinaEngine::Asset {
         u64 hash = kFnvOffset64;
 
         for (const auto& param : mScalars) {
-            hash = HashValue(hash, param.NameHash);
-            hash = HashValue(hash, param.Value);
+            hash = HashValue(hash, param.mNameHash);
+            hash = HashValue(hash, param.mValue);
         }
 
         for (const auto& param : mVectors) {
-            hash = HashValue(hash, param.NameHash);
+            hash = HashValue(hash, param.mNameHash);
             for (u32 i = 0U; i < 4U; ++i) {
-                hash = HashValue(hash, param.Value.mComponents[i]);
+                hash = HashValue(hash, param.mValue.mComponents[i]);
             }
         }
 
         for (const auto& param : mMatrices) {
-            hash = HashValue(hash, param.NameHash);
+            hash = HashValue(hash, param.mNameHash);
             for (u32 r = 0U; r < 4U; ++r) {
                 for (u32 c = 0U; c < 4U; ++c) {
-                    hash = HashValue(hash, param.Value.mElements[r][c]);
+                    hash = HashValue(hash, param.mValue.mElements[r][c]);
                 }
             }
         }
 
         for (const auto& param : mTextures) {
-            hash = HashValue(hash, param.NameHash);
-            hash = HashValue(hash, static_cast<u8>(param.Type));
-            hash = HashBytes(hash, param.Texture.Uuid.Data(), FUuid::kByteCount);
-            hash = HashValue(hash, static_cast<u8>(param.Texture.Type));
-            hash = HashValue(hash, param.SamplerFlags);
+            hash = HashValue(hash, param.mNameHash);
+            hash = HashValue(hash, static_cast<u8>(param.mType));
+            hash = HashBytes(hash, param.mTexture.mUuid.Data(), FUuid::kByteCount);
+            hash = HashValue(hash, static_cast<u8>(param.mTexture.mType));
+            hash = HashValue(hash, param.mSamplerFlags);
         }
 
         return hash;
@@ -224,37 +224,37 @@ namespace AltinaEngine::Asset {
 
         serializer.Write(static_cast<u32>(mScalars.Size()));
         for (const auto& param : mScalars) {
-            serializer.Write(param.NameHash);
-            serializer.Write(param.Value);
+            serializer.Write(param.mNameHash);
+            serializer.Write(param.mValue);
         }
 
         serializer.Write(static_cast<u32>(mVectors.Size()));
         for (const auto& param : mVectors) {
-            serializer.Write(param.NameHash);
+            serializer.Write(param.mNameHash);
             for (u32 i = 0U; i < 4U; ++i) {
-                serializer.Write(param.Value.mComponents[i]);
+                serializer.Write(param.mValue.mComponents[i]);
             }
         }
 
         serializer.Write(static_cast<u32>(mMatrices.Size()));
         for (const auto& param : mMatrices) {
-            serializer.Write(param.NameHash);
+            serializer.Write(param.mNameHash);
             for (u32 r = 0U; r < 4U; ++r) {
                 for (u32 c = 0U; c < 4U; ++c) {
-                    serializer.Write(param.Value.mElements[r][c]);
+                    serializer.Write(param.mValue.mElements[r][c]);
                 }
             }
         }
 
         serializer.Write(static_cast<u32>(mTextures.Size()));
         for (const auto& param : mTextures) {
-            serializer.Write(param.NameHash);
-            serializer.Write(static_cast<u8>(param.Type));
+            serializer.Write(param.mNameHash);
+            serializer.Write(static_cast<u8>(param.mType));
             for (usize i = 0U; i < FUuid::kByteCount; ++i) {
-                serializer.Write(param.Texture.Uuid.GetBytes()[i]);
+                serializer.Write(param.mTexture.mUuid.GetBytes()[i]);
             }
-            serializer.Write(static_cast<u8>(param.Texture.Type));
-            serializer.Write(param.SamplerFlags);
+            serializer.Write(static_cast<u8>(param.mTexture.mType));
+            serializer.Write(param.mSamplerFlags);
         }
     }
 
@@ -271,8 +271,8 @@ namespace AltinaEngine::Asset {
         result.mScalars.Reserve(scalarCount);
         for (u32 i = 0U; i < scalarCount; ++i) {
             FMeshMaterialScalarParam param{};
-            param.NameHash = deserializer.Read<u32>();
-            param.Value    = deserializer.Read<f32>();
+            param.mNameHash = deserializer.Read<u32>();
+            param.mValue    = deserializer.Read<f32>();
             result.mScalars.PushBack(param);
         }
 
@@ -280,9 +280,9 @@ namespace AltinaEngine::Asset {
         result.mVectors.Reserve(vectorCount);
         for (u32 i = 0U; i < vectorCount; ++i) {
             FMeshMaterialVectorParam param{};
-            param.NameHash = deserializer.Read<u32>();
+            param.mNameHash = deserializer.Read<u32>();
             for (u32 c = 0U; c < 4U; ++c) {
-                param.Value.mComponents[c] = deserializer.Read<f32>();
+                param.mValue.mComponents[c] = deserializer.Read<f32>();
             }
             result.mVectors.PushBack(param);
         }
@@ -291,10 +291,10 @@ namespace AltinaEngine::Asset {
         result.mMatrices.Reserve(matrixCount);
         for (u32 i = 0U; i < matrixCount; ++i) {
             FMeshMaterialMatrixParam param{};
-            param.NameHash = deserializer.Read<u32>();
+            param.mNameHash = deserializer.Read<u32>();
             for (u32 r = 0U; r < 4U; ++r) {
                 for (u32 c = 0U; c < 4U; ++c) {
-                    param.Value.mElements[r][c] = deserializer.Read<f32>();
+                    param.mValue.mElements[r][c] = deserializer.Read<f32>();
                 }
             }
             result.mMatrices.PushBack(param);
@@ -304,16 +304,16 @@ namespace AltinaEngine::Asset {
         result.mTextures.Reserve(textureCount);
         for (u32 i = 0U; i < textureCount; ++i) {
             FMeshMaterialTextureParam param{};
-            param.NameHash = deserializer.Read<u32>();
-            param.Type     = static_cast<EMeshMaterialTextureType>(deserializer.Read<u8>());
+            param.mNameHash = deserializer.Read<u32>();
+            param.mType     = static_cast<EMeshMaterialTextureType>(deserializer.Read<u8>());
 
             FUuid::FBytes bytes{};
             for (usize b = 0U; b < FUuid::kByteCount; ++b) {
                 bytes[b] = deserializer.Read<u8>();
             }
-            param.Texture.Uuid = FUuid(bytes);
-            param.Texture.Type = static_cast<EAssetType>(deserializer.Read<u8>());
-            param.SamplerFlags = deserializer.Read<u32>();
+            param.mTexture.mUuid = FUuid(bytes);
+            param.mTexture.mType = static_cast<EAssetType>(deserializer.Read<u8>());
+            param.mSamplerFlags  = deserializer.Read<u32>();
             result.mTextures.PushBack(param);
         }
 

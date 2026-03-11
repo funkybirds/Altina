@@ -29,8 +29,8 @@ namespace AltinaEngine::Asset {
     };
 
     struct AE_ASSET_API FAssetHandle {
-        FUuid                     Uuid;
-        EAssetType                Type = EAssetType::Unknown;
+        FUuid                     mUuid;
+        EAssetType                mType = EAssetType::Unknown;
 
         // Reflection serialization support (used by GameScene component serialization).
         void                      Serialize(Core::Reflection::ISerializer& serializer) const;
@@ -38,11 +38,11 @@ namespace AltinaEngine::Asset {
             -> FAssetHandle;
 
         [[nodiscard]] constexpr auto IsValid() const noexcept -> bool {
-            return !Uuid.IsNil() && Type != EAssetType::Unknown;
+            return !mUuid.IsNil() && mType != EAssetType::Unknown;
         }
 
         [[nodiscard]] constexpr auto operator==(const FAssetHandle& other) const noexcept -> bool {
-            return Uuid == other.Uuid && Type == other.Type;
+            return mUuid == other.mUuid && mType == other.mType;
         }
 
         [[nodiscard]] constexpr auto operator!=(const FAssetHandle& other) const noexcept -> bool {
@@ -51,9 +51,9 @@ namespace AltinaEngine::Asset {
     };
 
     struct AE_ASSET_API FAssetRedirector {
-        FUuid   OldUuid;
-        FUuid   NewUuid;
-        FString OldVirtualPath;
+        FUuid   mOldUuid;
+        FUuid   mNewUuid;
+        FString mOldVirtualPath;
     };
 
     struct AE_ASSET_API FTexture2DDesc {
@@ -105,24 +105,24 @@ namespace AltinaEngine::Asset {
     };
 
     struct AE_ASSET_API FScriptDesc {
-        FNativeString AssemblyPath;
-        FNativeString TypeName;
+        FNativeString mAssemblyPath;
+        FNativeString mTypeName;
     };
 
     struct AE_ASSET_API FAssetDesc {
-        FAssetHandle          Handle;
-        FString               VirtualPath;
-        FString               CookedPath;
-        TVector<FAssetHandle> Dependencies;
+        FAssetHandle          mHandle;
+        FString               mVirtualPath;
+        FString               mCookedPath;
+        TVector<FAssetHandle> mDependencies;
 
-        FTexture2DDesc        Texture;
-        FCubeMapDesc          CubeMap;
-        FMeshDesc             Mesh;
-        FMaterialDesc         Material;
-        FModelDesc            Model;
-        FShaderDesc           Shader;
-        FAudioDesc            Audio;
-        FScriptDesc           Script;
+        FTexture2DDesc        mTexture;
+        FCubeMapDesc          mCubeMap;
+        FMeshDesc             mMesh;
+        FMaterialDesc         mMaterial;
+        FModelDesc            mModel;
+        FShaderDesc           mShader;
+        FAudioDesc            mAudio;
+        FScriptDesc           mScript;
     };
 
 } // namespace AltinaEngine::Asset

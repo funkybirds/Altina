@@ -36,29 +36,29 @@ namespace AltinaEngine::Asset {
 
 #pragma pack(push, 1)
     struct AE_ASSET_API FBundleHeader {
-        u32 Magic       = kBundleMagic;
-        u16 Version     = kBundleVersion;
-        u16 Flags       = 0;
-        u64 IndexOffset = 0;
-        u64 IndexSize   = 0;
-        u64 BundleSize  = 0;
-        u64 HashOffset  = 0;
+        u32 mMagic       = kBundleMagic;
+        u16 mVersion     = kBundleVersion;
+        u16 mFlags       = 0;
+        u64 mIndexOffset = 0;
+        u64 mIndexSize   = 0;
+        u64 mBundleSize  = 0;
+        u64 mHashOffset  = 0;
     };
 
     struct AE_ASSET_API FBundleIndexHeader {
-        u32 EntryCount      = 0;
-        u32 StringTableSize = 0;
+        u32 mEntryCount      = 0;
+        u32 mStringTableSize = 0;
     };
 
     struct AE_ASSET_API FBundleIndexEntry {
-        u8  Uuid[AltinaEngine::FUuid::kByteCount]{};
-        u32 Type             = 0;
-        u32 Compression      = 0;
-        u64 Offset           = 0;
-        u64 Size             = 0;
-        u64 RawSize          = 0;
-        u32 ChunkCount       = 0;
-        u32 ChunkTableOffset = 0;
+        u8  mUuid[FUuid::kByteCount]{};
+        u32 mType             = 0;
+        u32 mCompression      = 0;
+        u64 mOffset           = 0;
+        u64 mSize             = 0;
+        u64 mRawSize          = 0;
+        u32 mChunkCount       = 0;
+        u32 mChunkTableOffset = 0;
     };
 
     struct AE_ASSET_API FBundleChunkDesc {

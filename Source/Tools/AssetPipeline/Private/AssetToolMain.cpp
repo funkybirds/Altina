@@ -496,7 +496,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
         void WriteBundleUuid(Asset::FBundleIndexEntry& entry, const FUuid& uuid) {
             const auto& bytes = uuid.GetBytes();
             for (usize index = 0; index < FUuid::kByteCount; ++index) {
-                entry.Uuid[index] = bytes[index];
+                entry.mUuid[index] = bytes[index];
             }
         }
 
@@ -971,12 +971,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     for (size_t depIndex = 0; depIndex < deps.size(); ++depIndex) {
                         const auto& dep = deps[depIndex];
                         stream << "        ";
-                        const std::string depUuid = ToStdString(dep.Uuid.ToNativeString());
-                        if (dep.Type == Asset::EAssetType::Unknown) {
+                        const std::string depUuid = ToStdString(dep.mUuid.ToNativeString());
+                        if (dep.mType == Asset::EAssetType::Unknown) {
                             stream << "\"" << EscapeJson(depUuid) << "\"";
                         } else {
                             stream << "{ \"Uuid\": \"" << EscapeJson(depUuid) << "\", \"Type\": \""
-                                   << AssetTypeToString(dep.Type) << "\" }";
+                                   << AssetTypeToString(dep.mType) << "\" }";
                         }
                         if (depIndex + 1 < deps.size()) {
                             stream << ",";
@@ -1232,8 +1232,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     ToLowerAscii(ext);
                     if (ext == ".hdr") {
                         Asset::FAssetHandle baseHandle{};
-                        baseHandle.Uuid = asset.Uuid;
-                        baseHandle.Type = asset.Type;
+                        baseHandle.mUuid = asset.Uuid;
+                        baseHandle.mType = asset.Type;
 
                         std::string envError;
                         if (!CookEnvMapFromHdr(asset.SourcePath, bytes, baseHandle,
@@ -1271,8 +1271,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     std::string cookError;
                     if (ext == ".exr") {
                         Asset::FAssetHandle baseHandle{};
-                        baseHandle.Uuid = asset.Uuid;
-                        baseHandle.Type = asset.Type;
+                        baseHandle.mUuid = asset.Uuid;
+                        baseHandle.mType = asset.Type;
                         if (!CookSkyCubeFromExr(asset.SourcePath, bytes, baseHandle,
                                 asset.VirtualPath, skyCubeResult, cookError)) {
                             std::cerr << "Failed to cook sky cubemap EXR: "
@@ -1286,8 +1286,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         }
                     } else if (ext == ".hdr") {
                         Asset::FAssetHandle baseHandle{};
-                        baseHandle.Uuid = asset.Uuid;
-                        baseHandle.Type = asset.Type;
+                        baseHandle.mUuid = asset.Uuid;
+                        baseHandle.mType = asset.Type;
                         if (!CookSkyCubeFromHdr(asset.SourcePath, bytes, baseHandle,
                                 asset.VirtualPath, skyCubeResult, cookError)) {
                             std::cerr << "Failed to cook sky cubemap HDR: "
@@ -1318,8 +1318,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     }
                 } else if (isModel) {
                     Asset::FAssetHandle baseHandle{};
-                    baseHandle.Uuid = asset.Uuid;
-                    baseHandle.Type = asset.Type;
+                    baseHandle.mUuid = asset.Uuid;
+                    baseHandle.mType = asset.Type;
                     std::string modelError;
                     if (!CookModel(asset.SourcePath, bytes, baseHandle, asset.VirtualPath,
                             modelResult, modelError)) {
@@ -1444,7 +1444,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         }
 
                         const std::string genUuid =
-                            ToStdString(generated.Handle.Uuid.ToNativeString());
+                            ToStdString(generated.Handle.mUuid.ToNativeString());
                         const std::string           genCookedRel = "Assets/" + genUuid + ".bin";
                         const std::filesystem::path genCookedPath =
                             paths.CookedRoot / "Assets" / (genUuid + ".bin");
@@ -1543,8 +1543,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
 
             Asset::FBundleHeader header{};
-            header.Magic   = Asset::kBundleMagic;
-            header.Version = Asset::kBundleVersion;
+            header.mMagic   = Asset::kBundleMagic;
+            header.mVersion = Asset::kBundleVersion;
 
             file.write(reinterpret_cast<const char*>(&header),
                 static_cast<std::streamsize>(sizeof(header)));
@@ -1561,24 +1561,24 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
                 Asset::FBundleIndexEntry entry{};
                 WriteBundleUuid(entry, asset.Uuid);
-                entry.Type             = static_cast<u32>(asset.Type);
-                entry.Compression      = static_cast<u32>(Asset::EBundleCompression::None);
-                entry.Offset           = offset;
-                entry.Size             = static_cast<u64>(asset.Data.size());
-                entry.RawSize          = static_cast<u64>(asset.Data.size());
-                entry.ChunkCount       = 0;
-                entry.ChunkTableOffset = 0;
+                entry.mType             = static_cast<u32>(asset.Type);
+                entry.mCompression      = static_cast<u32>(Asset::EBundleCompression::None);
+                entry.mOffset           = offset;
+                entry.mSize             = static_cast<u64>(asset.Data.size());
+                entry.mRawSize          = static_cast<u64>(asset.Data.size());
+                entry.mChunkCount       = 0;
+                entry.mChunkTableOffset = 0;
 
                 file.write(reinterpret_cast<const char*>(asset.Data.data()),
                     static_cast<std::streamsize>(asset.Data.size()));
-                offset += entry.Size;
+                offset += entry.mSize;
                 entries.push_back(entry);
             }
 
             const u64                 indexOffset = offset;
             Asset::FBundleIndexHeader indexHeader{};
-            indexHeader.EntryCount      = static_cast<u32>(entries.size());
-            indexHeader.StringTableSize = 0;
+            indexHeader.mEntryCount      = static_cast<u32>(entries.size());
+            indexHeader.mStringTableSize = 0;
 
             file.write(reinterpret_cast<const char*>(&indexHeader),
                 static_cast<std::streamsize>(sizeof(indexHeader)));
@@ -1593,9 +1593,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 + static_cast<u64>(entries.size()) * sizeof(Asset::FBundleIndexEntry);
             const u64 bundleSize = indexOffset + indexSize;
 
-            header.IndexOffset = indexOffset;
-            header.IndexSize   = indexSize;
-            header.BundleSize  = bundleSize;
+            header.mIndexOffset = indexOffset;
+            header.mIndexSize   = indexSize;
+            header.mBundleSize  = bundleSize;
 
             file.seekp(0, std::ios::beg);
             file.write(reinterpret_cast<const char*>(&header),

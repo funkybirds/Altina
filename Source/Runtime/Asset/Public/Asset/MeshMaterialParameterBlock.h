@@ -17,32 +17,32 @@ namespace AltinaEngine::Asset {
     namespace Math      = Core::Math;
     using Container::TVector;
 
-    using FMaterialParamId = u32;
+    using FMaterialParamId = u32; // NOLINT
 
     enum class EMeshMaterialTextureType : u8 {
         Texture2D = 0
     };
 
     struct AE_ASSET_API FMeshMaterialScalarParam {
-        FMaterialParamId NameHash = 0U;
-        f32              Value    = 0.0f;
+        FMaterialParamId mNameHash = 0U;
+        f32              mValue    = 0.0f;
     };
 
     struct AE_ASSET_API FMeshMaterialVectorParam {
-        FMaterialParamId NameHash = 0U;
-        Math::FVector4f  Value    = Math::FVector4f(0.0f);
+        FMaterialParamId mNameHash = 0U;
+        Math::FVector4f  mValue    = Math::FVector4f(0.0f);
     };
 
     struct AE_ASSET_API FMeshMaterialMatrixParam {
-        FMaterialParamId  NameHash = 0U;
-        Math::FMatrix4x4f Value    = Math::FMatrix4x4f(0.0f);
+        FMaterialParamId  mNameHash = 0U;
+        Math::FMatrix4x4f mValue    = Math::FMatrix4x4f(0.0f);
     };
 
     struct AE_ASSET_API FMeshMaterialTextureParam {
-        FMaterialParamId         NameHash = 0U;
-        EMeshMaterialTextureType Type     = EMeshMaterialTextureType::Texture2D;
-        FAssetHandle             Texture;
-        u32                      SamplerFlags = 0U;
+        FMaterialParamId         mNameHash = 0U;
+        EMeshMaterialTextureType mType     = EMeshMaterialTextureType::Texture2D;
+        FAssetHandle             mTexture;
+        u32                      mSamplerFlags = 0U;
     };
 
     class AE_ASSET_API FMeshMaterialParameterBlock final {

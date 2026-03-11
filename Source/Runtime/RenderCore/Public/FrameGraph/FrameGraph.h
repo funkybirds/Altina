@@ -141,31 +141,32 @@ namespace AltinaEngine::RenderCore {
 
     class AE_RENDER_CORE_API FFrameGraphPassBuilder {
     public:
-        FFrameGraphTextureRef CreateTexture(const FFrameGraphTextureDesc& desc);
-        FFrameGraphBufferRef  CreateBuffer(const FFrameGraphBufferDesc& desc);
+        auto CreateTexture(const FFrameGraphTextureDesc& desc) -> FFrameGraphTextureRef;
+        auto CreateBuffer(const FFrameGraphBufferDesc& desc) -> FFrameGraphBufferRef;
 
-        FFrameGraphTextureRef Read(FFrameGraphTextureRef tex, Rhi::ERhiResourceState state);
-        FFrameGraphTextureRef Write(FFrameGraphTextureRef tex, Rhi::ERhiResourceState state);
-        FFrameGraphBufferRef  Read(FFrameGraphBufferRef buf, Rhi::ERhiResourceState state);
-        FFrameGraphBufferRef  Write(FFrameGraphBufferRef buf, Rhi::ERhiResourceState state);
+        auto Read(FFrameGraphTextureRef tex, Rhi::ERhiResourceState state) -> FFrameGraphTextureRef;
+        auto Write(FFrameGraphTextureRef tex, Rhi::ERhiResourceState state)
+            -> FFrameGraphTextureRef;
+        auto Read(FFrameGraphBufferRef buf, Rhi::ERhiResourceState state) -> FFrameGraphBufferRef;
+        auto Write(FFrameGraphBufferRef buf, Rhi::ERhiResourceState state) -> FFrameGraphBufferRef;
 
-        FFrameGraphTextureRef Read(FFrameGraphTextureRef tex, Rhi::ERhiResourceState state,
-            const Rhi::FRhiTextureViewRange& range);
-        FFrameGraphTextureRef Write(FFrameGraphTextureRef tex, Rhi::ERhiResourceState state,
-            const Rhi::FRhiTextureViewRange& range);
+        auto Read(FFrameGraphTextureRef tex, Rhi::ERhiResourceState state,
+            const Rhi::FRhiTextureViewRange& range) -> FFrameGraphTextureRef;
+        auto Write(FFrameGraphTextureRef tex, Rhi::ERhiResourceState state,
+            const Rhi::FRhiTextureViewRange& range) -> FFrameGraphTextureRef;
 
-        FFrameGraphSRVRef     CreateSRV(
-                FFrameGraphTextureRef tex, const Rhi::FRhiShaderResourceViewDesc& desc);
-        FFrameGraphUAVRef CreateUAV(
-            FFrameGraphTextureRef tex, const Rhi::FRhiUnorderedAccessViewDesc& desc);
-        FFrameGraphSRVRef CreateSRV(
-            FFrameGraphBufferRef buf, const Rhi::FRhiShaderResourceViewDesc& desc);
-        FFrameGraphUAVRef CreateUAV(
-            FFrameGraphBufferRef buf, const Rhi::FRhiUnorderedAccessViewDesc& desc);
-        FFrameGraphRTVRef CreateRTV(
-            FFrameGraphTextureRef tex, const Rhi::FRhiRenderTargetViewDesc& desc);
-        FFrameGraphDSVRef CreateDSV(
-            FFrameGraphTextureRef tex, const Rhi::FRhiDepthStencilViewDesc& desc);
+        auto CreateSRV(FFrameGraphTextureRef tex, const Rhi::FRhiShaderResourceViewDesc& desc)
+            -> FFrameGraphSRVRef;
+        auto CreateUAV(FFrameGraphTextureRef tex, const Rhi::FRhiUnorderedAccessViewDesc& desc)
+            -> FFrameGraphUAVRef;
+        auto CreateSRV(FFrameGraphBufferRef buf, const Rhi::FRhiShaderResourceViewDesc& desc)
+            -> FFrameGraphSRVRef;
+        auto CreateUAV(FFrameGraphBufferRef buf, const Rhi::FRhiUnorderedAccessViewDesc& desc)
+            -> FFrameGraphUAVRef;
+        auto CreateRTV(FFrameGraphTextureRef tex, const Rhi::FRhiRenderTargetViewDesc& desc)
+            -> FFrameGraphRTVRef;
+        auto CreateDSV(FFrameGraphTextureRef tex, const Rhi::FRhiDepthStencilViewDesc& desc)
+            -> FFrameGraphDSVRef;
 
         void SetRenderTargets(
             const FRdgRenderTargetBinding* RTVs, u32 RTVCount, const FRdgDepthStencilBinding* DSV);

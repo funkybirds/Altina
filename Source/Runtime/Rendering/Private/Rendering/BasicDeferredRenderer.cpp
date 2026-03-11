@@ -99,11 +99,11 @@ namespace AltinaEngine::Rendering {
                 if (mesh == nullptr) {
                     continue;
                 }
-                if (batch.mStatic.mLodIndex >= mesh->Lods.Size()) {
+                if (batch.mStatic.mLodIndex >= mesh->mLods.Size()) {
                     continue;
                 }
 
-                const auto& lodBounds = mesh->Lods[batch.mStatic.mLodIndex].Bounds;
+                const auto& lodBounds = mesh->mLods[batch.mStatic.mLodIndex].mBounds;
                 if (!lodBounds.IsValid()) {
                     continue;
                 }
@@ -1842,40 +1842,40 @@ namespace AltinaEngine::Rendering {
 
             // Lighting inputs.
             RenderCore::Lighting::FDirectionalLight dir{};
-            if (lights != nullptr && lights->bHasMainDirectionalLight) {
-                dir = lights->MainDirectionalLight;
+            if (lights != nullptr && lights->mHasMainDirectionalLight) {
+                dir = lights->mMainDirectionalLight;
             } else {
-                dir.DirectionWS  = FVector3f(0.4f, 0.6f, 0.7f);
-                dir.Color        = FVector3f(1.0f, 1.0f, 1.0f);
-                dir.Intensity    = 2.0f;
-                dir.bCastShadows = false;
+                dir.mDirectionWS = FVector3f(0.4f, 0.6f, 0.7f);
+                dir.mColor       = FVector3f(1.0f, 1.0f, 1.0f);
+                dir.mIntensity   = 2.0f;
+                dir.mCastShadows = false;
             }
 
-            perFrameConstants.DirLightDirectionWS[0] = dir.DirectionWS[0];
-            perFrameConstants.DirLightDirectionWS[1] = dir.DirectionWS[1];
-            perFrameConstants.DirLightDirectionWS[2] = dir.DirectionWS[2];
-            perFrameConstants.DirLightColor[0]       = dir.Color[0];
-            perFrameConstants.DirLightColor[1]       = dir.Color[1];
-            perFrameConstants.DirLightColor[2]       = dir.Color[2];
-            perFrameConstants.DirLightIntensity      = dir.Intensity;
+            perFrameConstants.DirLightDirectionWS[0] = dir.mDirectionWS[0];
+            perFrameConstants.DirLightDirectionWS[1] = dir.mDirectionWS[1];
+            perFrameConstants.DirLightDirectionWS[2] = dir.mDirectionWS[2];
+            perFrameConstants.DirLightColor[0]       = dir.mColor[0];
+            perFrameConstants.DirLightColor[1]       = dir.mColor[1];
+            perFrameConstants.DirLightColor[2]       = dir.mColor[2];
+            perFrameConstants.DirLightIntensity      = dir.mIntensity;
 
             // Point lights.
             perFrameConstants.PointLightCount = 0U;
-            if (lights != nullptr && !lights->PointLights.IsEmpty()) {
-                const u32 count = static_cast<u32>(lights->PointLights.Size());
+            if (lights != nullptr && !lights->mPointLights.IsEmpty()) {
+                const u32 count = static_cast<u32>(lights->mPointLights.Size());
                 const u32 clamped =
                     (count > Deferred::kMaxPointLights) ? Deferred::kMaxPointLights : count;
                 perFrameConstants.PointLightCount = clamped;
                 for (u32 i = 0U; i < clamped; ++i) {
-                    const auto& src                                = lights->PointLights[i];
-                    perFrameConstants.PointLights[i].PositionWS[0] = src.PositionWS[0];
-                    perFrameConstants.PointLights[i].PositionWS[1] = src.PositionWS[1];
-                    perFrameConstants.PointLights[i].PositionWS[2] = src.PositionWS[2];
-                    perFrameConstants.PointLights[i].Range         = src.Range;
-                    perFrameConstants.PointLights[i].Color[0]      = src.Color[0];
-                    perFrameConstants.PointLights[i].Color[1]      = src.Color[1];
-                    perFrameConstants.PointLights[i].Color[2]      = src.Color[2];
-                    perFrameConstants.PointLights[i].Intensity     = src.Intensity;
+                    const auto& src                                = lights->mPointLights[i];
+                    perFrameConstants.PointLights[i].PositionWS[0] = src.mPositionWS[0];
+                    perFrameConstants.PointLights[i].PositionWS[1] = src.mPositionWS[1];
+                    perFrameConstants.PointLights[i].PositionWS[2] = src.mPositionWS[2];
+                    perFrameConstants.PointLights[i].Range         = src.mRange;
+                    perFrameConstants.PointLights[i].Color[0]      = src.mColor[0];
+                    perFrameConstants.PointLights[i].Color[1]      = src.mColor[1];
+                    perFrameConstants.PointLights[i].Color[2]      = src.mColor[2];
+                    perFrameConstants.PointLights[i].Intensity     = src.mIntensity;
                 }
             }
 

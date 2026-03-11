@@ -14,7 +14,7 @@ namespace {
         mesh.Lods.Reserve(1);
 
         Geometry::FStaticMeshLodData lod{};
-        lod.PrimitiveTopology = AltinaEngine::Rhi::ERhiPrimitiveTopology::TriangleList;
+        lod.mPrimitiveTopology = AltinaEngine::Rhi::ERhiPrimitiveTopology::TriangleList;
 
         const Math::FVector3f pos[] = {
             Math::FVector3f(0.0f, 0.0f, 0.0f),
@@ -46,19 +46,19 @@ namespace {
         section.MaterialSlot = 0U;
         lod.Sections.PushBack(section);
 
-        lod.Bounds.Min = pos[0];
-        lod.Bounds.Max = pos[0];
+        lod.mBounds.Min = pos[0];
+        lod.mBounds.Max = pos[0];
         for (u32 i = 1U; i < 3U; ++i) {
             for (u32 c = 0U; c < 3U; ++c) {
-                if (pos[i][c] < lod.Bounds.Min[c])
-                    lod.Bounds.Min[c] = pos[i][c];
-                if (pos[i][c] > lod.Bounds.Max[c])
-                    lod.Bounds.Max[c] = pos[i][c];
+                if (pos[i][c] < lod.mBounds.Min[c])
+                    lod.mBounds.Min[c] = pos[i][c];
+                if (pos[i][c] > lod.mBounds.Max[c])
+                    lod.mBounds.Max[c] = pos[i][c];
             }
         }
 
         mesh.Lods.PushBack(Move(lod));
-        mesh.Bounds = mesh.Lods[0].Bounds;
+        mesh.Bounds = mesh.Lods[0].mBounds;
         return mesh;
     }
 } // namespace

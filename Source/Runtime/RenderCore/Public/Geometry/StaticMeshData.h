@@ -50,47 +50,47 @@ namespace AltinaEngine::RenderCore::Geometry {
         FStaticMeshLodData(FStaticMeshLodData&&) noexcept                               = default;
         auto            operator=(FStaticMeshLodData&&) noexcept -> FStaticMeshLodData& = default;
 
-        f32             ScreenSize = 1.0f;
+        f32             mScreenSize = 1.0f;
 
-        FPositionBuffer PositionBuffer;
-        FVertexTangentBuffer        TangentBuffer;
-        FVertexUVBuffer             UV0Buffer;
-        FVertexUVBuffer             UV1Buffer;
-        FIndexBuffer                IndexBuffer;
+        FPositionBuffer mPositionBuffer;
+        FVertexTangentBuffer        mTangentBuffer;
+        FVertexUVBuffer             mUV0Buffer;
+        FVertexUVBuffer             mUV1Buffer;
+        FIndexBuffer                mIndexBuffer;
 
-        Rhi::ERhiPrimitiveTopology  PrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
+        Rhi::ERhiPrimitiveTopology  mPrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
 
-        TVector<FStaticMeshSection> Sections;
-        FStaticMeshBounds3f         Bounds;
+        TVector<FStaticMeshSection> mSections;
+        FStaticMeshBounds3f         mBounds;
 
         void                        SetPositions(const Math::FVector3f* data, u32 count) {
-            PositionBuffer.SetData(
+            mPositionBuffer.SetData(
                 data, count * static_cast<u32>(sizeof(Math::FVector3f)), sizeof(Math::FVector3f));
         }
 
         void SetTangents(const Math::FVector4f* data, u32 count) {
-            TangentBuffer.SetData(
+            mTangentBuffer.SetData(
                 data, count * static_cast<u32>(sizeof(Math::FVector4f)), sizeof(Math::FVector4f));
         }
 
         void SetUV0(const Math::FVector2f* data, u32 count) {
-            UV0Buffer.SetData(
+            mUV0Buffer.SetData(
                 data, count * static_cast<u32>(sizeof(Math::FVector2f)), sizeof(Math::FVector2f));
         }
 
         void SetUV1(const Math::FVector2f* data, u32 count) {
-            UV1Buffer.SetData(
+            mUV1Buffer.SetData(
                 data, count * static_cast<u32>(sizeof(Math::FVector2f)), sizeof(Math::FVector2f));
         }
 
         void SetIndices(const void* data, u32 count, Rhi::ERhiIndexType indexType) {
             const u32 strideBytes = GetIndexStrideBytes(indexType);
-            IndexBuffer.SetData(data, count * strideBytes, indexType);
+            mIndexBuffer.SetData(data, count * strideBytes, indexType);
         }
 
         [[nodiscard]] auto GetVertexCount() const noexcept -> u32 {
-            const u32 stride = PositionBuffer.GetStrideBytes();
-            const u64 size   = PositionBuffer.GetSizeBytes();
+            const u32 stride = mPositionBuffer.GetStrideBytes();
+            const u64 size   = mPositionBuffer.GetSizeBytes();
             if (stride == 0U || (size % static_cast<u64>(stride)) != 0ULL) {
                 return 0U;
             }
@@ -98,8 +98,8 @@ namespace AltinaEngine::RenderCore::Geometry {
         }
 
         [[nodiscard]] auto GetIndexCount() const noexcept -> u32 {
-            const u32 stride = GetIndexStrideBytes(IndexBuffer.GetIndexType());
-            const u64 size   = IndexBuffer.GetSizeBytes();
+            const u32 stride = GetIndexStrideBytes(mIndexBuffer.GetIndexType());
+            const u64 size   = mIndexBuffer.GetSizeBytes();
             if (stride == 0U || (size % static_cast<u64>(stride)) != 0ULL) {
                 return 0U;
             }
@@ -136,14 +136,14 @@ namespace AltinaEngine::RenderCore::Geometry {
                 return false;
             }
 
-            if (TangentBuffer.GetSizeBytes() != 0ULL
-                && TangentBuffer.GetElementCount() != vertexCount) {
+            if (mTangentBuffer.GetSizeBytes() != 0ULL
+                && mTangentBuffer.GetElementCount() != vertexCount) {
                 return false;
             }
-            if (UV0Buffer.GetSizeBytes() != 0ULL && UV0Buffer.GetElementCount() != vertexCount) {
+            if (mUV0Buffer.GetSizeBytes() != 0ULL && mUV0Buffer.GetElementCount() != vertexCount) {
                 return false;
             }
-            if (UV1Buffer.GetSizeBytes() != 0ULL && UV1Buffer.GetElementCount() != vertexCount) {
+            if (mUV1Buffer.GetSizeBytes() != 0ULL && mUV1Buffer.GetElementCount() != vertexCount) {
                 return false;
             }
 
@@ -152,12 +152,12 @@ namespace AltinaEngine::RenderCore::Geometry {
                 return false;
             }
 
-            const u32 stride = GetIndexStrideBytes(IndexBuffer.GetIndexType());
+            const u32 stride = GetIndexStrideBytes(mIndexBuffer.GetIndexType());
             if (stride == 0U) {
                 return false;
             }
 
-            for (const auto& section : Sections) {
+            for (const auto& section : mSections) {
                 const u64 endIndex =
                     static_cast<u64>(section.FirstIndex) + static_cast<u64>(section.IndexCount);
                 if (endIndex > indexCount) {
@@ -174,28 +174,28 @@ namespace AltinaEngine::RenderCore::Geometry {
                 resource.WaitForRelease();
             };
 
-            release(PositionBuffer);
-            release(TangentBuffer);
-            release(UV0Buffer);
-            release(UV1Buffer);
-            release(IndexBuffer);
+            release(mPositionBuffer);
+            release(mTangentBuffer);
+            release(mUV0Buffer);
+            release(mUV1Buffer);
+            release(mIndexBuffer);
         }
     };
 
     struct AE_RENDER_CORE_API FStaticMeshData {
-        TVector<FStaticMeshLodData> Lods;
-        FStaticMeshBounds3f         Bounds;
+        TVector<FStaticMeshLodData> mLods;
+        FStaticMeshBounds3f         mBounds;
 
         [[nodiscard]] auto          GetLodCount() const noexcept -> u32 {
-            return static_cast<u32>(Lods.Size());
+            return static_cast<u32>(mLods.Size());
         }
 
         [[nodiscard]] auto IsValid() const noexcept -> bool {
-            if (Lods.IsEmpty()) {
+            if (mLods.IsEmpty()) {
                 return false;
             }
 
-            for (const auto& lod : Lods) {
+            for (const auto& lod : mLods) {
                 if (!lod.IsValid()) {
                     return false;
                 }

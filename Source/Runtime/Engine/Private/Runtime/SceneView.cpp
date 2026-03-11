@@ -109,7 +109,7 @@ namespace AltinaEngine::Engine {
                 continue;
             }
 
-            if (outScene.Lights.bHasMainDirectionalLight) {
+            if (outScene.Lights.mHasMainDirectionalLight) {
                 // Phase1: first enabled directional is treated as the main light.
                 continue;
             }
@@ -119,22 +119,22 @@ namespace AltinaEngine::Engine {
                 transform.Rotation.RotateVector(Core::Math::FVector3f(0.0f, 0.0f, 1.0f));
 
             RenderCore::Lighting::FDirectionalLight light{};
-            light.DirectionWS        = forward;
-            light.Color              = component.mColor;
-            light.Intensity          = component.mIntensity;
-            light.bCastShadows       = component.mCastShadows;
-            light.ShadowCascadeCount = component.mShadowCascadeCount;
-            light.ShadowSplitLambda  = component.mShadowSplitLambda;
-            light.ShadowMaxDistance  = component.mShadowMaxDistance;
-            light.ShadowMapSize      = component.mShadowMapSize;
-            light.ShadowReceiverBias = component.mShadowReceiverBias;
+            light.mDirectionWS        = forward;
+            light.mColor              = component.mColor;
+            light.mIntensity          = component.mIntensity;
+            light.mCastShadows        = component.mCastShadows;
+            light.mShadowCascadeCount = component.mShadowCascadeCount;
+            light.mShadowSplitLambda  = component.mShadowSplitLambda;
+            light.mShadowMaxDistance  = component.mShadowMaxDistance;
+            light.mShadowMapSize      = component.mShadowMapSize;
+            light.mShadowReceiverBias = component.mShadowReceiverBias;
 
-            outScene.Lights.bHasMainDirectionalLight = true;
-            outScene.Lights.MainDirectionalLight     = light;
+            outScene.Lights.mHasMainDirectionalLight = true;
+            outScene.Lights.mMainDirectionalLight    = light;
         }
 
         const auto& pointLightIds = world.GetActivePointLightComponents();
-        outScene.Lights.PointLights.Reserve(pointLightIds.Size());
+        outScene.Lights.mPointLights.Reserve(pointLightIds.Size());
         for (const auto& id : pointLightIds) {
             if (!world.IsAlive(id)) {
                 continue;
@@ -148,26 +148,26 @@ namespace AltinaEngine::Engine {
             const auto transform = world.Object(component.GetOwner()).GetWorldTransform();
 
             RenderCore::Lighting::FPointLight light{};
-            light.PositionWS = transform.Translation;
-            light.Range      = component.mRange;
-            light.Color      = component.mColor;
-            light.Intensity  = component.mIntensity;
-            outScene.Lights.PointLights.PushBack(light);
+            light.mPositionWS = transform.Translation;
+            light.mRange      = component.mRange;
+            light.mColor      = component.mColor;
+            light.mIntensity  = component.mIntensity;
+            outScene.Lights.mPointLights.PushBack(light);
         }
 
-        if (!outScene.Lights.bHasMainDirectionalLight) {
+        if (!outScene.Lights.mHasMainDirectionalLight) {
             // Default main light so scenes are visible without explicit light authoring.
-            outScene.Lights.bHasMainDirectionalLight = true;
-            outScene.Lights.MainDirectionalLight.DirectionWS =
+            outScene.Lights.mHasMainDirectionalLight = true;
+            outScene.Lights.mMainDirectionalLight.mDirectionWS =
                 Core::Math::FVector3f(0.4f, 0.6f, 0.7f);
-            outScene.Lights.MainDirectionalLight.Color = Core::Math::FVector3f(1.0f, 1.0f, 1.0f);
-            outScene.Lights.MainDirectionalLight.Intensity          = 2.0f;
-            outScene.Lights.MainDirectionalLight.bCastShadows       = false;
-            outScene.Lights.MainDirectionalLight.ShadowCascadeCount = 4U;
-            outScene.Lights.MainDirectionalLight.ShadowSplitLambda  = 0.65f;
-            outScene.Lights.MainDirectionalLight.ShadowMaxDistance  = 250.0f;
-            outScene.Lights.MainDirectionalLight.ShadowMapSize      = 2048U;
-            outScene.Lights.MainDirectionalLight.ShadowReceiverBias = 0.0015f;
+            outScene.Lights.mMainDirectionalLight.mColor = Core::Math::FVector3f(1.0f, 1.0f, 1.0f);
+            outScene.Lights.mMainDirectionalLight.mIntensity          = 2.0f;
+            outScene.Lights.mMainDirectionalLight.mCastShadows        = false;
+            outScene.Lights.mMainDirectionalLight.mShadowCascadeCount = 4U;
+            outScene.Lights.mMainDirectionalLight.mShadowSplitLambda  = 0.65f;
+            outScene.Lights.mMainDirectionalLight.mShadowMaxDistance  = 250.0f;
+            outScene.Lights.mMainDirectionalLight.mShadowMapSize      = 2048U;
+            outScene.Lights.mMainDirectionalLight.mShadowReceiverBias = 0.0015f;
         }
 
         // Sky cube: first enabled instance with a valid asset handle wins.

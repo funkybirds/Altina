@@ -105,17 +105,17 @@ namespace AltinaEngine::GameScene {
             serializer.WriteFieldName(TEXT("valid"));
             serializer.Write(mesh.IsValid());
             serializer.WriteFieldName(TEXT("lods"));
-            serializer.BeginArray(mesh.Lods.Size());
-            for (const auto& lod : mesh.Lods) {
+            serializer.BeginArray(mesh.mLods.Size());
+            for (const auto& lod : mesh.mLods) {
                 serializer.BeginObject({});
                 serializer.WriteFieldName(TEXT("vertexCount"));
                 serializer.Write(lod.GetVertexCount());
                 serializer.WriteFieldName(TEXT("indexCount"));
                 serializer.Write(lod.GetIndexCount());
                 serializer.WriteFieldName(TEXT("sectionCount"));
-                serializer.Write(static_cast<u32>(lod.Sections.Size()));
+                serializer.Write(static_cast<u32>(lod.mSections.Size()));
                 serializer.WriteFieldName(TEXT("screenSize"));
-                serializer.Write(lod.ScreenSize);
+                serializer.Write(lod.mScreenSize);
                 serializer.EndObject();
             }
             serializer.EndArray();

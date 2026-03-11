@@ -122,11 +122,11 @@ namespace AltinaEngine::Engine {
             if (entry.Mesh == nullptr) {
                 continue;
             }
-            const auto& lods = entry.Mesh->Lods;
+            const auto& lods = entry.Mesh->mLods;
             if (params.LodIndex >= lods.Size()) {
                 continue;
             }
-            totalSections += lods[params.LodIndex].Sections.Size();
+            totalSections += lods[params.LodIndex].mSections.Size();
         }
 
         Core::Container::TVector<FDrawItem> items;
@@ -136,18 +136,18 @@ namespace AltinaEngine::Engine {
             if (entry.Mesh == nullptr) {
                 continue;
             }
-            if (params.LodIndex >= entry.Mesh->Lods.Size()) {
+            if (params.LodIndex >= entry.Mesh->mLods.Size()) {
                 continue;
             }
 
-            const auto& lod = entry.Mesh->Lods[params.LodIndex];
-            if (lod.Sections.IsEmpty()) {
+            const auto& lod = entry.Mesh->mLods[params.LodIndex];
+            if (lod.mSections.IsEmpty()) {
                 continue;
             }
 
-            const u32 sectionCount = static_cast<u32>(lod.Sections.Size());
+            const u32 sectionCount = static_cast<u32>(lod.mSections.Size());
             for (u32 sectionIndex = 0U; sectionIndex < sectionCount; ++sectionIndex) {
-                const auto&            section  = lod.Sections[sectionIndex];
+                const auto&            section  = lod.mSections[sectionIndex];
                 RenderCore::FMaterial* material = nullptr;
                 if (entry.Materials != nullptr) {
                     const auto* slot = entry.Materials->GetMaterialSlot(section.MaterialSlot);
@@ -175,7 +175,7 @@ namespace AltinaEngine::Engine {
                     material != nullptr ? material->FindPassDesc(params.Pass) : nullptr);
                 item.mKey.mMaterialKey = HashPointer(material);
                 item.mKey.mGeometryKey =
-                    BuildGeometryKey(entry.Mesh, params.LodIndex, lod.PrimitiveTopology);
+                    BuildGeometryKey(entry.Mesh, params.LodIndex, lod.mPrimitiveTopology);
                 item.mKey.mSectionKey = BuildSectionKey(section);
 
                 items.PushBack(Move(item));

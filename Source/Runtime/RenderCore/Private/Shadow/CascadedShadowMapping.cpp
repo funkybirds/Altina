@@ -110,7 +110,7 @@ namespace AltinaEngine::RenderCore::Shadow {
                  : 1.0f;
         const f32 tanHalfFovY = std::tan(std::max(view.Camera.mVerticalFovRadians * 0.5f, 0.001f));
 
-        const FVector3f dirWS = SafeNormalize(light.DirectionWS);
+        const FVector3f dirWS = SafeNormalize(light.mDirectionWS);
 
         static bool     sLoggedOnce = false;
         if (!sLoggedOnce) {
@@ -119,7 +119,7 @@ namespace AltinaEngine::RenderCore::Shadow {
                 cascadeCount, settings.mSplitLambda, settings.mMaxDistance,
                 settings.mShadowMapSize);
             LogInfo(TEXT("CSM Light: dirWS=({}, {}, {}) castShadows={}"), dirWS[0], dirWS[1],
-                dirWS[2], light.bCastShadows ? 1 : 0);
+                dirWS[2], light.mCastShadows ? 1 : 0);
             LogInfo(
                 TEXT("CSM View: originWS=({}, {}, {}) nearVS={} farVS={} fovY(rad)={} reverseZ={}"),
                 view.ViewOrigin[0], view.ViewOrigin[1], view.ViewOrigin[2], nearVS, farVS,

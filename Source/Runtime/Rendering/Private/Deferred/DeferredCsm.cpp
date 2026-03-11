@@ -77,13 +77,13 @@ namespace AltinaEngine::Rendering::Deferred {
         u32             mapSize  = 2048U;
         f32             recvBias = 0.0015f;
 
-        if (inputs.Lights != nullptr && inputs.Lights->bHasMainDirectionalLight) {
-            const auto& dl = inputs.Lights->MainDirectionalLight;
-            cascades       = dl.ShadowCascadeCount;
-            lambda         = dl.ShadowSplitLambda;
-            maxDist        = dl.ShadowMaxDistance;
-            mapSize        = dl.ShadowMapSize;
-            recvBias       = dl.ShadowReceiverBias;
+        if (inputs.Lights != nullptr && inputs.Lights->mHasMainDirectionalLight) {
+            const auto& dl = inputs.Lights->mMainDirectionalLight;
+            cascades       = dl.mShadowCascadeCount;
+            lambda         = dl.mShadowSplitLambda;
+            maxDist        = dl.mShadowMaxDistance;
+            mapSize        = dl.mShadowMapSize;
+            recvBias       = dl.mShadowReceiverBias;
         }
 
         cascades = std::max(1U, std::min(cascades, RenderCore::Shadow::kMaxCascades));
@@ -109,11 +109,11 @@ namespace AltinaEngine::Rendering::Deferred {
         result.Settings.mReceiverBias  = recvBias;
 
         if (inputs.View != nullptr && inputs.Lights != nullptr
-            && inputs.Lights->bHasMainDirectionalLight
-            && inputs.Lights->MainDirectionalLight.bCastShadows
+            && inputs.Lights->mHasMainDirectionalLight
+            && inputs.Lights->mMainDirectionalLight.mCastShadows
             && inputs.ShadowDrawList != nullptr) {
             RenderCore::Shadow::BuildDirectionalCSM(
-                *inputs.View, inputs.Lights->MainDirectionalLight, result.Settings, result.Data);
+                *inputs.View, inputs.Lights->mMainDirectionalLight, result.Settings, result.Data);
         }
 
         return result;

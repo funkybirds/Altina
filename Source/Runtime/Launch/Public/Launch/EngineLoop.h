@@ -144,18 +144,18 @@ namespace AltinaEngine::Launch {
                 if (!Rendering::ConvertMeshAssetToStaticMesh(*meshAsset, mesh)) {
                     return {};
                 }
-                for (auto& lod : mesh.Lods) {
-                    lod.PositionBuffer.InitResource();
-                    lod.IndexBuffer.InitResource();
-                    lod.TangentBuffer.InitResource();
-                    lod.UV0Buffer.InitResource();
-                    lod.UV1Buffer.InitResource();
+                for (auto& lod : mesh.mLods) {
+                    lod.mPositionBuffer.InitResource();
+                    lod.mIndexBuffer.InitResource();
+                    lod.mTangentBuffer.InitResource();
+                    lod.mUV0Buffer.InitResource();
+                    lod.mUV1Buffer.InitResource();
 
-                    lod.PositionBuffer.WaitForInit();
-                    lod.IndexBuffer.WaitForInit();
-                    lod.TangentBuffer.WaitForInit();
-                    lod.UV0Buffer.WaitForInit();
-                    lod.UV1Buffer.WaitForInit();
+                    lod.mPositionBuffer.WaitForInit();
+                    lod.mIndexBuffer.WaitForInit();
+                    lod.mTangentBuffer.WaitForInit();
+                    lod.mUV0Buffer.WaitForInit();
+                    lod.mUV1Buffer.WaitForInit();
                 }
                 return mesh;
             };

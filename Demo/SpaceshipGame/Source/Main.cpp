@@ -163,7 +163,7 @@ namespace {
         }
 
         Geometry::FStaticMeshLodData lod{};
-        lod.PrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
+        lod.mPrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
 
         lod.SetPositions(positions.Data(), static_cast<u32>(positions.Size()));
         lod.SetTangents(tangents.Data(), static_cast<u32>(tangents.Size()));
@@ -179,11 +179,11 @@ namespace {
         section.MaterialSlot = 0U;
         lod.Sections.PushBack(section);
 
-        lod.Bounds.Min = boundsMin;
-        lod.Bounds.Max = boundsMax;
+        lod.mBounds.Min = boundsMin;
+        lod.mBounds.Max = boundsMax;
 
         mesh.Lods.PushBack(Move(lod));
-        mesh.Bounds = lod.Bounds;
+        mesh.Bounds = lod.mBounds;
 
         LogInfo(
             TEXT(

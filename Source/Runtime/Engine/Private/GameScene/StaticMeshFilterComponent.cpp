@@ -3,7 +3,7 @@
 namespace AltinaEngine::GameScene {
     namespace {
         void ReleaseStaticMeshGpuResources(Geometry::FStaticMeshData& mesh) noexcept {
-            for (auto& lod : mesh.Lods) {
+            for (auto& lod : mesh.mLods) {
                 lod.ReleaseGpuResources();
             }
         }
@@ -43,18 +43,18 @@ namespace AltinaEngine::GameScene {
 
         // Mirror the mesh-asset conversion path: ensure GPU buffers exist so the procedural mesh is
         // drawable immediately.
-        for (auto& lod : mStaticMesh.Lods) {
-            lod.PositionBuffer.InitResource();
-            lod.IndexBuffer.InitResource();
-            lod.TangentBuffer.InitResource();
-            lod.UV0Buffer.InitResource();
-            lod.UV1Buffer.InitResource();
+        for (auto& lod : mStaticMesh.mLods) {
+            lod.mPositionBuffer.InitResource();
+            lod.mIndexBuffer.InitResource();
+            lod.mTangentBuffer.InitResource();
+            lod.mUV0Buffer.InitResource();
+            lod.mUV1Buffer.InitResource();
 
-            lod.PositionBuffer.WaitForInit();
-            lod.IndexBuffer.WaitForInit();
-            lod.TangentBuffer.WaitForInit();
-            lod.UV0Buffer.WaitForInit();
-            lod.UV1Buffer.WaitForInit();
+            lod.mPositionBuffer.WaitForInit();
+            lod.mIndexBuffer.WaitForInit();
+            lod.mTangentBuffer.WaitForInit();
+            lod.mUV0Buffer.WaitForInit();
+            lod.mUV1Buffer.WaitForInit();
         }
     }
 

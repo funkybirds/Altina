@@ -100,15 +100,15 @@ namespace AltinaEngine::Core::Console {
 
         FConsoleVariable(const FString& name, FConsoleValue value, EType type, ECVarFlags flags);
 
-        const FString& GetName() const noexcept;
+        auto GetName() const noexcept -> const FString&;
 
-        FString        GetString() const noexcept;
+        auto GetString() const noexcept -> FString;
 
-        FString        GetRenderString() const noexcept;
+        auto GetRenderString() const noexcept -> FString;
 
-        void           SetFromString(const FString& v) noexcept;
+        void SetFromString(const FString& v) noexcept;
 
-        auto           GetFlags() const noexcept -> ECVarFlags { return mFlags; }
+        auto GetFlags() const noexcept -> ECVarFlags { return mFlags; }
 
         auto HasFlag(ECVarFlags flag) const noexcept -> bool { return HasAnyFlags(mFlags, flag); }
 
@@ -165,13 +165,13 @@ namespace AltinaEngine::Core::Console {
             return out;
         }
 
-        EType GetType() const noexcept { return mType; }
+        auto GetType() const noexcept -> EType { return mType; }
 
         // Registry helpers (header-only convenience API)
         template <typename T>
             requires CConsoleValueType<T>
-        static FConsoleVariable* Register(
-            const TChar* name, T&& defaultValue, ECVarFlags flags = ECVarFlags::None) noexcept {
+        static auto Register(const TChar* name, T&& defaultValue,
+            ECVarFlags flags = ECVarFlags::None) noexcept -> FConsoleVariable* {
             if (name == nullptr || name[0] == static_cast<TChar>(0)) {
                 return nullptr;
             }
@@ -182,9 +182,9 @@ namespace AltinaEngine::Core::Console {
             return RegisterInternal(nameStr, Move(value), TypeFrom<TDecayed>(), flags);
         }
 
-        static FConsoleVariable* Find(const FString& name) noexcept;
+        static auto Find(const FString& name) noexcept -> FConsoleVariable*;
 
-        static void              ForEach(TFunction<void(const FConsoleVariable&)> fn) noexcept;
+        static void ForEach(TFunction<void(const FConsoleVariable&)> fn) noexcept;
 
     private:
         template <typename T> static constexpr auto TypeFrom() noexcept -> EType {
@@ -299,8 +299,8 @@ namespace AltinaEngine::Core::Console {
             return false;
         }
 
-        static FConsoleVariable* RegisterInternal(
-            const FString& name, FConsoleValue&& value, EType type, ECVarFlags flags) noexcept;
+        static auto    RegisterInternal(const FString& name, FConsoleValue&& value, EType type,
+               ECVarFlags flags) noexcept -> FConsoleVariable*;
 
         FString        mName;
         FConsoleValue  mValue;
@@ -350,7 +350,7 @@ namespace AltinaEngine::Core::Console {
             }
         }
 
-        auto GetRaw() const noexcept -> FConsoleVariable* { return mVariable; }
+        [[nodiscard]] auto GetRaw() const noexcept -> FConsoleVariable* { return mVariable; }
 
     private:
         FConsoleVariable* mVariable = nullptr;

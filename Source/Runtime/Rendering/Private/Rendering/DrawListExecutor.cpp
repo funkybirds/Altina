@@ -13,30 +13,30 @@ namespace AltinaEngine::Rendering {
     namespace {
         auto GetSection(const RenderCore::Geometry::FStaticMeshLodData& lod, u32 sectionIndex)
             -> const RenderCore::Geometry::FStaticMeshSection* {
-            if (sectionIndex >= lod.Sections.Size()) {
+            if (sectionIndex >= lod.mSections.Size()) {
                 return nullptr;
             }
-            return &lod.Sections[sectionIndex];
+            return &lod.mSections[sectionIndex];
         }
 
         void BindVertexBuffersLegacy(
             Rhi::FRhiCmdContext& ctx, const RenderCore::Geometry::FStaticMeshLodData& lod) {
-            const auto positionView = lod.PositionBuffer.GetView();
+            const auto positionView = lod.mPositionBuffer.GetView();
             if (positionView.mBuffer != nullptr) {
                 ctx.RHISetVertexBuffer(0U, positionView);
             }
 
-            const auto normalView = lod.TangentBuffer.GetView();
+            const auto normalView = lod.mTangentBuffer.GetView();
             if (normalView.mBuffer != nullptr) {
                 ctx.RHISetVertexBuffer(1U, normalView);
             }
 
-            const auto uv0View = lod.UV0Buffer.GetView();
+            const auto uv0View = lod.mUV0Buffer.GetView();
             if (uv0View.mBuffer != nullptr) {
                 ctx.RHISetVertexBuffer(2U, uv0View);
             }
 
-            const auto uv1View = lod.UV1Buffer.GetView();
+            const auto uv1View = lod.mUV1Buffer.GetView();
             if (uv1View.mBuffer != nullptr) {
                 ctx.RHISetVertexBuffer(3U, uv1View);
             }
@@ -46,20 +46,20 @@ namespace AltinaEngine::Rendering {
             const Rhi::FRhiVertexAttributeDesc& attr, Rhi::FRhiVertexBufferView& outView) -> bool {
             const auto semantic = attr.mSemanticName.ToView();
             if (Core::Utility::String::EqualsIgnoreCase(semantic, TEXT("POSITION"))) {
-                outView = lod.PositionBuffer.GetView();
+                outView = lod.mPositionBuffer.GetView();
                 return outView.mBuffer != nullptr;
             }
             if (Core::Utility::String::EqualsIgnoreCase(semantic, TEXT("NORMAL"))
                 || Core::Utility::String::EqualsIgnoreCase(semantic, TEXT("TANGENT"))) {
                 // Static-mesh slot1 currently stores packed normal(float3).
-                outView = lod.TangentBuffer.GetView();
+                outView = lod.mTangentBuffer.GetView();
                 return outView.mBuffer != nullptr;
             }
             if (Core::Utility::String::EqualsIgnoreCase(semantic, TEXT("TEXCOORD"))) {
                 if (attr.mSemanticIndex == 0U) {
-                    outView = lod.UV0Buffer.GetView();
+                    outView = lod.mUV0Buffer.GetView();
                 } else if (attr.mSemanticIndex == 1U) {
-                    outView = lod.UV1Buffer.GetView();
+                    outView = lod.mUV1Buffer.GetView();
                 } else {
                     return false;
                 }
@@ -129,12 +129,12 @@ namespace AltinaEngine::Rendering {
                 ++skippedNullMesh;
                 continue;
             }
-            if (batch.mStatic.mLodIndex >= mesh->Lods.Size()) {
+            if (batch.mStatic.mLodIndex >= mesh->mLods.Size()) {
                 ++skippedInvalidLod;
                 continue;
             }
 
-            const auto& lod     = mesh->Lods[batch.mStatic.mLodIndex];
+            const auto& lod     = mesh->mLods[batch.mStatic.mLodIndex];
             const auto* section = GetSection(lod, batch.mStatic.mSectionIndex);
             if (section == nullptr) {
                 ++skippedNullSection;
@@ -168,13 +168,13 @@ namespace AltinaEngine::Rendering {
                 batchBinder(ctx, batch, batchUserData);
             }
 
-            const auto indexView = lod.IndexBuffer.GetView();
+            const auto indexView = lod.mIndexBuffer.GetView();
             if (indexView.mBuffer == nullptr) {
                 ++skippedNullIndex;
                 continue;
             }
 
-            ctx.RHISetPrimitiveTopology(lod.PrimitiveTopology);
+            ctx.RHISetPrimitiveTopology(lod.mPrimitiveTopology);
             BindVertexBuffersResolved(ctx, lod, bindings.ResolvedVertexLayout);
             ctx.RHISetIndexBuffer(indexView);
 

@@ -258,9 +258,9 @@ namespace AltinaEngine::Rendering {
         }
 
         RenderCore::Geometry::FStaticMeshLodData lod{};
-        lod.ScreenSize = 1.0f;
+        lod.mScreenSize = 1.0f;
         lod.SetPositions(positions.Data(), desc.mVertexCount);
-        lod.TangentBuffer.SetData(packedNormals.Data(),
+        lod.mTangentBuffer.SetData(packedNormals.Data(),
             desc.mVertexCount * static_cast<u32>(sizeof(Core::Math::FVector3f)),
             static_cast<u32>(sizeof(Core::Math::FVector3f)));
         // Always provide UV0 (see note above).
@@ -270,22 +270,22 @@ namespace AltinaEngine::Rendering {
         }
 
         lod.SetIndices(indexData.Data(), desc.mIndexCount, indexType);
-        lod.PrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
+        lod.mPrimitiveTopology = Rhi::ERhiPrimitiveTopology::TriangleList;
 
-        lod.Bounds.Min =
+        lod.mBounds.Min =
             Core::Math::FVector3f(desc.mBoundsMin[0], desc.mBoundsMin[1], desc.mBoundsMin[2]);
-        lod.Bounds.Max =
+        lod.mBounds.Max =
             Core::Math::FVector3f(desc.mBoundsMax[0], desc.mBoundsMax[1], desc.mBoundsMax[2]);
 
         if (!subMeshes.IsEmpty()) {
-            lod.Sections.Reserve(subMeshes.Size());
+            lod.mSections.Reserve(subMeshes.Size());
             for (const auto& subMesh : subMeshes) {
                 RenderCore::Geometry::FStaticMeshSection section{};
                 section.FirstIndex   = subMesh.mIndexStart;
                 section.IndexCount   = subMesh.mIndexCount;
                 section.BaseVertex   = subMesh.mBaseVertex;
                 section.MaterialSlot = subMesh.mMaterialSlot;
-                lod.Sections.PushBack(section);
+                lod.mSections.PushBack(section);
             }
         } else {
             RenderCore::Geometry::FStaticMeshSection section{};
@@ -293,12 +293,12 @@ namespace AltinaEngine::Rendering {
             section.IndexCount   = desc.mIndexCount;
             section.BaseVertex   = 0;
             section.MaterialSlot = 0U;
-            lod.Sections.PushBack(section);
+            lod.mSections.PushBack(section);
         }
 
-        outMesh.Lods.Clear();
-        outMesh.Lods.PushBack(Move(lod));
-        outMesh.Bounds = outMesh.Lods[0].Bounds;
+        outMesh.mLods.Clear();
+        outMesh.mLods.PushBack(Move(lod));
+        outMesh.mBounds = outMesh.mLods[0].mBounds;
 
         return outMesh.IsValid();
     }

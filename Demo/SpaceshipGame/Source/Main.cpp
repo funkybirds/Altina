@@ -177,13 +177,13 @@ namespace {
         section.IndexCount   = static_cast<u32>(indices.Size());
         section.BaseVertex   = 0;
         section.MaterialSlot = 0U;
-        lod.Sections.PushBack(section);
+        lod.mSections.PushBack(section);
 
         lod.mBounds.Min = boundsMin;
         lod.mBounds.Max = boundsMax;
 
-        mesh.Lods.PushBack(Move(lod));
-        mesh.Bounds = lod.mBounds;
+        mesh.mLods.PushBack(Move(lod));
+        mesh.mBounds = lod.mBounds;
 
         LogInfo(
             TEXT(

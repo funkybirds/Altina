@@ -7,8 +7,11 @@
 #include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Reflection/Serializer.h"
+#include "Utility/Json.h"
 #include "Utility/Assert.h"
 #include "Utility/String/CodeConvert.h"
+#include "Utility/String/StringViewUtility.h"
+#include "Utility/String/UuidParser.h"
 
 using AltinaEngine::Move;
 using AltinaEngine::Core::Container::FStringView;
@@ -168,6 +171,45 @@ namespace AltinaEngine::GameScene {
             const auto uuidText = handle.mUuid.ToString();
             serializer.WriteString(uuidText.ToView());
             serializer.EndObject();
+        }
+
+        auto ParseAssetHandleJson(
+            const Core::Utility::Json::FJsonValue& value, Asset::FAssetHandle& outHandle) -> bool {
+            using Core::Utility::Json::EJsonType;
+            using Core::Utility::Json::FindObjectValueInsensitive;
+            using Core::Utility::Json::GetBoolValue;
+            using Core::Utility::Json::GetNumberValue;
+            using Core::Utility::Json::GetStringValue;
+
+            if (value.Type != EJsonType::Object) {
+                return false;
+            }
+
+            bool valid = false;
+            (void)GetBoolValue(FindObjectValueInsensitive(value, "valid"), valid);
+            if (!valid) {
+                outHandle = {};
+                return true;
+            }
+
+            double typeNumber = 0.0;
+            if (!GetNumberValue(FindObjectValueInsensitive(value, "type"), typeNumber)) {
+                return false;
+            }
+
+            Core::Container::FNativeString uuidText;
+            if (!GetStringValue(FindObjectValueInsensitive(value, "uuid"), uuidText)) {
+                return false;
+            }
+
+            FUuid uuid{};
+            if (!Core::Utility::String::ParseUuid(uuidText.ToView(), uuid)) {
+                return false;
+            }
+
+            outHandle.mType = static_cast<Asset::EAssetType>(static_cast<u8>(typeNumber));
+            outHandle.mUuid = uuid;
+            return outHandle.IsValid();
         }
 
     } // namespace
@@ -695,6 +737,358 @@ namespace AltinaEngine::GameScene {
 
         serializer.EndArray();
         serializer.EndObject();
+    }
+
+    auto FWorld::DeserializeJson(Core::Container::FNativeStringView jsonText,
+        Asset::FAssetManager& assetManager) -> TOwner<FWorld> {
+        using Core::Utility::Json::EJsonType;
+        using Core::Utility::Json::FindObjectValueInsensitive;
+        using Core::Utility::Json::FJsonDocument;
+        using Core::Utility::Json::FJsonValue;
+        using Core::Utility::Json::GetBoolValue;
+        using Core::Utility::Json::GetNumberValue;
+        using Core::Utility::Json::GetStringValue;
+
+        struct FPendingParentLink {
+            FGameObjectId mChild{};
+            FGameObjectId mParentSerialized{};
+        };
+
+        auto ParseSerializedId = [](const FJsonValue& value, FGameObjectId& outId) -> bool {
+            if (value.Type != EJsonType::Object) {
+                return false;
+            }
+            double indexNumber      = 0.0;
+            double generationNumber = 0.0;
+            if (!GetNumberValue(FindObjectValueInsensitive(value, "index"), indexNumber)) {
+                return false;
+            }
+            if (!GetNumberValue(
+                    FindObjectValueInsensitive(value, "generation"), generationNumber)) {
+                return false;
+            }
+            if (indexNumber < 0.0 || generationNumber <= 0.0) {
+                return false;
+            }
+            outId.Index      = static_cast<u32>(indexNumber);
+            outId.Generation = static_cast<u32>(generationNumber);
+            return true;
+        };
+
+        auto ParseTransform = [](const FJsonValue&                       value,
+                                  Core::Math::LinAlg::FSpatialTransform& outTransform) -> bool {
+            if (value.Type != EJsonType::Object) {
+                return false;
+            }
+
+            const auto* rotation    = FindObjectValueInsensitive(value, "rotation");
+            const auto* translation = FindObjectValueInsensitive(value, "translation");
+            const auto* scale       = FindObjectValueInsensitive(value, "scale");
+            if (rotation == nullptr || translation == nullptr || scale == nullptr) {
+                return false;
+            }
+            if (rotation->Type != EJsonType::Array || translation->Type != EJsonType::Array
+                || scale->Type != EJsonType::Array) {
+                return false;
+            }
+            if (rotation->Array.Size() != 4 || translation->Array.Size() != 3
+                || scale->Array.Size() != 3) {
+                return false;
+            }
+
+            double valueNumber = 0.0;
+            if (!GetNumberValue(rotation->Array[0], valueNumber)) {
+                return false;
+            }
+            outTransform.Rotation.x = static_cast<f32>(valueNumber);
+            if (!GetNumberValue(rotation->Array[1], valueNumber)) {
+                return false;
+            }
+            outTransform.Rotation.y = static_cast<f32>(valueNumber);
+            if (!GetNumberValue(rotation->Array[2], valueNumber)) {
+                return false;
+            }
+            outTransform.Rotation.z = static_cast<f32>(valueNumber);
+            if (!GetNumberValue(rotation->Array[3], valueNumber)) {
+                return false;
+            }
+            outTransform.Rotation.w = static_cast<f32>(valueNumber);
+
+            if (!GetNumberValue(translation->Array[0], valueNumber)) {
+                return false;
+            }
+            outTransform.Translation.mComponents[0] = static_cast<f32>(valueNumber);
+            if (!GetNumberValue(translation->Array[1], valueNumber)) {
+                return false;
+            }
+            outTransform.Translation.mComponents[1] = static_cast<f32>(valueNumber);
+            if (!GetNumberValue(translation->Array[2], valueNumber)) {
+                return false;
+            }
+            outTransform.Translation.mComponents[2] = static_cast<f32>(valueNumber);
+
+            if (!GetNumberValue(scale->Array[0], valueNumber)) {
+                return false;
+            }
+            outTransform.Scale.mComponents[0] = static_cast<f32>(valueNumber);
+            if (!GetNumberValue(scale->Array[1], valueNumber)) {
+                return false;
+            }
+            outTransform.Scale.mComponents[1] = static_cast<f32>(valueNumber);
+            if (!GetNumberValue(scale->Array[2], valueNumber)) {
+                return false;
+            }
+            outTransform.Scale.mComponents[2] = static_cast<f32>(valueNumber);
+            return true;
+        };
+
+        FJsonDocument document{};
+        if (!document.Parse(jsonText)) {
+            return {};
+        }
+
+        const FJsonValue* root = document.GetRoot();
+        if (root == nullptr || root->Type != EJsonType::Object) {
+            return {};
+        }
+
+        double versionNumber = 0.0;
+        if (!GetNumberValue(FindObjectValueInsensitive(*root, "version"), versionNumber)) {
+            return {};
+        }
+
+        const u32 version = static_cast<u32>(versionNumber);
+        Assert(version == kWorldSerializationVersion, TEXT("GameScene.World"),
+            "FWorld::DeserializeJson version mismatch. expected={}, actual={}",
+            kWorldSerializationVersion, version);
+        if (version != kWorldSerializationVersion) {
+            return {};
+        }
+
+        double worldIdNumber = 0.0;
+        if (!GetNumberValue(FindObjectValueInsensitive(*root, "worldId"), worldIdNumber)) {
+            return {};
+        }
+
+        const auto* objectsValue = FindObjectValueInsensitive(*root, "objects");
+        if (objectsValue == nullptr || objectsValue->Type != EJsonType::Array) {
+            return {};
+        }
+
+        auto  world    = Core::Container::MakeUnique<FWorld>(static_cast<u32>(worldIdNumber));
+        auto& registry = GetComponentRegistry();
+
+        THashMap<FGameObjectId, FGameObjectId, FGameObjectIdHash> objectIdRemap{};
+        TVector<FPendingParentLink>                               pendingParents{};
+        objectIdRemap.Reserve(objectsValue->Array.Size());
+        pendingParents.Reserve(objectsValue->Array.Size());
+
+        for (const auto* objectNode : objectsValue->Array) {
+            if (objectNode == nullptr || objectNode->Type != EJsonType::Object) {
+                return {};
+            }
+
+            Core::Container::FNativeString recordKindText{};
+            if (!GetStringValue(
+                    FindObjectValueInsensitive(*objectNode, "recordKind"), recordKindText)) {
+                return {};
+            }
+
+            FGameObjectId serializedId{};
+            const auto*   idNode = FindObjectValueInsensitive(*objectNode, "id");
+            if (idNode == nullptr || !ParseSerializedId(*idNode, serializedId)) {
+                return {};
+            }
+            serializedId.WorldId = world->GetWorldId();
+
+            Core::Container::FNativeString objectName{};
+            if (!GetStringValue(FindObjectValueInsensitive(*objectNode, "name"), objectName)) {
+                return {};
+            }
+
+            bool active = true;
+            if (!GetBoolValue(FindObjectValueInsensitive(*objectNode, "active"), active)) {
+                return {};
+            }
+
+            bool hasParent = false;
+            if (!GetBoolValue(FindObjectValueInsensitive(*objectNode, "hasParent"), hasParent)) {
+                return {};
+            }
+
+            FGameObjectId parentSerializedId{};
+            if (hasParent) {
+                const auto* parentNode = FindObjectValueInsensitive(*objectNode, "parent");
+                if (parentNode == nullptr || !ParseSerializedId(*parentNode, parentSerializedId)) {
+                    return {};
+                }
+                parentSerializedId.WorldId = world->GetWorldId();
+            }
+
+            Core::Math::LinAlg::FSpatialTransform localTransform{};
+            const auto* transformNode = FindObjectValueInsensitive(*objectNode, "transform");
+            if (transformNode == nullptr || !ParseTransform(*transformNode, localTransform)) {
+                return {};
+            }
+
+            const bool isRawRecord =
+                Core::Utility::String::EqualLiteralI(recordKindText.ToView(), "raw");
+            const bool isPrefabRecord =
+                Core::Utility::String::EqualLiteralI(recordKindText.ToView(), "prefab");
+            if (!isRawRecord && !isPrefabRecord) {
+                return {};
+            }
+
+            if (isRawRecord) {
+                auto* object = world->CreateGameObjectWithId(serializedId);
+                if (object == nullptr) {
+                    return {};
+                }
+                const auto actualId = object->GetId();
+                object->SetName(Core::Utility::String::FromUtf8(objectName).ToView());
+                object->SetLocalTransform(localTransform);
+                world->SetGameObjectActive(actualId, active);
+
+                objectIdRemap[serializedId] = actualId;
+                if (hasParent) {
+                    pendingParents.PushBack({ actualId, parentSerializedId });
+                }
+
+                const auto* componentsNode = FindObjectValueInsensitive(*objectNode, "components");
+                if (componentsNode == nullptr || componentsNode->Type != EJsonType::Array) {
+                    return {};
+                }
+
+                for (const auto* componentNode : componentsNode->Array) {
+                    if (componentNode == nullptr || componentNode->Type != EJsonType::Object) {
+                        return {};
+                    }
+
+                    double typeNumber = 0.0;
+                    if (!GetNumberValue(
+                            FindObjectValueInsensitive(*componentNode, "type"), typeNumber)) {
+                        return {};
+                    }
+                    auto componentType = static_cast<FComponentTypeHash>(typeNumber);
+
+                    bool enabled = true;
+                    if (!GetBoolValue(
+                            FindObjectValueInsensitive(*componentNode, "enabled"), enabled)) {
+                        return {};
+                    }
+
+                    const auto* dataNode = FindObjectValueInsensitive(*componentNode, "data");
+                    if (dataNode == nullptr || dataNode->Type != EJsonType::Object) {
+                        return {};
+                    }
+
+                    const auto* componentEntry = registry.Find(componentType);
+                    if (componentEntry == nullptr) {
+                        Core::Container::FNativeString typeNameText{};
+                        if (GetStringValue(FindObjectValueInsensitive(*componentNode, "typeName"),
+                                typeNameText)) {
+                            componentEntry = registry.FindByTypeName(typeNameText.ToView());
+                            if (componentEntry != nullptr) {
+                                componentType = componentEntry->TypeHash;
+                            }
+                        }
+                    }
+                    Assert(componentEntry != nullptr && componentEntry->Create != nullptr
+                            && componentEntry->DeserializeJson != nullptr,
+                        TEXT("GameScene.World"),
+                        "Component type is not json-deserializable. type={}", componentType);
+                    if (componentEntry == nullptr || componentEntry->DeserializeJson == nullptr) {
+                        return {};
+                    }
+
+                    const auto componentId = world->CreateComponent(actualId, componentType);
+                    if (!componentId.IsValid()) {
+                        return {};
+                    }
+
+                    registry.DeserializeJson(*world, componentId, *dataNode);
+
+                    auto* component = world->ResolveComponentBase(componentId);
+                    if (component == nullptr) {
+                        return {};
+                    }
+
+                    component->Initialize(world.Get(), componentId, actualId);
+                    if (!enabled) {
+                        component->mEnabled = true;
+                        component->SetEnabled(false);
+                    }
+                }
+                continue;
+            }
+
+            const auto* prefabNode = FindObjectValueInsensitive(*objectNode, "prefab");
+            if (prefabNode == nullptr || prefabNode->Type != EJsonType::Object) {
+                return {};
+            }
+
+            Core::Container::FNativeString loaderType{};
+            if (!GetStringValue(
+                    FindObjectValueInsensitive(*prefabNode, "loaderType"), loaderType)) {
+                return {};
+            }
+
+            Asset::FAssetHandle prefabAsset{};
+            const auto*         assetNode = FindObjectValueInsensitive(*prefabNode, "asset");
+            if (assetNode == nullptr || !ParseAssetHandleJson(*assetNode, prefabAsset)) {
+                return {};
+            }
+
+            const auto prefabResult =
+                Engine::GameSceneAsset::GetPrefabInstantiatorRegistry().Instantiate(
+                    loaderType.ToView(), *world, assetManager, prefabAsset);
+            if (!prefabResult.Root.IsValid() || !world->IsAlive(prefabResult.Root)) {
+                return {};
+            }
+
+            auto* prefabRoot = world->ResolveGameObject(prefabResult.Root);
+            if (prefabRoot == nullptr) {
+                return {};
+            }
+
+            prefabRoot->SetName(Core::Utility::String::FromUtf8(objectName).ToView());
+            prefabRoot->SetLocalTransform(localTransform);
+            world->SetGameObjectActive(prefabResult.Root, active);
+
+            Engine::GameSceneAsset::FPrefabDescriptor descriptor{};
+            descriptor.LoaderType  = loaderType;
+            descriptor.AssetHandle = prefabAsset;
+            world->RegisterPrefabRoot(prefabResult.Root, descriptor);
+
+            objectIdRemap[serializedId] = prefabResult.Root;
+            if (hasParent) {
+                pendingParents.PushBack({ prefabResult.Root, parentSerializedId });
+            }
+        }
+
+        for (const auto& link : pendingParents) {
+            auto parentIt = objectIdRemap.FindIt(link.mParentSerialized);
+            if (parentIt == objectIdRemap.end()) {
+                return {};
+            }
+
+            auto* childObject = world->ResolveGameObject(link.mChild);
+            if (childObject == nullptr) {
+                return {};
+            }
+            childObject->SetParent(parentIt->second);
+        }
+
+        world->mFreeGameObjects.Clear();
+        for (u32 index = 0U; index < static_cast<u32>(world->mGameObjects.Size()); ++index) {
+            const auto& slot = world->mGameObjects[index];
+            if (!slot.Alive || !slot.Handle) {
+                world->mFreeGameObjects.PushBack(index);
+            }
+        }
+
+        world->UpdateTransforms();
+        return world;
     }
 
     auto FWorld::Deserialize(Core::Reflection::IDeserializer& deserializer,

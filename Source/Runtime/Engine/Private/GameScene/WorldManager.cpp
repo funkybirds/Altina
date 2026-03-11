@@ -15,6 +15,25 @@ namespace AltinaEngine::GameScene {
         return handle;
     }
 
+    auto FWorldManager::AddWorld(TOwner<FWorld> world) -> FWorldHandle {
+        if (!world) {
+            return {};
+        }
+
+        const u32 id = world->GetWorldId();
+        if (id == 0U) {
+            return {};
+        }
+
+        mWorlds[id] = Move(world);
+
+        FWorldHandle handle{ id };
+        if (!mActiveWorld.IsValid()) {
+            mActiveWorld = handle;
+        }
+        return handle;
+    }
+
     void FWorldManager::DestroyWorld(FWorldHandle handle) {
         if (!handle.IsValid()) {
             return;

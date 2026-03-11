@@ -50,6 +50,9 @@ namespace AltinaEngine::Asset {
             if (Core::Utility::String::EqualLiteralI(text, "script")) {
                 return EAssetType::Script;
             }
+            if (Core::Utility::String::EqualLiteralI(text, "level")) {
+                return EAssetType::Level;
+            }
             if (Core::Utility::String::EqualLiteralI(text, "redirector")) {
                 return EAssetType::Redirector;
             }
@@ -142,6 +145,10 @@ namespace AltinaEngine::Asset {
                     }
                     break;
                 }
+                case EAssetType::Level:
+                    ReadU32Field(descObject, "Encoding", desc.mLevel.Encoding);
+                    ReadU32Field(descObject, "ByteSize", desc.mLevel.ByteSize);
+                    break;
                 default:
                     break;
             }

@@ -945,6 +945,7 @@ namespace AltinaEngine::Launch {
         if (!mAssetReady) {
             mAssetManager.SetRegistry(&mAssetRegistry);
             mAssetManager.RegisterLoader(&mAudioLoader);
+            mAssetManager.RegisterLoader(&mLevelLoader);
             mAssetManager.RegisterLoader(&mMaterialLoader);
             mAssetManager.RegisterLoader(&mModelLoader);
             mAssetManager.RegisterLoader(&mMeshLoader);
@@ -1448,6 +1449,7 @@ namespace AltinaEngine::Launch {
             mMaterialCache.Clear();
             mAssetManager.ClearCache();
             mAssetManager.UnregisterLoader(&mTexture2DLoader);
+            mAssetManager.UnregisterLoader(&mLevelLoader);
             mAssetManager.UnregisterLoader(&mShaderLoader);
             mAssetManager.UnregisterLoader(&mScriptLoader);
             mAssetManager.UnregisterLoader(&mMeshLoader);

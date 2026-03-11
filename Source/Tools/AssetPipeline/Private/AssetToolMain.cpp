@@ -5,6 +5,7 @@
 #include "AssetToolTypes.h"
 #include "Importers/Audio/AudioImporter.h"
 #include "Importers/EnvMap/EnvMapImporter.h"
+#include "Importers/Level/LevelImporter.h"
 #include "Importers/Material/MaterialImporter.h"
 #include "Importers/Mesh/MeshImporter.h"
 #include "Importers/Model/ModelImporter.h"
@@ -85,6 +86,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::string                      ScriptAssemblyPath;
             std::string                      ScriptTypeName;
             bool                             HasScriptDesc = false;
+            Asset::FLevelDesc                LevelDesc{};
+            bool                             HasLevelDesc = false;
         };
 
         struct FCookCacheEntry {
@@ -193,6 +196,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return "Model";
                 case Asset::EAssetType::Script:
                     return "Script";
+                case Asset::EAssetType::Level:
+                    return "Level";
                 case Asset::EAssetType::Redirector:
                     return "Redirector";
                 case Asset::EAssetType::MaterialInstance:
@@ -261,6 +266,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             if (value == "script") {
                 return Asset::EAssetType::Script;
             }
+            if (value == "level") {
+                return Asset::EAssetType::Level;
+            }
             if (value == "redirector") {
                 return Asset::EAssetType::Redirector;
             }
@@ -285,6 +293,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     return "ModelImporter";
                 case Asset::EAssetType::Script:
                     return "ScriptImporter";
+                case Asset::EAssetType::Level:
+                    return "LevelImporter";
                 case Asset::EAssetType::MaterialInstance:
                     return "MaterialInstanceImporter";
                 default:
@@ -355,6 +365,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return ext == ".script";
         }
 
+        auto IsLevelExtension(const std::filesystem::path& path) -> bool {
+            std::string ext = path.extension().string();
+            ToLowerAscii(ext);
+            return ext == ".level";
+        }
+
         auto GuessAssetType(const std::filesystem::path& path) -> Asset::EAssetType {
             if (IsTextureExtension(path)) {
                 return Asset::EAssetType::Texture2D;
@@ -376,6 +392,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
             if (IsScriptExtension(path)) {
                 return Asset::EAssetType::Script;
+            }
+            if (IsLevelExtension(path)) {
+                return Asset::EAssetType::Level;
             }
             return Asset::EAssetType::Unknown;
         }
@@ -1079,6 +1098,14 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             stream << "\"AssemblyPath\": \"\", \"TypeName\": \"\"";
                         }
                         break;
+                    case Asset::EAssetType::Level:
+                        if (entry.HasLevelDesc) {
+                            stream << "\"Encoding\": " << entry.LevelDesc.Encoding
+                                   << ", \"ByteSize\": " << entry.LevelDesc.ByteSize;
+                        } else {
+                            stream << "\"Encoding\": 0, \"ByteSize\": 0";
+                        }
+                        break;
                     default:
                         break;
                 }
@@ -1205,15 +1232,18 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 const bool            isTexture2D = asset.Type == Asset::EAssetType::Texture2D;
                 const bool            isCubeMap   = asset.Type == Asset::EAssetType::CubeMap;
                 const bool            isMesh      = asset.Type == Asset::EAssetType::Mesh;
-                const bool  isMaterial = asset.Type == Asset::EAssetType::MaterialTemplate;
-                const bool  isAudio    = asset.Type == Asset::EAssetType::Audio;
-                const bool  isScript   = asset.Type == Asset::EAssetType::Script;
-                const bool  isShader   = asset.Type == Asset::EAssetType::Shader;
-                const bool  isModel    = asset.Type == Asset::EAssetType::Model;
-                std::string scriptAssemblyPath;
-                std::string scriptTypeName;
-                bool        hasScriptDesc = false;
+                const bool        isMaterial = asset.Type == Asset::EAssetType::MaterialTemplate;
+                const bool        isAudio    = asset.Type == Asset::EAssetType::Audio;
+                const bool        isScript   = asset.Type == Asset::EAssetType::Script;
+                const bool        isShader   = asset.Type == Asset::EAssetType::Shader;
+                const bool        isModel    = asset.Type == Asset::EAssetType::Model;
+                const bool        isLevel    = asset.Type == Asset::EAssetType::Level;
+                std::string       scriptAssemblyPath;
+                std::string       scriptTypeName;
+                bool              hasScriptDesc = false;
+                Asset::FLevelDesc levelDesc{};
                 std::vector<Asset::FAssetHandle> materialDeps;
+                std::vector<Asset::FAssetHandle> levelDeps;
                 FModelCookResult                 modelResult{};
                 FEnvMapCookResult                envMapResult{};
                 FSkyCubeCookResult               skyCubeResult{};
@@ -1357,6 +1387,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
                         timing.Result = "cook_failed";
                         continue;
                     }
+                } else if (isLevel) {
+                    if (!CookLevel(asset.SourcePath, bytes, cookedBytes, levelDeps, levelDesc)) {
+                        std::cerr << "Failed to cook level: " << asset.SourcePath.string() << "\n";
+                        timing.Result = "cook_failed";
+                        continue;
+                    }
+                    cookKeyExtras = cookedBytes;
                 } else {
                     cookedBytes = bytes;
                 }
@@ -1434,6 +1471,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                     registryEntry.ScriptAssemblyPath = scriptAssemblyPath;
                     registryEntry.ScriptTypeName     = scriptTypeName;
                     registryEntry.HasScriptDesc      = hasScriptDesc;
+                } else if (isLevel) {
+                    registryEntry.Dependencies = Move(levelDeps);
+                    registryEntry.LevelDesc    = levelDesc;
+                    registryEntry.HasLevelDesc = true;
                 }
                 registryAssets.push_back(registryEntry);
 

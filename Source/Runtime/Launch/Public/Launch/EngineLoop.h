@@ -11,6 +11,7 @@
 #include "Asset/AssetRegistry.h"
 #include "Asset/AssetBinary.h"
 #include "Asset/AudioLoader.h"
+#include "Asset/LevelLoader.h"
 #include "Asset/MaterialLoader.h"
 #include "Asset/ModelLoader.h"
 #include "Asset/MeshLoader.h"
@@ -298,6 +299,7 @@ namespace AltinaEngine::Launch {
         Asset::FAssetRegistry                mAssetRegistry;
         Asset::FAssetManager                 mAssetManager;
         Asset::FAudioLoader                  mAudioLoader;
+        Asset::FLevelLoader                  mLevelLoader;
         Asset::FMaterialLoader               mMaterialLoader;
         Asset::FModelLoader                  mModelLoader;
         Asset::FMeshLoader                   mMeshLoader;

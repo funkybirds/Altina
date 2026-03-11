@@ -36,17 +36,35 @@ namespace {
         component.mFloatValue = deserializer.Read<f32>();
     }
 
-    void RegisterDeserializeTestComponent() {
-        static bool registered = false;
-        if (registered) {
-            return;
-        }
-        registered = true;
+    void SerializeCameraTestData(FWorld& world, FComponentId id, ISerializer& serializer) {
+        const auto& component = world.ResolveComponent<FCameraComponent>(id);
+        serializer.Write(component.GetFovYRadians());
+        serializer.Write(component.GetNearPlane());
+        serializer.Write(component.GetFarPlane());
+    }
 
+    void DeserializeCameraTestData(FWorld& world, FComponentId id, IDeserializer& deserializer) {
+        auto& component = world.ResolveComponent<FCameraComponent>(id);
+        component.SetFovYRadians(deserializer.Read<f32>());
+        component.SetNearPlane(deserializer.Read<f32>());
+        component.SetFarPlane(deserializer.Read<f32>());
+    }
+
+    void RegisterDeserializeTestComponent() {
         auto entry        = BuildComponentTypeEntry<FDeserializeTestComponent>();
         entry.Serialize   = &SerializeDeserializeTestData;
         entry.Deserialize = &DeserializeDeserializeTestData;
         GetComponentRegistry().Register(entry);
+
+        auto cameraEntry = BuildComponentTypeEntry<FCameraComponent>();
+        if (const auto* existing =
+                GetComponentRegistry().Find(GetComponentTypeHash<FCameraComponent>());
+            existing != nullptr) {
+            cameraEntry = *existing;
+        }
+        cameraEntry.Serialize   = &SerializeCameraTestData;
+        cameraEntry.Deserialize = &DeserializeCameraTestData;
+        GetComponentRegistry().Register(cameraEntry);
     }
 
     auto MakeUuid(u8 seed) -> FUuid {

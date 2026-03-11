@@ -26,6 +26,7 @@ namespace AltinaEngine::Asset {
         Shader           = 8,
         Model            = 9,
         CubeMap          = 10,
+        Level            = 11,
     };
 
     struct AE_ASSET_API FAssetHandle {
@@ -109,6 +110,11 @@ namespace AltinaEngine::Asset {
         FNativeString mTypeName;
     };
 
+    struct AE_ASSET_API FLevelDesc {
+        u32 Encoding = 0;
+        u32 ByteSize = 0;
+    };
+
     struct AE_ASSET_API FAssetDesc {
         FAssetHandle          mHandle;
         FString               mVirtualPath;
@@ -123,6 +129,7 @@ namespace AltinaEngine::Asset {
         FShaderDesc           mShader;
         FAudioDesc            mAudio;
         FScriptDesc           mScript;
+        FLevelDesc            mLevel;
     };
 
 } // namespace AltinaEngine::Asset

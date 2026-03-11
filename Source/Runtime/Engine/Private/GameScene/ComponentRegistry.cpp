@@ -5,7 +5,20 @@
 namespace AltinaEngine::GameScene {
     namespace {
         FComponentRegistry gComponentRegistry;
-    }
+
+        auto               StripCppTypeKeyword(Core::Container::FNativeStringView typeName)
+            -> Core::Container::FNativeStringView {
+            constexpr Core::Container::FNativeStringView classPrefix("class ");
+            constexpr Core::Container::FNativeStringView structPrefix("struct ");
+            if (typeName.StartsWith(classPrefix)) {
+                return typeName.Substr(classPrefix.Length());
+            }
+            if (typeName.StartsWith(structPrefix)) {
+                return typeName.Substr(structPrefix.Length());
+            }
+            return typeName;
+        }
+    } // namespace
 
     void FComponentRegistry::Register(const FComponentTypeEntry& entry) {
         if (entry.TypeHash == 0 || entry.Create == nullptr) {
@@ -37,6 +50,31 @@ namespace AltinaEngine::GameScene {
             return nullptr;
         }
         return &it->second;
+    }
+
+    auto FComponentRegistry::FindByTypeName(Core::Container::FNativeStringView typeName) const
+        -> const FComponentTypeEntry* {
+        if (typeName.IsEmpty()) {
+            return nullptr;
+        }
+
+        const auto strippedQuery = StripCppTypeKeyword(typeName);
+        for (const auto& [hash, entry] : mEntries) {
+            (void)hash;
+            if (entry.TypeName.IsEmpty()) {
+                continue;
+            }
+
+            if (entry.TypeName == typeName) {
+                return &entry;
+            }
+
+            const auto strippedEntry = StripCppTypeKeyword(entry.TypeName);
+            if (strippedEntry == strippedQuery) {
+                return &entry;
+            }
+        }
+        return nullptr;
     }
 
     auto FComponentRegistry::Create(FComponentTypeHash type, FComponentCreateContext& ctx) const
@@ -72,6 +110,15 @@ namespace AltinaEngine::GameScene {
             return;
         }
         entry->SerializeJson(world, id, s);
+    }
+
+    void FComponentRegistry::DeserializeJson(
+        FWorld& world, FComponentId id, const Core::Utility::Json::FJsonValue& value) const {
+        const auto* entry = Find(id.Type);
+        if (entry == nullptr || entry->DeserializeJson == nullptr) {
+            return;
+        }
+        entry->DeserializeJson(world, id, value);
     }
 
     void FComponentRegistry::Deserialize(

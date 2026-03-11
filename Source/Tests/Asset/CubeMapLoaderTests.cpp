@@ -82,7 +82,7 @@ TEST_CASE("Asset.CubeMap.Loader.Basic") {
 
     FCubeMapBlobDesc blobDesc{};
     blobDesc.mSize     = size;
-    blobDesc.Format    = format;
+    blobDesc.mFormat   = format;
     blobDesc.mMipCount = mipCount;
     blobDesc.mRowPitch = size * bytesPerPixel;
 
@@ -103,10 +103,10 @@ TEST_CASE("Asset.CubeMap.Loader.Basic") {
     FCubeMapLoader   loader;
 
     FAssetDesc       desc{};
-    desc.CubeMap.Size     = size;
-    desc.CubeMap.MipCount = mipCount;
-    desc.CubeMap.Format   = format;
-    desc.CubeMap.SRGB     = false;
+    desc.mCubeMap.Size     = size;
+    desc.mCubeMap.MipCount = mipCount;
+    desc.mCubeMap.Format   = format;
+    desc.mCubeMap.SRGB     = false;
 
     auto asset = loader.Load(desc, stream);
     REQUIRE(asset);

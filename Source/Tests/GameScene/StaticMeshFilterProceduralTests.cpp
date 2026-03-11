@@ -11,7 +11,7 @@ namespace {
 
     auto MakeTinyTriangleMesh() -> Geometry::FStaticMeshData {
         Geometry::FStaticMeshData mesh{};
-        mesh.Lods.Reserve(1);
+        mesh.mLods.Reserve(1);
 
         Geometry::FStaticMeshLodData lod{};
         lod.mPrimitiveTopology = AltinaEngine::Rhi::ERhiPrimitiveTopology::TriangleList;
@@ -44,7 +44,7 @@ namespace {
         section.IndexCount   = 3U;
         section.BaseVertex   = 0;
         section.MaterialSlot = 0U;
-        lod.Sections.PushBack(section);
+        lod.mSections.PushBack(section);
 
         lod.mBounds.Min = pos[0];
         lod.mBounds.Max = pos[0];
@@ -57,8 +57,8 @@ namespace {
             }
         }
 
-        mesh.Lods.PushBack(Move(lod));
-        mesh.Bounds = mesh.Lods[0].mBounds;
+        mesh.mLods.PushBack(Move(lod));
+        mesh.mBounds = mesh.mLods[0].mBounds;
         return mesh;
     }
 } // namespace
@@ -71,15 +71,15 @@ TEST_CASE("GameScene.StaticMeshFilterComponent.ProceduralOverrideStable") {
     const auto& m0 = comp.GetStaticMesh();
     REQUIRE(m0.IsValid());
     REQUIRE_EQ(m0.GetLodCount(), 1U);
-    const u32 v0 = m0.Lods[0].GetVertexCount();
-    const u32 i0 = m0.Lods[0].GetIndexCount();
+    const u32 v0 = m0.mLods[0].GetVertexCount();
+    const u32 i0 = m0.mLods[0].GetIndexCount();
     REQUIRE_EQ(v0, 3U);
     REQUIRE_EQ(i0, 3U);
 
     const auto& m1 = comp.GetStaticMesh();
     REQUIRE(m1.IsValid());
-    REQUIRE_EQ(m1.Lods[0].GetVertexCount(), v0);
-    REQUIRE_EQ(m1.Lods[0].GetIndexCount(), i0);
+    REQUIRE_EQ(m1.mLods[0].GetVertexCount(), v0);
+    REQUIRE_EQ(m1.mLods[0].GetIndexCount(), i0);
 }
 
 TEST_CASE("GameScene.StaticMeshFilterComponent.ProceduralOverrideBeatsAssetResolve") {
@@ -93,8 +93,8 @@ TEST_CASE("GameScene.StaticMeshFilterComponent.ProceduralOverrideBeatsAssetResol
     // Even with an asset converter installed, procedural override should keep the mesh intact.
     const auto& mesh = comp.GetStaticMesh();
     REQUIRE(mesh.IsValid());
-    REQUIRE_EQ(mesh.Lods[0].GetVertexCount(), 3U);
-    REQUIRE_EQ(mesh.Lods[0].GetIndexCount(), 3U);
+    REQUIRE_EQ(mesh.mLods[0].GetVertexCount(), 3U);
+    REQUIRE_EQ(mesh.mLods[0].GetIndexCount(), 3U);
 
     FStaticMeshFilterComponent::AssetToStaticMeshConverter = old;
 }

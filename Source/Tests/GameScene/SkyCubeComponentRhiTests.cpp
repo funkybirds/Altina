@@ -87,7 +87,7 @@ namespace {
 
         FCubeMapBlobDesc blobDesc{};
         blobDesc.mSize     = size;
-        blobDesc.Format    = format;
+        blobDesc.mFormat   = format;
         blobDesc.mMipCount = mipCount;
         blobDesc.mRowPitch = size * bytesPerPixel;
 
@@ -140,14 +140,14 @@ TEST_CASE("GameScene.SkyCubeComponent.AssetToRhi") {
 
     Asset::FAssetRegistry registry;
     Asset::FAssetDesc     desc{};
-    desc.mHandle.Uuid     = MakeUuid(0x42U);
-    desc.mHandle.Type     = Asset::EAssetType::CubeMap;
-    desc.mVirtualPath     = TEXT("test/sky");
-    desc.mCookedPath      = ToFString(cookedPath);
-    desc.CubeMap.Size     = 4U;
-    desc.CubeMap.MipCount = 2U;
-    desc.CubeMap.Format   = Asset::kTextureFormatRGBA8;
-    desc.CubeMap.SRGB     = false;
+    desc.mHandle.mUuid     = MakeUuid(0x42U);
+    desc.mHandle.mType     = Asset::EAssetType::CubeMap;
+    desc.mVirtualPath      = TEXT("test/sky");
+    desc.mCookedPath       = ToFString(cookedPath);
+    desc.mCubeMap.Size     = 4U;
+    desc.mCubeMap.MipCount = 2U;
+    desc.mCubeMap.Format   = Asset::kTextureFormatRGBA8;
+    desc.mCubeMap.SRGB     = false;
     registry.AddAsset(desc);
 
     Asset::FAssetManager  manager;

@@ -14,6 +14,8 @@
 #include "Asset/MaterialLoader.h"
 #include "Asset/MeshAsset.h"
 #include "Asset/MeshLoader.h"
+#include "Asset/LevelAsset.h"
+#include "Asset/LevelLoader.h"
 #include "Asset/Texture2DAsset.h"
 #include "Asset/Texture2DLoader.h"
 #include "TestHarness.h"
@@ -32,6 +34,8 @@ namespace {
     using AltinaEngine::Asset::FAssetRegistry;
     using AltinaEngine::Asset::FAudioAsset;
     using AltinaEngine::Asset::FAudioLoader;
+    using AltinaEngine::Asset::FLevelAsset;
+    using AltinaEngine::Asset::FLevelLoader;
     using AltinaEngine::Asset::FMaterialAsset;
     using AltinaEngine::Asset::FMaterialLoader;
     using AltinaEngine::Asset::FMeshAsset;
@@ -276,21 +280,21 @@ TEST_CASE("Asset.MaterialTemplate.Json.Load") {
     REQUIRE_EQ(pass.mName, FString(TEXT("BasePass")));
     REQUIRE(pass.mHasVertex);
     REQUIRE(pass.mHasPixel);
-    REQUIRE_EQ(pass.mVertex.mAsset.Uuid, shaderUuid);
-    REQUIRE_EQ(pass.mVertex.mAsset.Type, AltinaEngine::Asset::EAssetType::Shader);
+    REQUIRE_EQ(pass.mVertex.mAsset.mUuid, shaderUuid);
+    REQUIRE_EQ(pass.mVertex.mAsset.mType, AltinaEngine::Asset::EAssetType::Shader);
     REQUIRE_EQ(pass.mVertex.mEntry, FString(TEXT("VSMain")));
-    REQUIRE_EQ(pass.mPixel.mAsset.Uuid, shaderUuid);
-    REQUIRE_EQ(pass.mPixel.mAsset.Type, AltinaEngine::Asset::EAssetType::Shader);
+    REQUIRE_EQ(pass.mPixel.mAsset.mUuid, shaderUuid);
+    REQUIRE_EQ(pass.mPixel.mAsset.mType, AltinaEngine::Asset::EAssetType::Shader);
     REQUIRE_EQ(pass.mPixel.mEntry, FString(TEXT("PSMain")));
 
     REQUIRE(pass.mRasterOverrides.HasAny());
-    REQUIRE(pass.mRasterOverrides.HasCullMode);
+    REQUIRE(pass.mRasterOverrides.mHasCullMode);
     REQUIRE_EQ(pass.mRasterOverrides.mCullMode, AltinaEngine::Asset::EMaterialRasterCullMode::None);
-    REQUIRE(pass.mRasterOverrides.HasFrontFace);
+    REQUIRE(pass.mRasterOverrides.mHasFrontFace);
     REQUIRE_EQ(pass.mRasterOverrides.mFrontFace, AltinaEngine::Asset::EMaterialRasterFrontFace::CW);
-    REQUIRE(pass.mRasterOverrides.HasDepthBias);
+    REQUIRE(pass.mRasterOverrides.mHasDepthBias);
     REQUIRE_EQ(pass.mRasterOverrides.mDepthBias, 2);
-    REQUIRE(pass.mRasterOverrides.HasDepthClip);
+    REQUIRE(pass.mRasterOverrides.mHasDepthClip);
     REQUIRE(!pass.mRasterOverrides.mDepthClip);
 
     const auto& variants = material->GetPrecompileVariants();
@@ -516,4 +520,58 @@ TEST_CASE("Asset.Audio.EngineFormat.LoadFromRegistry") {
 
     manager.UnregisterLoader(&loader);
     manager.SetRegistry(nullptr);
+}
+
+TEST_CASE("Asset.Level.EngineFormat.Load") {
+    const char* levelJson = "{\"version\":2,\"worldId\":1,\"objects\":[]}";
+    const usize jsonSize  = std::strlen(levelJson);
+
+    AltinaEngine::Asset::FAssetBlobHeader header{};
+    header.mType     = static_cast<u8>(AltinaEngine::Asset::EAssetType::Level);
+    header.mDescSize = static_cast<u32>(sizeof(AltinaEngine::Asset::FLevelBlobDesc));
+    header.mDataSize = static_cast<u32>(jsonSize);
+
+    AltinaEngine::Asset::FLevelBlobDesc levelDesc{};
+    levelDesc.mEncoding = AltinaEngine::Asset::kLevelEncodingWorldJson;
+
+    TVector<u8> cooked{};
+    cooked.Resize(sizeof(header) + sizeof(levelDesc) + jsonSize);
+    std::memcpy(cooked.Data(), &header, sizeof(header));
+    std::memcpy(cooked.Data() + sizeof(header), &levelDesc, sizeof(levelDesc));
+    std::memcpy(cooked.Data() + sizeof(header) + sizeof(levelDesc), levelJson, jsonSize);
+
+    FTestAssetStream stream(cooked);
+    FLevelLoader     loader{};
+
+    FAssetDesc       desc{};
+    desc.mLevel.Encoding = AltinaEngine::Asset::kLevelEncodingWorldJson;
+    desc.mLevel.ByteSize = static_cast<u32>(jsonSize);
+
+    auto asset = loader.Load(desc, stream);
+    REQUIRE(asset);
+
+    const auto* level = static_cast<FLevelAsset*>(asset.Get());
+    REQUIRE(level != nullptr);
+    REQUIRE_EQ(level->GetEncoding(), AltinaEngine::Asset::kLevelEncodingWorldJson);
+    REQUIRE_EQ(level->GetPayload().Size(), jsonSize);
+}
+
+TEST_CASE("Asset.Registry.LevelType.Parse") {
+    AltinaEngine::Asset::FAssetRegistry          registry{};
+    AltinaEngine::Core::Container::FNativeString text{};
+    text.Append(
+        "{\"SchemaVersion\":1,\"Assets\":[{\"Uuid\":\"12345678-1234-1234-1234-1234567890ab\","
+        "\"Type\":\"Level\",\"VirtualPath\":\"demo/minimal/levels/default\",\"CookedPath\":\"Assets/"
+        "12345678-1234-1234-1234-1234567890ab.bin\",\"Dependencies\":[],\"Desc\":{\"Encoding\":1,"
+        "\"ByteSize\":32}}],\"Redirectors\":[]}");
+
+    REQUIRE(registry.LoadFromJsonText(text.ToView()));
+    const auto handle = registry.FindByPath(TEXT("demo/minimal/levels/default"));
+    REQUIRE(handle.IsValid());
+    REQUIRE_EQ(handle.mType, AltinaEngine::Asset::EAssetType::Level);
+
+    const auto* desc = registry.GetDesc(handle);
+    REQUIRE(desc != nullptr);
+    REQUIRE_EQ(desc->mLevel.Encoding, 1U);
+    REQUIRE_EQ(desc->mLevel.ByteSize, 32U);
 }

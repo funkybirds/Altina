@@ -149,6 +149,13 @@ namespace AltinaEngine::Asset {
         u32          mMaterialSlotCount  = 0;
     };
 
+    struct AE_ASSET_API FLevelBlobDesc {
+        u32 mEncoding = 0;
+    };
+
+    constexpr u32                kLevelEncodingWorldBinary = 0;
+    constexpr u32                kLevelEncodingWorldJson   = 1;
+
     constexpr u32                kMeshSemanticPosition = 0;
     constexpr u32                kMeshSemanticNormal   = 1;
     constexpr u32                kMeshSemanticTangent  = 2;

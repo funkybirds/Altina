@@ -7,10 +7,51 @@
 #include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
+#include "Utility/Json.h"
 #include "Utility/String/CodeConvert.h"
+#include "Utility/String/UuidParser.h"
 
 namespace AltinaEngine::GameScene {
     namespace {
+        using Core::Utility::Json::EJsonType;
+        using Core::Utility::Json::FindObjectValueInsensitive;
+        using Core::Utility::Json::FJsonValue;
+        using Core::Utility::Json::GetBoolValue;
+        using Core::Utility::Json::GetNumberValue;
+        using Core::Utility::Json::GetStringValue;
+
+        auto ParseAssetHandleJson(const FJsonValue& value, Asset::FAssetHandle& outHandle) -> bool {
+            if (value.Type != EJsonType::Object) {
+                return false;
+            }
+
+            bool valid = false;
+            (void)GetBoolValue(FindObjectValueInsensitive(value, "valid"), valid);
+            if (!valid) {
+                outHandle = {};
+                return true;
+            }
+
+            double typeNumber = 0.0;
+            if (!GetNumberValue(FindObjectValueInsensitive(value, "type"), typeNumber)) {
+                return false;
+            }
+
+            Core::Container::FNativeString uuidText;
+            if (!GetStringValue(FindObjectValueInsensitive(value, "uuid"), uuidText)) {
+                return false;
+            }
+
+            FUuid uuid{};
+            if (!Core::Utility::String::ParseUuid(uuidText.ToView(), uuid)) {
+                return false;
+            }
+
+            outHandle.mType = static_cast<Asset::EAssetType>(static_cast<u8>(typeNumber));
+            outHandle.mUuid = uuid;
+            return outHandle.IsValid();
+        }
+
         auto WriteNativeStringJson(Core::Reflection::ISerializer& serializer,
             Core::Container::FNativeStringView                    value) -> void {
 #if defined(AE_UNICODE) || defined(UNICODE) || defined(_UNICODE)
@@ -48,6 +89,24 @@ namespace AltinaEngine::GameScene {
             serializer.EndObject();
         }
 
+        void DeserializeCameraComponentJson(
+            FWorld& world, FComponentId id, const FJsonValue& value) {
+            if (value.Type != EJsonType::Object) {
+                return;
+            }
+            auto&  component = world.ResolveComponent<FCameraComponent>(id);
+            double number    = 0.0;
+            if (GetNumberValue(FindObjectValueInsensitive(value, "fovYRadians"), number)) {
+                component.SetFovYRadians(static_cast<f32>(number));
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "nearPlane"), number)) {
+                component.SetNearPlane(static_cast<f32>(number));
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "farPlane"), number)) {
+                component.SetFarPlane(static_cast<f32>(number));
+            }
+        }
+
         void SerializeDirectionalLightComponentJson(
             FWorld& world, FComponentId id, Core::Reflection::ISerializer& serializer) {
             const auto& component = world.ResolveComponent<FDirectionalLightComponent>(id);
@@ -75,6 +134,52 @@ namespace AltinaEngine::GameScene {
             serializer.EndObject();
         }
 
+        void DeserializeDirectionalLightComponentJson(
+            FWorld& world, FComponentId id, const FJsonValue& value) {
+            if (value.Type != EJsonType::Object) {
+                return;
+            }
+
+            auto& component = world.ResolveComponent<FDirectionalLightComponent>(id);
+            if (const auto* colorValue = FindObjectValueInsensitive(value, "color");
+                colorValue != nullptr && colorValue->Type == EJsonType::Array
+                && colorValue->Array.Size() >= 3) {
+                double x = 0.0;
+                double y = 0.0;
+                double z = 0.0;
+                if (GetNumberValue(colorValue->Array[0], x)
+                    && GetNumberValue(colorValue->Array[1], y)
+                    && GetNumberValue(colorValue->Array[2], z)) {
+                    component.mColor = Core::Math::FVector3f(
+                        static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(z));
+                }
+            }
+
+            double number = 0.0;
+            if (GetNumberValue(FindObjectValueInsensitive(value, "intensity"), number)) {
+                component.mIntensity = static_cast<f32>(number);
+            }
+            bool flag = false;
+            if (GetBoolValue(FindObjectValueInsensitive(value, "castShadows"), flag)) {
+                component.mCastShadows = flag;
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "shadowCascadeCount"), number)) {
+                component.mShadowCascadeCount = static_cast<u32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "shadowSplitLambda"), number)) {
+                component.mShadowSplitLambda = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "shadowMaxDistance"), number)) {
+                component.mShadowMaxDistance = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "shadowMapSize"), number)) {
+                component.mShadowMapSize = static_cast<u32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "shadowReceiverBias"), number)) {
+                component.mShadowReceiverBias = static_cast<f32>(number);
+            }
+        }
+
         void SerializePointLightComponentJson(
             FWorld& world, FComponentId id, Core::Reflection::ISerializer& serializer) {
             const auto& component = world.ResolveComponent<FPointLightComponent>(id);
@@ -90,6 +195,36 @@ namespace AltinaEngine::GameScene {
             serializer.WriteFieldName(TEXT("range"));
             serializer.Write(component.mRange);
             serializer.EndObject();
+        }
+
+        void DeserializePointLightComponentJson(
+            FWorld& world, FComponentId id, const FJsonValue& value) {
+            if (value.Type != EJsonType::Object) {
+                return;
+            }
+
+            auto& component = world.ResolveComponent<FPointLightComponent>(id);
+            if (const auto* colorValue = FindObjectValueInsensitive(value, "color");
+                colorValue != nullptr && colorValue->Type == EJsonType::Array
+                && colorValue->Array.Size() >= 3) {
+                double x = 0.0;
+                double y = 0.0;
+                double z = 0.0;
+                if (GetNumberValue(colorValue->Array[0], x)
+                    && GetNumberValue(colorValue->Array[1], y)
+                    && GetNumberValue(colorValue->Array[2], z)) {
+                    component.mColor = Core::Math::FVector3f(
+                        static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(z));
+                }
+            }
+
+            double number = 0.0;
+            if (GetNumberValue(FindObjectValueInsensitive(value, "intensity"), number)) {
+                component.mIntensity = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "range"), number)) {
+                component.mRange = static_cast<f32>(number);
+            }
         }
 
         void SerializeStaticMeshComponentJson(
@@ -120,6 +255,25 @@ namespace AltinaEngine::GameScene {
             }
             serializer.EndArray();
             serializer.EndObject();
+        }
+
+        void DeserializeStaticMeshComponentJson(
+            FWorld& world, FComponentId id, const FJsonValue& value) {
+            if (value.Type != EJsonType::Object) {
+                return;
+            }
+            auto* assetValue = FindObjectValueInsensitive(value, "asset");
+            if (assetValue == nullptr) {
+                return;
+            }
+
+            Asset::FAssetHandle handle{};
+            if (!ParseAssetHandleJson(*assetValue, handle)) {
+                return;
+            }
+
+            auto& component = world.ResolveComponent<FStaticMeshFilterComponent>(id);
+            component.SetStaticMeshAsset(handle);
         }
 
         void SerializeMeshMaterialComponentJson(
@@ -155,6 +309,38 @@ namespace AltinaEngine::GameScene {
             serializer.EndObject();
         }
 
+        void DeserializeMeshMaterialComponentJson(
+            FWorld& world, FComponentId id, const FJsonValue& value) {
+            if (value.Type != EJsonType::Object) {
+                return;
+            }
+
+            const auto* slotsValue = FindObjectValueInsensitive(value, "slots");
+            if (slotsValue == nullptr || slotsValue->Type != EJsonType::Array) {
+                return;
+            }
+
+            auto& component = world.ResolveComponent<FMeshMaterialComponent>(id);
+            u32   slotIndex = 0U;
+            for (const auto* slotValue : slotsValue->Array) {
+                if (slotValue == nullptr || slotValue->Type != EJsonType::Object) {
+                    ++slotIndex;
+                    continue;
+                }
+                const auto* templateValue = FindObjectValueInsensitive(*slotValue, "template");
+                if (templateValue == nullptr) {
+                    ++slotIndex;
+                    continue;
+                }
+
+                Asset::FAssetHandle handle{};
+                if (ParseAssetHandleJson(*templateValue, handle)) {
+                    component.SetMaterialTemplate(slotIndex, handle);
+                }
+                ++slotIndex;
+            }
+        }
+
         void SerializeScriptComponentJson(
             FWorld& world, FComponentId id, Core::Reflection::ISerializer& serializer) {
             const auto& component = world.ResolveComponent<FScriptComponent>(id);
@@ -168,6 +354,32 @@ namespace AltinaEngine::GameScene {
             serializer.EndObject();
         }
 
+        void DeserializeScriptComponentJson(
+            FWorld& world, FComponentId id, const FJsonValue& value) {
+            if (value.Type != EJsonType::Object) {
+                return;
+            }
+            auto&                          component = world.ResolveComponent<FScriptComponent>(id);
+
+            Core::Container::FNativeString assemblyPath{};
+            if (GetStringValue(FindObjectValueInsensitive(value, "assemblyPath"), assemblyPath)) {
+                component.SetAssemblyPath(assemblyPath.ToView());
+            }
+
+            Core::Container::FNativeString typeName{};
+            if (GetStringValue(FindObjectValueInsensitive(value, "typeName"), typeName)) {
+                component.SetTypeName(typeName.ToView());
+            }
+
+            const auto* scriptAssetValue = FindObjectValueInsensitive(value, "scriptAsset");
+            if (scriptAssetValue != nullptr) {
+                Asset::FAssetHandle handle{};
+                if (ParseAssetHandleJson(*scriptAssetValue, handle)) {
+                    component.SetScriptAsset(handle);
+                }
+            }
+        }
+
         void SerializeSkyCubeComponentJson(
             FWorld& world, FComponentId id, Core::Reflection::ISerializer& serializer) {
             const auto& component = world.ResolveComponent<FSkyCubeComponent>(id);
@@ -177,7 +389,27 @@ namespace AltinaEngine::GameScene {
             serializer.EndObject();
         }
 
-        template <typename T> void RegisterJsonSerializer(FnSerializeJson serializer) {
+        void DeserializeSkyCubeComponentJson(
+            FWorld& world, FComponentId id, const FJsonValue& value) {
+            if (value.Type != EJsonType::Object) {
+                return;
+            }
+            const auto* handleValue = FindObjectValueInsensitive(value, "cubeMapAsset");
+            if (handleValue == nullptr) {
+                return;
+            }
+
+            Asset::FAssetHandle handle{};
+            if (!ParseAssetHandleJson(*handleValue, handle)) {
+                return;
+            }
+
+            auto& component = world.ResolveComponent<FSkyCubeComponent>(id);
+            component.SetCubeMapAsset(handle);
+        }
+
+        template <typename T>
+        void RegisterJsonSerializer(FnSerializeJson serializer, FnDeserializeJson deserializer) {
             auto&                    registry = GetComponentRegistry();
             const FComponentTypeHash typeHash = GetComponentTypeHash<T>();
 
@@ -188,8 +420,9 @@ namespace AltinaEngine::GameScene {
                 entry = BuildComponentTypeEntry<T>();
             }
 
-            entry.TypeName      = Core::TypeMeta::TMetaTypeInfo<T>::kName;
-            entry.SerializeJson = serializer;
+            entry.TypeName        = Core::TypeMeta::TMetaTypeInfo<T>::kName;
+            entry.SerializeJson   = serializer;
+            entry.DeserializeJson = deserializer;
             registry.Register(entry);
         }
     } // namespace
@@ -201,12 +434,19 @@ namespace AltinaEngine::GameScene {
         }
         registered = true;
 
-        RegisterJsonSerializer<FCameraComponent>(&SerializeCameraComponentJson);
-        RegisterJsonSerializer<FDirectionalLightComponent>(&SerializeDirectionalLightComponentJson);
-        RegisterJsonSerializer<FPointLightComponent>(&SerializePointLightComponentJson);
-        RegisterJsonSerializer<FStaticMeshFilterComponent>(&SerializeStaticMeshComponentJson);
-        RegisterJsonSerializer<FMeshMaterialComponent>(&SerializeMeshMaterialComponentJson);
-        RegisterJsonSerializer<FScriptComponent>(&SerializeScriptComponentJson);
-        RegisterJsonSerializer<FSkyCubeComponent>(&SerializeSkyCubeComponentJson);
+        RegisterJsonSerializer<FCameraComponent>(
+            &SerializeCameraComponentJson, &DeserializeCameraComponentJson);
+        RegisterJsonSerializer<FDirectionalLightComponent>(
+            &SerializeDirectionalLightComponentJson, &DeserializeDirectionalLightComponentJson);
+        RegisterJsonSerializer<FPointLightComponent>(
+            &SerializePointLightComponentJson, &DeserializePointLightComponentJson);
+        RegisterJsonSerializer<FStaticMeshFilterComponent>(
+            &SerializeStaticMeshComponentJson, &DeserializeStaticMeshComponentJson);
+        RegisterJsonSerializer<FMeshMaterialComponent>(
+            &SerializeMeshMaterialComponentJson, &DeserializeMeshMaterialComponentJson);
+        RegisterJsonSerializer<FScriptComponent>(
+            &SerializeScriptComponentJson, &DeserializeScriptComponentJson);
+        RegisterJsonSerializer<FSkyCubeComponent>(
+            &SerializeSkyCubeComponentJson, &DeserializeSkyCubeComponentJson);
     }
 } // namespace AltinaEngine::GameScene

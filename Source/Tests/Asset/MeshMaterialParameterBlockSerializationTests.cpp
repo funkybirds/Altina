@@ -41,7 +41,7 @@ namespace {
             }
         }
         for (usize i = 0U; i < lhs.GetMatrices().Size(); ++i) {
-            REQUIRE(lhs.GetMatrices()[i].NameHash == rhs.GetMatrices()[i].NameHash);
+            REQUIRE(lhs.GetMatrices()[i].mNameHash == rhs.GetMatrices()[i].mNameHash);
             for (u32 r = 0U; r < 4U; ++r) {
                 for (u32 c = 0U; c < 4U; ++c) {
                     REQUIRE(lhs.GetMatrices()[i].mValue.mElements[r][c]
@@ -78,8 +78,8 @@ TEST_CASE("Asset.MeshMaterialParameterBlock.Serialization.BinaryRoundTrip") {
     original.SetMatrix(matrixId, matrix);
 
     FAssetHandle textureHandle{};
-    textureHandle.Uuid = MakeUuid(10U);
-    textureHandle.Type = EAssetType::Texture2D;
+    textureHandle.mUuid = MakeUuid(10U);
+    textureHandle.mType = EAssetType::Texture2D;
     original.SetTexture(textureId, EMeshMaterialTextureType::Texture2D, textureHandle, 123U);
 
     FBinarySerializer serializer;
@@ -110,8 +110,8 @@ TEST_CASE("Asset.MeshMaterialParameterBlock.Serialization.JsonRoundTrip") {
     original.SetMatrix(matrixId, matrix);
 
     FAssetHandle textureHandle{};
-    textureHandle.Uuid = MakeUuid(42U);
-    textureHandle.Type = EAssetType::Texture2D;
+    textureHandle.mUuid = MakeUuid(42U);
+    textureHandle.mType = EAssetType::Texture2D;
     original.SetTexture(textureId, EMeshMaterialTextureType::Texture2D, textureHandle, 77U);
 
     FJsonSerializer serializer;

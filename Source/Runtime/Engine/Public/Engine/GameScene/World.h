@@ -17,6 +17,7 @@
 using AltinaEngine::CClassBaseOf;
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
+using AltinaEngine::Core::Container::FNativeStringView;
 using AltinaEngine::Core::Container::FStringView;
 using AltinaEngine::Core::Container::MakeUniqueAs;
 namespace AltinaEngine::Core::Reflection {
@@ -106,6 +107,8 @@ namespace AltinaEngine::GameScene {
         void               SerializeJson(Core::Reflection::ISerializer& serializer) const;
         static auto        Deserialize(Core::Reflection::IDeserializer& deserializer,
                    Asset::FAssetManager&                                assetManager) -> TOwner<FWorld>;
+        static auto        DeserializeJson(Core::Container::FNativeStringView jsonText,
+                   Asset::FAssetManager& assetManager) -> TOwner<FWorld>;
 
     private:
         [[nodiscard]] auto CreateGameObjectId(FStringView name = {}) -> FGameObjectId;

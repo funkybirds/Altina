@@ -114,6 +114,7 @@ set(Target_Private_Sources
     Private/AssetToolIO.cpp
     Private/Importers/Audio/AudioImporter.cpp
     Private/Importers/EnvMap/EnvMapImporter.cpp
+    Private/Importers/Level/LevelImporter.cpp
     ${CMAKE_SOURCE_DIR}/ThirdParty/tinyexr/miniz.cpp
     Private/Importers/Material/MaterialImporter.cpp
     Private/Importers/Mesh/MeshImporter.cpp

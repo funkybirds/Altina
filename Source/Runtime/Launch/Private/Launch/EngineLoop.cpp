@@ -561,16 +561,16 @@ namespace AltinaEngine::Launch {
             if (bHasSkyCube && assetRegistry != nullptr && assetManager != nullptr) {
                 const auto* baseDesc = assetRegistry->GetDesc(scene.SkyCubeAsset);
                 if (baseDesc != nullptr && !baseDesc->mVirtualPath.IsEmpty()) {
-                    auto MakeDerivedPath = [&](const TChar* suffix) -> Container::FString {
+                    auto makeDerivedPath = [&](const TChar* suffix) -> Container::FString {
                         Container::FString out = baseDesc->mVirtualPath;
                         out.Append(TEXT("/"));
                         out.Append(suffix);
                         return out;
                     };
 
-                    const auto irradiancePath = MakeDerivedPath(TEXT("irradiance"));
-                    const auto specularPath   = MakeDerivedPath(TEXT("specular"));
-                    const auto brdfPath       = MakeDerivedPath(TEXT("brdf_lut"));
+                    const auto irradiancePath = makeDerivedPath(TEXT("irradiance"));
+                    const auto specularPath   = makeDerivedPath(TEXT("specular"));
+                    const auto brdfPath       = makeDerivedPath(TEXT("brdf_lut"));
 
                     const auto irradianceHandle =
                         assetRegistry->FindByPath(irradiancePath.ToView());

@@ -99,9 +99,9 @@ TEST_CASE("GameScene.World.SerializationV2.PrefabRecordAndSubtreeFiltering") {
     rawComponent.Get().Value         = 33;
 
     Engine::GameSceneAsset::FPrefabDescriptor descriptor{};
-    descriptor.LoaderType       = "engine.prefab.model_asset";
-    descriptor.AssetHandle.Type = Asset::EAssetType::Model;
-    descriptor.AssetHandle.Uuid = MakeUuid(5U);
+    descriptor.LoaderType        = "engine.prefab.model_asset";
+    descriptor.AssetHandle.mType = Asset::EAssetType::Model;
+    descriptor.AssetHandle.mUuid = MakeUuid(5U);
     world.RegisterPrefabRoot(prefabRoot.GetId(), descriptor);
 
     FBinarySerializer serializer;

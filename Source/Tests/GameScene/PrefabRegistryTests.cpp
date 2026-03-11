@@ -62,8 +62,8 @@ TEST_CASE("GameScene.PrefabRegistry.Dispatch") {
     Asset::FAssetManager manager{};
     GameScene::FWorld    world(501);
     Asset::FAssetHandle  handle{};
-    handle.Type = Asset::EAssetType::Model;
-    handle.Uuid = MakeUuid(3U);
+    handle.mType = Asset::EAssetType::Model;
+    handle.mUuid = MakeUuid(3U);
 
     const auto* found = registry.Find("tests.prefab.registry.dispatch");
     REQUIRE(found == &gDispatchInstantiator);
@@ -85,8 +85,8 @@ TEST_CASE("GameScene.PrefabRegistry.ReplaceExisting") {
     Asset::FAssetManager manager{};
     GameScene::FWorld    world(502);
     Asset::FAssetHandle  handle{};
-    handle.Type = Asset::EAssetType::Model;
-    handle.Uuid = MakeUuid(8U);
+    handle.mType = Asset::EAssetType::Model;
+    handle.mUuid = MakeUuid(8U);
 
     const auto result =
         registry.Instantiate("tests.prefab.registry.replace", world, manager, handle);

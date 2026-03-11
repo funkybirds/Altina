@@ -104,7 +104,8 @@ namespace AltinaEngine::GameScene {
 
         void               Serialize(Core::Reflection::ISerializer& serializer) const;
         void               SerializeJson(Core::Reflection::ISerializer& serializer) const;
-        static auto Deserialize(Core::Reflection::IDeserializer& deserializer) -> TOwner<FWorld>;
+        static auto        Deserialize(Core::Reflection::IDeserializer& deserializer,
+                   Asset::FAssetManager&                                assetManager) -> TOwner<FWorld>;
 
     private:
         [[nodiscard]] auto CreateGameObjectId(FStringView name = {}) -> FGameObjectId;

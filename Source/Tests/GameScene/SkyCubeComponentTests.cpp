@@ -92,8 +92,8 @@ TEST_CASE("GameScene.SkyCubeComponent.Serialization.BinaryV2Raw") {
     REQUIRE(compRef.IsValid());
 
     FAssetHandle handle{};
-    handle.Uuid = MakeUuid(42U);
-    handle.Type = EAssetType::Texture2D;
+    handle.mUuid = MakeUuid(42U);
+    handle.mType = EAssetType::Texture2D;
 
     compRef.Get().SetCubeMapAsset(handle);
 
@@ -124,10 +124,10 @@ TEST_CASE("GameScene.SkyCubeComponent.Serialization.BinaryV2Raw") {
     REQUIRE(deserializer.Read<bool>() == true);
 
     const auto serializedType = static_cast<EAssetType>(deserializer.Read<u8>());
-    REQUIRE(serializedType == handle.Type);
+    REQUIRE(serializedType == handle.mType);
     FUuid::FBytes bytes{};
     for (u32 i = 0U; i < FUuid::kByteCount; ++i) {
         bytes[i] = deserializer.Read<u8>();
     }
-    REQUIRE(FUuid(bytes) == handle.Uuid);
+    REQUIRE(FUuid(bytes) == handle.mUuid);
 }

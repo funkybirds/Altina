@@ -37,8 +37,55 @@ namespace AltinaEngine::GameScene {
 
         constexpr u32 kWorldSerializationVersion = 2U;
 
-        auto          WriteTransform(Core::Reflection::ISerializer& serializer,
-                     const Core::Math::LinAlg::FSpatialTransform&   transform) -> void {
+        auto          ReadTransform(Core::Reflection::IDeserializer& deserializer)
+            -> Core::Math::LinAlg::FSpatialTransform {
+            Core::Math::LinAlg::FSpatialTransform transform{};
+            transform.Rotation.x = deserializer.Read<f32>();
+            transform.Rotation.y = deserializer.Read<f32>();
+            transform.Rotation.z = deserializer.Read<f32>();
+            transform.Rotation.w = deserializer.Read<f32>();
+
+            transform.Translation.mComponents[0] = deserializer.Read<f32>();
+            transform.Translation.mComponents[1] = deserializer.Read<f32>();
+            transform.Translation.mComponents[2] = deserializer.Read<f32>();
+
+            transform.Scale.mComponents[0] = deserializer.Read<f32>();
+            transform.Scale.mComponents[1] = deserializer.Read<f32>();
+            transform.Scale.mComponents[2] = deserializer.Read<f32>();
+            return transform;
+        }
+
+        auto ReadString(Core::Reflection::IDeserializer& deserializer) -> Core::Container::FString {
+            const u32 length = deserializer.Read<u32>();
+            if (length == 0U) {
+                return {};
+            }
+
+            Core::Container::TVector<TChar> text{};
+            text.Resize(length);
+            for (u32 i = 0U; i < length; ++i) {
+                text[i] = deserializer.Read<TChar>();
+            }
+            return Core::Container::FString(text.Data(), static_cast<usize>(length));
+        }
+
+        auto ReadNativeString(Core::Reflection::IDeserializer& deserializer)
+            -> Core::Container::FNativeString {
+            const u32 length = deserializer.Read<u32>();
+            if (length == 0U) {
+                return {};
+            }
+
+            Core::Container::TVector<char> text{};
+            text.Resize(length);
+            for (u32 i = 0U; i < length; ++i) {
+                text[i] = deserializer.Read<char>();
+            }
+            return Core::Container::FNativeString(text.Data(), static_cast<usize>(length));
+        }
+
+        auto WriteTransform(Core::Reflection::ISerializer& serializer,
+            const Core::Math::LinAlg::FSpatialTransform&   transform) -> void {
             serializer.Write(transform.Rotation.x);
             serializer.Write(transform.Rotation.y);
             serializer.Write(transform.Rotation.z);
@@ -650,13 +697,156 @@ namespace AltinaEngine::GameScene {
         serializer.EndObject();
     }
 
-    auto FWorld::Deserialize(Core::Reflection::IDeserializer& deserializer) -> TOwner<FWorld> {
-        (void)deserializer;
-        Assert(false, TEXT("GameScene.World"),
-            "FWorld::Deserialize is disabled in Prefab Serialization V2 phase.");
-        // TODO: Re-enable world loading in a follow-up phase by reconstructing prefab roots
-        // through PrefabInstantiatorRegistry (loaderType + assetHandle).
-        return {};
+    auto FWorld::Deserialize(Core::Reflection::IDeserializer& deserializer,
+        Asset::FAssetManager&                                 assetManager) -> TOwner<FWorld> {
+        struct FPendingParentLink {
+            FGameObjectId mChild{};
+            FGameObjectId mParentSerialized{};
+        };
+
+        const u32 version = deserializer.Read<u32>();
+        Assert(version == kWorldSerializationVersion, TEXT("GameScene.World"),
+            "FWorld::Deserialize version mismatch. expected={}, actual={}",
+            kWorldSerializationVersion, version);
+
+        const u32 worldId     = deserializer.Read<u32>();
+        const u32 objectCount = deserializer.Read<u32>();
+
+        auto      world    = Core::Container::MakeUnique<FWorld>(worldId);
+        auto&     registry = GetComponentRegistry();
+
+        THashMap<FGameObjectId, FGameObjectId, FGameObjectIdHash> objectIdRemap{};
+        TVector<FPendingParentLink>                               pendingParents{};
+        pendingParents.Reserve(objectCount);
+
+        for (u32 recordIndex = 0U; recordIndex < objectCount; ++recordIndex) {
+            const auto recordKindRaw = deserializer.Read<u8>();
+            Assert(recordKindRaw <= static_cast<u8>(EWorldObjectRecordKind::Prefab),
+                TEXT("GameScene.World"), "Invalid world object record kind: {}", recordKindRaw);
+
+            const auto    recordKind = static_cast<EWorldObjectRecordKind>(recordKindRaw);
+
+            FGameObjectId serializedId{};
+            serializedId.Index      = deserializer.Read<u32>();
+            serializedId.Generation = deserializer.Read<u32>();
+            serializedId.WorldId    = worldId;
+
+            const auto    objectName = ReadString(deserializer);
+            const bool    active     = deserializer.Read<bool>();
+            const bool    hasParent  = deserializer.Read<bool>();
+            FGameObjectId parentSerializedId{};
+            if (hasParent) {
+                parentSerializedId.Index      = deserializer.Read<u32>();
+                parentSerializedId.Generation = deserializer.Read<u32>();
+                parentSerializedId.WorldId    = worldId;
+            }
+
+            const auto localTransform = ReadTransform(deserializer);
+
+            if (recordKind == EWorldObjectRecordKind::Raw) {
+                auto* object = world->CreateGameObjectWithId(serializedId);
+                Assert(object != nullptr, TEXT("GameScene.World"),
+                    "Failed to create raw game object during deserialize. index={}, generation={}",
+                    serializedId.Index, serializedId.Generation);
+
+                object->SetName(objectName.ToView());
+                object->SetLocalTransform(localTransform);
+                object->SetActive(active);
+
+                const auto actualId         = object->GetId();
+                objectIdRemap[serializedId] = actualId;
+                if (hasParent) {
+                    pendingParents.PushBack({ actualId, parentSerializedId });
+                }
+
+                const u32 componentCount = deserializer.Read<u32>();
+                for (u32 componentIndex = 0U; componentIndex < componentCount; ++componentIndex) {
+                    const auto  componentType = deserializer.Read<FComponentTypeHash>();
+                    const bool  enabled       = deserializer.Read<bool>();
+
+                    const auto* componentEntry = registry.Find(componentType);
+                    Assert(componentEntry != nullptr && componentEntry->Create != nullptr
+                            && componentEntry->Deserialize != nullptr,
+                        TEXT("GameScene.World"),
+                        "Component type is not deserializable during world deserialize. type={}",
+                        componentType);
+
+                    const auto componentId = world->CreateComponent(actualId, componentType);
+                    Assert(componentId.IsValid(), TEXT("GameScene.World"),
+                        "Failed to create component during world deserialize. type={}",
+                        componentType);
+
+                    registry.Deserialize(*world, componentId, deserializer);
+
+                    auto* component = world->ResolveComponentBase(componentId);
+                    Assert(component != nullptr, TEXT("GameScene.World"),
+                        "Failed to resolve component after deserialize. type={}", componentType);
+
+                    component->Initialize(world.Get(), componentId, actualId);
+                    if (enabled) {
+                        component->mEnabled = true;
+                        world->OnComponentEnabledChanged(componentId, actualId, true);
+                    } else {
+                        component->mEnabled = true;
+                        component->SetEnabled(false);
+                    }
+                }
+                continue;
+            }
+
+            const auto loaderType  = ReadNativeString(deserializer);
+            const auto assetHandle = Asset::FAssetHandle::Deserialize(deserializer);
+
+            const auto prefabResult =
+                Engine::GameSceneAsset::GetPrefabInstantiatorRegistry().Instantiate(
+                    loaderType.ToView(), *world, assetManager, assetHandle);
+            Assert(prefabResult.Root.IsValid() && world->IsAlive(prefabResult.Root),
+                TEXT("GameScene.World"),
+                "Failed to instantiate prefab during world deserialize. loaderType={}",
+                loaderType.ToView());
+
+            auto* prefabRoot = world->ResolveGameObject(prefabResult.Root);
+            Assert(prefabRoot != nullptr, TEXT("GameScene.World"),
+                "Prefab instantiate returned an invalid root object.");
+
+            prefabRoot->SetName(objectName.ToView());
+            prefabRoot->SetLocalTransform(localTransform);
+            world->SetGameObjectActive(prefabResult.Root, active);
+
+            Engine::GameSceneAsset::FPrefabDescriptor descriptor{};
+            descriptor.LoaderType  = loaderType;
+            descriptor.AssetHandle = assetHandle;
+            world->RegisterPrefabRoot(prefabResult.Root, descriptor);
+
+            objectIdRemap[serializedId] = prefabResult.Root;
+            if (hasParent) {
+                pendingParents.PushBack({ prefabResult.Root, parentSerializedId });
+            }
+        }
+
+        for (const auto& link : pendingParents) {
+            auto parentIt = objectIdRemap.FindIt(link.mParentSerialized);
+            Assert(parentIt != objectIdRemap.end(), TEXT("GameScene.World"),
+                "Missing parent remap during world deserialize. parent index={}, generation={}",
+                link.mParentSerialized.Index, link.mParentSerialized.Generation);
+
+            const auto parentActual = parentIt->second;
+            auto*      childObject  = world->ResolveGameObject(link.mChild);
+            Assert(childObject != nullptr, TEXT("GameScene.World"),
+                "Missing child object while applying parent links during world deserialize.");
+            childObject->SetParent(parentActual);
+        }
+
+        world->mFreeGameObjects.Clear();
+        for (u32 index = 0U; index < static_cast<u32>(world->mGameObjects.Size()); ++index) {
+            const auto& slot = world->mGameObjects[index];
+            if (!slot.Alive || !slot.Handle) {
+                world->mFreeGameObjects.PushBack(index);
+            }
+        }
+
+        world->UpdateTransforms();
+        return world;
     }
 
     void FWorld::AddActiveComponent(TVector<FComponentId>& list, FComponentId id) {

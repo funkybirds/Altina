@@ -8,6 +8,7 @@ Project Altina is a `personal` playground (or toy gaming engine) to validate gam
 - **Suggestions** are things that you are suggested to follow. You should make architectural considerations before you accept a suggestion.
 
 ## IMPORTANT: Building
+- **Rule**: IMPORTANT!!! WHEN COMPILE THE PROJECT, RUN IN VISUAL STUDIO DEV TERMINAL! DO NOT USE PLAIN POWERSHELL OR PLAIN CMD.
 - **Suggstion**: You can use CMake (with reldebinfo preset), if it fails, use following shortcuts:
   - Building demo: `Scripts/BuildDemo.ps1` (Always run before commit)
   - Run tests: `Scripts/RunTests.ps1` (Always run before commit)

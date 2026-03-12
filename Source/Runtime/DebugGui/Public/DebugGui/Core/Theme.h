@@ -54,8 +54,13 @@ namespace AltinaEngine::DebugGui {
         FColor32  mCollapseButtonBorder   = MakeColor32(255, 255, 255, 90);
         FColor32  mCollapseIcon           = MakeColor32(240, 240, 240, 255);
 
-        FColor32  mSelectedRowBg = MakeColor32(60, 80, 110, 220);
-        FColor32  mHoveredRowBg  = MakeColor32(55, 55, 55, 200);
+        FColor32  mSelectedRowBg            = MakeColor32(60, 80, 110, 220);
+        FColor32  mHoveredRowBg             = MakeColor32(55, 55, 55, 200);
+        FColor32  mTreeExpandIcon           = MakeColor32(210, 210, 210, 255);
+        FColor32  mTreeText                 = MakeColor32(220, 220, 220, 255);
+        FColor32  mIconPlaceholderFile      = MakeColor32(72, 98, 148, 255);
+        FColor32  mIconPlaceholderDirectory = MakeColor32(166, 132, 70, 255);
+        FColor32  mIconItemBorder           = MakeColor32(255, 255, 255, 90);
 
         // Metrics.
         FVector2f mWindowDefaultSize = FVector2f(460.0f, 260.0f);
@@ -100,5 +105,11 @@ namespace AltinaEngine::DebugGui {
         f32       mCollapseButtonOffsetY  = 3.0f;
         f32       mCollapseIconHalfWidth  = 4.0f;
         f32       mCollapseIconHalfHeight = 3.0f;
+        f32       mTreeRowHeight          = 18.0f;
+        f32       mTreeIndent             = 18.0f;
+        f32       mTreeArrowSize          = 6.0f;
+        f32       mTreeTextPadX           = 4.0f;
+        f32       mIconLabelPadY          = 4.0f;
+        f32       mIconInnerPadding       = 6.0f;
     };
 } // namespace AltinaEngine::DebugGui

@@ -172,6 +172,7 @@ namespace AltinaEngine::DebugGui {
                 }
 
                 mUi.ClearTransient();
+                ++mUi.mFrameIndex;
                 mPending.Clear();
                 mClip.Clear();
                 mWindowOrder.Clear();
@@ -192,6 +193,9 @@ namespace AltinaEngine::DebugGui {
                 guiInput.mMouseDown           = input.IsMouseButtonDown(0U);
                 guiInput.mMousePressed        = input.WasMouseButtonPressed(0U);
                 guiInput.mMouseReleased       = input.WasMouseButtonReleased(0U);
+                guiInput.mMouseDownRight      = input.IsMouseButtonDown(1U);
+                guiInput.mMousePressedRight   = input.WasMouseButtonPressed(1U);
+                guiInput.mMouseReleasedRight  = input.WasMouseButtonReleased(1U);
                 guiInput.mMouseWheelDelta     = input.GetMouseWheelDelta();
                 guiInput.mKeyEnterPressed     = input.WasKeyPressed(Input::EKey::Enter);
                 guiInput.mKeyBackspacePressed = input.WasKeyPressed(Input::EKey::Backspace);

@@ -62,6 +62,9 @@ namespace AltinaEngine::DebugGui::Private {
         u64  mHotId                = 0ULL;
         u64  mActiveId             = 0ULL;
         u64  mFocusId              = 0ULL;
+        u64  mLastClickId          = 0ULL;
+        u64  mLastClickFrame       = 0ULL;
+        u64  mFrameIndex           = 0ULL;
         bool mWantsCaptureMouse    = false;
         bool mWantsCaptureKeyboard = false;
 
@@ -92,6 +95,9 @@ namespace AltinaEngine::DebugGui::Private {
         bool                       mMouseDown           = false;
         bool                       mMousePressed        = false;
         bool                       mMouseReleased       = false;
+        bool                       mMouseDownRight      = false;
+        bool                       mMousePressedRight   = false;
+        bool                       mMouseReleasedRight  = false;
         f32                        mMouseWheelDelta     = 0.0f;
         bool                       mKeyEnterPressed     = false;
         bool                       mKeyBackspacePressed = false;

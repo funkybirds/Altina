@@ -337,6 +337,10 @@ namespace AltinaEngine::DebugGui::Private {
             -> bool override;
         [[nodiscard]] auto InputText(FStringView label, Container::FString& value) -> bool override;
         [[nodiscard]] auto Gizmo(FStringView label, FVector2f& value) -> bool override;
+        [[nodiscard]] auto TreeViewItem(const FTreeViewItemDesc& desc)
+            -> FTreeViewItemResult override;
+        [[nodiscard]] auto TextedIconView(const FTextedIconViewDesc& desc)
+            -> FTextedIconViewResult override;
 
     private:
         void AdvanceLine() {
@@ -372,6 +376,23 @@ namespace AltinaEngine::DebugGui::Private {
                 }
             };
             mixView(mCurrentWindowTitle.ToView());
+            mixView(label);
+            return h;
+        }
+
+        [[nodiscard]] auto BuildChildHashId(FStringView prefix, FStringView label) const noexcept
+            -> u64 {
+            constexpr u64 kOffset = 1469598103934665603ULL;
+            constexpr u64 kPrime  = 1099511628211ULL;
+            u64           h       = kOffset;
+            auto          mixView = [&](FStringView v) -> void {
+                for (usize i = 0; i < v.Length(); ++i) {
+                    h ^= static_cast<u64>(static_cast<u32>(v[i]));
+                    h *= kPrime;
+                }
+            };
+            mixView(mCurrentWindowTitle.ToView());
+            mixView(prefix);
             mixView(label);
             return h;
         }

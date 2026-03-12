@@ -33,6 +33,8 @@ namespace AltinaEngine::DebugGui {
 
         [[nodiscard]] virtual auto GetDisplaySize() const noexcept -> FVector2f = 0;
         [[nodiscard]] virtual auto GetMousePos() const noexcept -> FVector2f    = 0;
+        [[nodiscard]] virtual auto GetCursorPos() const noexcept -> FVector2f   = 0;
+        virtual void               SetCursorPos(const FVector2f& p) noexcept    = 0;
         [[nodiscard]] virtual auto IsMouseDown() const noexcept -> bool         = 0;
         [[nodiscard]] virtual auto WasMousePressed() const noexcept -> bool     = 0;
         [[nodiscard]] virtual auto WasMouseReleased() const noexcept -> bool    = 0;
@@ -51,5 +53,9 @@ namespace AltinaEngine::DebugGui {
         [[nodiscard]] virtual auto InputText(FStringView label, Container::FString& value)
             -> bool                                                                   = 0;
         [[nodiscard]] virtual auto Gizmo(FStringView label, FVector2f& value) -> bool = 0;
+        [[nodiscard]] virtual auto TreeViewItem(const FTreeViewItemDesc& desc)
+            -> FTreeViewItemResult = 0;
+        [[nodiscard]] virtual auto TextedIconView(const FTextedIconViewDesc& desc)
+            -> FTextedIconViewResult = 0;
     };
 } // namespace AltinaEngine::DebugGui

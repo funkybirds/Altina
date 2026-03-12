@@ -470,3 +470,101 @@ TEST_CASE("DebugGui DrawImage emits additional draw geometry") {
 
     DestroyDebugGuiSystem(sys);
 }
+
+TEST_CASE("DebugGui widget: TreeViewItem click/toggle/context menu") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    bool clicked = false;
+    bool toggled = false;
+    bool context = false;
+    sys->RegisterPanel(TEXT("TreeTest"), [&](IDebugGui& gui) {
+        AltinaEngine::DebugGui::FTreeViewItemDesc desc{};
+        desc.mLabel       = TEXT("NodeA");
+        desc.mDepth       = 0U;
+        desc.mExpanded    = false;
+        desc.mHasChildren = true;
+        auto result       = gui.TreeViewItem(desc);
+        clicked           = clicked || result.mClicked;
+        toggled           = toggled || result.mToggleExpanded;
+        context           = context || result.mContextMenuRequested;
+    });
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 24, 40);
+
+    input.OnMouseButtonDown(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    PrepareInput(input, 1280, 720, 24, 40);
+    input.OnMouseButtonUp(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    REQUIRE(clicked);
+
+    PrepareInput(input, 1280, 720, 24, 40);
+    input.OnMouseButtonDown(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    PrepareInput(input, 1280, 720, 24, 40);
+    input.OnMouseButtonUp(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    REQUIRE(toggled);
+
+    PrepareInput(input, 1280, 720, 24, 40);
+    input.OnMouseButtonDown(1U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    REQUIRE(context);
+
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("DebugGui widget: TextedIconView click/double-click/context menu") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    bool clicked = false;
+    bool dbl     = false;
+    bool context = false;
+    sys->RegisterPanel(TEXT("IconTest"), [&](IDebugGui& gui) {
+        AltinaEngine::DebugGui::FTextedIconViewDesc desc{};
+        desc.mLabel       = TEXT("AssetA");
+        desc.mRect        = { FVector2f(20.0f, 40.0f), FVector2f(120.0f, 130.0f) };
+        desc.mImageId     = 0ULL;
+        desc.mIsDirectory = true;
+        auto result       = gui.TextedIconView(desc);
+        clicked           = clicked || result.mClicked;
+        dbl               = dbl || result.mDoubleClicked;
+        context           = context || result.mContextMenuRequested;
+    });
+
+    AltinaEngine::Input::FInputSystem input;
+
+    PrepareInput(input, 1280, 720, 40, 60);
+    input.OnMouseButtonDown(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    PrepareInput(input, 1280, 720, 40, 60);
+    input.OnMouseButtonUp(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    REQUIRE(clicked);
+
+    PrepareInput(input, 1280, 720, 40, 60);
+    input.OnMouseButtonDown(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    PrepareInput(input, 1280, 720, 40, 60);
+    input.OnMouseButtonUp(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    REQUIRE(dbl);
+
+    PrepareInput(input, 1280, 720, 40, 60);
+    input.OnMouseButtonDown(1U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    REQUIRE(context);
+
+    DestroyDebugGuiSystem(sys);
+}

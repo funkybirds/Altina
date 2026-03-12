@@ -1,27 +1,36 @@
 #include "EditorUI/EditorUiModule.h"
 
+#include "Algorithm/Sort.h"
 #include "DebugGui/DebugGui.h"
 #include "Math/Common.h"
 #include "Math/Vector.h"
+#include "Logging/Log.h"
+#include "Utility/EngineConfig/EngineConfig.h"
+#include "Utility/Filesystem/FileSystem.h"
 
 namespace AltinaEngine::Editor::UI {
     namespace {
+        using ::AltinaEngine::Core::Container::FString;
         using ::AltinaEngine::Core::Container::FStringView;
+        using ::AltinaEngine::Core::Container::TVector;
         using Core::Math::Clamp;
         using Core::Math::FVector2f;
+        using Core::Utility::Filesystem::EnumerateDirectory;
+        using Core::Utility::Filesystem::FDirectoryEntry;
+        using Core::Utility::Filesystem::FPath;
         using DebugGui::FRect;
 
-        constexpr f32      kMenuBarHeight   = 24.0f;
-        constexpr f32      kWorkspacePad    = 4.0f;
-        constexpr f32      kSplitterSize    = 4.0f;
-        constexpr f32      kTabBarHeight    = 22.0f;
-        constexpr f32      kPanelPadding    = 6.0f;
-        constexpr f32      kMinPanelWidth   = 140.0f;
-        constexpr f32      kMinCenterWidth  = 260.0f;
-        constexpr f32      kMinTopHeight    = 180.0f;
-        constexpr f32      kMinBottomHeight = 100.0f;
-        constexpr f32      kGlyphW          = 8.0f;
-        constexpr f32      kGlyphH          = 11.0f;
+        constexpr f32      kMenuBarHeight              = 24.0f;
+        constexpr f32      kWorkspacePad               = 4.0f;
+        constexpr f32      kSplitterSize               = 4.0f;
+        constexpr f32      kTabBarHeight               = 22.0f;
+        constexpr f32      kPanelPadding               = 6.0f;
+        constexpr f32      kMinPanelWidth              = 140.0f;
+        constexpr f32      kMinCenterWidth             = 260.0f;
+        constexpr f32      kMinTopHeight               = 180.0f;
+        constexpr f32      kMinBottomHeight            = 100.0f;
+        constexpr f32      kGlyphW                     = 8.0f;
+        constexpr u64      kAssetRefreshIntervalFrames = 60ULL;
 
         [[nodiscard]] auto MakeRect(f32 x0, f32 y0, f32 x1, f32 y1) -> FRect {
             return { FVector2f(x0, y0), FVector2f(x1, y1) };
@@ -37,7 +46,8 @@ namespace AltinaEngine::Editor::UI {
         }
     } // namespace
 
-    void FEditorUiModule::RegisterDefaultPanels(DebugGui::IDebugGuiSystem* debugGuiSystem) {
+    void FEditorUiModule::RegisterDefaultPanels(DebugGui::IDebugGuiSystem* debugGuiSystem,
+        Core::Container::FStringView assetRoot, Core::Container::FStringView projectSourcePath) {
         if (debugGuiSystem == nullptr) {
             return;
         }
@@ -48,18 +58,76 @@ namespace AltinaEngine::Editor::UI {
         }
         mRegistered = true;
 
+        mAssetRootPath = ResolveAssetRoot(assetRoot);
+        if (mAssetRootPath.IsEmptyString() && !projectSourcePath.IsEmpty()) {
+            FPath       projectFilePath(projectSourcePath);
+            const FPath projectConfigDir = projectFilePath.ParentPath().Normalized();
+            FPath       projectRoot      = projectConfigDir;
+            if (projectConfigDir.Filename() == FStringView(TEXT("Config"))) {
+                projectRoot = projectConfigDir.ParentPath().Normalized();
+            }
+            FPath projectAssetRoot = (projectRoot / TEXT("Assets")).Normalized();
+            if (Core::Platform::IsPathExist(projectAssetRoot.GetString())) {
+                mAssetRootPath = projectAssetRoot.GetString();
+            }
+        }
+        mCurrentAssetPath  = mAssetRootPath;
+        mAssetNeedsRefresh = true;
+
         mPanels.Clear();
-        mPanels.PushBack(
-            { ::AltinaEngine::Core::Container::FString(TEXT("Hierarchy")), EDockArea::Left, true });
-        mPanels.PushBack({ ::AltinaEngine::Core::Container::FString(TEXT("Viewport")),
-            EDockArea::Center, true });
-        mPanels.PushBack({ ::AltinaEngine::Core::Container::FString(TEXT("Inspector")),
-            EDockArea::Right, true });
-        mPanels.PushBack(
-            { ::AltinaEngine::Core::Container::FString(TEXT("Output")), EDockArea::Bottom, true });
+        mPanels.PushBack({ FString(TEXT("Hierarchy")), EDockArea::Left, true });
+        mPanels.PushBack({ FString(TEXT("Viewport")), EDockArea::Center, true });
+        mPanels.PushBack({ FString(TEXT("Inspector")), EDockArea::Right, true });
+        mPanels.PushBack({ FString(TEXT("Asset")), EDockArea::Bottom, true });
+        mPanels.PushBack({ FString(TEXT("Output")), EDockArea::Bottom, true });
+
+        mDock.ActiveLeft   = 0;
+        mDock.ActiveCenter = 1;
+        mDock.ActiveRight  = 2;
+        mDock.ActiveBottom = 3;
+
+        mDebugGuiSystem->SetImageTexture(mAssetFolderIconImageId, nullptr);
+        mDebugGuiSystem->SetImageTexture(mAssetFileIconImageId, nullptr);
 
         debugGuiSystem->RegisterBackgroundOverlay(TEXT("Editor.UI.Root"),
             [this, debugGuiSystem](DebugGui::IDebugGui& gui) { DrawRootUi(debugGuiSystem, gui); });
+    }
+
+    auto FEditorUiModule::ResolveAssetRoot(Core::Container::FStringView requestedRoot) const
+        -> Core::Container::FString {
+        if (!requestedRoot.IsEmpty()) {
+            const FPath requested       = FPath(requestedRoot).Normalized();
+            const auto  requestedString = requested.GetString();
+            if (Core::Platform::IsPathExist(requestedString)) {
+                const auto parent = requested.ParentPath().Normalized();
+                if (requested.Filename() == FStringView(TEXT("Assets"))
+                    && parent.Filename() == FStringView(TEXT("Binaries"))) {
+                    const FPath sourceAssets =
+                        (parent.ParentPath().Normalized() / TEXT("Assets")).Normalized();
+                    const auto sourceAssetsString = sourceAssets.GetString();
+                    if (Core::Platform::IsPathExist(sourceAssetsString)) {
+                        return sourceAssetsString;
+                    }
+                }
+                return requestedString;
+            }
+        }
+
+        const auto configured =
+            Core::Utility::EngineConfig::GetGlobalConfig().GetString(TEXT("GameClient/AssetRoot"));
+        if (!configured.IsEmptyString()) {
+            FPath configuredPath(configured);
+            if (configuredPath.IsAbsolute()) {
+                return configuredPath.Normalized().GetString();
+            }
+            FPath cwd(Core::Platform::GetCurrentWorkingDir());
+            cwd /= configured;
+            return cwd.Normalized().GetString();
+        }
+
+        FPath cwd(Core::Platform::GetCurrentWorkingDir());
+        cwd /= TEXT("Assets");
+        return cwd.Normalized().GetString();
     }
 
     auto FEditorUiModule::GetViewportRequest() const noexcept -> FEditorViewportRequest {
@@ -73,9 +141,485 @@ namespace AltinaEngine::Editor::UI {
         return out;
     }
 
+    auto FEditorUiModule::DebugGetAssetItemsForTest() const
+        -> ::AltinaEngine::Core::Container::TVector<::AltinaEngine::Core::Container::FString> {
+        ::AltinaEngine::Core::Container::TVector<::AltinaEngine::Core::Container::FString> out;
+        out.Reserve(mAssetItems.Size());
+        for (const auto& item : mAssetItems) {
+            out.PushBack(item.mPath);
+        }
+        return out;
+    }
+
+    auto FEditorUiModule::DebugGetCurrentAssetPathForTest() const
+        -> ::AltinaEngine::Core::Container::FString {
+        return mCurrentAssetPath;
+    }
+
+    auto FEditorUiModule::IsMetaPath(Core::Container::FStringView path) const -> bool {
+        const FPath p(path);
+        if (p.Extension() == FStringView(TEXT(".meta"))) {
+            return true;
+        }
+        const auto filename = p.Filename();
+        return filename.EndsWith(TEXT(".meta"));
+    }
+
+    auto FEditorUiModule::GetAssetDisplayName(Core::Container::FStringView path) const
+        -> Core::Container::FString {
+        const FPath p(path);
+        const auto  filename = p.Filename();
+        if (filename.IsEmpty()) {
+            return FString(path);
+        }
+        return FString(filename);
+    }
+
+    auto FEditorUiModule::GetNodeIndexByPath(Core::Container::FStringView path) const -> i32 {
+        auto it = mAssetNodeLookup.FindIt(FString(path));
+        if (it == mAssetNodeLookup.end()) {
+            return -1;
+        }
+        return it->second;
+    }
+
+    auto FEditorUiModule::TruncateAssetLabel(Core::Container::FStringView label, f32 maxWidth) const
+        -> Core::Container::FString {
+        if (label.IsEmpty()) {
+            return FString();
+        }
+
+        const i32 maxChars = static_cast<i32>(maxWidth / kGlyphW);
+        if (maxChars <= 0) {
+            return FString(TEXT("..."));
+        }
+        if (static_cast<i32>(label.Length()) <= maxChars) {
+            return FString(label);
+        }
+        if (maxChars <= 3) {
+            return FString(TEXT("..."));
+        }
+
+        FString out;
+        out.Append(label.Substr(0, static_cast<usize>(maxChars - 3)));
+        out.Append(TEXT("..."));
+        return out;
+    }
+
+    void FEditorUiModule::EnsureNodeVisible(i32 nodeIndex) {
+        i32 current = nodeIndex;
+        while (current >= 0 && current < static_cast<i32>(mAssetNodes.Size())) {
+            auto& node = mAssetNodes[static_cast<usize>(current)];
+            if (node.mParentIndex >= 0) {
+                node.mExpanded = true;
+            }
+            current = node.mParentIndex;
+        }
+    }
+
+    void FEditorUiModule::BuildAssetItemsForCurrentFolder() {
+        mAssetItems.Clear();
+        if (mCurrentAssetPath.IsEmptyString()) {
+            return;
+        }
+
+        const FPath currentPath(mCurrentAssetPath);
+        const FPath rootPath(mAssetRootPath);
+        if (!mAssetRootPath.IsEmptyString()) {
+            const auto currentNormalized = currentPath.Normalized().GetString();
+            const auto rootNormalized    = rootPath.Normalized().GetString();
+            if (currentNormalized != rootNormalized) {
+                const auto parentPath = currentPath.ParentPath().Normalized().GetString();
+                if (!parentPath.IsEmptyString() && parentPath.StartsWith(rootNormalized.ToView())) {
+                    FAssetItem upItem{};
+                    upItem.mPath       = parentPath;
+                    upItem.mName       = FString(TEXT(".."));
+                    upItem.mType       = EAssetItemType::Directory;
+                    upItem.mNavigateUp = true;
+                    mAssetItems.PushBack(Move(upItem));
+                }
+            }
+        }
+
+        TVector<FDirectoryEntry> entries;
+        if (!EnumerateDirectory(FPath(mCurrentAssetPath), false, entries)) {
+            return;
+        }
+
+        for (const auto& entry : entries) {
+            const auto normalized = entry.Path.Normalized().GetString();
+            if (IsMetaPath(normalized.ToView())) {
+                continue;
+            }
+
+            FAssetItem item{};
+            item.mPath = normalized;
+            item.mName = GetAssetDisplayName(normalized.ToView());
+            item.mType = entry.IsDirectory ? EAssetItemType::Directory : EAssetItemType::File;
+            mAssetItems.PushBack(Move(item));
+        }
+
+        Core::Algorithm::Sort(mAssetItems, [](const FAssetItem& lhs, const FAssetItem& rhs) {
+            if (lhs.mNavigateUp != rhs.mNavigateUp) {
+                return lhs.mNavigateUp;
+            }
+            if (lhs.mType != rhs.mType) {
+                return lhs.mType == EAssetItemType::Directory;
+            }
+            return lhs.mName < rhs.mName.ToView();
+        });
+    }
+
+    void FEditorUiModule::RefreshAssetCache(bool force) {
+        if (mAssetRootPath.IsEmptyString()) {
+            return;
+        }
+        if (!force && !mAssetNeedsRefresh
+            && (mFrameCounter - mAssetLastRefreshFrame) < kAssetRefreshIntervalFrames) {
+            return;
+        }
+
+        mAssetNeedsRefresh     = false;
+        mAssetLastRefreshFrame = mFrameCounter;
+
+        Core::Container::THashMap<FString, bool> oldExpanded;
+        for (const auto& node : mAssetNodes) {
+            oldExpanded[node.mPath] = node.mExpanded;
+        }
+
+        TVector<FDirectoryEntry> entries;
+        mAssetNodes.Clear();
+        mAssetNodeLookup.Clear();
+
+        FAssetNode root{};
+        root.mPath = FPath(mAssetRootPath).Normalized().GetString();
+        root.mName = GetAssetDisplayName(root.mPath.ToView());
+        if (root.mName.IsEmptyString()) {
+            root.mName = root.mPath;
+        }
+        auto rootExpandedIt = oldExpanded.FindIt(root.mPath);
+        root.mExpanded      = (rootExpandedIt != oldExpanded.end()) ? rootExpandedIt->second : true;
+        root.mVisible       = true;
+        mAssetNodeLookup[root.mPath] = 0;
+        mAssetNodes.PushBack(Move(root));
+
+        if (EnumerateDirectory(FPath(mAssetRootPath), true, entries)) {
+            TVector<FPath> dirs;
+            for (const auto& entry : entries) {
+                if (!entry.IsDirectory) {
+                    continue;
+                }
+                const auto normalized = entry.Path.Normalized();
+                if (IsMetaPath(normalized.ToView())) {
+                    continue;
+                }
+                dirs.PushBack(normalized);
+            }
+
+            Core::Algorithm::Sort(dirs, [](const FPath& lhs, const FPath& rhs) {
+                const auto lhsLen = lhs.GetString().Length();
+                const auto rhsLen = rhs.GetString().Length();
+                if (lhsLen != rhsLen) {
+                    return lhsLen < rhsLen;
+                }
+                return lhs.GetString() < rhs.GetString().ToView();
+            });
+
+            for (const auto& dir : dirs) {
+                const auto dirPath = dir.GetString();
+                if (mAssetNodeLookup.FindIt(dirPath) != mAssetNodeLookup.end()) {
+                    continue;
+                }
+                const auto parentPath = dir.ParentPath().Normalized().GetString();
+                auto       parentIt   = mAssetNodeLookup.FindIt(parentPath);
+                if (parentIt == mAssetNodeLookup.end()) {
+                    continue;
+                }
+
+                FAssetNode node{};
+                node.mPath        = dirPath;
+                node.mName        = GetAssetDisplayName(dirPath.ToView());
+                node.mParentIndex = parentIt->second;
+                auto expandedIt   = oldExpanded.FindIt(node.mPath);
+                node.mExpanded    = (expandedIt != oldExpanded.end()) ? expandedIt->second : false;
+
+                const i32 index              = static_cast<i32>(mAssetNodes.Size());
+                mAssetNodeLookup[node.mPath] = index;
+                mAssetNodes.PushBack(Move(node));
+                mAssetNodes[static_cast<usize>(parentIt->second)].mChildren.PushBack(index);
+            }
+
+            for (auto& node : mAssetNodes) {
+                Core::Algorithm::Sort(node.mChildren, [this](i32 lhs, i32 rhs) {
+                    const auto& lhsNode = mAssetNodes[static_cast<usize>(lhs)];
+                    const auto& rhsNode = mAssetNodes[static_cast<usize>(rhs)];
+                    return lhsNode.mName < rhsNode.mName.ToView();
+                });
+            }
+        }
+
+        if (mCurrentAssetPath.IsEmptyString()
+            || GetNodeIndexByPath(mCurrentAssetPath.ToView()) < 0) {
+            mCurrentAssetPath = mAssetRootPath;
+        }
+        const i32 currentNodeIndex = GetNodeIndexByPath(mCurrentAssetPath.ToView());
+        if (currentNodeIndex > 0) {
+            EnsureNodeVisible(currentNodeIndex);
+        }
+        BuildAssetItemsForCurrentFolder();
+    }
+
+    void FEditorUiModule::OpenPathInAssetView(
+        Core::Container::FStringView path, EAssetItemType type) {
+        if (type == EAssetItemType::Directory) {
+            mCurrentAssetPath   = FPath(path).Normalized().GetString();
+            mSelectedAssetPath  = mCurrentAssetPath;
+            mSelectedAssetType  = type;
+            const i32 nodeIndex = GetNodeIndexByPath(mCurrentAssetPath.ToView());
+            if (nodeIndex >= 0) {
+                EnsureNodeVisible(nodeIndex);
+                if (mAssetNodes[static_cast<usize>(nodeIndex)].mParentIndex >= 0) {
+                    mAssetNodes[static_cast<usize>(nodeIndex)].mExpanded = true;
+                }
+            }
+            BuildAssetItemsForCurrentFolder();
+            return;
+        }
+        mSelectedAssetPath = FString(path);
+        mSelectedAssetType = type;
+    }
+
+    void FEditorUiModule::DrawAssetPanel(DebugGui::IDebugGui& gui,
+        const DebugGui::FRect& contentRect, const Core::Math::FVector2f& mouse,
+        bool blockWorkspaceInput) {
+        const auto colPanelBg        = DebugGui::MakeColor32(26, 29, 35, 255);
+        const auto colBorder         = DebugGui::MakeColor32(88, 94, 108, 255);
+        const auto colText           = DebugGui::MakeColor32(224, 226, 230, 255);
+        const auto colMutedText      = DebugGui::MakeColor32(160, 168, 180, 255);
+        const auto colMenuBg         = DebugGui::MakeColor32(28, 31, 36, 250);
+        const auto colMenuHover      = DebugGui::MakeColor32(48, 54, 63, 255);
+        const auto HashAssetItemPath = [](Core::Container::FStringView path) -> u64 {
+            constexpr u64 kOffset = 1469598103934665603ULL;
+            constexpr u64 kPrime  = 1099511628211ULL;
+            u64           h       = kOffset;
+            for (usize i = 0; i < path.Length(); ++i) {
+                h ^= static_cast<u64>(static_cast<u32>(path[i]));
+                h *= kPrime;
+            }
+            return h;
+        };
+
+        const f32 panelWidth    = contentRect.Max.X() - contentRect.Min.X();
+        const f32 minTreeWidth  = 120.0f;
+        const f32 minGridWidth  = 180.0f;
+        const f32 splitterWidth = 6.0f;
+        const f32 minSplitX     = contentRect.Min.X() + minTreeWidth;
+        const f32 maxSplitRaw   = contentRect.Max.X() - minGridWidth - splitterWidth;
+        const f32 maxSplitX     = (maxSplitRaw > minSplitX) ? maxSplitRaw : minSplitX;
+        const f32 splitX =
+            Clamp(contentRect.Min.X() + panelWidth * mAssetTreeSplitRatio, minSplitX, maxSplitX);
+        const FRect treeRect =
+            MakeRect(contentRect.Min.X(), contentRect.Min.Y(), splitX, contentRect.Max.Y());
+        const FRect splitterRect =
+            MakeRect(splitX, contentRect.Min.Y(), splitX + splitterWidth, contentRect.Max.Y());
+        const FRect gridRect = MakeRect(
+            splitterRect.Max.X(), contentRect.Min.Y(), contentRect.Max.X(), contentRect.Max.Y());
+
+        if (!blockWorkspaceInput && gui.WasMousePressed() && IsInside(splitterRect, mouse)) {
+            mAssetSplitterActive = true;
+        }
+        if (!gui.IsMouseDown()) {
+            mAssetSplitterActive = false;
+        }
+        if (!blockWorkspaceInput && mAssetSplitterActive && gui.IsMouseDown()) {
+            const f32 newSplit   = Clamp(mouse.X() - splitterWidth * 0.5f, minSplitX, maxSplitX);
+            mAssetTreeSplitRatio = (newSplit - contentRect.Min.X()) / panelWidth;
+        }
+
+        gui.DrawRectFilled(treeRect, colPanelBg);
+        gui.DrawRect(treeRect, colBorder, 1.0f);
+        gui.DrawRectFilled(splitterRect,
+            (mAssetSplitterActive || IsInside(splitterRect, mouse)) ? colMenuHover : colBorder);
+        gui.DrawRectFilled(gridRect, colPanelBg);
+        gui.DrawRect(gridRect, colBorder, 1.0f);
+
+        gui.PushClipRect(treeRect);
+        gui.SetCursorPos(FVector2f(treeRect.Min.X() + 4.0f, treeRect.Min.Y() + 2.0f));
+
+        TVector<i32> drawStack;
+        TVector<u32> depthStack;
+        FString      pendingTreeOpenPath;
+        bool         bHasPendingTreeOpen = false;
+        if (!mAssetNodes.IsEmpty()) {
+            drawStack.PushBack(0);
+            depthStack.PushBack(0U);
+        }
+        while (!drawStack.IsEmpty()) {
+            const i32 nodeIndex = drawStack.Back();
+            drawStack.PopBack();
+            const u32 depth = depthStack.Back();
+            depthStack.PopBack();
+            if (nodeIndex < 0 || nodeIndex >= static_cast<i32>(mAssetNodes.Size())) {
+                continue;
+            }
+
+            auto&                       node = mAssetNodes[static_cast<usize>(nodeIndex)];
+            DebugGui::FTreeViewItemDesc itemDesc{};
+            itemDesc.mLabel       = node.mName.ToView();
+            itemDesc.mDepth       = depth;
+            itemDesc.mSelected    = (mCurrentAssetPath == node.mPath);
+            itemDesc.mExpanded    = node.mExpanded;
+            itemDesc.mHasChildren = !node.mChildren.IsEmpty();
+
+            const auto result = gui.TreeViewItem(itemDesc);
+            if (!blockWorkspaceInput && result.mToggleExpanded && !node.mChildren.IsEmpty()) {
+                node.mExpanded = !node.mExpanded;
+            } else if (!blockWorkspaceInput && result.mClicked) {
+                pendingTreeOpenPath = node.mPath;
+                bHasPendingTreeOpen = true;
+                Core::Logging::LogInfoCategory(
+                    TEXT("Editor.UI.Asset"), TEXT("Tree select: {}"), node.mPath.ToView());
+            } else if (!blockWorkspaceInput && result.mDoubleClicked && !node.mChildren.IsEmpty()) {
+                node.mExpanded = !node.mExpanded;
+            }
+            if (!blockWorkspaceInput && result.mContextMenuRequested) {
+                mAssetContextMenu.mOpen     = true;
+                mAssetContextMenu.mItemType = EAssetItemType::Directory;
+                mAssetContextMenu.mPath     = node.mPath;
+                mAssetContextMenu.mPos      = mouse;
+            }
+
+            if (node.mExpanded) {
+                for (isize child = static_cast<isize>(node.mChildren.Size()) - 1; child >= 0;
+                    --child) {
+                    drawStack.PushBack(node.mChildren[static_cast<usize>(child)]);
+                    depthStack.PushBack(depth + 1U);
+                    if (child == 0) {
+                        break;
+                    }
+                }
+            }
+        }
+        if (!blockWorkspaceInput && bHasPendingTreeOpen) {
+            OpenPathInAssetView(pendingTreeOpenPath.ToView(), EAssetItemType::Directory);
+        }
+        gui.PopClipRect();
+
+        const f32 itemWidth  = 94.0f;
+        const f32 itemHeight = 84.0f;
+        const f32 itemGap    = 8.0f;
+        const f32 gridWidth  = gridRect.Max.X() - gridRect.Min.X() - 8.0f;
+        i32       columns    = static_cast<i32>(gridWidth / (itemWidth + itemGap));
+        if (columns < 1) {
+            columns = 1;
+        }
+
+        gui.PushClipRect(gridRect);
+        for (usize i = 0; i < mAssetItems.Size(); ++i) {
+            const i32 col = static_cast<i32>(i % static_cast<usize>(columns));
+            const i32 row = static_cast<i32>(i / static_cast<usize>(columns));
+            const f32 x0  = gridRect.Min.X() + 4.0f + static_cast<f32>(col) * (itemWidth + itemGap);
+            const f32 y0 = gridRect.Min.Y() + 4.0f + static_cast<f32>(row) * (itemHeight + itemGap);
+            const FRect itemRect = MakeRect(x0, y0, x0 + itemWidth, y0 + itemHeight);
+            if (itemRect.Max.Y() > gridRect.Max.Y()) {
+                break;
+            }
+
+            auto&                         item = mAssetItems[i];
+            DebugGui::FTextedIconViewDesc itemDesc{};
+            const auto truncatedName = TruncateAssetLabel(item.mName.ToView(), itemWidth - 12.0f);
+            itemDesc.mLabel          = truncatedName.ToView();
+            itemDesc.mRect           = itemRect;
+            itemDesc.mImageId  = (item.mType == EAssetItemType::Directory) ? mAssetFolderIconImageId
+                                                                           : mAssetFileIconImageId;
+            itemDesc.mSelected = (mSelectedAssetPath == item.mPath);
+            itemDesc.mIsDirectory = (item.mType == EAssetItemType::Directory);
+
+            const auto result = gui.TextedIconView(itemDesc);
+            if (!blockWorkspaceInput && result.mClicked) {
+                const u64  pathHash      = HashAssetItemPath(item.mPath.ToView());
+                const bool isDoubleClick = (mLastAssetClickId == pathHash)
+                    && (mFrameCounter - mLastAssetClickFrame <= 24ULL);
+                mSelectedAssetPath   = item.mPath;
+                mSelectedAssetType   = item.mType;
+                mLastAssetClickId    = pathHash;
+                mLastAssetClickFrame = mFrameCounter;
+                if (isDoubleClick && item.mType == EAssetItemType::Directory) {
+                    OpenPathInAssetView(item.mPath.ToView(), item.mType);
+                }
+            }
+            if (!blockWorkspaceInput && result.mDoubleClicked
+                && item.mType == EAssetItemType::Directory) {
+                OpenPathInAssetView(item.mPath.ToView(), item.mType);
+            }
+            if (!blockWorkspaceInput && result.mContextMenuRequested) {
+                mAssetContextMenu.mOpen     = true;
+                mAssetContextMenu.mItemType = item.mType;
+                mAssetContextMenu.mPath     = item.mPath;
+                mAssetContextMenu.mPos      = mouse;
+            }
+        }
+        gui.PopClipRect();
+
+        if (mAssetContextMenu.mOpen && !blockWorkspaceInput) {
+            FVector2f  menuPos = mAssetContextMenu.mPos;
+            const f32  menuW   = 160.0f;
+            const f32  rowH    = 20.0f;
+            const f32  menuH   = rowH * 2.0f + 4.0f;
+            const auto display = gui.GetDisplaySize();
+            if (menuPos.X() + menuW > display.X()) {
+                menuPos = FVector2f(display.X() - menuW - 2.0f, menuPos.Y());
+            }
+            if (menuPos.Y() + menuH > display.Y()) {
+                menuPos = FVector2f(menuPos.X(), display.Y() - menuH - 2.0f);
+            }
+
+            const FRect menuRect =
+                MakeRect(menuPos.X(), menuPos.Y(), menuPos.X() + menuW, menuPos.Y() + menuH);
+            gui.DrawRectFilled(menuRect, colMenuBg);
+            gui.DrawRect(menuRect, colBorder, 1.0f);
+
+            const FRect openRect    = MakeRect(menuRect.Min.X() + 2.0f, menuRect.Min.Y() + 2.0f,
+                   menuRect.Max.X() - 2.0f, menuRect.Min.Y() + 2.0f + rowH);
+            const FRect refreshRect = MakeRect(menuRect.Min.X() + 2.0f, openRect.Max.Y(),
+                menuRect.Max.X() - 2.0f, openRect.Max.Y() + rowH);
+
+            const bool  openHovered    = IsInside(openRect, mouse);
+            const bool  refreshHovered = IsInside(refreshRect, mouse);
+            if (openHovered) {
+                gui.DrawRectFilled(openRect, colMenuHover);
+            }
+            if (refreshHovered) {
+                gui.DrawRectFilled(refreshRect, colMenuHover);
+            }
+
+            const bool canOpen = (mAssetContextMenu.mItemType == EAssetItemType::Directory);
+            gui.DrawText(FVector2f(openRect.Min.X() + 8.0f, openRect.Min.Y() + 4.0f),
+                canOpen ? colText : colMutedText, TEXT("Open"));
+            gui.DrawText(FVector2f(refreshRect.Min.X() + 8.0f, refreshRect.Min.Y() + 4.0f), colText,
+                TEXT("Refresh"));
+
+            if (gui.WasMousePressed()) {
+                if (openHovered && canOpen) {
+                    OpenPathInAssetView(
+                        mAssetContextMenu.mPath.ToView(), mAssetContextMenu.mItemType);
+                    mAssetContextMenu.mOpen = false;
+                } else if (refreshHovered) {
+                    mAssetNeedsRefresh = true;
+                    RefreshAssetCache(true);
+                    mAssetContextMenu.mOpen = false;
+                } else if (!IsInside(menuRect, mouse)) {
+                    mAssetContextMenu.mOpen = false;
+                }
+            }
+        }
+    }
+
     void FEditorUiModule::DrawRootUi(
         DebugGui::IDebugGuiSystem* debugGuiSystem, DebugGui::IDebugGui& gui) {
+        ++mFrameCounter;
         mViewportRequest = {};
+        RefreshAssetCache(false);
 
         const auto display = gui.GetDisplaySize();
         if (display.X() <= 0.0f || display.Y() <= 0.0f) {
@@ -154,7 +698,7 @@ namespace AltinaEngine::Editor::UI {
         };
 
         const bool blockWorkspaceInput    = (mOpenMenu >= 0 && mOpenMenu < 3);
-        mViewportRequest.bUiBlockingInput = blockWorkspaceInput;
+        mViewportRequest.bUiBlockingInput = blockWorkspaceInput || mAssetContextMenu.mOpen;
 
         const FRect workspaceRect = MakeRect(kWorkspacePad, menuRect.Max.Y() + kWorkspacePad,
             display.X() - kWorkspacePad, display.Y() - kWorkspacePad);
@@ -284,7 +828,7 @@ namespace AltinaEngine::Editor::UI {
             gui.DrawRectFilled(tabBar, colPanelTitle);
             gui.DrawRect(tabBar, colBorder, 1.0f);
 
-            ::AltinaEngine::Core::Container::TVector<i32> panelIndices;
+            TVector<i32> panelIndices;
             for (usize i = 0; i < mPanels.Size(); ++i) {
                 auto& panel = mPanels[i];
                 if (panel.bVisible && panel.Area == areaInfo.Area) {
@@ -382,6 +926,11 @@ namespace AltinaEngine::Editor::UI {
                 return;
             }
 
+            if (panel.Name.ToView() == FStringView(TEXT("Asset"))) {
+                DrawAssetPanel(gui, contentRect, mouse, blockWorkspaceInput);
+                return;
+            }
+
             gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 2.0f), colText,
                 TEXT("Output"));
             gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 20.0f),
@@ -421,7 +970,7 @@ namespace AltinaEngine::Editor::UI {
             const FRect anchor    = menus[mOpenMenu].Rect;
             const f32   itemH     = 20.0f;
             const f32   menuW     = (mOpenMenu == 1) ? 220.0f : 180.0f;
-            const usize itemCount = (mOpenMenu == 1) ? 7U : 5U;
+            const usize itemCount = (mOpenMenu == 1) ? 8U : 5U;
             const FRect dropRect =
                 MakeRect(anchor.Min.X(), menuRect.Max.Y(), anchor.Min.X() + menuW,
                     menuRect.Max.Y() + static_cast<f32>(itemCount) * itemH + 4.0f);
@@ -463,7 +1012,9 @@ namespace AltinaEngine::Editor::UI {
                     [&]() { togglePanel(TEXT("Viewport")); });
                 drawMenuItem(itemRect(2), TEXT("Inspector"), panelChecked(TEXT("Inspector")), true,
                     [&]() { togglePanel(TEXT("Inspector")); });
-                drawMenuItem(itemRect(3), TEXT("Output"), panelChecked(TEXT("Output")), true,
+                drawMenuItem(itemRect(3), TEXT("Asset"), panelChecked(TEXT("Asset")), true,
+                    [&]() { togglePanel(TEXT("Asset")); });
+                drawMenuItem(itemRect(4), TEXT("Output"), panelChecked(TEXT("Output")), true,
                     [&]() { togglePanel(TEXT("Output")); });
 
                 const bool statsShown =
@@ -472,13 +1023,13 @@ namespace AltinaEngine::Editor::UI {
                     (debugGuiSystem != nullptr) ? debugGuiSystem->IsConsoleShown() : false;
                 const bool cvarsShown =
                     (debugGuiSystem != nullptr) ? debugGuiSystem->IsCVarsShown() : false;
-                drawMenuItem(itemRect(4), TEXT("Debug Stats"), statsShown,
+                drawMenuItem(itemRect(5), TEXT("Debug Stats"), statsShown,
                     debugGuiSystem != nullptr,
                     [&]() { debugGuiSystem->SetShowStats(!statsShown); });
-                drawMenuItem(itemRect(5), TEXT("Debug Console"), consoleShown,
+                drawMenuItem(itemRect(6), TEXT("Debug Console"), consoleShown,
                     debugGuiSystem != nullptr,
                     [&]() { debugGuiSystem->SetShowConsole(!consoleShown); });
-                drawMenuItem(itemRect(6), TEXT("Debug CVars"), cvarsShown,
+                drawMenuItem(itemRect(7), TEXT("Debug CVars"), cvarsShown,
                     debugGuiSystem != nullptr,
                     [&]() { debugGuiSystem->SetShowCVars(!cvarsShown); });
             } else {

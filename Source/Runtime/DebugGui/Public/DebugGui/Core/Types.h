@@ -1,11 +1,15 @@
 ﻿#pragma once
 
 #include "Container/StringView.h"
+#include "Container/Function.h"
 #include "Math/Vector.h"
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::DebugGui {
+    class IDebugGui;
+
     using Core::Container::FStringView;
+    using Core::Container::TFunction;
     using Core::Math::FVector2f;
 
     struct FRect {
@@ -31,5 +35,35 @@ namespace AltinaEngine::DebugGui {
         u64 mFrameIndex      = 0ULL;
         u32 mViewCount       = 0U;
         u32 mSceneBatchCount = 0U;
+    };
+
+    struct FTreeViewItemDesc {
+        FStringView                               mLabel;
+        u32                                       mDepth       = 0U;
+        bool                                      mSelected    = false;
+        bool                                      mExpanded    = false;
+        bool                                      mHasChildren = false;
+        TFunction<void(IDebugGui&, const FRect&)> mTrailingWidgetDraw;
+    };
+
+    struct FTreeViewItemResult {
+        bool mClicked              = false;
+        bool mDoubleClicked        = false;
+        bool mContextMenuRequested = false;
+        bool mToggleExpanded       = false;
+    };
+
+    struct FTextedIconViewDesc {
+        FStringView mLabel;
+        u64         mImageId = 0ULL;
+        FRect       mRect{};
+        bool        mSelected    = false;
+        bool        mIsDirectory = false;
+    };
+
+    struct FTextedIconViewResult {
+        bool mClicked              = false;
+        bool mDoubleClicked        = false;
+        bool mContextMenuRequested = false;
     };
 } // namespace AltinaEngine::DebugGui

@@ -187,6 +187,9 @@ namespace {
 
     class FEditorHostHooks final : public Launch::IRuntimeHostHooks {
     public:
+        explicit FEditorHostHooks(const Editor::Core::FEditorProjectSettings& inProjectSettings)
+            : mProjectSettings(inProjectSettings) {}
+
         auto OnInit(Launch::IRuntimeSession& session) -> bool override {
             if (!CoreModule.Initialize(EditorContext)) {
                 return false;
@@ -196,7 +199,8 @@ namespace {
             PlaySession.Start();
 
             auto services = session.GetServices();
-            UiModule.RegisterDefaultPanels(services.DebugGuiSystem);
+            UiModule.RegisterDefaultPanels(services.DebugGuiSystem,
+                mProjectSettings.AssetRootOverride.ToView(), mProjectSettings.SourcePath.ToView());
             return true;
         }
 
@@ -321,6 +325,7 @@ namespace {
         Editor::Viewport::FEditorViewportBootstrap ViewportBootstrap{};
         Editor::PlaySession::FEditorPlaySession    PlaySession{};
         Editor::UI::FEditorUiModule                UiModule{};
+        Editor::Core::FEditorProjectSettings       mProjectSettings{};
         FEditorRuntimeInputRouter                  InputRouter{};
         bool                                       bExitRequested = false;
     };
@@ -371,7 +376,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    FEditorHostHooks                   editorHooks{};
+    FEditorHostHooks                   editorHooks(projectSettings);
     Launch::FDemoHostHooks             demoHooks(demoDescriptor, &editorHooks);
 
     Launch::FHostApplicationLoopConfig config{};

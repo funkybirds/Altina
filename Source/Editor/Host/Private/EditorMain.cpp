@@ -4,16 +4,109 @@
 #include "EditorPlaySession/EditorPlaySession.h"
 #include "EditorUI/EditorUiModule.h"
 #include "EditorViewport/EditorViewportBootstrap.h"
+#include "Engine/GameScene/ComponentRegistry.h"
 #include "Launch/DemoRuntime.h"
 #include "Launch/EngineLoop.h"
 #include "Launch/HostApplicationLoop.h"
 #include "Launch/RuntimeSession.h"
 #include "Utility/EngineConfig/EngineConfig.h"
+#include "Utility/String/CodeConvert.h"
 #include "DebugGui/DebugGui.h"
 
 using namespace AltinaEngine;
 
 namespace {
+    struct FComponentTypeLabel {
+        Core::Container::FString mTypeName;
+        Core::Container::FString mTypeNamespace;
+    };
+
+    auto ParseComponentTypeLabel(Core::Container::FNativeStringView typeName)
+        -> FComponentTypeLabel {
+        FComponentTypeLabel label{};
+        if (typeName.IsEmpty()) {
+            label.mTypeName = Core::Container::FString(TEXT("Component"));
+            return label;
+        }
+
+        Core::Container::FNativeString native(typeName.Data(), typeName.Length());
+        auto                           fullName = Core::Utility::String::FromUtf8(native);
+        if (fullName.IsEmptyString()) {
+            label.mTypeName = Core::Container::FString(TEXT("Component"));
+            return label;
+        }
+
+        const auto separator = fullName.ToView().RFind(TEXT("::"));
+        if (separator == Core::Container::FString::npos) {
+            label.mTypeName = fullName;
+            return label;
+        }
+
+        label.mTypeNamespace = fullName.Substr(0, separator);
+        label.mTypeName      = fullName.Substr(separator + 2);
+        return label;
+    }
+
+    auto BuildHierarchySnapshot(const GameScene::FWorld* world)
+        -> Editor::UI::FEditorWorldHierarchySnapshot {
+        Editor::UI::FEditorWorldHierarchySnapshot snapshot{};
+        if (world == nullptr) {
+            return snapshot;
+        }
+
+        snapshot.mWorldId    = world->GetWorldId();
+        const auto objectIds = world->GetAllGameObjectIds();
+        snapshot.mGameObjects.Reserve(objectIds.Size());
+
+        auto& componentRegistry = GameScene::GetComponentRegistry();
+        for (const auto& objectId : objectIds) {
+            auto objectView = world->Object(objectId);
+            if (!objectView.IsValid()) {
+                continue;
+            }
+
+            Editor::UI::FEditorGameObjectSnapshot objectSnapshot{};
+            objectSnapshot.mId.mWorldId    = objectId.WorldId;
+            objectSnapshot.mId.mIndex      = objectId.Index;
+            objectSnapshot.mId.mGeneration = objectId.Generation;
+
+            auto parent = objectView.GetParent();
+            if (parent.IsValid() && parent.WorldId == 0U) {
+                parent.WorldId = objectId.WorldId;
+            }
+            objectSnapshot.mParentId.mWorldId    = parent.WorldId;
+            objectSnapshot.mParentId.mIndex      = parent.Index;
+            objectSnapshot.mParentId.mGeneration = parent.Generation;
+            objectSnapshot.mName                 = objectView.GetName();
+
+            const auto componentIds = objectView.GetAllComponents();
+            objectSnapshot.mComponents.Reserve(componentIds.Size());
+            for (const auto& componentId : componentIds) {
+                Editor::UI::FEditorComponentSnapshot componentSnapshot{};
+                componentSnapshot.mId.mType       = static_cast<u64>(componentId.Type);
+                componentSnapshot.mId.mIndex      = componentId.Index;
+                componentSnapshot.mId.mGeneration = componentId.Generation;
+
+                const auto* typeEntry = componentRegistry.Find(componentId.Type);
+                if (typeEntry != nullptr) {
+                    const auto parsed                = ParseComponentTypeLabel(typeEntry->TypeName);
+                    componentSnapshot.mName          = parsed.mTypeName;
+                    componentSnapshot.mTypeName      = parsed.mTypeName;
+                    componentSnapshot.mTypeNamespace = parsed.mTypeNamespace;
+                } else {
+                    componentSnapshot.mName          = Core::Container::FString(TEXT("Component"));
+                    componentSnapshot.mTypeName      = componentSnapshot.mName;
+                    componentSnapshot.mTypeNamespace = Core::Container::FString();
+                }
+                objectSnapshot.mComponents.PushBack(Move(componentSnapshot));
+            }
+
+            snapshot.mGameObjects.PushBack(Move(objectSnapshot));
+        }
+
+        return snapshot;
+    }
+
     class FEditorRuntimeInputRouter final {
     public:
         void Route(const Input::FInputSystem*         source,
@@ -209,7 +302,10 @@ namespace {
             (void)frameContext;
             auto        services      = session.GetServices();
             const auto* platformInput = ResolvePlatformInput(session, services.InputSystem);
-            const auto  commands      = UiModule.ConsumeUiCommands();
+            UiModule.SetWorldHierarchySnapshot((services.WorldManager != nullptr)
+                    ? BuildHierarchySnapshot(services.WorldManager->GetActiveWorld())
+                    : Editor::UI::FEditorWorldHierarchySnapshot{});
+            const auto commands = UiModule.ConsumeUiCommands();
             for (auto cmd : commands) {
                 switch (cmd) {
                     case Editor::UI::EEditorUiCommand::Play:

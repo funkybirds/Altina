@@ -31,19 +31,19 @@ namespace {
 } // namespace
 
 TEST_CASE("GameScene.World.GameObjectId.GenerationAndReuse") {
-    FWorld              world;
+    FWorld     world;
 
     const auto firstView = world.CreateGameObject();
     REQUIRE(firstView.IsValid());
     const FGameObjectId first = firstView.GetId();
 
-    const u32 firstIndex = first.Index;
-    const u32 firstGen   = first.Generation;
+    const u32           firstIndex = first.Index;
+    const u32           firstGen   = first.Generation;
 
     world.DestroyGameObject(firstView);
     REQUIRE(!world.IsAlive(first));
 
-    const auto          secondView = world.CreateGameObject();
+    const auto secondView = world.CreateGameObject();
     REQUIRE(secondView.IsValid());
     const FGameObjectId second = secondView.GetId();
     REQUIRE_EQ(second.Index, firstIndex);
@@ -61,7 +61,7 @@ TEST_CASE("GameScene.World.ComponentId.GenerationAndReuse") {
     ResetCounters();
 
     FWorld world;
-    auto objectView = world.CreateGameObject();
+    auto   objectView = world.CreateGameObject();
     REQUIRE(objectView.IsValid());
 
     const auto objectId = objectView.GetId();
@@ -79,8 +79,7 @@ TEST_CASE("GameScene.World.ComponentId.GenerationAndReuse") {
     REQUIRE_EQ(FTestComponent::sDestroyCount, 1);
 
     const FComponentTypeHash typeHash = GetComponentTypeHash<FTestComponent>();
-    const FComponentId       second   =
-        world.Object(objectId).AddComponent<FTestComponent>().GetId();
+    const FComponentId       second = world.Object(objectId).AddComponent<FTestComponent>().GetId();
     REQUIRE(second.IsValid());
     REQUIRE_EQ(second.Type, typeHash);
     REQUIRE_EQ(second.Index, first.Index);
@@ -92,7 +91,7 @@ TEST_CASE("GameScene.World.DestroyGameObjectDestroysComponents") {
     ResetCounters();
 
     FWorld world;
-    auto objectView = world.CreateGameObject();
+    auto   objectView = world.CreateGameObject();
     REQUIRE(objectView.IsValid());
 
     const auto objectId = objectView.GetId();
@@ -106,4 +105,39 @@ TEST_CASE("GameScene.World.DestroyGameObjectDestroysComponents") {
     REQUIRE(!world.IsAlive(objectId));
     REQUIRE(!world.IsAlive(compId));
     REQUIRE_EQ(FTestComponent::sDestroyCount, 1);
+}
+
+TEST_CASE("GameScene.World.ReadOnlyEnumerationAndViewAccessors") {
+    FWorld world;
+
+    auto   root  = world.CreateGameObject(TEXT("RootNode"));
+    auto   child = world.CreateGameObject(TEXT("ChildNode"));
+    auto   lone  = world.CreateGameObject(TEXT("LoneNode"));
+    REQUIRE(root.IsValid());
+    REQUIRE(child.IsValid());
+    REQUIRE(lone.IsValid());
+
+    child.SetParent(root.GetId());
+
+    auto rootComponent  = root.AddComponent<FTestComponent>();
+    auto childComponent = child.AddComponent<FTestComponent>();
+    REQUIRE(rootComponent.IsValid());
+    REQUIRE(childComponent.IsValid());
+
+    const auto allIds = world.GetAllGameObjectIds();
+    REQUIRE_EQ(allIds.Size(), 3U);
+
+    REQUIRE(world.GetGameObjectName(root.GetId()) == TEXT("RootNode"));
+    REQUIRE(world.GetGameObjectName(child.GetId()) == TEXT("ChildNode"));
+    REQUIRE(world.GetGameObjectParent(child.GetId()) == root.GetId());
+    REQUIRE(!world.GetGameObjectParent(lone.GetId()).IsValid());
+
+    const auto rootComponents = root.GetAllComponents();
+    REQUIRE_EQ(rootComponents.Size(), 1U);
+    REQUIRE(rootComponents[0] == rootComponent.GetId());
+
+    const auto childComponents = child.GetAllComponents();
+    REQUIRE_EQ(childComponents.Size(), 1U);
+    REQUIRE(childComponents[0] == childComponent.GetId());
+    REQUIRE(child.GetName() == TEXT("ChildNode"));
 }

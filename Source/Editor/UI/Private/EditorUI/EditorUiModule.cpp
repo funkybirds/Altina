@@ -44,6 +44,7 @@ namespace AltinaEngine::Editor::UI {
         [[nodiscard]] auto TextWidth(FStringView text) -> f32 {
             return static_cast<f32>(text.Length()) * kGlyphW;
         }
+
     } // namespace
 
     void FEditorUiModule::RegisterDefaultPanels(DebugGui::IDebugGuiSystem* debugGuiSystem,
@@ -154,6 +155,290 @@ namespace AltinaEngine::Editor::UI {
     auto FEditorUiModule::DebugGetCurrentAssetPathForTest() const
         -> ::AltinaEngine::Core::Container::FString {
         return mCurrentAssetPath;
+    }
+
+    void FEditorUiModule::SetWorldHierarchySnapshot(const FEditorWorldHierarchySnapshot& snapshot) {
+        mHierarchySnapshot = snapshot;
+        RefreshHierarchyCache();
+        RefreshHierarchyDebugItems();
+    }
+
+    auto FEditorUiModule::DebugGetHierarchyItemsForTest() const
+        -> ::AltinaEngine::Core::Container::TVector<FEditorHierarchyDebugItem> {
+        return mHierarchyDebugItems;
+    }
+
+    auto FEditorUiModule::DebugGetSelectionInfoForTest() const -> FEditorSelectionInfo {
+        return mSelection;
+    }
+
+    void FEditorUiModule::DebugSelectGameObjectForTest(FEditorGameObjectRuntimeId id) {
+        SelectGameObject(id);
+    }
+
+    void FEditorUiModule::DebugSelectComponentForTest(FEditorComponentRuntimeId id) {
+        SelectComponent(id);
+    }
+
+    auto FEditorUiModule::DebugOpenAssetPathForTest(
+        Core::Container::FStringView path, EAssetItemType type) -> bool {
+        if (path.IsEmpty()) {
+            return false;
+        }
+        OpenPathInAssetView(path, type);
+        return true;
+    }
+
+    auto FEditorUiModule::MakeGameObjectUuid(FEditorGameObjectRuntimeId id) const
+        -> Core::Container::FString {
+        Core::Container::FString uuid;
+        uuid.AppendNumber(id.mWorldId);
+        uuid.Append(TEXT("-"));
+        uuid.AppendNumber(id.mIndex);
+        uuid.Append(TEXT("-"));
+        uuid.AppendNumber(id.mGeneration);
+        return uuid;
+    }
+
+    auto FEditorUiModule::MakeComponentUuid(FEditorComponentRuntimeId id) const
+        -> Core::Container::FString {
+        Core::Container::FString uuid;
+        uuid.AppendNumber(id.mType);
+        uuid.Append(TEXT("-"));
+        uuid.AppendNumber(id.mIndex);
+        uuid.Append(TEXT("-"));
+        uuid.AppendNumber(id.mGeneration);
+        return uuid;
+    }
+
+    auto FEditorUiModule::FindGameObjectIndex(FEditorGameObjectRuntimeId id) const -> i32 {
+        auto it = mHierarchyLookup.FindIt(id);
+        if (it == mHierarchyLookup.end()) {
+            return -1;
+        }
+        return it->second;
+    }
+
+    auto FEditorUiModule::FindComponentSnapshot(FEditorComponentRuntimeId id) const
+        -> const FEditorComponentSnapshot* {
+        for (const auto& object : mHierarchySnapshot.mGameObjects) {
+            for (const auto& component : object.mComponents) {
+                if (component.mId == id) {
+                    return &component;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    auto FEditorUiModule::IsGameObjectSelected(FEditorGameObjectRuntimeId id) const -> bool {
+        if (mSelection.mType != EEditorSelectionType::GameObject) {
+            return false;
+        }
+        return mSelection.mUuid == MakeGameObjectUuid(id).ToView();
+    }
+
+    auto FEditorUiModule::IsComponentSelected(FEditorComponentRuntimeId id) const -> bool {
+        if (mSelection.mType != EEditorSelectionType::Component) {
+            return false;
+        }
+        return mSelection.mUuid == MakeComponentUuid(id).ToView();
+    }
+
+    void FEditorUiModule::SelectGameObject(FEditorGameObjectRuntimeId id) {
+        const i32 index = FindGameObjectIndex(id);
+        if (index < 0 || index >= static_cast<i32>(mHierarchySnapshot.mGameObjects.Size())) {
+            mSelection = {};
+            return;
+        }
+
+        const auto& object = mHierarchySnapshot.mGameObjects[static_cast<usize>(index)];
+        mSelection.mType   = EEditorSelectionType::GameObject;
+        mSelection.mName   = object.mName;
+        mSelection.mUuid   = MakeGameObjectUuid(object.mId);
+        mSelection.mTypeName.Clear();
+        mSelection.mTypeNamespace.Clear();
+    }
+
+    void FEditorUiModule::SelectComponent(FEditorComponentRuntimeId id) {
+        const auto* component = FindComponentSnapshot(id);
+        if (component == nullptr) {
+            mSelection = {};
+            return;
+        }
+
+        mSelection.mType          = EEditorSelectionType::Component;
+        mSelection.mName          = component->mName;
+        mSelection.mUuid          = MakeComponentUuid(component->mId);
+        mSelection.mTypeName      = component->mTypeName;
+        mSelection.mTypeNamespace = component->mTypeNamespace;
+    }
+
+    void FEditorUiModule::RefreshHierarchyCache() {
+        mHierarchyChildren.Clear();
+        mHierarchyRoots.Clear();
+        mHierarchyLookup.Clear();
+
+        mHierarchyChildren.Resize(mHierarchySnapshot.mGameObjects.Size());
+        for (usize i = 0; i < mHierarchySnapshot.mGameObjects.Size(); ++i) {
+            mHierarchyLookup[mHierarchySnapshot.mGameObjects[i].mId] = static_cast<i32>(i);
+        }
+
+        const auto findParentIndex = [this](const FEditorGameObjectRuntimeId& parentId) -> i32 {
+            const i32 directIndex = FindGameObjectIndex(parentId);
+            if (directIndex >= 0) {
+                return directIndex;
+            }
+            if (parentId.mWorldId == 0U && parentId.mIndex == 0U && parentId.mGeneration == 0U) {
+                return -1;
+            }
+            for (i32 index = 0; index < static_cast<i32>(mHierarchySnapshot.mGameObjects.Size());
+                ++index) {
+                const auto& candidate =
+                    mHierarchySnapshot.mGameObjects[static_cast<usize>(index)].mId;
+                if (candidate.mIndex != parentId.mIndex) {
+                    continue;
+                }
+                if (parentId.mWorldId != 0U && candidate.mWorldId != parentId.mWorldId) {
+                    continue;
+                }
+                return index;
+            }
+            return -1;
+        };
+
+        for (i32 i = 0; i < static_cast<i32>(mHierarchySnapshot.mGameObjects.Size()); ++i) {
+            const auto& object      = mHierarchySnapshot.mGameObjects[static_cast<usize>(i)];
+            const i32   parentIndex = findParentIndex(object.mParentId);
+            const auto  key         = MakeGameObjectUuid(object.mId);
+            auto        it          = mHierarchyExpanded.FindIt(key);
+            const bool  isNewNode   = (it == mHierarchyExpanded.end());
+            if (isNewNode) {
+                mHierarchyExpanded[Move(key)] = false;
+            }
+            if (parentIndex >= 0
+                && parentIndex < static_cast<i32>(mHierarchySnapshot.mGameObjects.Size())) {
+                mHierarchyChildren[static_cast<usize>(parentIndex)].PushBack(i);
+            } else {
+                mHierarchyRoots.PushBack(i);
+                if (isNewNode) {
+                    mHierarchyExpanded[MakeGameObjectUuid(object.mId)] = true;
+                }
+            }
+        }
+
+        for (auto& children : mHierarchyChildren) {
+            if (children.IsEmpty()) {
+                continue;
+            }
+            TVector<i32> filtered;
+            filtered.Reserve(children.Size());
+            for (const i32 childIndex : children) {
+                if (childIndex >= 0
+                    && childIndex < static_cast<i32>(mHierarchySnapshot.mGameObjects.Size())) {
+                    filtered.PushBack(childIndex);
+                }
+            }
+            children = Move(filtered);
+        }
+
+        Core::Algorithm::Sort(mHierarchyRoots, [this](i32 lhs, i32 rhs) {
+            const auto& lhsObject = mHierarchySnapshot.mGameObjects[static_cast<usize>(lhs)];
+            const auto& rhsObject = mHierarchySnapshot.mGameObjects[static_cast<usize>(rhs)];
+            if (lhsObject.mId.mIndex != rhsObject.mId.mIndex) {
+                return lhsObject.mId.mIndex < rhsObject.mId.mIndex;
+            }
+            return lhsObject.mId.mGeneration < rhsObject.mId.mGeneration;
+        });
+
+        for (auto& children : mHierarchyChildren) {
+            Core::Algorithm::Sort(children, [this](i32 lhs, i32 rhs) {
+                const auto& lhsObject = mHierarchySnapshot.mGameObjects[static_cast<usize>(lhs)];
+                const auto& rhsObject = mHierarchySnapshot.mGameObjects[static_cast<usize>(rhs)];
+                if (lhsObject.mId.mIndex != rhsObject.mId.mIndex) {
+                    return lhsObject.mId.mIndex < rhsObject.mId.mIndex;
+                }
+                return lhsObject.mId.mGeneration < rhsObject.mId.mGeneration;
+            });
+        }
+
+        bool selectionValid = false;
+        if (mSelection.mType == EEditorSelectionType::GameObject) {
+            for (const auto& object : mHierarchySnapshot.mGameObjects) {
+                if (mSelection.mUuid == MakeGameObjectUuid(object.mId).ToView()) {
+                    selectionValid = true;
+                    break;
+                }
+            }
+        } else if (mSelection.mType == EEditorSelectionType::Component) {
+            for (const auto& object : mHierarchySnapshot.mGameObjects) {
+                for (const auto& component : object.mComponents) {
+                    if (mSelection.mUuid == MakeComponentUuid(component.mId).ToView()) {
+                        selectionValid = true;
+                        break;
+                    }
+                }
+                if (selectionValid) {
+                    break;
+                }
+            }
+        }
+
+        if (!selectionValid) {
+            mSelection = {};
+        }
+    }
+
+    void FEditorUiModule::RefreshHierarchyDebugItems() {
+        mHierarchyDebugItems.Clear();
+        TVector<i32> stack;
+        for (isize i = static_cast<isize>(mHierarchyRoots.Size()) - 1; i >= 0; --i) {
+            stack.PushBack(mHierarchyRoots[static_cast<usize>(i)]);
+            if (i == 0) {
+                break;
+            }
+        }
+
+        TVector<u32> depthStack;
+        for (usize i = 0; i < stack.Size(); ++i) {
+            depthStack.PushBack(0U);
+        }
+
+        while (!stack.IsEmpty()) {
+            const i32 objectIndex = stack.Back();
+            stack.PopBack();
+            const u32 depth = depthStack.Back();
+            depthStack.PopBack();
+
+            if (objectIndex < 0
+                || objectIndex >= static_cast<i32>(mHierarchySnapshot.mGameObjects.Size())) {
+                continue;
+            }
+
+            const auto& object = mHierarchySnapshot.mGameObjects[static_cast<usize>(objectIndex)];
+            FEditorHierarchyDebugItem objectItem{};
+            objectItem.mLabel       = object.mName;
+            objectItem.mDepth       = depth;
+            objectItem.mIsComponent = false;
+            mHierarchyDebugItems.PushBack(Move(objectItem));
+
+            for (const auto& component : object.mComponents) {
+                FEditorHierarchyDebugItem componentItem{};
+                componentItem.mLabel       = component.mName;
+                componentItem.mDepth       = depth + 1U;
+                componentItem.mIsComponent = true;
+                mHierarchyDebugItems.PushBack(Move(componentItem));
+            }
+
+            const auto& children = mHierarchyChildren[static_cast<usize>(objectIndex)];
+            for (isize child = static_cast<isize>(children.Size()) - 1; child >= 0; --child) {
+                stack.PushBack(children[static_cast<usize>(child)]);
+                depthStack.PushBack(depth + 1U);
+                if (child == 0) {
+                    break;
+                }
+            }
+        }
     }
 
     auto FEditorUiModule::IsMetaPath(Core::Container::FStringView path) const -> bool {
@@ -335,21 +620,35 @@ namespace AltinaEngine::Editor::UI {
                 if (parentIt == mAssetNodeLookup.end()) {
                     continue;
                 }
+                const i32 parentIndex = parentIt->second;
+                if (parentIndex < 0 || parentIndex >= static_cast<i32>(mAssetNodes.Size())) {
+                    continue;
+                }
 
                 FAssetNode node{};
                 node.mPath        = dirPath;
                 node.mName        = GetAssetDisplayName(dirPath.ToView());
-                node.mParentIndex = parentIt->second;
+                node.mParentIndex = parentIndex;
                 auto expandedIt   = oldExpanded.FindIt(node.mPath);
                 node.mExpanded    = (expandedIt != oldExpanded.end()) ? expandedIt->second : false;
 
                 const i32 index              = static_cast<i32>(mAssetNodes.Size());
                 mAssetNodeLookup[node.mPath] = index;
                 mAssetNodes.PushBack(Move(node));
-                mAssetNodes[static_cast<usize>(parentIt->second)].mChildren.PushBack(index);
+                mAssetNodes[static_cast<usize>(parentIndex)].mChildren.PushBack(index);
             }
 
             for (auto& node : mAssetNodes) {
+                if (!node.mChildren.IsEmpty()) {
+                    TVector<i32> filtered;
+                    filtered.Reserve(node.mChildren.Size());
+                    for (const i32 childIndex : node.mChildren) {
+                        if (childIndex >= 0 && childIndex < static_cast<i32>(mAssetNodes.Size())) {
+                            filtered.PushBack(childIndex);
+                        }
+                    }
+                    node.mChildren = Move(filtered);
+                }
                 Core::Algorithm::Sort(node.mChildren, [this](i32 lhs, i32 rhs) {
                     const auto& lhsNode = mAssetNodes[static_cast<usize>(lhs)];
                     const auto& rhsNode = mAssetNodes[static_cast<usize>(rhs)];
@@ -389,15 +688,283 @@ namespace AltinaEngine::Editor::UI {
         mSelectedAssetType = type;
     }
 
+    void FEditorUiModule::DrawHierarchyPanel(DebugGui::IDebugGui& gui,
+        const DebugGui::FRect& contentRect, const Core::Math::FVector2f& mouse,
+        bool blockWorkspaceInput) {
+        const auto colText      = DebugGui::MakeColor32(224, 226, 230, 255);
+        const auto colMutedText = DebugGui::MakeColor32(160, 168, 180, 255);
+
+        if (mHierarchySnapshot.mGameObjects.IsEmpty()) {
+            gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 2.0f), colText,
+                TEXT("World"));
+            gui.DrawText(FVector2f(contentRect.Min.X() + 10.0f, contentRect.Min.Y() + 20.0f),
+                colMutedText, TEXT("No active world."));
+            return;
+        }
+
+        Core::Container::FString worldLabel(TEXT("World "));
+        worldLabel.AppendNumber(mHierarchySnapshot.mWorldId);
+        gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 2.0f), colText,
+            worldLabel.ToView());
+
+        const FRect treeRect = MakeRect(contentRect.Min.X(), contentRect.Min.Y() + 18.0f,
+            contentRect.Max.X(), contentRect.Max.Y());
+        DebugGui::FDebugGuiTheme theme{};
+        if (mDebugGuiSystem != nullptr) {
+            theme = mDebugGuiSystem->GetTheme();
+        }
+        const f32 rowHeight      = (theme.mTreeRowHeight > 0.0f) ? theme.mTreeRowHeight : 18.0f;
+        const f32 rowStep        = rowHeight + theme.mItemSpacingY;
+        const f32 scrollBarWidth = (theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 10.0f;
+        const f32 scrollBarPad = (theme.mScrollBarPadding > 0.0f) ? theme.mScrollBarPadding : 2.0f;
+        const f32 thumbMinH =
+            (theme.mScrollBarThumbMinHeight > 0.0f) ? theme.mScrollBarThumbMinHeight : 14.0f;
+
+        i32 visibleRowCount = 0;
+        {
+            TVector<i32> countStack;
+            for (isize i = static_cast<isize>(mHierarchyRoots.Size()) - 1; i >= 0; --i) {
+                countStack.PushBack(mHierarchyRoots[static_cast<usize>(i)]);
+                if (i == 0) {
+                    break;
+                }
+            }
+            while (!countStack.IsEmpty()) {
+                const i32 objectIndex = countStack.Back();
+                countStack.PopBack();
+                if (objectIndex < 0
+                    || objectIndex >= static_cast<i32>(mHierarchySnapshot.mGameObjects.Size())) {
+                    continue;
+                }
+                const auto& object =
+                    mHierarchySnapshot.mGameObjects[static_cast<usize>(objectIndex)];
+                visibleRowCount += 1 + static_cast<i32>(object.mComponents.Size());
+                const auto uuid     = MakeGameObjectUuid(object.mId);
+                const auto keyIt    = mHierarchyExpanded.FindIt(uuid);
+                const bool expanded = (keyIt != mHierarchyExpanded.end()) ? keyIt->second : true;
+                if (!expanded) {
+                    continue;
+                }
+                const auto& children = mHierarchyChildren[static_cast<usize>(objectIndex)];
+                for (isize child = static_cast<isize>(children.Size()) - 1; child >= 0; --child) {
+                    countStack.PushBack(children[static_cast<usize>(child)]);
+                    if (child == 0) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        const f32 viewHeight  = Core::Math::Max(0.0f, treeRect.Max.Y() - treeRect.Min.Y() - 4.0f);
+        const f32 totalHeight = static_cast<f32>(visibleRowCount) * rowStep;
+        const f32 maxScrollY  = Core::Math::Max(0.0f, totalHeight - viewHeight);
+        mHierarchyScrollY     = Clamp(mHierarchyScrollY, 0.0f, maxScrollY);
+
+        const bool needsScrollBar = (maxScrollY > 0.0f)
+            && (treeRect.Max.X() - treeRect.Min.X() > (scrollBarWidth + scrollBarPad + 24.0f));
+        const FRect scrollTrackRect = needsScrollBar
+            ? MakeRect(treeRect.Max.X() - scrollBarWidth - scrollBarPad, treeRect.Min.Y() + 2.0f,
+                  treeRect.Max.X() - scrollBarPad, treeRect.Max.Y() - 2.0f)
+            : MakeRect(0.0f, 0.0f, 0.0f, 0.0f);
+        const FRect treeContentRect = needsScrollBar
+            ? MakeRect(treeRect.Min.X(), treeRect.Min.Y(), scrollTrackRect.Min.X() - scrollBarPad,
+                  treeRect.Max.Y())
+            : treeRect;
+
+        if (!gui.IsMouseDown()) {
+            mHierarchyScrollDragging = false;
+        }
+        if (!blockWorkspaceInput && needsScrollBar && gui.WasMousePressed()
+            && IsInside(scrollTrackRect, mouse)) {
+            const f32 trackH = scrollTrackRect.Max.Y() - scrollTrackRect.Min.Y();
+            const f32 thumbHRaw =
+                (totalHeight > 0.0f) ? (viewHeight / totalHeight) * trackH : trackH;
+            const f32   thumbH         = Clamp(thumbHRaw, thumbMinH, trackH);
+            const f32   maxThumbTravel = Core::Math::Max(0.0f, trackH - thumbH);
+            const f32   t      = (maxScrollY > 0.0f) ? (mHierarchyScrollY / maxScrollY) : 0.0f;
+            const f32   thumbY = scrollTrackRect.Min.Y() + maxThumbTravel * t;
+            const FRect thumbRect =
+                MakeRect(scrollTrackRect.Min.X(), thumbY, scrollTrackRect.Max.X(), thumbY + thumbH);
+            mHierarchyScrollDragging = true;
+            mHierarchyScrollDragOffsetY =
+                IsInside(thumbRect, mouse) ? (mouse.Y() - thumbY) : (thumbH * 0.5f);
+        }
+        if (!blockWorkspaceInput && needsScrollBar && mHierarchyScrollDragging
+            && gui.IsMouseDown()) {
+            const f32 trackH = scrollTrackRect.Max.Y() - scrollTrackRect.Min.Y();
+            const f32 thumbHRaw =
+                (totalHeight > 0.0f) ? (viewHeight / totalHeight) * trackH : trackH;
+            const f32 thumbH         = Clamp(thumbHRaw, thumbMinH, trackH);
+            const f32 maxThumbTravel = Core::Math::Max(0.0f, trackH - thumbH);
+            const f32 minY           = scrollTrackRect.Min.Y();
+            const f32 maxY           = scrollTrackRect.Max.Y() - thumbH;
+            const f32 desiredY       = Clamp(mouse.Y() - mHierarchyScrollDragOffsetY, minY, maxY);
+            const f32 t = (maxThumbTravel > 0.0f) ? ((desiredY - minY) / maxThumbTravel) : 0.0f;
+            mHierarchyScrollY = t * maxScrollY;
+        }
+
+        gui.PushClipRect(treeContentRect);
+        gui.SetCursorPos(FVector2f(
+            treeContentRect.Min.X() + 2.0f, treeContentRect.Min.Y() + 2.0f - mHierarchyScrollY));
+
+        TVector<i32> indexStack;
+        TVector<u32> depthStack;
+        for (isize i = static_cast<isize>(mHierarchyRoots.Size()) - 1; i >= 0; --i) {
+            indexStack.PushBack(mHierarchyRoots[static_cast<usize>(i)]);
+            depthStack.PushBack(0U);
+            if (i == 0) {
+                break;
+            }
+        }
+
+        while (!indexStack.IsEmpty()) {
+            const i32 objectIndex = indexStack.Back();
+            indexStack.PopBack();
+            const u32 depth = depthStack.Back();
+            depthStack.PopBack();
+            if (objectIndex < 0
+                || objectIndex >= static_cast<i32>(mHierarchySnapshot.mGameObjects.Size())) {
+                continue;
+            }
+
+            const auto& object   = mHierarchySnapshot.mGameObjects[static_cast<usize>(objectIndex)];
+            const auto& children = mHierarchyChildren[static_cast<usize>(objectIndex)];
+            const auto  uuid     = MakeGameObjectUuid(object.mId);
+            const auto  keyIt    = mHierarchyExpanded.FindIt(uuid);
+            const bool  expanded = (keyIt != mHierarchyExpanded.end()) ? keyIt->second : true;
+            const bool  hasChildren = !children.IsEmpty() || !object.mComponents.IsEmpty();
+
+            DebugGui::FTreeViewItemDesc objectDesc{};
+            objectDesc.mLabel       = object.mName.ToView();
+            objectDesc.mDepth       = depth;
+            objectDesc.mSelected    = IsGameObjectSelected(object.mId);
+            objectDesc.mExpanded    = expanded;
+            objectDesc.mHasChildren = hasChildren;
+
+            const auto objectResult = gui.TreeViewItem(objectDesc);
+            if (!blockWorkspaceInput && objectResult.mClicked) {
+                SelectGameObject(object.mId);
+            }
+            if (!blockWorkspaceInput && objectResult.mToggleExpanded && hasChildren) {
+                mHierarchyExpanded[uuid] = !expanded;
+            }
+
+            const bool currentExpanded =
+                (mHierarchyExpanded.FindIt(uuid) != mHierarchyExpanded.end())
+                ? mHierarchyExpanded[uuid]
+                : true;
+            if (!currentExpanded) {
+                continue;
+            }
+
+            for (isize child = static_cast<isize>(children.Size()) - 1; child >= 0; --child) {
+                indexStack.PushBack(children[static_cast<usize>(child)]);
+                depthStack.PushBack(depth + 1U);
+                if (child == 0) {
+                    break;
+                }
+            }
+
+            for (usize c = 0; c < object.mComponents.Size(); ++c) {
+                const auto&                 component = object.mComponents[c];
+                DebugGui::FTreeViewItemDesc componentDesc{};
+                componentDesc.mLabel       = component.mName.ToView();
+                componentDesc.mDepth       = depth + 1U;
+                componentDesc.mSelected    = IsComponentSelected(component.mId);
+                componentDesc.mExpanded    = false;
+                componentDesc.mHasChildren = false;
+                const auto componentResult = gui.TreeViewItem(componentDesc);
+                if (!blockWorkspaceInput && componentResult.mClicked) {
+                    SelectComponent(component.mId);
+                }
+            }
+        }
+
+        gui.PopClipRect();
+        if (needsScrollBar) {
+            const f32 trackH = scrollTrackRect.Max.Y() - scrollTrackRect.Min.Y();
+            const f32 thumbHRaw =
+                (totalHeight > 0.0f) ? (viewHeight / totalHeight) * trackH : trackH;
+            const f32   thumbH         = Clamp(thumbHRaw, thumbMinH, trackH);
+            const f32   maxThumbTravel = Core::Math::Max(0.0f, trackH - thumbH);
+            const f32   t      = (maxScrollY > 0.0f) ? (mHierarchyScrollY / maxScrollY) : 0.0f;
+            const f32   thumbY = scrollTrackRect.Min.Y() + maxThumbTravel * t;
+            const FRect thumbRect =
+                MakeRect(scrollTrackRect.Min.X(), thumbY, scrollTrackRect.Max.X(), thumbY + thumbH);
+            gui.DrawRectFilled(scrollTrackRect, theme.mScrollBarTrackBg);
+            gui.DrawRect(scrollTrackRect, theme.mScrollBarTrackBorder, 1.0f);
+            const bool thumbHovered = IsInside(thumbRect, mouse);
+            const auto thumbColor   = mHierarchyScrollDragging
+                  ? theme.mScrollBarThumbActiveBg
+                  : (thumbHovered ? theme.mScrollBarThumbHoverBg : theme.mScrollBarThumbBg);
+            gui.DrawRectFilled(thumbRect, thumbColor);
+            gui.DrawRect(thumbRect, theme.mScrollBarThumbBorder, 1.0f);
+        }
+    }
+
+    void FEditorUiModule::DrawInspectorPanel(
+        DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect) const {
+        const auto colText      = DebugGui::MakeColor32(224, 226, 230, 255);
+        const auto colMutedText = DebugGui::MakeColor32(160, 168, 180, 255);
+        const f32  x            = contentRect.Min.X() + 4.0f;
+        f32        y            = contentRect.Min.Y() + 2.0f;
+
+        gui.DrawText(FVector2f(x, y), colText, TEXT("Inspector"));
+        y += 18.0f;
+
+        if (mSelection.mType == EEditorSelectionType::None) {
+            gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Select a GameObject or Component."));
+            return;
+        }
+
+        const TChar* selectionType = TEXT("None");
+        if (mSelection.mType == EEditorSelectionType::GameObject) {
+            selectionType = TEXT("GameObject");
+        } else if (mSelection.mType == EEditorSelectionType::Component) {
+            selectionType = TEXT("Component");
+        }
+
+        gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Selection Type"));
+        gui.DrawText(FVector2f(x + 120.0f, y), colText, selectionType);
+        y += 18.0f;
+
+        gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Name"));
+        gui.DrawText(FVector2f(x + 120.0f, y), colText, mSelection.mName.ToView());
+        y += 18.0f;
+
+        gui.DrawText(FVector2f(x, y), colMutedText, TEXT("UUID"));
+        gui.DrawText(FVector2f(x + 120.0f, y), colText, mSelection.mUuid.ToView());
+        y += 24.0f;
+
+        if (mSelection.mType == EEditorSelectionType::Component) {
+            gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Type"));
+            gui.DrawText(FVector2f(x + 120.0f, y), colText, mSelection.mTypeName.ToView());
+            y += 18.0f;
+            gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Namespace"));
+            if (mSelection.mTypeNamespace.IsEmptyString()) {
+                gui.DrawText(FVector2f(x + 120.0f, y), colText, TEXT("(global)"));
+            } else {
+                gui.DrawText(FVector2f(x + 120.0f, y), colText, mSelection.mTypeNamespace.ToView());
+            }
+            y += 24.0f;
+        }
+
+        gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Properties (Coming Soon)"));
+    }
+
     void FEditorUiModule::DrawAssetPanel(DebugGui::IDebugGui& gui,
         const DebugGui::FRect& contentRect, const Core::Math::FVector2f& mouse,
         bool blockWorkspaceInput) {
-        const auto colPanelBg        = DebugGui::MakeColor32(26, 29, 35, 255);
-        const auto colBorder         = DebugGui::MakeColor32(88, 94, 108, 255);
-        const auto colText           = DebugGui::MakeColor32(224, 226, 230, 255);
-        const auto colMutedText      = DebugGui::MakeColor32(160, 168, 180, 255);
-        const auto colMenuBg         = DebugGui::MakeColor32(28, 31, 36, 250);
-        const auto colMenuHover      = DebugGui::MakeColor32(48, 54, 63, 255);
+        const auto               colPanelBg   = DebugGui::MakeColor32(26, 29, 35, 255);
+        const auto               colBorder    = DebugGui::MakeColor32(88, 94, 108, 255);
+        const auto               colText      = DebugGui::MakeColor32(224, 226, 230, 255);
+        const auto               colMutedText = DebugGui::MakeColor32(160, 168, 180, 255);
+        const auto               colMenuBg    = DebugGui::MakeColor32(28, 31, 36, 250);
+        const auto               colMenuHover = DebugGui::MakeColor32(48, 54, 63, 255);
+        DebugGui::FDebugGuiTheme theme{};
+        if (mDebugGuiSystem != nullptr) {
+            theme = mDebugGuiSystem->GetTheme();
+        }
         const auto HashAssetItemPath = [](Core::Container::FStringView path) -> u64 {
             constexpr u64 kOffset = 1469598103934665603ULL;
             constexpr u64 kPrime  = 1099511628211ULL;
@@ -443,8 +1010,89 @@ namespace AltinaEngine::Editor::UI {
         gui.DrawRectFilled(gridRect, colPanelBg);
         gui.DrawRect(gridRect, colBorder, 1.0f);
 
-        gui.PushClipRect(treeRect);
-        gui.SetCursorPos(FVector2f(treeRect.Min.X() + 4.0f, treeRect.Min.Y() + 2.0f));
+        const f32 treeRowHeight  = (theme.mTreeRowHeight > 0.0f) ? theme.mTreeRowHeight : 18.0f;
+        const f32 treeRowStep    = treeRowHeight + theme.mItemSpacingY;
+        const f32 scrollBarWidth = (theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 10.0f;
+        const f32 scrollBarPad = (theme.mScrollBarPadding > 0.0f) ? theme.mScrollBarPadding : 2.0f;
+        const f32 thumbMinH =
+            (theme.mScrollBarThumbMinHeight > 0.0f) ? theme.mScrollBarThumbMinHeight : 14.0f;
+
+        i32 visibleNodeCount = 0;
+        if (!mAssetNodes.IsEmpty()) {
+            TVector<i32> countStack;
+            countStack.PushBack(0);
+            while (!countStack.IsEmpty()) {
+                const i32 nodeIndex = countStack.Back();
+                countStack.PopBack();
+                if (nodeIndex < 0 || nodeIndex >= static_cast<i32>(mAssetNodes.Size())) {
+                    continue;
+                }
+                ++visibleNodeCount;
+                const auto& node = mAssetNodes[static_cast<usize>(nodeIndex)];
+                if (!node.mExpanded) {
+                    continue;
+                }
+                for (isize child = static_cast<isize>(node.mChildren.Size()) - 1; child >= 0;
+                    --child) {
+                    countStack.PushBack(node.mChildren[static_cast<usize>(child)]);
+                    if (child == 0) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        const f32 treeViewHeight =
+            Core::Math::Max(0.0f, treeRect.Max.Y() - treeRect.Min.Y() - 4.0f);
+        const f32 treeTotalHeight     = static_cast<f32>(visibleNodeCount) * treeRowStep;
+        const f32 treeMaxScrollY      = Core::Math::Max(0.0f, treeTotalHeight - treeViewHeight);
+        mAssetTreeScrollY             = Clamp(mAssetTreeScrollY, 0.0f, treeMaxScrollY);
+        const bool treeNeedsScrollBar = (treeMaxScrollY > 0.0f)
+            && (treeRect.Max.X() - treeRect.Min.X() > (scrollBarWidth + scrollBarPad + 24.0f));
+        const FRect treeScrollTrackRect = treeNeedsScrollBar
+            ? MakeRect(treeRect.Max.X() - scrollBarWidth - scrollBarPad, treeRect.Min.Y() + 2.0f,
+                  treeRect.Max.X() - scrollBarPad, treeRect.Max.Y() - 2.0f)
+            : MakeRect(0.0f, 0.0f, 0.0f, 0.0f);
+        const FRect treeContentRect     = treeNeedsScrollBar
+                ? MakeRect(treeRect.Min.X(), treeRect.Min.Y(),
+                      treeScrollTrackRect.Min.X() - scrollBarPad, treeRect.Max.Y())
+                : treeRect;
+
+        if (!gui.IsMouseDown()) {
+            mAssetTreeScrollDragging = false;
+        }
+        if (!blockWorkspaceInput && treeNeedsScrollBar && gui.WasMousePressed()
+            && IsInside(treeScrollTrackRect, mouse)) {
+            const f32 trackH = treeScrollTrackRect.Max.Y() - treeScrollTrackRect.Min.Y();
+            const f32 thumbHRaw =
+                (treeTotalHeight > 0.0f) ? (treeViewHeight / treeTotalHeight) * trackH : trackH;
+            const f32   thumbH         = Clamp(thumbHRaw, thumbMinH, trackH);
+            const f32   maxThumbTravel = Core::Math::Max(0.0f, trackH - thumbH);
+            const f32   t = (treeMaxScrollY > 0.0f) ? (mAssetTreeScrollY / treeMaxScrollY) : 0.0f;
+            const f32   thumbY    = treeScrollTrackRect.Min.Y() + maxThumbTravel * t;
+            const FRect thumbRect = MakeRect(
+                treeScrollTrackRect.Min.X(), thumbY, treeScrollTrackRect.Max.X(), thumbY + thumbH);
+            mAssetTreeScrollDragging = true;
+            mAssetTreeScrollDragOffsetY =
+                IsInside(thumbRect, mouse) ? (mouse.Y() - thumbY) : (thumbH * 0.5f);
+        }
+        if (!blockWorkspaceInput && treeNeedsScrollBar && mAssetTreeScrollDragging
+            && gui.IsMouseDown()) {
+            const f32 trackH = treeScrollTrackRect.Max.Y() - treeScrollTrackRect.Min.Y();
+            const f32 thumbHRaw =
+                (treeTotalHeight > 0.0f) ? (treeViewHeight / treeTotalHeight) * trackH : trackH;
+            const f32 thumbH         = Clamp(thumbHRaw, thumbMinH, trackH);
+            const f32 maxThumbTravel = Core::Math::Max(0.0f, trackH - thumbH);
+            const f32 minY           = treeScrollTrackRect.Min.Y();
+            const f32 maxY           = treeScrollTrackRect.Max.Y() - thumbH;
+            const f32 desiredY       = Clamp(mouse.Y() - mAssetTreeScrollDragOffsetY, minY, maxY);
+            const f32 t = (maxThumbTravel > 0.0f) ? ((desiredY - minY) / maxThumbTravel) : 0.0f;
+            mAssetTreeScrollY = t * treeMaxScrollY;
+        }
+
+        gui.PushClipRect(treeContentRect);
+        gui.SetCursorPos(FVector2f(
+            treeContentRect.Min.X() + 4.0f, treeContentRect.Min.Y() + 2.0f - mAssetTreeScrollY));
 
         TVector<i32> drawStack;
         TVector<u32> depthStack;
@@ -504,6 +1152,25 @@ namespace AltinaEngine::Editor::UI {
             OpenPathInAssetView(pendingTreeOpenPath.ToView(), EAssetItemType::Directory);
         }
         gui.PopClipRect();
+        if (treeNeedsScrollBar) {
+            const f32 trackH = treeScrollTrackRect.Max.Y() - treeScrollTrackRect.Min.Y();
+            const f32 thumbHRaw =
+                (treeTotalHeight > 0.0f) ? (treeViewHeight / treeTotalHeight) * trackH : trackH;
+            const f32   thumbH         = Clamp(thumbHRaw, thumbMinH, trackH);
+            const f32   maxThumbTravel = Core::Math::Max(0.0f, trackH - thumbH);
+            const f32   t = (treeMaxScrollY > 0.0f) ? (mAssetTreeScrollY / treeMaxScrollY) : 0.0f;
+            const f32   thumbY    = treeScrollTrackRect.Min.Y() + maxThumbTravel * t;
+            const FRect thumbRect = MakeRect(
+                treeScrollTrackRect.Min.X(), thumbY, treeScrollTrackRect.Max.X(), thumbY + thumbH);
+            gui.DrawRectFilled(treeScrollTrackRect, theme.mScrollBarTrackBg);
+            gui.DrawRect(treeScrollTrackRect, theme.mScrollBarTrackBorder, 1.0f);
+            const bool thumbHovered = IsInside(thumbRect, mouse);
+            const auto thumbColor   = mAssetTreeScrollDragging
+                  ? theme.mScrollBarThumbActiveBg
+                  : (thumbHovered ? theme.mScrollBarThumbHoverBg : theme.mScrollBarThumbBg);
+            gui.DrawRectFilled(thumbRect, thumbColor);
+            gui.DrawRect(thumbRect, theme.mScrollBarThumbBorder, 1.0f);
+        }
 
         const f32 itemWidth  = 94.0f;
         const f32 itemHeight = 84.0f;
@@ -513,6 +1180,10 @@ namespace AltinaEngine::Editor::UI {
         if (columns < 1) {
             columns = 1;
         }
+
+        FString        pendingGridOpenPath;
+        EAssetItemType pendingGridOpenType = EAssetItemType::None;
+        bool           bHasPendingGridOpen = false;
 
         gui.PushClipRect(gridRect);
         for (usize i = 0; i < mAssetItems.Size(); ++i) {
@@ -545,12 +1216,16 @@ namespace AltinaEngine::Editor::UI {
                 mLastAssetClickId    = pathHash;
                 mLastAssetClickFrame = mFrameCounter;
                 if (isDoubleClick && item.mType == EAssetItemType::Directory) {
-                    OpenPathInAssetView(item.mPath.ToView(), item.mType);
+                    pendingGridOpenPath = item.mPath;
+                    pendingGridOpenType = item.mType;
+                    bHasPendingGridOpen = true;
                 }
             }
             if (!blockWorkspaceInput && result.mDoubleClicked
                 && item.mType == EAssetItemType::Directory) {
-                OpenPathInAssetView(item.mPath.ToView(), item.mType);
+                pendingGridOpenPath = item.mPath;
+                pendingGridOpenType = item.mType;
+                bHasPendingGridOpen = true;
             }
             if (!blockWorkspaceInput && result.mContextMenuRequested) {
                 mAssetContextMenu.mOpen     = true;
@@ -560,6 +1235,9 @@ namespace AltinaEngine::Editor::UI {
             }
         }
         gui.PopClipRect();
+        if (!blockWorkspaceInput && bHasPendingGridOpen) {
+            OpenPathInAssetView(pendingGridOpenPath.ToView(), pendingGridOpenType);
+        }
 
         if (mAssetContextMenu.mOpen && !blockWorkspaceInput) {
             FVector2f  menuPos = mAssetContextMenu.mPos;
@@ -909,20 +1587,12 @@ namespace AltinaEngine::Editor::UI {
             }
 
             if (panel.Name.ToView() == FStringView(TEXT("Hierarchy"))) {
-                gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 2.0f),
-                    colText, TEXT("World"));
-                gui.DrawText(FVector2f(contentRect.Min.X() + 14.0f, contentRect.Min.Y() + 18.0f),
-                    colMutedText, TEXT("Editor.DefaultCamera"));
-                gui.DrawText(FVector2f(contentRect.Min.X() + 14.0f, contentRect.Min.Y() + 34.0f),
-                    colMutedText, TEXT("DirectionalLight"));
+                DrawHierarchyPanel(gui, contentRect, mouse, blockWorkspaceInput);
                 return;
             }
 
             if (panel.Name.ToView() == FStringView(TEXT("Inspector"))) {
-                gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 2.0f),
-                    colText, TEXT("Inspector"));
-                gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 20.0f),
-                    colMutedText, TEXT("Select an object to edit properties."));
+                DrawInspectorPanel(gui, contentRect);
                 return;
             }
 

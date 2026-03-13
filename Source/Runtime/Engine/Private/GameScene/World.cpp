@@ -364,6 +364,39 @@ namespace AltinaEngine::GameScene {
         return slot.Alive && slot.Generation == id.Generation && slot.Handle;
     }
 
+    auto FWorld::GetAllGameObjectIds() const -> TVector<FGameObjectId> {
+        TVector<FGameObjectId> out;
+        out.Reserve(mGameObjects.Size());
+        for (u32 index = 0; index < static_cast<u32>(mGameObjects.Size()); ++index) {
+            const auto& slot = mGameObjects[index];
+            if (!slot.Alive || !slot.Handle) {
+                continue;
+            }
+            FGameObjectId id{};
+            id.Index      = index;
+            id.Generation = slot.Generation;
+            id.WorldId    = mWorldId;
+            out.PushBack(id);
+        }
+        return out;
+    }
+
+    auto FWorld::GetGameObjectName(FGameObjectId id) const -> Core::Container::FString {
+        const auto* obj = ResolveGameObject(id);
+        if (obj == nullptr) {
+            return {};
+        }
+        return obj->GetName();
+    }
+
+    auto FWorld::GetGameObjectParent(FGameObjectId id) const -> FGameObjectId {
+        const auto* obj = ResolveGameObject(id);
+        if (obj == nullptr) {
+            return {};
+        }
+        return obj->GetParent();
+    }
+
     auto FWorld::CreateComponent(FGameObjectId owner, FComponentTypeHash type) -> FComponentId {
         if (!IsAlive(owner)) {
             return {};
@@ -1664,6 +1697,20 @@ namespace AltinaEngine::GameScene {
             return {};
         }
         return obj->GetParent();
+    }
+
+    auto FGameObjectView::GetName() const -> Core::Container::FString {
+        if (mWorld == nullptr) {
+            return {};
+        }
+        return mWorld->GetGameObjectName(mId);
+    }
+
+    auto FGameObjectView::GetAllComponents() const -> TVector<FComponentId> {
+        if (mWorld == nullptr) {
+            return {};
+        }
+        return mWorld->GetAllComponents(mId);
     }
 
     void FGameObjectView::SetParent(FGameObjectId parent) {

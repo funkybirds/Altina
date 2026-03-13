@@ -3,6 +3,8 @@
 #include "Engine/EngineAPI.h"
 #include "Engine/GameScene/ComponentRef.h"
 #include "Engine/GameScene/Ids.h"
+#include "Container/String.h"
+#include "Container/Vector.h"
 #include "Math/LinAlg/SpatialTransform.h"
 
 namespace AltinaEngine::GameScene {
@@ -39,6 +41,8 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto GetParent() const noexcept -> FGameObjectId;
         void               SetParent(FGameObjectId parent);
         void               ClearParent();
+        [[nodiscard]] auto GetName() const -> Core::Container::FString;
+        [[nodiscard]] auto GetAllComponents() const -> Core::Container::TVector<FComponentId>;
 
     private:
         FWorld*       mWorld = nullptr;

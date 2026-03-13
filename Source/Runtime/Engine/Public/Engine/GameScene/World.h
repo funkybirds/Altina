@@ -50,6 +50,9 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto CreateGameObject(FStringView name = {}) -> FGameObjectView;
         void               DestroyGameObject(FGameObjectView object);
         [[nodiscard]] auto IsAlive(FGameObjectId id) const noexcept -> bool;
+        [[nodiscard]] auto GetAllGameObjectIds() const -> TVector<FGameObjectId>;
+        [[nodiscard]] auto GetGameObjectName(FGameObjectId id) const -> Container::FString;
+        [[nodiscard]] auto GetGameObjectParent(FGameObjectId id) const -> FGameObjectId;
 
         template <typename T>
         [[nodiscard]] auto CreateComponent(FGameObjectId owner) -> FComponentId;

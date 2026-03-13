@@ -61,8 +61,10 @@ namespace AltinaEngine::DebugGui::Private {
         const FRect textHitRect{ FVector2f(textStartX - 2.0f, rowRect.Min.Y()),
             FVector2f(textStartX + textWidth + 4.0f, rowRect.Max.Y()) };
 
-        const u64   rowId = BuildChildHashId(TEXT("##TreeRow"), desc.mLabel);
-        const bool  hovered =
+        const u64   baseRowId = BuildChildHashId(TEXT("##TreeRow"), desc.mLabel);
+        const u64   rowId     = baseRowId ^ (static_cast<u64>(desc.mDepth) << 32U)
+            ^ static_cast<u64>(static_cast<u32>(rowRect.Min.Y()));
+        const bool hovered =
             PointInRect(mInput.mMousePos, rowRect) || PointInRect(mInput.mMousePos, textHitRect);
         if (hovered) {
             mUi->mHotId             = rowId;
@@ -137,7 +139,7 @@ namespace AltinaEngine::DebugGui::Private {
             trailingWidgetDraw(*this, rowRect);
         }
 
-        mCursor = FVector2f(mContentMin.X(), mCursor.Y() + rowHeight + mTheme->mItemSpacingY);
+        mCursor = FVector2f(rowRect.Min.X(), mCursor.Y() + rowHeight + mTheme->mItemSpacingY);
         return result;
     }
 

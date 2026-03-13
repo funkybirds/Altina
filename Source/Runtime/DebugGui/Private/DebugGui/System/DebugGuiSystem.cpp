@@ -777,7 +777,7 @@ namespace AltinaEngine::DebugGui {
             f32          mCVarsScrollDragOffsetY = 0.0f;
 
             // Panel toggles.
-            bool         mShowStats   = true;
+            bool         mShowStats   = false;
             bool         mShowConsole = false;
             bool         mShowCVars   = false;
         };

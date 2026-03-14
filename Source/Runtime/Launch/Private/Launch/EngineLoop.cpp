@@ -93,6 +93,59 @@ namespace AltinaEngine::Launch {
             }
         }
 
+        [[nodiscard]] auto ParseWindowDpiPolicy(const Container::FString& value) noexcept
+            -> Application::EWindowDpiPolicy {
+            const auto view = value.ToView();
+            if (view == Container::FStringView(TEXT("PhysicalFixed"))) {
+                return Application::EWindowDpiPolicy::PhysicalFixed;
+            }
+            return Application::EWindowDpiPolicy::LogicalFixed;
+        }
+
+        void ResolveLogicalWindowSize(const Core::Utility::EngineConfig::FConfigCollection& config,
+            u32& outWidth, u32& outHeight) {
+            u32 logicalWidth  = config.GetUint32(TEXT("Window/LogicalWidth"));
+            u32 logicalHeight = config.GetUint32(TEXT("Window/LogicalHeight"));
+
+            if (logicalWidth == 0U) {
+                logicalWidth = config.GetUint32(TEXT("GameClient/ResolutionX"));
+            }
+            if (logicalHeight == 0U) {
+                logicalHeight = config.GetUint32(TEXT("GameClient/ResolutionY"));
+            }
+            if (logicalWidth == 0U) {
+                logicalWidth = 1280U;
+            }
+            if (logicalHeight == 0U) {
+                logicalHeight = 720U;
+            }
+
+            outWidth  = logicalWidth;
+            outHeight = logicalHeight;
+        }
+
+        [[nodiscard]] auto ClampInternalRenderScale(f32 value) noexcept -> f32 {
+            if (value <= 0.01f) {
+                return 1.0f;
+            }
+            if (value > 4.0f) {
+                return 4.0f;
+            }
+            return value;
+        }
+
+        [[nodiscard]] auto ScaleRenderDimension(u32 value, f32 scale) noexcept -> u32 {
+            if (value == 0U) {
+                return 0U;
+            }
+            const f32 scaled = static_cast<f32>(value) * scale;
+            u32       out    = static_cast<u32>(scaled + 0.5f);
+            if (out == 0U) {
+                out = 1U;
+            }
+            return out;
+        }
+
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
         GameScene::FWorldManager*     gScriptWorldManager        = nullptr;
         Application::FPlatformWindow* gMainWindowForManagedTitle = nullptr;
@@ -900,21 +953,20 @@ namespace AltinaEngine::Launch {
             mApplication->RegisterMessageHandler(mAppMessageHandler.Get());
         }
 
-        // Demo/client window size overrides (if present) must be applied before window creation.
+        // Window settings must be applied before window creation.
         {
             const auto& config = Core::Utility::EngineConfig::GetGlobalConfig();
             auto        props  = mApplication->GetWindowProperties();
-
-            const u32   resolutionX = config.GetUint32(TEXT("GameClient/ResolutionX"));
-            const u32   resolutionY = config.GetUint32(TEXT("GameClient/ResolutionY"));
-            if (resolutionX > 0U) {
-                props.mWidth = resolutionX;
-            }
-            if (resolutionY > 0U) {
-                props.mHeight = resolutionY;
-            }
+            ResolveLogicalWindowSize(config, mWindowLogicalWidth, mWindowLogicalHeight);
+            props.mWidth     = mWindowLogicalWidth;
+            props.mHeight    = mWindowLogicalHeight;
+            props.mDpiPolicy = ParseWindowDpiPolicy(config.GetString(TEXT("Window/DpiPolicy")));
+            mRenderInternalScale =
+                ClampInternalRenderScale(config.GetFloat32(TEXT("Render/InternalScale")));
 
             mApplication->SetWindowProperties(props);
+            LogInfo(TEXT("Window config logical={}x{} dpiPolicy={} renderScale={}."), props.mWidth,
+                props.mHeight, static_cast<u32>(props.mDpiPolicy), mRenderInternalScale);
         }
 
         mApplication->Initialize();
@@ -1200,18 +1252,27 @@ namespace AltinaEngine::Launch {
     }
 
     void FEngineLoop::Draw(const FRenderTick& tick) {
-        u32  windowWidth  = 0U;
-        u32  windowHeight = 0U;
-        u32  renderWidth  = 0U;
-        u32  renderHeight = 0U;
-        bool shouldResize = false;
+        u32  windowWidth         = 0U;
+        u32  windowHeight        = 0U;
+        u32  renderWidth         = 0U;
+        u32  renderHeight        = 0U;
+        u32  windowLogicalWidth  = 0U;
+        u32  windowLogicalHeight = 0U;
+        u32  windowDpi           = 0U;
+        f32  windowDpiScale      = 1.0f;
+        bool shouldResize        = false;
 
         if (mApplication) {
             auto* window = mApplication->GetMainWindow();
             if (window != nullptr) {
-                const auto extent = window->GetSize();
-                windowWidth       = extent.mWidth;
-                windowHeight      = extent.mHeight;
+                const auto extent     = window->GetSize();
+                windowWidth           = extent.mWidth;
+                windowHeight          = extent.mHeight;
+                const auto properties = window->GetProperties();
+                windowLogicalWidth    = properties.mWidth;
+                windowLogicalHeight   = properties.mHeight;
+                windowDpi             = properties.mDpi;
+                windowDpiScale        = properties.mDpiScaling;
                 if (windowWidth > 0U && windowHeight > 0U) {
                     if (windowWidth != mViewportWidth || windowHeight != mViewportHeight) {
                         mViewportWidth  = windowWidth;
@@ -1227,6 +1288,41 @@ namespace AltinaEngine::Launch {
         if (tick.RenderWidth > 0U && tick.RenderHeight > 0U) {
             renderWidth  = tick.RenderWidth;
             renderHeight = tick.RenderHeight;
+        }
+
+        if (renderWidth > 0U && renderHeight > 0U) {
+            const f32 safeScale = ClampInternalRenderScale(mRenderInternalScale);
+            renderWidth         = ScaleRenderDimension(renderWidth, safeScale);
+            renderHeight        = ScaleRenderDimension(renderHeight, safeScale);
+        }
+
+        const bool shouldLogWindowMetrics = (mLastLoggedDpi != windowDpi)
+            || (mLastLoggedDpiScale != windowDpiScale)
+            || (mLastLoggedLogicalWidth != windowLogicalWidth)
+            || (mLastLoggedLogicalHeight != windowLogicalHeight)
+            || (mLastLoggedPhysicalWidth != windowWidth)
+            || (mLastLoggedPhysicalHeight != windowHeight)
+            || (mLastLoggedSwapchainWidth != windowWidth)
+            || (mLastLoggedSwapchainHeight != windowHeight)
+            || (mLastLoggedInternalWidth != renderWidth)
+            || (mLastLoggedInternalHeight != renderHeight);
+        if (shouldLogWindowMetrics) {
+            LogInfo(
+                TEXT(
+                    "Window metrics: DPI={} scale={} logical={}x{} physical={}x{} swapchain={}x{} internal={}x{} renderScale={}."),
+                windowDpi, windowDpiScale, windowLogicalWidth, windowLogicalHeight, windowWidth,
+                windowHeight, windowWidth, windowHeight, renderWidth, renderHeight,
+                mRenderInternalScale);
+            mLastLoggedDpi             = windowDpi;
+            mLastLoggedDpiScale        = windowDpiScale;
+            mLastLoggedLogicalWidth    = windowLogicalWidth;
+            mLastLoggedLogicalHeight   = windowLogicalHeight;
+            mLastLoggedPhysicalWidth   = windowWidth;
+            mLastLoggedPhysicalHeight  = windowHeight;
+            mLastLoggedSwapchainWidth  = windowWidth;
+            mLastLoggedSwapchainHeight = windowHeight;
+            mLastLoggedInternalWidth   = renderWidth;
+            mLastLoggedInternalHeight  = renderHeight;
         }
 
         const u64 frameIndex = (mHostFrameIndex == 0ULL) ? (mFrameIndex + 1ULL) : mHostFrameIndex;
@@ -1312,6 +1408,8 @@ namespace AltinaEngine::Launch {
             stats.mFrameIndex      = frameIndex;
             stats.mViewCount       = static_cast<u32>(renderScene.Views.Size());
             stats.mSceneBatchCount = totalBatches;
+            stats.mDpi             = windowDpi;
+            stats.mDpiScale        = windowDpiScale;
             mDebugGui->SetExternalStats(stats);
             mDebugGui->TickGameThread(
                 *mInputSystem.Get(), mLastDeltaTimeSeconds, windowWidth, windowHeight);

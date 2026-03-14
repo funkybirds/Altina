@@ -35,6 +35,8 @@ namespace AltinaEngine::DebugGui {
         u64 mFrameIndex      = 0ULL;
         u32 mViewCount       = 0U;
         u32 mSceneBatchCount = 0U;
+        u32 mDpi             = 96U;
+        f32 mDpiScale        = 1.0f;
     };
 
     struct FTreeViewItemDesc {

@@ -14,17 +14,26 @@ namespace AltinaEngine::Application {
         Borderless
     };
 
+    enum class EWindowDpiPolicy : u8 {
+        LogicalFixed = 0,
+        PhysicalFixed
+    };
+
     struct AE_APPLICATION_API FWindowExtent {
         u32 mWidth  = 0;
         u32 mHeight = 0;
     };
 
     struct AE_APPLICATION_API FPlatformWindowProperty {
-        FString            mTitle       = FString(TEXT("AltinaEngine"));
-        u32                mWidth       = 1280;
-        u32                mHeight      = 720;
-        f32                mDpiScaling  = 1.0f;
-        EWindowDisplayMode mDisplayMode = EWindowDisplayMode::Windowed;
+        FString            mTitle          = FString(TEXT("AltinaEngine"));
+        u32                mWidth          = 1280;
+        u32                mHeight         = 720;
+        u32                mPhysicalWidth  = 1280;
+        u32                mPhysicalHeight = 720;
+        u32                mDpi            = 96;
+        f32                mDpiScaling     = 1.0f;
+        EWindowDpiPolicy   mDpiPolicy      = EWindowDpiPolicy::LogicalFixed;
+        EWindowDisplayMode mDisplayMode    = EWindowDisplayMode::Windowed;
     };
 
     class AE_APPLICATION_API FPlatformWindow {

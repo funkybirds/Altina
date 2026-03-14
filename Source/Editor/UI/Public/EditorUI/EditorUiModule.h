@@ -264,6 +264,7 @@ namespace AltinaEngine::Editor::UI {
         u64                                                  mAssetLastRefreshFrame      = 0ULL;
         u64                                                  mLastAssetClickId           = 0ULL;
         u64                                                  mLastAssetClickFrame        = 0ULL;
+        f32                                                  mUiScale                    = 1.0f;
         bool                                                 mAssetSplitterActive        = false;
         f32                                                  mAssetTreeSplitRatio        = 0.32f;
         f32                                                  mAssetTreeScrollY           = 0.0f;

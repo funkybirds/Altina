@@ -34,10 +34,19 @@ namespace AltinaEngine::DebugGui::Private {
 
     private:
         struct FConstants {
-            f32 ScaleX     = 1.0f;
-            f32 ScaleY     = 1.0f;
-            f32 TranslateX = -1.0f;
-            f32 TranslateY = -1.0f;
+            f32 ScaleX        = 1.0f;
+            f32 ScaleY        = 1.0f;
+            f32 TranslateX    = -1.0f;
+            f32 TranslateY    = -1.0f;
+            f32 SdfEdge       = 0.5f;
+            f32 SdfSoftness   = 0.0f;
+            f32 SdfPixelRange = FFontAtlas::kSdfPixelRange;
+            f32 AtlasWidth    = static_cast<f32>(FFontAtlas::kAtlasW);
+            f32 AtlasHeight   = static_cast<f32>(FFontAtlas::kAtlasH);
+            f32 UseSdf        = 1.0f;
+            f32 FontStretchX  = 2.0f;
+            f32 GlyphTexelW   = static_cast<f32>(FFontAtlas::kAtlasGlyphW);
+            f32 GlyphTexelH   = static_cast<f32>(FFontAtlas::kAtlasGlyphH);
         };
 
         bool EnsureResources(Rhi::FRhiDevice& device, const FFontAtlas& atlas);
@@ -48,13 +57,14 @@ namespace AltinaEngine::DebugGui::Private {
         bool EnsureBindGroupForTexture(Rhi::FRhiDevice& device, u64 imageId,
             Rhi::FRhiTexture* texture, Rhi::FRhiBindGroupRef& out);
         void PruneExternalTextureCache();
-        void UpdateConstants(u32 w, u32 h);
+        void UpdateConstants(u32 w, u32 h, const FDrawData& drawData, const FFontAtlas& atlas);
         bool CompileShaders(Rhi::FRhiDevice& device);
 
         Rhi::FRhiTextureRef                            mFontTexture;
         Rhi::FRhiShaderResourceViewRef                 mFontSrv;
         Rhi::FRhiSamplerRef                            mSampler;
-        Rhi::FRhiBufferRef                             mConstantsBuffer;
+        Rhi::FRhiBufferRef                             mConstantsBufferSdf;
+        Rhi::FRhiBufferRef                             mConstantsBufferImage;
         Rhi::FRhiBindGroupLayoutRef                    mLayout;
         Rhi::FRhiPipelineLayoutRef                     mPipelineLayout;
         Rhi::FRhiBindGroupRef                          mBindGroup;
@@ -78,6 +88,8 @@ namespace AltinaEngine::DebugGui::Private {
 
         Rhi::FRhiBufferRef           mVertexBuffer;
         Rhi::FRhiBufferRef           mIndexBuffer;
+        FConstants                   mConstantsSdfValue{};
+        FConstants                   mConstantsImageValue{};
         u64                          mVertexBufferSize = 0ULL;
         u64                          mIndexBufferSize  = 0ULL;
 

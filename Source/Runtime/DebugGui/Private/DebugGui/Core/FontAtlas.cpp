@@ -1,12 +1,14 @@
-﻿#include "DebugGui/Core/FontAtlas.h"
+#include "DebugGui/Core/FontAtlas.h"
 
 #include <cstddef>
 
 namespace AltinaEngine::DebugGui::Private {
-#include "DebugGui/FontAtlas32x32.inl"
+#include "DebugGui/FontAtlasMSDF64x64.inl"
 
     void FFontAtlas::Build() {
         mPixels.Resize(static_cast<usize>(kAtlasW) * static_cast<usize>(kAtlasH) * 4U);
+        mGlyphMetrics.Resize(static_cast<usize>(kGlyphCount));
+        mRecommendedStretchX = GetFont32x32RecommendedStretchX();
         for (usize i = 0; i < mPixels.Size(); ++i) {
             mPixels[i] = 0U;
         }
@@ -18,19 +20,24 @@ namespace AltinaEngine::DebugGui::Private {
             const u32 baseX      = col * kAtlasGlyphW;
             const u32 baseY      = row * kAtlasGlyphH;
 
-            const u8* glyph = GetFont32x32Glyph(static_cast<u8>(ch));
+            const u8* glyph = GetFont32x32MsdfGlyph(static_cast<u8>(ch));
             for (u32 y = 0U; y < kAtlasGlyphH; ++y) {
                 for (u32 x = 0U; x < kAtlasGlyphW; ++x) {
-                    const u8    a     = glyph ? glyph[y * kAtlasGlyphW + x] : 0U;
+                    const usize src   = (static_cast<usize>(y) * kAtlasGlyphW + x) * 3U;
                     const u32   px    = baseX + x;
                     const u32   py    = baseY + y;
                     const usize idx   = (static_cast<usize>(py) * kAtlasW + px) * 4U;
-                    mPixels[idx + 0U] = 255U;
-                    mPixels[idx + 1U] = 255U;
-                    mPixels[idx + 2U] = 255U;
-                    mPixels[idx + 3U] = a;
+                    mPixels[idx + 0U] = glyph ? glyph[src + 0U] : 0U;
+                    mPixels[idx + 1U] = glyph ? glyph[src + 1U] : 0U;
+                    mPixels[idx + 2U] = glyph ? glyph[src + 2U] : 0U;
+                    mPixels[idx + 3U] = 255U;
                 }
             }
+
+            const u32 mIdx                = ch - kFirstChar;
+            mGlyphMetrics[mIdx].mAdvance  = GetFont32x32GlyphAdvance(static_cast<u8>(ch));
+            mGlyphMetrics[mIdx].mBearingX = GetFont32x32GlyphBearingX(static_cast<u8>(ch));
+            mGlyphMetrics[mIdx].mBearingY = GetFont32x32GlyphBearingY(static_cast<u8>(ch));
         }
 
         for (u32 y = 0U; y < kAtlasGlyphH; ++y) {
@@ -68,5 +75,22 @@ namespace AltinaEngine::DebugGui::Private {
         outV0 = (y0 + 0.5f) * invH;
         outU1 = (x1 - 0.5f) * invW;
         outV1 = (y1 - 0.5f) * invH;
+    }
+
+    auto FFontAtlas::GetGlyphWidth(f32 fontScale) noexcept -> f32 {
+        const f32 safeScale = (fontScale > 0.01f) ? fontScale : 1.0f;
+        return static_cast<f32>(kDrawGlyphW) * safeScale;
+    }
+
+    auto FFontAtlas::GetGlyphHeight(f32 fontScale) noexcept -> f32 {
+        const f32 safeScale = (fontScale > 0.01f) ? fontScale : 1.0f;
+        return static_cast<f32>(kDrawGlyphH) * safeScale;
+    }
+
+    auto FFontAtlas::GetGlyphMetrics(u32 ch) const noexcept -> FFontGlyphMetrics {
+        if (ch < kFirstChar || ch > kLastChar || mGlyphMetrics.IsEmpty()) {
+            return FFontGlyphMetrics{};
+        }
+        return mGlyphMetrics[ch - kFirstChar];
     }
 } // namespace AltinaEngine::DebugGui::Private

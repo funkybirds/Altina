@@ -61,6 +61,20 @@ if(WIN32)
         COMMAND_EXPAND_LISTS
         COMMENT "Staging AltinaEditor runtime DLLs"
     )
+
+    add_custom_target(${TargetName}SyncRuntimeDlls ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${EditorBinaryDir}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:${TargetName}>
+            ${EditorBinaryDir}
+        COMMAND_EXPAND_LISTS
+        DEPENDS ${TargetName}
+        COMMENT "Syncing AltinaEditor runtime DLLs"
+    )
+    set_target_properties(${TargetName}SyncRuntimeDlls
+        PROPERTIES
+            FOLDER "Editor/Host"
+    )
 endif()
 
 if(TARGET AltinaEngineManagedBuild)

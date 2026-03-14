@@ -31,6 +31,7 @@ TEST_CASE("DebugGui builds overlay when enabled") {
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);
     sys->SetEnabled(true);
+    sys->SetShowStats(true);
 
     AltinaEngine::Input::FInputSystem input;
     PrepareInput(input, 1280, 720, 50, 50);
@@ -138,6 +139,7 @@ TEST_CASE("DebugGui widgets: Button/Checkbox/Slider/InputText basic interactions
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);
     sys->SetEnabled(true);
+    sys->SetShowStats(true);
     // Keep the built-in window stack stable: Stats/Console/CVars then custom panels.
     sys->SetShowConsole(true);
     sys->SetShowCVars(true);
@@ -297,7 +299,7 @@ TEST_CASE("DebugGui default built-in panel visibility") {
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);
 
-    REQUIRE(sys->IsStatsShown());
+    REQUIRE(!sys->IsStatsShown());
     REQUIRE(!sys->IsConsoleShown());
     REQUIRE(!sys->IsCVarsShown());
 
@@ -308,6 +310,7 @@ TEST_CASE("DebugGui console executes 'set' command via Enter") {
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);
     sys->SetEnabled(true);
+    sys->SetShowStats(true);
     sys->SetShowConsole(true);
 
     auto* cvar =
@@ -350,6 +353,7 @@ TEST_CASE("DebugGui window collapse toggle reduces draw stats") {
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);
     sys->SetEnabled(true);
+    sys->SetShowStats(true);
 
     AltinaEngine::Input::FInputSystem              input;
 
@@ -565,6 +569,103 @@ TEST_CASE("DebugGui widget: TextedIconView click/double-click/context menu") {
     input.OnMouseButtonDown(1U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
     REQUIRE(context);
+
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("DebugGui font layout remains stable at scale 1.0") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    sys->RegisterPanel(TEXT("FontLayoutTest"), [](IDebugGui& gui) {
+        gui.Text(TEXT("LayoutLine"));
+        (void)gui.Button(TEXT("LayoutButton"));
+    });
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 20, 20);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto baseline = sys->GetLastFrameStats();
+
+    auto       theme   = sys->GetTheme();
+    theme.mFontScale   = 1.0f;
+    theme.mFontSdfEdge = 0.5f;
+    sys->SetTheme(theme);
+
+    PrepareInput(input, 1280, 720, 20, 20);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto after = sys->GetLastFrameStats();
+
+    REQUIRE_EQ(after.mVertexCount, baseline.mVertexCount);
+    REQUIRE_EQ(after.mIndexCount, baseline.mIndexCount);
+    REQUIRE_EQ(after.mCmdCount, baseline.mCmdCount);
+
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("DebugGui font scale variants generate valid draw data") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    sys->RegisterPanel(TEXT("FontScaleTest"), [](IDebugGui& gui) {
+        gui.Text(TEXT("ScaleReadability"));
+        gui.Text(TEXT("0123456789"));
+    });
+
+    AltinaEngine::Input::FInputSystem input;
+    const AltinaEngine::f32           scales[] = { 0.8f, 1.0f, 1.5f, 2.0f };
+    for (const AltinaEngine::f32 scale : scales) {
+        auto theme       = sys->GetTheme();
+        theme.mFontScale = scale;
+        sys->SetTheme(theme);
+
+        PrepareInput(input, 1280, 720, 20, 20);
+        sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+        const auto stats = sys->GetLastFrameStats();
+        REQUIRE(stats.mVertexCount > 0U);
+        REQUIRE(stats.mIndexCount > 0U);
+        REQUIRE(stats.mCmdCount > 0U);
+    }
+
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("DebugGui fractional text positions keep command output valid") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    bool useFirstPos = true;
+    sys->RegisterPanel(TEXT("FontSnapTest"), [&](IDebugGui& gui) {
+        const FVector2f p = useFirstPos ? FVector2f(20.1f, 20.2f) : FVector2f(20.9f, 20.8f);
+        gui.DrawText(p, MakeColor32(255, 255, 255, 255), TEXT("SnapProbe"));
+    });
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 20, 20);
+    useFirstPos = true;
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto first = sys->GetLastFrameStats();
+
+    PrepareInput(input, 1280, 720, 20, 20);
+    useFirstPos = false;
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto second = sys->GetLastFrameStats();
+
+    REQUIRE_EQ(second.mVertexCount, first.mVertexCount);
+    REQUIRE_EQ(second.mIndexCount, first.mIndexCount);
+    REQUIRE_EQ(second.mCmdCount, first.mCmdCount);
 
     DestroyDebugGuiSystem(sys);
 }

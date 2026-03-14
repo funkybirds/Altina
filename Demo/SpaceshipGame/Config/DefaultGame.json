@@ -6,6 +6,13 @@
     "GameClient":{
         "ResolutionX":1280,
         "ResolutionY":720
+    },
+    "Window":{
+        "LogicalWidth":1280,
+        "LogicalHeight":720,
+        "DpiPolicy":"LogicalFixed"
+    },
+    "Render":{
+        "InternalScale":1.0
     }
 }
-

@@ -189,7 +189,7 @@ namespace AltinaEngine::DebugGui::Private {
         const u32   w      = bbDesc.mWidth;
         const u32   h      = bbDesc.mHeight;
 
-        UpdateConstants(w, h);
+        UpdateConstants(w, h, drawData, atlas);
 
         ctx.RHISetGraphicsPipeline(mPipeline.Get());
         ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
@@ -355,10 +355,11 @@ namespace AltinaEngine::DebugGui::Private {
         if (!mSampler) {
             Rhi::FRhiSamplerDesc s{};
             s.mDebugName.Assign(TEXT("DebugGui.Sampler"));
-            // Debug text is frequently rendered at small sizes; use point sampling to avoid
-            // blur.
-            s.mFilter = Rhi::ERhiSamplerFilter::Nearest;
-            mSampler  = device.CreateSampler(s);
+            s.mFilter   = Rhi::ERhiSamplerFilter::Linear;
+            s.mAddressU = Rhi::ERhiSamplerAddressMode::Clamp;
+            s.mAddressV = Rhi::ERhiSamplerAddressMode::Clamp;
+            s.mAddressW = Rhi::ERhiSamplerAddressMode::Clamp;
+            mSampler    = device.CreateSampler(s);
             if (!mSampler) {
                 LogError(TEXT("DebugGui: Failed to create sampler."));
                 return false;
@@ -412,16 +413,22 @@ namespace AltinaEngine::DebugGui::Private {
             }
         }
 
-        if (!mConstantsBuffer) {
+        if (!mConstantsBufferSdf || !mConstantsBufferImage) {
             Rhi::FRhiBufferDesc cb{};
-            cb.mDebugName.Assign(TEXT("DebugGui.Constants"));
-            cb.mSizeBytes    = sizeof(FConstants);
-            cb.mUsage        = Rhi::ERhiResourceUsage::Dynamic;
-            cb.mBindFlags    = Rhi::ERhiBufferBindFlags::Constant;
-            cb.mCpuAccess    = Rhi::ERhiCpuAccess::Write;
-            mConstantsBuffer = device.CreateBuffer(cb);
-            if (!mConstantsBuffer) {
-                LogError(TEXT("DebugGui: Failed to create constants buffer."));
+            cb.mDebugName.Assign(TEXT("DebugGui.Constants.Sdf"));
+            cb.mSizeBytes = sizeof(FConstants);
+            cb.mUsage     = Rhi::ERhiResourceUsage::Dynamic;
+            cb.mBindFlags = Rhi::ERhiBufferBindFlags::Constant;
+            cb.mCpuAccess = Rhi::ERhiCpuAccess::Write;
+            if (!mConstantsBufferSdf) {
+                mConstantsBufferSdf = device.CreateBuffer(cb);
+            }
+            cb.mDebugName.Assign(TEXT("DebugGui.Constants.Image"));
+            if (!mConstantsBufferImage) {
+                mConstantsBufferImage = device.CreateBuffer(cb);
+            }
+            if (!mConstantsBufferSdf || !mConstantsBufferImage) {
+                LogError(TEXT("DebugGui: Failed to create constants buffers."));
                 return false;
             }
         }
@@ -435,7 +442,7 @@ namespace AltinaEngine::DebugGui::Private {
             }
 
             RenderCore::ShaderBinding::FBindGroupBuilder builder(mLayout.Get());
-            if (!builder.AddBuffer(mConstantsBinding, mConstantsBuffer.Get(), 0ULL,
+            if (!builder.AddBuffer(mConstantsBinding, mConstantsBufferSdf.Get(), 0ULL,
                     static_cast<u64>(sizeof(FConstants)))) {
                 LogError(
                     TEXT("DebugGui: Failed to add constant-buffer bind-group entry (binding={})."),
@@ -523,7 +530,8 @@ namespace AltinaEngine::DebugGui::Private {
 
     bool FDebugGuiRendererD3D11::EnsureBindGroupForTexture(Rhi::FRhiDevice& device, u64 imageId,
         Rhi::FRhiTexture* texture, Rhi::FRhiBindGroupRef& out) {
-        if (imageId == 0ULL || texture == nullptr || !mLayout || !mSampler || !mConstantsBuffer) {
+        if (imageId == 0ULL || texture == nullptr || !mLayout || !mSampler
+            || !mConstantsBufferImage) {
             return false;
         }
         if (mConstantsBinding == RenderCore::ShaderBinding::kInvalidBinding
@@ -557,7 +565,7 @@ namespace AltinaEngine::DebugGui::Private {
         }
 
         RenderCore::ShaderBinding::FBindGroupBuilder builder(mLayout.Get());
-        if (!builder.AddBuffer(mConstantsBinding, mConstantsBuffer.Get(), 0ULL,
+        if (!builder.AddBuffer(mConstantsBinding, mConstantsBufferImage.Get(), 0ULL,
                 static_cast<u64>(sizeof(FConstants)))) {
             return false;
         }
@@ -701,16 +709,29 @@ namespace AltinaEngine::DebugGui::Private {
         return true;
     }
 
-    void FDebugGuiRendererD3D11::UpdateConstants(u32 w, u32 h) {
-        if (!mConstantsBuffer || w == 0U || h == 0U) {
+    void FDebugGuiRendererD3D11::UpdateConstants(
+        u32 w, u32 h, const FDrawData& drawData, const FFontAtlas& atlas) {
+        if (!mConstantsBufferSdf || !mConstantsBufferImage || w == 0U || h == 0U) {
             return;
         }
-        FConstants c{};
-        c.ScaleX     = 2.0f / static_cast<f32>(w);
-        c.ScaleY     = 2.0f / static_cast<f32>(h);
-        c.TranslateX = -1.0f;
-        c.TranslateY = -1.0f;
-        UploadDynamicBuffer(mConstantsBuffer.Get(), &c, sizeof(FConstants));
+        mConstantsSdfValue               = FConstants{};
+        mConstantsSdfValue.ScaleX        = 2.0f / static_cast<f32>(w);
+        mConstantsSdfValue.ScaleY        = 2.0f / static_cast<f32>(h);
+        mConstantsSdfValue.TranslateX    = -1.0f;
+        mConstantsSdfValue.TranslateY    = -1.0f;
+        mConstantsSdfValue.SdfEdge       = drawData.mFontSdfEdge;
+        mConstantsSdfValue.SdfSoftness   = drawData.mFontSdfSoftness;
+        mConstantsSdfValue.SdfPixelRange = FFontAtlas::kSdfPixelRange;
+        mConstantsSdfValue.AtlasWidth    = static_cast<f32>(FFontAtlas::kAtlasW);
+        mConstantsSdfValue.AtlasHeight   = static_cast<f32>(FFontAtlas::kAtlasH);
+        mConstantsSdfValue.UseSdf        = 1.0f;
+        mConstantsSdfValue.FontStretchX  = atlas.GetRecommendedStretchX();
+        mConstantsSdfValue.GlyphTexelW   = static_cast<f32>(FFontAtlas::kAtlasGlyphW);
+        mConstantsSdfValue.GlyphTexelH   = static_cast<f32>(FFontAtlas::kAtlasGlyphH);
+        mConstantsImageValue             = mConstantsSdfValue;
+        mConstantsImageValue.UseSdf      = 0.0f;
+        UploadDynamicBuffer(mConstantsBufferSdf.Get(), &mConstantsSdfValue, sizeof(FConstants));
+        UploadDynamicBuffer(mConstantsBufferImage.Get(), &mConstantsImageValue, sizeof(FConstants));
     }
 
     bool FDebugGuiRendererD3D11::CompileShaders(Rhi::FRhiDevice& device) {

@@ -19,6 +19,7 @@ namespace AltinaEngine::DebugGui::Private {
             , mDisplaySize(displaySize)
             , mAtlas(&atlas)
             , mTheme(&theme)
+            , mFontScale((theme.mFontScale > 0.01f) ? theme.mFontScale : 1.0f)
             // Inset by half a texel to avoid sampling bleed (linear sampler).
             , mSolidU0((static_cast<f32>(FFontAtlas::kSolidTexelX) + 0.5f)
                   / static_cast<f32>(FFontAtlas::kAtlasW))
@@ -343,9 +344,21 @@ namespace AltinaEngine::DebugGui::Private {
             -> FTextedIconViewResult override;
 
     private:
+        [[nodiscard]] static auto SnapToPixel(f32 value) noexcept -> f32 {
+            return static_cast<f32>(Core::Math::RoundedCast<i32>(value));
+        }
+
+        [[nodiscard]] auto GetGlyphWidth() const noexcept -> f32 {
+            return FFontAtlas::GetGlyphWidth(mFontScale);
+        }
+
+        [[nodiscard]] auto GetGlyphHeight() const noexcept -> f32 {
+            return FFontAtlas::GetGlyphHeight(mFontScale);
+        }
+
         void AdvanceLine() {
-            mCursor = FVector2f(mContentMin.X(),
-                mCursor.Y() + static_cast<f32>(FFontAtlas::kDrawGlyphH) + mTheme->mItemSpacingY);
+            mCursor =
+                FVector2f(mContentMin.X(), mCursor.Y() + GetGlyphHeight() + mTheme->mItemSpacingY);
         }
 
         void AdvanceItem(const FVector2f& itemSize) {
@@ -353,14 +366,23 @@ namespace AltinaEngine::DebugGui::Private {
                 FVector2f(mContentMin.X(), mCursor.Y() + itemSize.Y() + mTheme->mItemSpacingY);
         }
 
-        static [[nodiscard]] auto CalcTextWidth(FStringView s) noexcept -> f32 {
-            return static_cast<f32>(s.Length()) * static_cast<f32>(FFontAtlas::kDrawGlyphW);
+        [[nodiscard]] auto CalcTextWidth(FStringView s) const noexcept -> f32 {
+            if (mAtlas == nullptr) {
+                return static_cast<f32>(s.Length()) * GetGlyphWidth();
+            }
+            f32 width = 0.0f;
+            for (usize i = 0; i < s.Length(); ++i) {
+                const auto metrics = mAtlas->GetGlyphMetrics(static_cast<u32>(s[i]));
+                const f32  adv =
+                    (metrics.mAdvance > 0.0f) ? (metrics.mAdvance * mFontScale) : GetGlyphWidth();
+                width += adv;
+            }
+            return width;
         }
 
         [[nodiscard]] auto CalcButtonSize(FStringView label) const noexcept -> FVector2f {
             const f32 w = CalcTextWidth(label) + mTheme->mButtonPaddingX * 2.0f;
-            const f32 h =
-                static_cast<f32>(FFontAtlas::kDrawGlyphH) + mTheme->mButtonPaddingY * 2.0f;
+            const f32 h = GetGlyphHeight() + mTheme->mButtonPaddingY * 2.0f;
             return FVector2f(w, h);
         }
 
@@ -727,11 +749,14 @@ namespace AltinaEngine::DebugGui::Private {
             if (text.IsEmpty()) {
                 return;
             }
-            FVector2f cursor = pos;
+            const f32 glyphW = GetGlyphWidth();
+            const f32 glyphH = GetGlyphHeight();
+            const f32 baseX  = SnapToPixel(pos.X());
+            FVector2f cursor(baseX, SnapToPixel(pos.Y()));
             for (usize i = 0; i < text.Length(); ++i) {
                 const TChar c = text[i];
                 if (c == static_cast<TChar>('\n')) {
-                    cursor = FVector2f(pos.X(), cursor.Y() + FFontAtlas::kDrawGlyphH);
+                    cursor = FVector2f(baseX, SnapToPixel(cursor.Y() + glyphH));
                     continue;
                 }
                 if (c == static_cast<TChar>('\r')) {
@@ -741,16 +766,20 @@ namespace AltinaEngine::DebugGui::Private {
                 f32 u0 = 0.0f, v0 = 0.0f, u1 = 0.0f, v1 = 0.0f;
                 mAtlas->GetGlyphUV(static_cast<u32>(c), u0, v0, u1, v1);
 
-                const FVector2f p0 = cursor;
-                const FVector2f p1(
-                    cursor.X() + static_cast<f32>(FFontAtlas::kDrawGlyphW), cursor.Y());
-                const FVector2f p2(cursor.X() + static_cast<f32>(FFontAtlas::kDrawGlyphW),
-                    cursor.Y() + static_cast<f32>(FFontAtlas::kDrawGlyphH));
-                const FVector2f p3(
-                    cursor.X(), cursor.Y() + static_cast<f32>(FFontAtlas::kDrawGlyphH));
+                const f32       x0 = cursor.X();
+                const f32       y0 = cursor.Y();
+                const f32       x1 = cursor.X() + glyphW;
+                const f32       y1 = cursor.Y() + glyphH;
+
+                const FVector2f p0(x0, y0);
+                const FVector2f p1(x1, y0);
+                const FVector2f p2(x1, y1);
+                const FVector2f p3(x0, y1);
                 AddQuad(p0, p1, p2, p3, u0, v0, u1, v1, color);
-                cursor =
-                    FVector2f(cursor.X() + static_cast<f32>(FFontAtlas::kDrawGlyphW), cursor.Y());
+                const auto metrics = mAtlas->GetGlyphMetrics(static_cast<u32>(c));
+                const f32  adv =
+                    (metrics.mAdvance > 0.0f) ? (metrics.mAdvance * mFontScale) : glyphW;
+                cursor = FVector2f(cursor.X() + adv, cursor.Y());
             }
         }
 
@@ -761,6 +790,7 @@ namespace AltinaEngine::DebugGui::Private {
         FVector2f                               mDisplaySize = FVector2f(0.0f, 0.0f);
         const FFontAtlas*                       mAtlas       = nullptr;
         const FDebugGuiTheme*                   mTheme       = nullptr;
+        f32                                     mFontScale   = 1.0f;
         f32                                     mSolidU0     = 0.0f;
         f32                                     mSolidV0     = 0.0f;
         f32                                     mSolidU1     = 0.0f;

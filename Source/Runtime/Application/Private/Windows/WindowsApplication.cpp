@@ -17,8 +17,121 @@ namespace AltinaEngine::Application {
     namespace {
         constexpr const TChar* kWindowClassName = TEXT("AltinaEngineWindowClass");
         constexpr f32          kDefaultDpi      = 96.0f;
+        using FGetDpiForWindowFn                = UINT(WINAPI*)(HWND);
+        using FGetDpiForSystemFn                = UINT(WINAPI*)();
+        using FAdjustWindowRectExForDpiFn       = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
+        using FSetProcessDpiAwarenessContextFn  = BOOL(WINAPI*)(DPI_AWARENESS_CONTEXT);
+        using FSetProcessDpiAwareFn             = BOOL(WINAPI*)();
 
-        auto                   ToWin32DisplayMode(EWindowDisplayMode DisplayMode) -> DWORD {
+        void EnsureProcessDpiAwareness() {
+            static bool sInitialized = false;
+            if (sInitialized) {
+                return;
+            }
+            sInitialized = true;
+
+            const HMODULE user32 = GetModuleHandle(TEXT("user32.dll"));
+            if (user32 == nullptr) {
+                return;
+            }
+
+            auto* setContext = reinterpret_cast<FSetProcessDpiAwarenessContextFn>(
+                GetProcAddress(user32, "SetProcessDpiAwarenessContext"));
+            if (setContext != nullptr) {
+                if (setContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)) {
+                    return;
+                }
+                if (setContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE)) {
+                    return;
+                }
+                if (setContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE)) {
+                    return;
+                }
+            }
+
+            auto* setAware = reinterpret_cast<FSetProcessDpiAwareFn>(
+                GetProcAddress(user32, "SetProcessDPIAware"));
+            if (setAware != nullptr) {
+                setAware();
+            }
+        }
+
+        [[nodiscard]] auto QueryWindowDpi(HWND windowHandle) -> u32 {
+            const HMODULE user32 = GetModuleHandle(TEXT("user32.dll"));
+            if (user32 == nullptr) {
+                return static_cast<u32>(kDefaultDpi);
+            }
+
+            auto* getWindowDpi =
+                reinterpret_cast<FGetDpiForWindowFn>(GetProcAddress(user32, "GetDpiForWindow"));
+            if (getWindowDpi != nullptr && windowHandle != nullptr) {
+                const UINT dpi = getWindowDpi(windowHandle);
+                if (dpi > 0U) {
+                    return static_cast<u32>(dpi);
+                }
+            }
+
+            auto* getSystemDpi =
+                reinterpret_cast<FGetDpiForSystemFn>(GetProcAddress(user32, "GetDpiForSystem"));
+            if (getSystemDpi != nullptr) {
+                const UINT dpi = getSystemDpi();
+                if (dpi > 0U) {
+                    return static_cast<u32>(dpi);
+                }
+            }
+            return static_cast<u32>(kDefaultDpi);
+        }
+
+        [[nodiscard]] auto ClampMinClientSize(u32 value) -> u32 {
+            return (value > 0U) ? value : 1U;
+        }
+
+        [[nodiscard]] auto ScaleLogicalToPhysical(u32 logicalSize, f32 dpiScale) -> u32 {
+            const f32 safeScale = (dpiScale > 0.01f) ? dpiScale : 1.0f;
+            const f32 scaled    = static_cast<f32>(ClampMinClientSize(logicalSize)) * safeScale;
+            const u32 rounded   = static_cast<u32>(scaled + 0.5f);
+            return (rounded > 0U) ? rounded : 1U;
+        }
+
+        void ResolveClientSizeForPolicy(const FPlatformWindowProperty& properties, f32 dpiScale,
+            u32& outClientWidth, u32& outClientHeight) {
+            if (properties.mDpiPolicy == EWindowDpiPolicy::LogicalFixed) {
+                outClientWidth  = ScaleLogicalToPhysical(properties.mWidth, dpiScale);
+                outClientHeight = ScaleLogicalToPhysical(properties.mHeight, dpiScale);
+                return;
+            }
+
+            outClientWidth  = ClampMinClientSize(properties.mWidth);
+            outClientHeight = ClampMinClientSize(properties.mHeight);
+        }
+
+        [[nodiscard]] auto ComputeWindowSizeFromClient(HWND windowHandle, DWORD style,
+            u32 clientWidth, u32 clientHeight, u32 dpi, i32& outWidth, i32& outHeight) -> bool {
+            RECT          windowRect{ 0, 0, static_cast<LONG>(ClampMinClientSize(clientWidth)),
+                static_cast<LONG>(ClampMinClientSize(clientHeight)) };
+
+            const DWORD   exStyle = static_cast<DWORD>(GetWindowLongPtr(windowHandle, GWL_EXSTYLE));
+            const HMODULE user32  = GetModuleHandle(TEXT("user32.dll"));
+            auto*         adjustForDpi = (user32 != nullptr)
+                        ? reinterpret_cast<FAdjustWindowRectExForDpiFn>(
+                      GetProcAddress(user32, "AdjustWindowRectExForDpi"))
+                        : nullptr;
+            BOOL          ok           = FALSE;
+            if (adjustForDpi != nullptr && dpi > 0U) {
+                ok = adjustForDpi(&windowRect, style, FALSE, exStyle, dpi);
+            } else {
+                ok = AdjustWindowRectEx(&windowRect, style, FALSE, exStyle);
+            }
+            if (!ok) {
+                return false;
+            }
+
+            outWidth  = windowRect.right - windowRect.left;
+            outHeight = windowRect.bottom - windowRect.top;
+            return true;
+        }
+
+        auto ToWin32DisplayMode(EWindowDisplayMode DisplayMode) -> DWORD {
             switch (DisplayMode) {
                 case EWindowDisplayMode::Fullscreen:
                     return WS_POPUP;
@@ -58,6 +171,7 @@ namespace AltinaEngine::Application {
 
     FWindowsPlatformWindow::FWindowsPlatformWindow() {
         mInstanceHandle = static_cast<void*>(GetModuleHandle(nullptr));
+        EnsureProcessDpiAwareness();
     }
 
     FWindowsPlatformWindow::~FWindowsPlatformWindow() {
@@ -70,9 +184,14 @@ namespace AltinaEngine::Application {
     auto FWindowsPlatformWindow::Initialize(const FPlatformWindowProperty& InProperties) -> bool {
         RegisterWindowClass();
 
+        const u32 initialDpi   = QueryWindowDpi(nullptr);
+        const f32 initialScale = static_cast<f32>(initialDpi) / kDefaultDpi;
+        u32       clientWidth  = ClampMinClientSize(InProperties.mWidth);
+        u32       clientHeight = ClampMinClientSize(InProperties.mHeight);
+        ResolveClientSizeForPolicy(InProperties, initialScale, clientWidth, clientHeight);
+
         const DWORD windowStyle = ResolveWindowStyle(InProperties);
-        RECT        windowRect{ 0, 0, static_cast<LONG>(InProperties.mWidth),
-            static_cast<LONG>(InProperties.mHeight) };
+        RECT windowRect{ 0, 0, static_cast<LONG>(clientWidth), static_cast<LONG>(clientHeight) };
         AdjustWindowRect(&windowRect, windowStyle, FALSE);
 
         const i32              width  = windowRect.right - windowRect.left;
@@ -92,9 +211,27 @@ namespace AltinaEngine::Application {
         SetWindowLongPtr(
             static_cast<HWND>(mWindowHandle), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
-        mProperties = InProperties;
+        mProperties             = InProperties;
+        const u32 dpi           = QueryWindowDpi(static_cast<HWND>(mWindowHandle));
+        mProperties.mDpiScaling = static_cast<f32>(dpi) / kDefaultDpi;
+        mProperties.mDpi        = dpi;
         UpdateCachedSizeFromClientRect();
         mIsClosed = false;
+        if (mProperties.mDpiPolicy == EWindowDpiPolicy::LogicalFixed) {
+            u32 expectedClientWidth  = 0U;
+            u32 expectedClientHeight = 0U;
+            ResolveClientSizeForPolicy(
+                mProperties, mProperties.mDpiScaling, expectedClientWidth, expectedClientHeight);
+            if (mCachedSize.mWidth != expectedClientWidth
+                || mCachedSize.mHeight != expectedClientHeight) {
+                Resize(mProperties.mWidth, mProperties.mHeight);
+            }
+        }
+
+        LogInfo(TEXT("Window initialized DPI={} scale={} logical={}x{} physical={}x{} policy={}."),
+            dpi, mProperties.mDpiScaling, mProperties.mWidth, mProperties.mHeight,
+            mProperties.mPhysicalWidth, mProperties.mPhysicalHeight,
+            static_cast<u32>(mProperties.mDpiPolicy));
 
         return true;
     }
@@ -121,11 +258,26 @@ namespace AltinaEngine::Application {
             return;
         }
 
-        mProperties.mWidth  = InWidth;
-        mProperties.mHeight = InHeight;
+        mProperties.mWidth  = ClampMinClientSize(InWidth);
+        mProperties.mHeight = ClampMinClientSize(InHeight);
 
-        SetWindowPos(static_cast<HWND>(mWindowHandle), nullptr, 0, 0, static_cast<int>(InWidth),
-            static_cast<int>(InHeight), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        u32 targetClientWidth  = ClampMinClientSize(mProperties.mWidth);
+        u32 targetClientHeight = ClampMinClientSize(mProperties.mHeight);
+        ResolveClientSizeForPolicy(
+            mProperties, mProperties.mDpiScaling, targetClientWidth, targetClientHeight);
+
+        const auto  windowHandle = static_cast<HWND>(mWindowHandle);
+        const DWORD windowStyle  = static_cast<DWORD>(GetWindowLongPtr(windowHandle, GWL_STYLE));
+        i32         windowWidth  = static_cast<i32>(targetClientWidth);
+        i32         windowHeight = static_cast<i32>(targetClientHeight);
+        if (!ComputeWindowSizeFromClient(windowHandle, windowStyle, targetClientWidth,
+                targetClientHeight, mProperties.mDpi, windowWidth, windowHeight)) {
+            windowWidth  = static_cast<i32>(targetClientWidth);
+            windowHeight = static_cast<i32>(targetClientHeight);
+        }
+
+        SetWindowPos(windowHandle, nullptr, 0, 0, windowWidth, windowHeight,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         UpdateCachedSizeFromClientRect();
     }
 
@@ -280,6 +432,15 @@ namespace AltinaEngine::Application {
             case WM_SIZE:
                 if (window) {
                     window->UpdateCachedSizeFromClientRect();
+                    if (InWParam != SIZE_MINIMIZED
+                        && window->mProperties.mDpiPolicy == EWindowDpiPolicy::LogicalFixed
+                        && window->mProperties.mDpiScaling > 0.01f
+                        && window->mCachedSize.mWidth > 0U && window->mCachedSize.mHeight > 0U) {
+                        window->mProperties.mWidth = ScaleLogicalToPhysical(
+                            window->mCachedSize.mWidth, 1.0f / window->mProperties.mDpiScaling);
+                        window->mProperties.mHeight = ScaleLogicalToPhysical(
+                            window->mCachedSize.mHeight, 1.0f / window->mProperties.mDpiScaling);
+                    }
                     const auto extent = window->GetSize();
                     dispatchIfAvailable([window, &extent](FAppMessageRouter& router) {
                         router.BroadcastWindowResized(window, extent);
@@ -326,17 +487,51 @@ namespace AltinaEngine::Application {
                     const u32 dpiX                  = LOWORD(InWParam);
                     const f32 dpiScale              = static_cast<f32>(dpiX) / kDefaultDpi;
                     window->mProperties.mDpiScaling = dpiScale;
+                    window->mProperties.mDpi        = dpiX;
                     dispatchIfAvailable([window, dpiScale](FAppMessageRouter& router) {
                         router.BroadcastWindowDpiScaleChanged(window, dpiScale);
                     });
 
                     const RECT* suggestedRect = reinterpret_cast<const RECT*>(InLParam);
-                    if (suggestedRect != nullptr) {
+                    if (window->mProperties.mDpiPolicy == EWindowDpiPolicy::LogicalFixed) {
+                        u32 targetClientWidth  = 0U;
+                        u32 targetClientHeight = 0U;
+                        ResolveClientSizeForPolicy(
+                            window->mProperties, dpiScale, targetClientWidth, targetClientHeight);
+                        const DWORD windowStyle =
+                            static_cast<DWORD>(GetWindowLongPtr(InWindowHandle, GWL_STYLE));
+                        i32 windowWidth  = static_cast<i32>(targetClientWidth);
+                        i32 windowHeight = static_cast<i32>(targetClientHeight);
+                        if (!ComputeWindowSizeFromClient(InWindowHandle, windowStyle,
+                                targetClientWidth, targetClientHeight, dpiX, windowWidth,
+                                windowHeight)) {
+                            windowWidth  = static_cast<i32>(targetClientWidth);
+                            windowHeight = static_cast<i32>(targetClientHeight);
+                        }
+
+                        RECT currentRect{};
+                        GetWindowRect(InWindowHandle, &currentRect);
+                        i32 posX = currentRect.left;
+                        i32 posY = currentRect.top;
+                        if (suggestedRect != nullptr) {
+                            posX = suggestedRect->left;
+                            posY = suggestedRect->top;
+                        }
+                        SetWindowPos(InWindowHandle, nullptr, posX, posY, windowWidth, windowHeight,
+                            SWP_NOZORDER | SWP_NOACTIVATE);
+                    } else if (suggestedRect != nullptr) {
                         SetWindowPos(InWindowHandle, nullptr, suggestedRect->left,
                             suggestedRect->top, suggestedRect->right - suggestedRect->left,
                             suggestedRect->bottom - suggestedRect->top,
                             SWP_NOZORDER | SWP_NOACTIVATE);
                     }
+                    window->UpdateCachedSizeFromClientRect();
+                    LogInfo(
+                        TEXT(
+                            "Window DPI changed to {} (scale={}) logical={}x{} physical={}x{} policy={}."),
+                        dpiX, dpiScale, window->mProperties.mWidth, window->mProperties.mHeight,
+                        window->mProperties.mPhysicalWidth, window->mProperties.mPhysicalHeight,
+                        static_cast<u32>(window->mProperties.mDpiPolicy));
                 }
                 break;
             case WM_KEYDOWN:
@@ -496,10 +691,10 @@ namespace AltinaEngine::Application {
 
         RECT clientRect{};
         GetClientRect(static_cast<HWND>(mWindowHandle), &clientRect);
-        mCachedSize.mWidth  = static_cast<u32>(clientRect.right - clientRect.left);
-        mCachedSize.mHeight = static_cast<u32>(clientRect.bottom - clientRect.top);
-        mProperties.mWidth  = mCachedSize.mWidth;
-        mProperties.mHeight = mCachedSize.mHeight;
+        mCachedSize.mWidth          = static_cast<u32>(clientRect.right - clientRect.left);
+        mCachedSize.mHeight         = static_cast<u32>(clientRect.bottom - clientRect.top);
+        mProperties.mPhysicalWidth  = mCachedSize.mWidth;
+        mProperties.mPhysicalHeight = mCachedSize.mHeight;
     }
 
     DWORD FWindowsPlatformWindow::ResolveWindowStyle(

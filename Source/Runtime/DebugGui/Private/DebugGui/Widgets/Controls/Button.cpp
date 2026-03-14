@@ -56,8 +56,7 @@ namespace AltinaEngine::DebugGui::Private {
         const f32 rowMaxX = (clipRect.Max.X() > mCursor.X()) ? clipRect.Max.X() : mDisplaySize.X();
         const FRect rowRect{ mCursor, FVector2f(rowMaxX, mCursor.Y() + rowHeight) };
         const f32 textStartX = rowRect.Min.X() + indent + arrowSize + mTheme->mTreeTextPadX + 3.0f;
-        const f32 textWidth =
-            static_cast<f32>(desc.mLabel.Length()) * static_cast<f32>(FFontAtlas::kDrawGlyphW);
+        const f32 textWidth  = static_cast<f32>(desc.mLabel.Length()) * GetGlyphWidth();
         const FRect textHitRect{ FVector2f(textStartX - 2.0f, rowRect.Min.Y()),
             FVector2f(textStartX + textWidth + 4.0f, rowRect.Max.Y()) };
 
@@ -192,8 +191,8 @@ namespace AltinaEngine::DebugGui::Private {
             DrawRectFilled(itemRect, bg);
         }
 
-        const f32 labelHeight = static_cast<f32>(FFontAtlas::kDrawGlyphH) + mTheme->mIconLabelPadY;
-        const f32 innerPad    = mTheme->mIconInnerPadding;
+        const f32   labelHeight = GetGlyphHeight() + mTheme->mIconLabelPadY;
+        const f32   innerPad    = mTheme->mIconInnerPadding;
         const FRect iconRect{ FVector2f(itemRect.Min.X() + innerPad, itemRect.Min.Y() + innerPad),
             FVector2f(itemRect.Max.X() - innerPad, itemRect.Max.Y() - labelHeight) };
         const FColor32 placeholder =
@@ -203,7 +202,7 @@ namespace AltinaEngine::DebugGui::Private {
         DrawImage(iconRect, desc.mImageId, MakeColor32(255, 255, 255, 255));
 
         const f32 textX = itemRect.Min.X() + innerPad;
-        const f32 textY = itemRect.Max.Y() - static_cast<f32>(FFontAtlas::kDrawGlyphH) - 1.0f;
+        const f32 textY = itemRect.Max.Y() - GetGlyphHeight() - 1.0f;
         DrawText(FVector2f(textX, textY), mTheme->mTreeText, desc.mLabel);
         return result;
     }

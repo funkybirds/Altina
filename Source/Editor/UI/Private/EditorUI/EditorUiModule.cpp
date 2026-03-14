@@ -41,8 +41,8 @@ namespace AltinaEngine::Editor::UI {
                 && p.Y() < r.Max.Y();
         }
 
-        [[nodiscard]] auto TextWidth(FStringView text) -> f32 {
-            return static_cast<f32>(text.Length()) * kGlyphW;
+        [[nodiscard]] auto TextWidth(FStringView text, f32 glyphWidth = kGlyphW) -> f32 {
+            return static_cast<f32>(text.Length()) * glyphWidth;
         }
 
     } // namespace
@@ -474,7 +474,8 @@ namespace AltinaEngine::Editor::UI {
             return FString();
         }
 
-        const i32 maxChars = static_cast<i32>(maxWidth / kGlyphW);
+        const f32 glyphWidth = kGlyphW * ((mUiScale > 0.01f) ? mUiScale : 1.0f);
+        const i32 maxChars   = static_cast<i32>(maxWidth / glyphWidth);
         if (maxChars <= 0) {
             return FString(TEXT("..."));
         }
@@ -691,34 +692,44 @@ namespace AltinaEngine::Editor::UI {
     void FEditorUiModule::DrawHierarchyPanel(DebugGui::IDebugGui& gui,
         const DebugGui::FRect& contentRect, const Core::Math::FVector2f& mouse,
         bool blockWorkspaceInput) {
+        const f32  uiScale      = (mUiScale > 0.01f) ? mUiScale : 1.0f;
+        const auto ScalePx      = [uiScale](f32 value) { return value * uiScale; };
         const auto colText      = DebugGui::MakeColor32(224, 226, 230, 255);
         const auto colMutedText = DebugGui::MakeColor32(160, 168, 180, 255);
 
         if (mHierarchySnapshot.mGameObjects.IsEmpty()) {
-            gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 2.0f), colText,
-                TEXT("World"));
-            gui.DrawText(FVector2f(contentRect.Min.X() + 10.0f, contentRect.Min.Y() + 20.0f),
+            gui.DrawText(
+                FVector2f(contentRect.Min.X() + ScalePx(4.0f), contentRect.Min.Y() + ScalePx(2.0f)),
+                colText, TEXT("World"));
+            gui.DrawText(FVector2f(contentRect.Min.X() + ScalePx(10.0f),
+                             contentRect.Min.Y() + ScalePx(20.0f)),
                 colMutedText, TEXT("No active world."));
             return;
         }
 
         Core::Container::FString worldLabel(TEXT("World "));
         worldLabel.AppendNumber(mHierarchySnapshot.mWorldId);
-        gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 2.0f), colText,
-            worldLabel.ToView());
+        gui.DrawText(
+            FVector2f(contentRect.Min.X() + ScalePx(4.0f), contentRect.Min.Y() + ScalePx(2.0f)),
+            colText, worldLabel.ToView());
 
-        const FRect treeRect = MakeRect(contentRect.Min.X(), contentRect.Min.Y() + 18.0f,
+        const FRect treeRect = MakeRect(contentRect.Min.X(), contentRect.Min.Y() + ScalePx(18.0f),
             contentRect.Max.X(), contentRect.Max.Y());
         DebugGui::FDebugGuiTheme theme{};
         if (mDebugGuiSystem != nullptr) {
             theme = mDebugGuiSystem->GetTheme();
         }
-        const f32 rowHeight      = (theme.mTreeRowHeight > 0.0f) ? theme.mTreeRowHeight : 18.0f;
-        const f32 rowStep        = rowHeight + theme.mItemSpacingY;
-        const f32 scrollBarWidth = (theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 10.0f;
-        const f32 scrollBarPad = (theme.mScrollBarPadding > 0.0f) ? theme.mScrollBarPadding : 2.0f;
+        const f32 rowHeight =
+            ((theme.mTreeRowHeight > 0.0f) ? theme.mTreeRowHeight : 18.0f) * uiScale;
+        const f32 rowStep =
+            rowHeight + ((theme.mItemSpacingY > 0.0f) ? theme.mItemSpacingY : 4.0f) * uiScale;
+        const f32 scrollBarWidth =
+            ((theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 10.0f) * uiScale;
+        const f32 scrollBarPad =
+            ((theme.mScrollBarPadding > 0.0f) ? theme.mScrollBarPadding : 2.0f) * uiScale;
         const f32 thumbMinH =
-            (theme.mScrollBarThumbMinHeight > 0.0f) ? theme.mScrollBarThumbMinHeight : 14.0f;
+            ((theme.mScrollBarThumbMinHeight > 0.0f) ? theme.mScrollBarThumbMinHeight : 14.0f)
+            * uiScale;
 
         i32 visibleRowCount = 0;
         {
@@ -755,16 +766,19 @@ namespace AltinaEngine::Editor::UI {
             }
         }
 
-        const f32 viewHeight  = Core::Math::Max(0.0f, treeRect.Max.Y() - treeRect.Min.Y() - 4.0f);
+        const f32 viewHeight =
+            Core::Math::Max(0.0f, treeRect.Max.Y() - treeRect.Min.Y() - ScalePx(4.0f));
         const f32 totalHeight = static_cast<f32>(visibleRowCount) * rowStep;
         const f32 maxScrollY  = Core::Math::Max(0.0f, totalHeight - viewHeight);
         mHierarchyScrollY     = Clamp(mHierarchyScrollY, 0.0f, maxScrollY);
 
         const bool needsScrollBar = (maxScrollY > 0.0f)
-            && (treeRect.Max.X() - treeRect.Min.X() > (scrollBarWidth + scrollBarPad + 24.0f));
+            && (treeRect.Max.X() - treeRect.Min.X()
+                > (scrollBarWidth + scrollBarPad + ScalePx(24.0f)));
         const FRect scrollTrackRect = needsScrollBar
-            ? MakeRect(treeRect.Max.X() - scrollBarWidth - scrollBarPad, treeRect.Min.Y() + 2.0f,
-                  treeRect.Max.X() - scrollBarPad, treeRect.Max.Y() - 2.0f)
+            ? MakeRect(treeRect.Max.X() - scrollBarWidth - scrollBarPad,
+                  treeRect.Min.Y() + ScalePx(2.0f), treeRect.Max.X() - scrollBarPad,
+                  treeRect.Max.Y() - ScalePx(2.0f))
             : MakeRect(0.0f, 0.0f, 0.0f, 0.0f);
         const FRect treeContentRect = needsScrollBar
             ? MakeRect(treeRect.Min.X(), treeRect.Min.Y(), scrollTrackRect.Min.X() - scrollBarPad,
@@ -804,8 +818,8 @@ namespace AltinaEngine::Editor::UI {
         }
 
         gui.PushClipRect(treeContentRect);
-        gui.SetCursorPos(FVector2f(
-            treeContentRect.Min.X() + 2.0f, treeContentRect.Min.Y() + 2.0f - mHierarchyScrollY));
+        gui.SetCursorPos(FVector2f(treeContentRect.Min.X() + ScalePx(2.0f),
+            treeContentRect.Min.Y() + ScalePx(2.0f) - mHierarchyScrollY));
 
         TVector<i32> indexStack;
         TVector<u32> depthStack;
@@ -904,13 +918,15 @@ namespace AltinaEngine::Editor::UI {
 
     void FEditorUiModule::DrawInspectorPanel(
         DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect) const {
+        const f32  uiScale      = (mUiScale > 0.01f) ? mUiScale : 1.0f;
+        const auto ScalePx      = [uiScale](f32 value) { return value * uiScale; };
         const auto colText      = DebugGui::MakeColor32(224, 226, 230, 255);
         const auto colMutedText = DebugGui::MakeColor32(160, 168, 180, 255);
-        const f32  x            = contentRect.Min.X() + 4.0f;
-        f32        y            = contentRect.Min.Y() + 2.0f;
+        const f32  x            = contentRect.Min.X() + ScalePx(4.0f);
+        f32        y            = contentRect.Min.Y() + ScalePx(2.0f);
 
         gui.DrawText(FVector2f(x, y), colText, TEXT("Inspector"));
-        y += 18.0f;
+        y += ScalePx(18.0f);
 
         if (mSelection.mType == EEditorSelectionType::None) {
             gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Select a GameObject or Component."));
@@ -925,28 +941,29 @@ namespace AltinaEngine::Editor::UI {
         }
 
         gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Selection Type"));
-        gui.DrawText(FVector2f(x + 120.0f, y), colText, selectionType);
-        y += 18.0f;
+        gui.DrawText(FVector2f(x + ScalePx(120.0f), y), colText, selectionType);
+        y += ScalePx(18.0f);
 
         gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Name"));
-        gui.DrawText(FVector2f(x + 120.0f, y), colText, mSelection.mName.ToView());
-        y += 18.0f;
+        gui.DrawText(FVector2f(x + ScalePx(120.0f), y), colText, mSelection.mName.ToView());
+        y += ScalePx(18.0f);
 
         gui.DrawText(FVector2f(x, y), colMutedText, TEXT("UUID"));
-        gui.DrawText(FVector2f(x + 120.0f, y), colText, mSelection.mUuid.ToView());
-        y += 24.0f;
+        gui.DrawText(FVector2f(x + ScalePx(120.0f), y), colText, mSelection.mUuid.ToView());
+        y += ScalePx(24.0f);
 
         if (mSelection.mType == EEditorSelectionType::Component) {
             gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Type"));
-            gui.DrawText(FVector2f(x + 120.0f, y), colText, mSelection.mTypeName.ToView());
-            y += 18.0f;
+            gui.DrawText(FVector2f(x + ScalePx(120.0f), y), colText, mSelection.mTypeName.ToView());
+            y += ScalePx(18.0f);
             gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Namespace"));
             if (mSelection.mTypeNamespace.IsEmptyString()) {
-                gui.DrawText(FVector2f(x + 120.0f, y), colText, TEXT("(global)"));
+                gui.DrawText(FVector2f(x + ScalePx(120.0f), y), colText, TEXT("(global)"));
             } else {
-                gui.DrawText(FVector2f(x + 120.0f, y), colText, mSelection.mTypeNamespace.ToView());
+                gui.DrawText(
+                    FVector2f(x + ScalePx(120.0f), y), colText, mSelection.mTypeNamespace.ToView());
             }
-            y += 24.0f;
+            y += ScalePx(24.0f);
         }
 
         gui.DrawText(FVector2f(x, y), colMutedText, TEXT("Properties (Coming Soon)"));
@@ -955,6 +972,8 @@ namespace AltinaEngine::Editor::UI {
     void FEditorUiModule::DrawAssetPanel(DebugGui::IDebugGui& gui,
         const DebugGui::FRect& contentRect, const Core::Math::FVector2f& mouse,
         bool blockWorkspaceInput) {
+        const f32                uiScale      = (mUiScale > 0.01f) ? mUiScale : 1.0f;
+        const auto               ScalePx      = [uiScale](f32 value) { return value * uiScale; };
         const auto               colPanelBg   = DebugGui::MakeColor32(26, 29, 35, 255);
         const auto               colBorder    = DebugGui::MakeColor32(88, 94, 108, 255);
         const auto               colText      = DebugGui::MakeColor32(224, 226, 230, 255);
@@ -977,9 +996,9 @@ namespace AltinaEngine::Editor::UI {
         };
 
         const f32 panelWidth    = contentRect.Max.X() - contentRect.Min.X();
-        const f32 minTreeWidth  = 120.0f;
-        const f32 minGridWidth  = 180.0f;
-        const f32 splitterWidth = 6.0f;
+        const f32 minTreeWidth  = ScalePx(120.0f);
+        const f32 minGridWidth  = ScalePx(180.0f);
+        const f32 splitterWidth = ScalePx(6.0f);
         const f32 minSplitX     = contentRect.Min.X() + minTreeWidth;
         const f32 maxSplitRaw   = contentRect.Max.X() - minGridWidth - splitterWidth;
         const f32 maxSplitX     = (maxSplitRaw > minSplitX) ? maxSplitRaw : minSplitX;
@@ -1010,12 +1029,17 @@ namespace AltinaEngine::Editor::UI {
         gui.DrawRectFilled(gridRect, colPanelBg);
         gui.DrawRect(gridRect, colBorder, 1.0f);
 
-        const f32 treeRowHeight  = (theme.mTreeRowHeight > 0.0f) ? theme.mTreeRowHeight : 18.0f;
-        const f32 treeRowStep    = treeRowHeight + theme.mItemSpacingY;
-        const f32 scrollBarWidth = (theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 10.0f;
-        const f32 scrollBarPad = (theme.mScrollBarPadding > 0.0f) ? theme.mScrollBarPadding : 2.0f;
+        const f32 treeRowHeight =
+            ((theme.mTreeRowHeight > 0.0f) ? theme.mTreeRowHeight : 18.0f) * uiScale;
+        const f32 treeRowStep =
+            treeRowHeight + ((theme.mItemSpacingY > 0.0f) ? theme.mItemSpacingY : 4.0f) * uiScale;
+        const f32 scrollBarWidth =
+            ((theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 10.0f) * uiScale;
+        const f32 scrollBarPad =
+            ((theme.mScrollBarPadding > 0.0f) ? theme.mScrollBarPadding : 2.0f) * uiScale;
         const f32 thumbMinH =
-            (theme.mScrollBarThumbMinHeight > 0.0f) ? theme.mScrollBarThumbMinHeight : 14.0f;
+            ((theme.mScrollBarThumbMinHeight > 0.0f) ? theme.mScrollBarThumbMinHeight : 14.0f)
+            * uiScale;
 
         i32 visibleNodeCount = 0;
         if (!mAssetNodes.IsEmpty()) {
@@ -1043,15 +1067,17 @@ namespace AltinaEngine::Editor::UI {
         }
 
         const f32 treeViewHeight =
-            Core::Math::Max(0.0f, treeRect.Max.Y() - treeRect.Min.Y() - 4.0f);
+            Core::Math::Max(0.0f, treeRect.Max.Y() - treeRect.Min.Y() - ScalePx(4.0f));
         const f32 treeTotalHeight     = static_cast<f32>(visibleNodeCount) * treeRowStep;
         const f32 treeMaxScrollY      = Core::Math::Max(0.0f, treeTotalHeight - treeViewHeight);
         mAssetTreeScrollY             = Clamp(mAssetTreeScrollY, 0.0f, treeMaxScrollY);
         const bool treeNeedsScrollBar = (treeMaxScrollY > 0.0f)
-            && (treeRect.Max.X() - treeRect.Min.X() > (scrollBarWidth + scrollBarPad + 24.0f));
+            && (treeRect.Max.X() - treeRect.Min.X()
+                > (scrollBarWidth + scrollBarPad + ScalePx(24.0f)));
         const FRect treeScrollTrackRect = treeNeedsScrollBar
-            ? MakeRect(treeRect.Max.X() - scrollBarWidth - scrollBarPad, treeRect.Min.Y() + 2.0f,
-                  treeRect.Max.X() - scrollBarPad, treeRect.Max.Y() - 2.0f)
+            ? MakeRect(treeRect.Max.X() - scrollBarWidth - scrollBarPad,
+                  treeRect.Min.Y() + ScalePx(2.0f), treeRect.Max.X() - scrollBarPad,
+                  treeRect.Max.Y() - ScalePx(2.0f))
             : MakeRect(0.0f, 0.0f, 0.0f, 0.0f);
         const FRect treeContentRect     = treeNeedsScrollBar
                 ? MakeRect(treeRect.Min.X(), treeRect.Min.Y(),
@@ -1091,8 +1117,8 @@ namespace AltinaEngine::Editor::UI {
         }
 
         gui.PushClipRect(treeContentRect);
-        gui.SetCursorPos(FVector2f(
-            treeContentRect.Min.X() + 4.0f, treeContentRect.Min.Y() + 2.0f - mAssetTreeScrollY));
+        gui.SetCursorPos(FVector2f(treeContentRect.Min.X() + ScalePx(4.0f),
+            treeContentRect.Min.Y() + ScalePx(2.0f) - mAssetTreeScrollY));
 
         TVector<i32> drawStack;
         TVector<u32> depthStack;
@@ -1172,10 +1198,10 @@ namespace AltinaEngine::Editor::UI {
             gui.DrawRect(thumbRect, theme.mScrollBarThumbBorder, 1.0f);
         }
 
-        const f32 itemWidth  = 94.0f;
-        const f32 itemHeight = 84.0f;
-        const f32 itemGap    = 8.0f;
-        const f32 gridWidth  = gridRect.Max.X() - gridRect.Min.X() - 8.0f;
+        const f32 itemWidth  = ScalePx(94.0f);
+        const f32 itemHeight = ScalePx(84.0f);
+        const f32 itemGap    = ScalePx(8.0f);
+        const f32 gridWidth  = gridRect.Max.X() - gridRect.Min.X() - ScalePx(8.0f);
         i32       columns    = static_cast<i32>(gridWidth / (itemWidth + itemGap));
         if (columns < 1) {
             columns = 1;
@@ -1189,8 +1215,10 @@ namespace AltinaEngine::Editor::UI {
         for (usize i = 0; i < mAssetItems.Size(); ++i) {
             const i32 col = static_cast<i32>(i % static_cast<usize>(columns));
             const i32 row = static_cast<i32>(i / static_cast<usize>(columns));
-            const f32 x0  = gridRect.Min.X() + 4.0f + static_cast<f32>(col) * (itemWidth + itemGap);
-            const f32 y0 = gridRect.Min.Y() + 4.0f + static_cast<f32>(row) * (itemHeight + itemGap);
+            const f32 x0 =
+                gridRect.Min.X() + ScalePx(4.0f) + static_cast<f32>(col) * (itemWidth + itemGap);
+            const f32 y0 =
+                gridRect.Min.Y() + ScalePx(4.0f) + static_cast<f32>(row) * (itemHeight + itemGap);
             const FRect itemRect = MakeRect(x0, y0, x0 + itemWidth, y0 + itemHeight);
             if (itemRect.Max.Y() > gridRect.Max.Y()) {
                 break;
@@ -1198,9 +1226,10 @@ namespace AltinaEngine::Editor::UI {
 
             auto&                         item = mAssetItems[i];
             DebugGui::FTextedIconViewDesc itemDesc{};
-            const auto truncatedName = TruncateAssetLabel(item.mName.ToView(), itemWidth - 12.0f);
-            itemDesc.mLabel          = truncatedName.ToView();
-            itemDesc.mRect           = itemRect;
+            const auto                    truncatedName =
+                TruncateAssetLabel(item.mName.ToView(), itemWidth - ScalePx(12.0f));
+            itemDesc.mLabel    = truncatedName.ToView();
+            itemDesc.mRect     = itemRect;
             itemDesc.mImageId  = (item.mType == EAssetItemType::Directory) ? mAssetFolderIconImageId
                                                                            : mAssetFileIconImageId;
             itemDesc.mSelected = (mSelectedAssetPath == item.mPath);
@@ -1241,15 +1270,15 @@ namespace AltinaEngine::Editor::UI {
 
         if (mAssetContextMenu.mOpen && !blockWorkspaceInput) {
             FVector2f  menuPos = mAssetContextMenu.mPos;
-            const f32  menuW   = 160.0f;
-            const f32  rowH    = 20.0f;
-            const f32  menuH   = rowH * 2.0f + 4.0f;
+            const f32  menuW   = ScalePx(160.0f);
+            const f32  rowH    = ScalePx(20.0f);
+            const f32  menuH   = rowH * 2.0f + ScalePx(4.0f);
             const auto display = gui.GetDisplaySize();
             if (menuPos.X() + menuW > display.X()) {
-                menuPos = FVector2f(display.X() - menuW - 2.0f, menuPos.Y());
+                menuPos = FVector2f(display.X() - menuW - ScalePx(2.0f), menuPos.Y());
             }
             if (menuPos.Y() + menuH > display.Y()) {
-                menuPos = FVector2f(menuPos.X(), display.Y() - menuH - 2.0f);
+                menuPos = FVector2f(menuPos.X(), display.Y() - menuH - ScalePx(2.0f));
             }
 
             const FRect menuRect =
@@ -1257,10 +1286,11 @@ namespace AltinaEngine::Editor::UI {
             gui.DrawRectFilled(menuRect, colMenuBg);
             gui.DrawRect(menuRect, colBorder, 1.0f);
 
-            const FRect openRect    = MakeRect(menuRect.Min.X() + 2.0f, menuRect.Min.Y() + 2.0f,
-                   menuRect.Max.X() - 2.0f, menuRect.Min.Y() + 2.0f + rowH);
-            const FRect refreshRect = MakeRect(menuRect.Min.X() + 2.0f, openRect.Max.Y(),
-                menuRect.Max.X() - 2.0f, openRect.Max.Y() + rowH);
+            const FRect openRect =
+                MakeRect(menuRect.Min.X() + ScalePx(2.0f), menuRect.Min.Y() + ScalePx(2.0f),
+                    menuRect.Max.X() - ScalePx(2.0f), menuRect.Min.Y() + ScalePx(2.0f) + rowH);
+            const FRect refreshRect = MakeRect(menuRect.Min.X() + ScalePx(2.0f), openRect.Max.Y(),
+                menuRect.Max.X() - ScalePx(2.0f), openRect.Max.Y() + rowH);
 
             const bool  openHovered    = IsInside(openRect, mouse);
             const bool  refreshHovered = IsInside(refreshRect, mouse);
@@ -1272,10 +1302,12 @@ namespace AltinaEngine::Editor::UI {
             }
 
             const bool canOpen = (mAssetContextMenu.mItemType == EAssetItemType::Directory);
-            gui.DrawText(FVector2f(openRect.Min.X() + 8.0f, openRect.Min.Y() + 4.0f),
+            gui.DrawText(
+                FVector2f(openRect.Min.X() + ScalePx(8.0f), openRect.Min.Y() + ScalePx(4.0f)),
                 canOpen ? colText : colMutedText, TEXT("Open"));
-            gui.DrawText(FVector2f(refreshRect.Min.X() + 8.0f, refreshRect.Min.Y() + 4.0f), colText,
-                TEXT("Refresh"));
+            gui.DrawText(
+                FVector2f(refreshRect.Min.X() + ScalePx(8.0f), refreshRect.Min.Y() + ScalePx(4.0f)),
+                colText, TEXT("Refresh"));
 
             if (gui.WasMousePressed()) {
                 if (openHovered && canOpen) {
@@ -1298,6 +1330,25 @@ namespace AltinaEngine::Editor::UI {
         ++mFrameCounter;
         mViewportRequest = {};
         RefreshAssetCache(false);
+
+        if (debugGuiSystem != nullptr) {
+            const DebugGui::FDebugGuiTheme theme = debugGuiSystem->GetTheme();
+            mUiScale                             = Clamp(theme.mUiScale, 0.5f, 4.0f);
+        } else {
+            mUiScale = 1.0f;
+        }
+        const f32  uiScale         = (mUiScale > 0.01f) ? mUiScale : 1.0f;
+        const auto ScalePx         = [uiScale](f32 value) { return value * uiScale; };
+        const f32  menuBarHeight   = ScalePx(kMenuBarHeight);
+        const f32  workspacePad    = ScalePx(kWorkspacePad);
+        const f32  splitterSize    = ScalePx(kSplitterSize);
+        const f32  tabBarHeight    = ScalePx(kTabBarHeight);
+        const f32  panelPadding    = ScalePx(kPanelPadding);
+        const f32  minPanelWidth   = ScalePx(kMinPanelWidth);
+        const f32  minCenterWidth  = ScalePx(kMinCenterWidth);
+        const f32  minTopHeight    = ScalePx(kMinTopHeight);
+        const f32  minBottomHeight = ScalePx(kMinBottomHeight);
+        const f32  glyphW          = kGlyphW * uiScale;
 
         const auto display = gui.GetDisplaySize();
         if (display.X() <= 0.0f || display.Y() <= 0.0f) {
@@ -1323,7 +1374,7 @@ namespace AltinaEngine::Editor::UI {
         const FRect rootRect = MakeRect(0.0f, 0.0f, display.X(), display.Y());
         gui.DrawRectFilled(rootRect, colBg);
 
-        const FRect menuRect = MakeRect(0.0f, 0.0f, display.X(), kMenuBarHeight);
+        const FRect menuRect = MakeRect(0.0f, 0.0f, display.X(), menuBarHeight);
         gui.DrawRectFilled(menuRect, colMenuBg);
         gui.DrawRect(menuRect, colBorder, 1.0f);
 
@@ -1338,22 +1389,24 @@ namespace AltinaEngine::Editor::UI {
         FMenuState   menus[3]{};
         const TChar* menuNames[3] = { TEXT("File"), TEXT("View"), TEXT("Play") };
 
-        f32          menuX = 8.0f;
+        f32          menuX = ScalePx(8.0f);
         for (i32 i = 0; i < 3; ++i) {
-            const f32 labelW   = TextWidth(FStringView(menuNames[i]));
-            const f32 itemW    = labelW + 18.0f;
+            const f32 labelW   = TextWidth(FStringView(menuNames[i]), glyphW);
+            const f32 itemW    = labelW + ScalePx(18.0f);
             menus[i].Name      = menuNames[i];
             menus[i].MenuIndex = i;
-            menus[i].Rect      = MakeRect(menuX, 2.0f, menuX + itemW, kMenuBarHeight - 2.0f);
+            menus[i].Rect =
+                MakeRect(menuX, ScalePx(2.0f), menuX + itemW, menuBarHeight - ScalePx(2.0f));
             const bool hovered = IsInside(menus[i].Rect, mouse);
             if (hovered) {
                 gui.DrawRectFilled(menus[i].Rect, colMenuHover);
             }
-            gui.DrawText(FVector2f(menuX + 9.0f, 7.0f), colText, FStringView(menuNames[i]));
+            gui.DrawText(FVector2f(menuX + ScalePx(9.0f), ScalePx(7.0f)), colText,
+                FStringView(menuNames[i]));
             if (hovered && mousePressed) {
                 mOpenMenu = (mOpenMenu == i) ? -1 : i;
             }
-            menuX += itemW + 4.0f;
+            menuX += itemW + ScalePx(4.0f);
         }
 
         auto drawMenuItem = [&](const FRect& itemRect, FStringView label, bool checked,
@@ -1363,11 +1416,13 @@ namespace AltinaEngine::Editor::UI {
                 gui.DrawRectFilled(itemRect, colMenuHover);
             }
             if (checked) {
-                const FRect marker = MakeRect(itemRect.Min.X() + 4.0f, itemRect.Min.Y() + 4.0f,
-                    itemRect.Min.X() + 10.0f, itemRect.Max.Y() - 4.0f);
+                const FRect marker =
+                    MakeRect(itemRect.Min.X() + ScalePx(4.0f), itemRect.Min.Y() + ScalePx(4.0f),
+                        itemRect.Min.X() + ScalePx(10.0f), itemRect.Max.Y() - ScalePx(4.0f));
                 gui.DrawRectFilled(marker, colAccent);
             }
-            gui.DrawText(FVector2f(itemRect.Min.X() + 14.0f, itemRect.Min.Y() + 4.0f),
+            gui.DrawText(
+                FVector2f(itemRect.Min.X() + ScalePx(14.0f), itemRect.Min.Y() + ScalePx(4.0f)),
                 enabled ? colText : colMutedText, label);
             if (enabled && hovered && mousePressed) {
                 onClick();
@@ -1378,8 +1433,8 @@ namespace AltinaEngine::Editor::UI {
         const bool blockWorkspaceInput    = (mOpenMenu >= 0 && mOpenMenu < 3);
         mViewportRequest.bUiBlockingInput = blockWorkspaceInput || mAssetContextMenu.mOpen;
 
-        const FRect workspaceRect = MakeRect(kWorkspacePad, menuRect.Max.Y() + kWorkspacePad,
-            display.X() - kWorkspacePad, display.Y() - kWorkspacePad);
+        const FRect workspaceRect = MakeRect(workspacePad, menuRect.Max.Y() + workspacePad,
+            display.X() - workspacePad, display.Y() - workspacePad);
         if (workspaceRect.Max.X() <= workspaceRect.Min.X()
             || workspaceRect.Max.Y() <= workspaceRect.Min.Y()) {
             return;
@@ -1388,33 +1443,33 @@ namespace AltinaEngine::Editor::UI {
         f32 workspaceW = workspaceRect.Max.X() - workspaceRect.Min.X();
         f32 workspaceH = workspaceRect.Max.Y() - workspaceRect.Min.Y();
 
-        f32 leftW  = Clamp(workspaceW * mDock.LeftRatio, kMinPanelWidth,
-             workspaceW - kMinCenterWidth - kMinPanelWidth - 2.0f * kSplitterSize);
-        f32 rightW = Clamp(workspaceW * mDock.RightRatio, kMinPanelWidth,
-            workspaceW - kMinCenterWidth - leftW - 2.0f * kSplitterSize);
-        if (leftW + rightW + kMinCenterWidth + 2.0f * kSplitterSize > workspaceW) {
-            rightW = workspaceW - leftW - kMinCenterWidth - 2.0f * kSplitterSize;
-            if (rightW < kMinPanelWidth) {
-                rightW = kMinPanelWidth;
-                leftW  = workspaceW - rightW - kMinCenterWidth - 2.0f * kSplitterSize;
+        f32 leftW  = Clamp(workspaceW * mDock.LeftRatio, minPanelWidth,
+             workspaceW - minCenterWidth - minPanelWidth - 2.0f * splitterSize);
+        f32 rightW = Clamp(workspaceW * mDock.RightRatio, minPanelWidth,
+            workspaceW - minCenterWidth - leftW - 2.0f * splitterSize);
+        if (leftW + rightW + minCenterWidth + 2.0f * splitterSize > workspaceW) {
+            rightW = workspaceW - leftW - minCenterWidth - 2.0f * splitterSize;
+            if (rightW < minPanelWidth) {
+                rightW = minPanelWidth;
+                leftW  = workspaceW - rightW - minCenterWidth - 2.0f * splitterSize;
             }
         }
 
-        f32   topH    = Clamp(workspaceH * (1.0f - mDock.BottomRatio), kMinTopHeight,
-                 workspaceH - kMinBottomHeight - kSplitterSize);
-        f32   bottomH = workspaceH - topH - kSplitterSize;
+        f32   topH    = Clamp(workspaceH * (1.0f - mDock.BottomRatio), minTopHeight,
+                 workspaceH - minBottomHeight - splitterSize);
+        f32   bottomH = workspaceH - topH - splitterSize;
 
         f32   x0       = workspaceRect.Min.X();
         f32   y0       = workspaceRect.Min.Y();
         FRect leftRect = MakeRect(x0, y0, x0 + leftW, y0 + topH);
-        FRect splitV1 = MakeRect(leftRect.Max.X(), y0, leftRect.Max.X() + kSplitterSize, y0 + topH);
+        FRect splitV1  = MakeRect(leftRect.Max.X(), y0, leftRect.Max.X() + splitterSize, y0 + topH);
         FRect centerRect = MakeRect(splitV1.Max.X(), y0,
-            splitV1.Max.X() + (workspaceW - leftW - rightW - 2.0f * kSplitterSize), y0 + topH);
+            splitV1.Max.X() + (workspaceW - leftW - rightW - 2.0f * splitterSize), y0 + topH);
         FRect splitV2 =
-            MakeRect(centerRect.Max.X(), y0, centerRect.Max.X() + kSplitterSize, y0 + topH);
+            MakeRect(centerRect.Max.X(), y0, centerRect.Max.X() + splitterSize, y0 + topH);
         FRect rightRect  = MakeRect(splitV2.Max.X(), y0, workspaceRect.Max.X(), y0 + topH);
         FRect splitH     = MakeRect(workspaceRect.Min.X(), leftRect.Max.Y(), workspaceRect.Max.X(),
-                leftRect.Max.Y() + kSplitterSize);
+                leftRect.Max.Y() + splitterSize);
         FRect bottomRect = MakeRect(
             workspaceRect.Min.X(), splitH.Max.Y(), workspaceRect.Max.X(), workspaceRect.Max.Y());
 
@@ -1433,31 +1488,31 @@ namespace AltinaEngine::Editor::UI {
         if (!blockWorkspaceInput && mouseDown) {
             if (mActiveSplitter == 1) {
                 const f32 relative = mouse.X() - workspaceRect.Min.X();
-                leftW              = Clamp(relative, kMinPanelWidth,
-                                 workspaceW - rightW - kMinCenterWidth - 2.0f * kSplitterSize);
+                leftW              = Clamp(relative, minPanelWidth,
+                                 workspaceW - rightW - minCenterWidth - 2.0f * splitterSize);
                 mDock.LeftRatio    = leftW / workspaceW;
             } else if (mActiveSplitter == 2) {
                 const f32 rightBoundary = workspaceRect.Max.X() - mouse.X();
-                rightW                  = Clamp(rightBoundary, kMinPanelWidth,
-                                     workspaceW - leftW - kMinCenterWidth - 2.0f * kSplitterSize);
+                rightW                  = Clamp(rightBoundary, minPanelWidth,
+                                     workspaceW - leftW - minCenterWidth - 2.0f * splitterSize);
                 mDock.RightRatio        = rightW / workspaceW;
             } else if (mActiveSplitter == 3) {
                 const f32 relativeTop = mouse.Y() - workspaceRect.Min.Y();
-                topH                  = Clamp(
-                    relativeTop, kMinTopHeight, workspaceH - kMinBottomHeight - kSplitterSize);
-                bottomH           = workspaceH - topH - kSplitterSize;
+                topH =
+                    Clamp(relativeTop, minTopHeight, workspaceH - minBottomHeight - splitterSize);
+                bottomH           = workspaceH - topH - splitterSize;
                 mDock.BottomRatio = bottomH / workspaceH;
             }
         }
 
         leftRect   = MakeRect(x0, y0, x0 + leftW, y0 + topH);
-        splitV1    = MakeRect(leftRect.Max.X(), y0, leftRect.Max.X() + kSplitterSize, y0 + topH);
+        splitV1    = MakeRect(leftRect.Max.X(), y0, leftRect.Max.X() + splitterSize, y0 + topH);
         centerRect = MakeRect(splitV1.Max.X(), y0,
-            splitV1.Max.X() + (workspaceW - leftW - rightW - 2.0f * kSplitterSize), y0 + topH);
-        splitV2   = MakeRect(centerRect.Max.X(), y0, centerRect.Max.X() + kSplitterSize, y0 + topH);
-        rightRect = MakeRect(splitV2.Max.X(), y0, workspaceRect.Max.X(), y0 + topH);
-        splitH    = MakeRect(workspaceRect.Min.X(), leftRect.Max.Y(), workspaceRect.Max.X(),
-               leftRect.Max.Y() + kSplitterSize);
+            splitV1.Max.X() + (workspaceW - leftW - rightW - 2.0f * splitterSize), y0 + topH);
+        splitV2    = MakeRect(centerRect.Max.X(), y0, centerRect.Max.X() + splitterSize, y0 + topH);
+        rightRect  = MakeRect(splitV2.Max.X(), y0, workspaceRect.Max.X(), y0 + topH);
+        splitH     = MakeRect(workspaceRect.Min.X(), leftRect.Max.Y(), workspaceRect.Max.X(),
+                leftRect.Max.Y() + splitterSize);
         bottomRect = MakeRect(
             workspaceRect.Min.X(), splitH.Max.Y(), workspaceRect.Max.X(), workspaceRect.Max.Y());
 
@@ -1502,7 +1557,7 @@ namespace AltinaEngine::Editor::UI {
             gui.DrawRect(areaInfo.Rect, colBorder, 1.0f);
 
             const FRect tabBar = MakeRect(areaInfo.Rect.Min.X(), areaInfo.Rect.Min.Y(),
-                areaInfo.Rect.Max.X(), areaInfo.Rect.Min.Y() + kTabBarHeight);
+                areaInfo.Rect.Max.X(), areaInfo.Rect.Min.Y() + tabBarHeight);
             gui.DrawRectFilled(tabBar, colPanelTitle);
             gui.DrawRect(tabBar, colBorder, 1.0f);
 
@@ -1530,37 +1585,39 @@ namespace AltinaEngine::Editor::UI {
                 }
             }
 
-            f32 tabX = tabBar.Min.X() + 4.0f;
+            f32 tabX = tabBar.Min.X() + ScalePx(4.0f);
             for (i32 panelIndex : panelIndices) {
-                const auto& panel = mPanels[static_cast<usize>(panelIndex)];
-                const f32   tabW  = TextWidth(panel.Name.ToView()) + 18.0f;
-                FRect       tabRect =
-                    MakeRect(tabX, tabBar.Min.Y() + 2.0f, tabX + tabW, tabBar.Max.Y() - 2.0f);
-                const bool hovered  = IsInside(tabRect, mouse);
-                const bool selected = (activePanel == panelIndex);
+                const auto& panel    = mPanels[static_cast<usize>(panelIndex)];
+                const f32   tabW     = TextWidth(panel.Name.ToView(), glyphW) + ScalePx(18.0f);
+                FRect       tabRect  = MakeRect(tabX, tabBar.Min.Y() + ScalePx(2.0f), tabX + tabW,
+                           tabBar.Max.Y() - ScalePx(2.0f));
+                const bool  hovered  = IsInside(tabRect, mouse);
+                const bool  selected = (activePanel == panelIndex);
                 gui.DrawRectFilled(
                     tabRect, selected ? colAccent : (hovered ? colMenuHover : colPanelTitle));
                 gui.DrawRect(tabRect, colBorder, 1.0f);
-                gui.DrawText(FVector2f(tabRect.Min.X() + 8.0f, tabRect.Min.Y() + 4.0f), colText,
-                    panel.Name.ToView());
+                gui.DrawText(
+                    FVector2f(tabRect.Min.X() + ScalePx(8.0f), tabRect.Min.Y() + ScalePx(4.0f)),
+                    colText, panel.Name.ToView());
 
                 if (!blockWorkspaceInput && hovered && mousePressed) {
                     activePanel    = panelIndex;
                     mDraggingPanel = panelIndex;
                 }
-                tabX += tabW + 2.0f;
+                tabX += tabW + ScalePx(2.0f);
             }
 
             const FRect contentRect =
-                MakeRect(areaInfo.Rect.Min.X() + kPanelPadding, tabBar.Max.Y() + kPanelPadding,
-                    areaInfo.Rect.Max.X() - kPanelPadding, areaInfo.Rect.Max.Y() - kPanelPadding);
+                MakeRect(areaInfo.Rect.Min.X() + panelPadding, tabBar.Max.Y() + panelPadding,
+                    areaInfo.Rect.Max.X() - panelPadding, areaInfo.Rect.Max.Y() - panelPadding);
             if (contentRect.Max.X() <= contentRect.Min.X()
                 || contentRect.Max.Y() <= contentRect.Min.Y()) {
                 return;
             }
 
             if (activePanel < 0 || activePanel >= static_cast<i32>(mPanels.Size())) {
-                gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 4.0f),
+                gui.DrawText(FVector2f(contentRect.Min.X() + ScalePx(4.0f),
+                                 contentRect.Min.Y() + ScalePx(4.0f)),
                     colMutedText, TEXT("No panel"));
                 return;
             }
@@ -1581,7 +1638,8 @@ namespace AltinaEngine::Editor::UI {
                 gui.DrawRect(contentRect, colBorder, 1.0f);
                 gui.DrawImage(
                     contentRect, kEditorViewportImageId, DebugGui::MakeColor32(255, 255, 255, 255));
-                gui.DrawText(FVector2f(contentRect.Min.X() + 6.0f, contentRect.Min.Y() + 6.0f),
+                gui.DrawText(FVector2f(contentRect.Min.X() + ScalePx(6.0f),
+                                 contentRect.Min.Y() + ScalePx(6.0f)),
                     colMutedText, TEXT("Runtime View"));
                 return;
             }
@@ -1601,11 +1659,14 @@ namespace AltinaEngine::Editor::UI {
                 return;
             }
 
-            gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 2.0f), colText,
-                TEXT("Output"));
-            gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 20.0f),
+            gui.DrawText(
+                FVector2f(contentRect.Min.X() + ScalePx(4.0f), contentRect.Min.Y() + ScalePx(2.0f)),
+                colText, TEXT("Output"));
+            gui.DrawText(FVector2f(contentRect.Min.X() + ScalePx(4.0f),
+                             contentRect.Min.Y() + ScalePx(20.0f)),
                 colMutedText, TEXT("Editor initialized."));
-            gui.DrawText(FVector2f(contentRect.Min.X() + 4.0f, contentRect.Min.Y() + 36.0f),
+            gui.DrawText(FVector2f(contentRect.Min.X() + ScalePx(4.0f),
+                             contentRect.Min.Y() + ScalePx(36.0f)),
                 colMutedText, TEXT("Use File/View/Play menus above."));
         };
 
@@ -1628,28 +1689,32 @@ namespace AltinaEngine::Editor::UI {
                 }
             }
             const auto& panel   = mPanels[static_cast<usize>(mDraggingPanel)];
-            const FRect dragTag = MakeRect(mouse.X() + 12.0f, mouse.Y() + 12.0f,
-                mouse.X() + 12.0f + TextWidth(panel.Name.ToView()) + 14.0f, mouse.Y() + 30.0f);
+            const FRect dragTag = MakeRect(mouse.X() + ScalePx(12.0f), mouse.Y() + ScalePx(12.0f),
+                mouse.X() + ScalePx(12.0f) + TextWidth(panel.Name.ToView(), glyphW)
+                    + ScalePx(14.0f),
+                mouse.Y() + ScalePx(30.0f));
             gui.DrawRectFilled(dragTag, colMenuHover);
             gui.DrawRect(dragTag, colBorder, 1.0f);
-            gui.DrawText(FVector2f(dragTag.Min.X() + 7.0f, dragTag.Min.Y() + 4.0f), colText,
-                panel.Name.ToView());
+            gui.DrawText(
+                FVector2f(dragTag.Min.X() + ScalePx(7.0f), dragTag.Min.Y() + ScalePx(4.0f)),
+                colText, panel.Name.ToView());
         }
 
         if (mOpenMenu >= 0 && mOpenMenu < 3) {
             const FRect anchor    = menus[mOpenMenu].Rect;
-            const f32   itemH     = 20.0f;
-            const f32   menuW     = (mOpenMenu == 1) ? 220.0f : 180.0f;
+            const f32   itemH     = ScalePx(20.0f);
+            const f32   menuW     = (mOpenMenu == 1) ? ScalePx(220.0f) : ScalePx(180.0f);
             const usize itemCount = (mOpenMenu == 1) ? 8U : 5U;
             const FRect dropRect =
                 MakeRect(anchor.Min.X(), menuRect.Max.Y(), anchor.Min.X() + menuW,
-                    menuRect.Max.Y() + static_cast<f32>(itemCount) * itemH + 4.0f);
+                    menuRect.Max.Y() + static_cast<f32>(itemCount) * itemH + ScalePx(4.0f));
             gui.DrawRectFilled(dropRect, colMenuBg);
             gui.DrawRect(dropRect, colBorder, 1.0f);
 
             auto itemRect = [&](usize idx) -> FRect {
-                const f32 y0 = dropRect.Min.Y() + 2.0f + static_cast<f32>(idx) * itemH;
-                return MakeRect(dropRect.Min.X() + 2.0f, y0, dropRect.Max.X() - 2.0f, y0 + itemH);
+                const f32 y0 = dropRect.Min.Y() + ScalePx(2.0f) + static_cast<f32>(idx) * itemH;
+                return MakeRect(dropRect.Min.X() + ScalePx(2.0f), y0,
+                    dropRect.Max.X() - ScalePx(2.0f), y0 + itemH);
             };
 
             if (mOpenMenu == 0) {

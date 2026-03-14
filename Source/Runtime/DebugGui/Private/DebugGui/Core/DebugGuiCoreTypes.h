@@ -31,11 +31,17 @@ namespace AltinaEngine::DebugGui::Private {
         TVector<FDrawVertex> mVertices;
         TVector<u32>         mIndices;
         TVector<FDrawCmd>    mCmds;
+        f32                  mFontSdfEdge     = 0.5f;
+        f32                  mFontSdfSoftness = 0.0f;
+        f32                  mFontScale       = 1.0f;
 
         void                 Clear() {
             mVertices.Clear();
             mIndices.Clear();
             mCmds.Clear();
+            mFontSdfEdge     = 0.5f;
+            mFontSdfSoftness = 0.0f;
+            mFontScale       = 1.0f;
         }
     };
 

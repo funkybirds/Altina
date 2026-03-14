@@ -28,6 +28,7 @@ namespace AltinaEngine::DebugGui {
         using Container::MakeUniqueAs;
         using Container::TVector;
         using Core::Logging::ELogLevel;
+        using Core::Math::Clamp;
         using Core::Math::FVector2f;
         using Core::Threading::FMutex;
         using Core::Threading::FScopedLock;
@@ -134,8 +135,10 @@ namespace AltinaEngine::DebugGui {
             }
 
             [[nodiscard]] auto GetTheme() const noexcept -> FDebugGuiTheme override {
-                FScopedLock lock(mMutex);
-                return mTheme;
+                FScopedLock    lock(mMutex);
+                FDebugGuiTheme theme = mTheme;
+                theme.mUiScale       = mRuntimeUiScale;
+                return theme;
             }
 
             void TickGameThread(const Input::FInputSystem& input, f32 dtSeconds, u32 displayWidth,
@@ -171,9 +174,23 @@ namespace AltinaEngine::DebugGui {
                     overlays           = mOverlays;
                 }
 
+                const f32 uiScale =
+                    (ext.mDpiScale > 0.01f) ? Clamp(ext.mDpiScale, 0.5f, 4.0f) : 1.0f;
+                {
+                    FScopedLock lock(mMutex);
+                    mRuntimeUiScale = uiScale;
+                }
+                FDebugGuiTheme scaledTheme = theme;
+                ScaleThemeMetrics(scaledTheme, uiScale);
+                scaledTheme.mUiScale = uiScale;
+
                 mUi.ClearTransient();
                 ++mUi.mFrameIndex;
                 mPending.Clear();
+                mPending.mFontScale =
+                    (scaledTheme.mFontScale > 0.01f) ? scaledTheme.mFontScale : 1.0f;
+                mPending.mFontSdfSoftness = Clamp(scaledTheme.mFontSdfSoftness, -0.25f, 0.25f);
+                mPending.mFontSdfEdge     = Clamp(scaledTheme.mFontSdfEdge, 0.0f, 1.0f);
                 mClip.Clear();
                 mWindowOrder.Clear();
 
@@ -200,8 +217,8 @@ namespace AltinaEngine::DebugGui {
                 guiInput.mKeyEnterPressed     = input.WasKeyPressed(Input::EKey::Enter);
                 guiInput.mKeyBackspacePressed = input.WasKeyPressed(Input::EKey::Backspace);
 
-                FDebugGuiContext ctx(mPending, mClip, guiInput, mUi, displaySize, mFont, theme,
-                    mWindowOrder, mWindows, mDraggingWindowKey, mWindowDragOffset);
+                FDebugGuiContext ctx(mPending, mClip, guiInput, mUi, displaySize, mFont,
+                    scaledTheme, mWindowOrder, mWindows, mDraggingWindowKey, mWindowDragOffset);
                 ctx.PushClipRect({ FVector2f(0.0f, 0.0f), displaySize });
 
                 // Background overlays (drawn below windows/panels).
@@ -277,6 +294,54 @@ namespace AltinaEngine::DebugGui {
             }
 
         private:
+            static void ScaleThemeMetrics(FDebugGuiTheme& theme, f32 uiScale) {
+                if (uiScale <= 0.01f) {
+                    return;
+                }
+                const FVector2f scaleVec(uiScale, uiScale);
+                theme.mWindowDefaultSize *= scaleVec;
+                theme.mWindowDefaultPos *= scaleVec;
+                theme.mWindowPadding *= uiScale;
+                theme.mWindowSpacing *= uiScale;
+                theme.mTitleBarHeight *= uiScale;
+                theme.mTitleTextOffsetY *= uiScale;
+                theme.mSeparatorPaddingY *= uiScale;
+                theme.mItemSpacingY *= uiScale;
+                theme.mButtonPaddingX *= uiScale;
+                theme.mButtonPaddingY *= uiScale;
+                theme.mCheckboxBoxSize *= uiScale;
+                theme.mCheckboxTextOffsetX *= uiScale;
+                theme.mCheckboxMarkInset *= uiScale;
+                theme.mSliderHeight *= uiScale;
+                theme.mSliderBottomSpacingY *= uiScale;
+                theme.mInputHeight *= uiScale;
+                theme.mInputTextOffsetX *= uiScale;
+                theme.mInputTextOffsetY *= uiScale;
+                theme.mInputBottomSpacingY *= uiScale;
+                theme.mGizmoSize *= uiScale;
+                theme.mGizmoPadding *= uiScale;
+                theme.mGizmoAxisThickness *= uiScale;
+                theme.mGizmoHitRadius *= uiScale;
+                theme.mGizmoCenterHalfSize *= uiScale;
+                theme.mGizmoBottomSpacingY *= uiScale;
+                theme.mGizmoDragSensitivity *= uiScale;
+                theme.mScrollBarWidth *= uiScale;
+                theme.mScrollBarPadding *= uiScale;
+                theme.mScrollBarThumbMinHeight *= uiScale;
+                theme.mCollapseButtonSize *= uiScale;
+                theme.mCollapseButtonPadX *= uiScale;
+                theme.mCollapseButtonOffsetY *= uiScale;
+                theme.mCollapseIconHalfWidth *= uiScale;
+                theme.mCollapseIconHalfHeight *= uiScale;
+                theme.mTreeRowHeight *= uiScale;
+                theme.mTreeIndent *= uiScale;
+                theme.mTreeArrowSize *= uiScale;
+                theme.mTreeTextPadX *= uiScale;
+                theme.mIconLabelPadY *= uiScale;
+                theme.mIconInnerPadding *= uiScale;
+                theme.mFontScale *= uiScale;
+            }
+
             struct FPanelEntry {
                 FString  Name;
                 FPanelFn Fn;
@@ -741,6 +806,7 @@ namespace AltinaEngine::DebugGui {
             FDebugGuiRendererD3D11::FImageTextureMap mImageTextures;
             FDebugGuiExternalStats                   mExternalStats{};
             FDebugGuiTheme                           mTheme{};
+            f32                                      mRuntimeUiScale = 1.0f;
 
             FUIState                                 mUi{};
             FFontAtlas                               mFont{};

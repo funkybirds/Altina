@@ -111,5 +111,10 @@ namespace AltinaEngine::DebugGui {
         f32       mTreeTextPadX           = 4.0f;
         f32       mIconLabelPadY          = 4.0f;
         f32       mIconInnerPadding       = 6.0f;
+
+        f32       mFontScale       = 1.0f;
+        f32       mFontSdfSoftness = -0.01f;
+        f32       mFontSdfEdge     = 0.5f;
+        f32       mUiScale         = 1.0f;
     };
 } // namespace AltinaEngine::DebugGui

@@ -38,12 +38,15 @@ namespace AltinaEngine::DebugGui::Private {
             mUi->mActiveId = 0ULL;
         }
 
-        DrawRectFilled(r, mTheme->mSliderBg);
-        DrawRect(r, mTheme->mSliderBorder, 1.0f);
+        const f32 rounding = mTheme->mEditor.mPanelSurface.mCornerRadius;
+        DrawRoundedRectFilled(r, mTheme->mSliderBg, rounding);
+        if ((mTheme->mSliderBorder >> 24U) != 0U) {
+            DrawRoundedRect(r, mTheme->mSliderBorder, rounding, 1.0f);
+        }
         const f32   norm  = (value - minValue) / (maxValue - minValue);
         const f32   fillW = (norm < 0.0f) ? 0.0f : ((norm > 1.0f) ? 1.0f : norm);
         const FRect fill{ r.Min, FVector2f(r.Min.X() + w * fillW, r.Max.Y()) };
-        DrawRectFilled(fill, mTheme->mSliderFill);
+        DrawRoundedRectFilled(fill, mTheme->mSliderFill, rounding);
 
         AdvanceItem(FVector2f(w, h + mTheme->mSliderBottomSpacingY));
         return changed;

@@ -1,6 +1,7 @@
 #include "TestHarness.h"
 
 #include "EditorUI/EditorUiModule.h"
+#include "EditorUI/EditorUiTesting.h"
 #include "DebugGui/DebugGui.h"
 #include "Input/InputSystem.h"
 
@@ -31,6 +32,24 @@ namespace {
         input.OnWindowFocusGained();
         input.OnMouseMove(mx, my);
     }
+
+    void InitializeUi(AltinaEngine::Editor::UI::FEditorUiModule& uiModule,
+        AltinaEngine::DebugGui::IDebugGuiSystem*                 debugGuiSystem,
+        AltinaEngine::Core::Container::FStringView               assetRoot = {}) {
+        AltinaEngine::Editor::UI::FEditorUiInitDesc initDesc{};
+        initDesc.mDebugGuiSystem = debugGuiSystem;
+        initDesc.mAssetRoot      = assetRoot;
+        uiModule.Initialize(initDesc);
+    }
+
+    auto TickUi(AltinaEngine::Editor::UI::FEditorUiModule&             uiModule,
+        const AltinaEngine::Editor::UI::FEditorWorldHierarchySnapshot* snapshot = nullptr,
+        bool clearCommands = false) -> AltinaEngine::Editor::UI::FEditorUiFrameOutput {
+        AltinaEngine::Editor::UI::FEditorUiFrameContext context{};
+        context.mHierarchySnapshot  = snapshot;
+        context.bClearCommandBuffer = clearCommands;
+        return uiModule.TickUi(context);
+    }
 } // namespace
 
 TEST_CASE("EditorUiModule reports viewport render request after registration") {
@@ -45,17 +64,19 @@ TEST_CASE("EditorUiModule reports viewport render request after registration") {
     sys->SetShowCVars(false);
 
     AltinaEngine::Editor::UI::FEditorUiModule uiModule{};
-    uiModule.RegisterDefaultPanels(sys);
+    InitializeUi(uiModule, sys);
 
     AltinaEngine::Input::FInputSystem input;
     PrepareInput(input, 1280, 720, 300, 200);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
 
-    const auto request = uiModule.GetViewportRequest();
+    const auto output  = TickUi(uiModule);
+    const auto request = output.mViewportRequest;
     REQUIRE(request.bHasContent);
     REQUIRE(request.Width > 0U);
     REQUIRE(request.Height > 0U);
 
+    uiModule.Shutdown();
     DestroyDebugGuiSystem(sys);
 }
 
@@ -82,13 +103,15 @@ TEST_CASE("EditorUiModule asset panel scan ignores meta files") {
 
     AltinaEngine::Editor::UI::FEditorUiModule uiModule{};
     const auto                                rootString = ToFString(tempRoot);
-    uiModule.RegisterDefaultPanels(sys, rootString.ToView());
+    InitializeUi(uiModule, sys, rootString.ToView());
 
     AltinaEngine::Input::FInputSystem input;
     PrepareInput(input, 1280, 720, 320, 640);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule);
 
-    const auto items = uiModule.DebugGetAssetItemsForTest();
+    const auto items =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetAssetItems(uiModule);
     REQUIRE(!items.IsEmpty());
     for (const auto& item : items) {
         REQUIRE(!item.ToView().EndsWith(TEXT(".meta")));
@@ -102,27 +125,33 @@ TEST_CASE("EditorUiModule asset panel scan ignores meta files") {
         }
     }
     REQUIRE(!subFolderPath.IsEmptyString());
-    REQUIRE(uiModule.DebugOpenAssetPathForTest(
-        subFolderPath.ToView(), AltinaEngine::Editor::UI::EAssetItemType::Directory));
+    REQUIRE(AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::OpenAssetPath(
+        uiModule, subFolderPath.ToView(), AltinaEngine::Editor::UI::EAssetItemType::Directory));
 
-    REQUIRE(uiModule.DebugGetCurrentAssetPathForTest().ToView().Contains(TEXT("SubFolder")));
+    REQUIRE(AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetCurrentAssetPath(uiModule)
+            .ToView()
+            .Contains(TEXT("SubFolder")));
 
     // Right click inside asset panel and trigger refresh menu item.
     PrepareInput(input, 1280, 720, 430, 585);
     input.OnMouseButtonDown(1U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule);
     PrepareInput(input, 1280, 720, 430, 585);
     input.OnMouseButtonUp(1U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule);
     PrepareInput(input, 1280, 720, 438, 612);
     input.OnMouseButtonDown(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule);
 
+    uiModule.Shutdown();
     DestroyDebugGuiSystem(sys);
     std::filesystem::remove_all(tempRoot, ec);
 }
 
-TEST_CASE("EditorUiModule play menu enqueues command and consume clears queue") {
+TEST_CASE("EditorUiModule play menu enqueues command and clear is caller-controlled") {
     using AltinaEngine::DebugGui::CreateDebugGuiSystem;
     using AltinaEngine::DebugGui::DestroyDebugGuiSystem;
     using AltinaEngine::Editor::UI::EEditorUiCommand;
@@ -135,7 +164,7 @@ TEST_CASE("EditorUiModule play menu enqueues command and consume clears queue") 
     sys->SetShowCVars(false);
 
     AltinaEngine::Editor::UI::FEditorUiModule uiModule{};
-    uiModule.RegisterDefaultPanels(sys);
+    InitializeUi(uiModule, sys);
 
     AltinaEngine::Input::FInputSystem input;
 
@@ -143,18 +172,20 @@ TEST_CASE("EditorUiModule play menu enqueues command and consume clears queue") 
     PrepareInput(input, 1280, 720, 124, 8);
     input.OnMouseButtonDown(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule);
     PrepareInput(input, 1280, 720, 124, 8);
     input.OnMouseButtonUp(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule);
 
     // Click dropdown "Play" item.
     PrepareInput(input, 1280, 720, 128, 30);
     input.OnMouseButtonDown(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
 
-    auto commands = uiModule.ConsumeUiCommands();
-    bool hasPlay  = false;
-    for (auto cmd : commands) {
+    auto output  = TickUi(uiModule, nullptr, true);
+    bool hasPlay = false;
+    for (auto cmd : output.mCommands) {
         if (cmd == EEditorUiCommand::Play) {
             hasPlay = true;
             break;
@@ -162,9 +193,10 @@ TEST_CASE("EditorUiModule play menu enqueues command and consume clears queue") 
     }
     REQUIRE(hasPlay);
 
-    commands = uiModule.ConsumeUiCommands();
-    REQUIRE(commands.IsEmpty());
+    output = TickUi(uiModule, nullptr, true);
+    REQUIRE(output.mCommands.IsEmpty());
 
+    uiModule.Shutdown();
     DestroyDebugGuiSystem(sys);
 }
 
@@ -200,9 +232,10 @@ TEST_CASE("EditorUiModule hierarchy snapshot and inspector selection") {
     snapshot.mGameObjects.PushBack(root);
     snapshot.mGameObjects.PushBack(child);
     snapshot.mGameObjects.PushBack(lone);
-    uiModule.SetWorldHierarchySnapshot(snapshot);
+    TickUi(uiModule, &snapshot);
 
-    const auto hierarchyItems = uiModule.DebugGetHierarchyItemsForTest();
+    const auto hierarchyItems =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetHierarchyItems(uiModule);
     REQUIRE_EQ(hierarchyItems.Size(), 5U);
     REQUIRE(hierarchyItems[0].mLabel == TEXT("Root"));
     REQUIRE(hierarchyItems[0].mDepth == 0U);
@@ -220,20 +253,26 @@ TEST_CASE("EditorUiModule hierarchy snapshot and inspector selection") {
     REQUIRE(hierarchyItems[4].mDepth == 0U);
     REQUIRE(!hierarchyItems[4].mIsComponent);
 
-    uiModule.DebugSelectGameObjectForTest(FEditorGameObjectRuntimeId{ 99U, 2U, 1U });
-    auto selection = uiModule.DebugGetSelectionInfoForTest();
+    AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::SelectGameObject(
+        uiModule, FEditorGameObjectRuntimeId{ 99U, 2U, 1U });
+    auto selection =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetSelectionInfo(uiModule);
     REQUIRE(selection.mType == EEditorSelectionType::GameObject);
     REQUIRE(selection.mName == TEXT("Child"));
     REQUIRE(selection.mUuid == TEXT("99-2-1"));
 
-    uiModule.DebugSelectComponentForTest(FEditorComponentRuntimeId{ 202ULL, 2U, 1U });
-    selection = uiModule.DebugGetSelectionInfoForTest();
+    AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::SelectComponent(
+        uiModule, FEditorComponentRuntimeId{ 202ULL, 2U, 1U });
+    selection =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetSelectionInfo(uiModule);
     REQUIRE(selection.mType == EEditorSelectionType::Component);
     REQUIRE(selection.mName == TEXT("ScriptComponent"));
     REQUIRE(selection.mUuid == TEXT("202-2-1"));
 
-    uiModule.SetWorldHierarchySnapshot(FEditorWorldHierarchySnapshot{});
-    selection = uiModule.DebugGetSelectionInfoForTest();
+    FEditorWorldHierarchySnapshot emptySnapshot{};
+    TickUi(uiModule, &emptySnapshot);
+    selection =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetSelectionInfo(uiModule);
     REQUIRE(selection.mType == EEditorSelectionType::None);
 }
 
@@ -265,8 +304,9 @@ TEST_CASE("EditorUiModule hierarchy tolerates parent ids with missing world id")
     snapshot.mGameObjects.PushBack(child);
     snapshot.mGameObjects.PushBack(rootB);
 
-    uiModule.SetWorldHierarchySnapshot(snapshot);
-    const auto hierarchyItems = uiModule.DebugGetHierarchyItemsForTest();
+    TickUi(uiModule, &snapshot);
+    const auto hierarchyItems =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetHierarchyItems(uiModule);
     REQUIRE_EQ(hierarchyItems.Size(), 3U);
     REQUIRE(hierarchyItems[0].mLabel == TEXT("RootA"));
     REQUIRE(hierarchyItems[0].mDepth == 0U);
@@ -298,8 +338,9 @@ TEST_CASE("EditorUiModule hierarchy tolerates parent generation mismatch in snap
     snapshot.mGameObjects.PushBack(root);
     snapshot.mGameObjects.PushBack(child);
 
-    uiModule.SetWorldHierarchySnapshot(snapshot);
-    const auto hierarchyItems = uiModule.DebugGetHierarchyItemsForTest();
+    TickUi(uiModule, &snapshot);
+    const auto hierarchyItems =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetHierarchyItems(uiModule);
     REQUIRE_EQ(hierarchyItems.Size(), 2U);
     REQUIRE(hierarchyItems[0].mLabel == TEXT("Parent"));
     REQUIRE(hierarchyItems[0].mDepth == 0U);
@@ -329,8 +370,9 @@ TEST_CASE("EditorUiModule hierarchy tolerates parent generation missing in snaps
     snapshot.mGameObjects.PushBack(root);
     snapshot.mGameObjects.PushBack(child);
 
-    uiModule.SetWorldHierarchySnapshot(snapshot);
-    const auto hierarchyItems = uiModule.DebugGetHierarchyItemsForTest();
+    TickUi(uiModule, &snapshot);
+    const auto hierarchyItems =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetHierarchyItems(uiModule);
     REQUIRE_EQ(hierarchyItems.Size(), 2U);
     REQUIRE(hierarchyItems[0].mLabel == TEXT("RootG0"));
     REQUIRE(hierarchyItems[0].mDepth == 0U);
@@ -350,35 +392,83 @@ TEST_CASE("EditorUiModule viewport tab docking changes viewport request extent")
     sys->SetShowCVars(false);
 
     AltinaEngine::Editor::UI::FEditorUiModule uiModule{};
-    uiModule.RegisterDefaultPanels(sys);
+    InitializeUi(uiModule, sys);
 
     AltinaEngine::Input::FInputSystem input;
 
     PrepareInput(input, 1280, 720, 280, 40);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
-    const auto beforeDock = uiModule.GetViewportRequest();
+    auto beforeDock = TickUi(uiModule).mViewportRequest;
     REQUIRE(beforeDock.bHasContent);
 
     // Press viewport tab in center dock.
     PrepareInput(input, 1280, 720, 282, 40);
     input.OnMouseButtonDown(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule);
 
     // Drag while holding.
     PrepareInput(input, 1280, 720, 120, 120);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule);
 
     // Release on left dock.
     PrepareInput(input, 1280, 720, 120, 120);
     input.OnMouseButtonUp(0U);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule);
 
     PrepareInput(input, 1280, 720, 120, 120);
     sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
-    const auto afterDock = uiModule.GetViewportRequest();
+    const auto afterDock = TickUi(uiModule).mViewportRequest;
     REQUIRE(afterDock.bHasContent);
     REQUIRE(afterDock.Width > 0U);
     REQUIRE(afterDock.Width < beforeDock.Width);
 
+    uiModule.Shutdown();
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("EditorUiModule initialize and shutdown toggles module state") {
+    using AltinaEngine::DebugGui::CreateDebugGuiSystem;
+    using AltinaEngine::DebugGui::DestroyDebugGuiSystem;
+
+    auto* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+
+    AltinaEngine::Editor::UI::FEditorUiModule uiModule{};
+    REQUIRE(!uiModule.IsInitialized());
+    InitializeUi(uiModule, sys);
+    REQUIRE(uiModule.IsInitialized());
+    uiModule.Shutdown();
+    REQUIRE(!uiModule.IsInitialized());
+
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("EditorUiModule menu open blocks runtime viewport input") {
+    using AltinaEngine::DebugGui::CreateDebugGuiSystem;
+    using AltinaEngine::DebugGui::DestroyDebugGuiSystem;
+
+    auto* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    AltinaEngine::Editor::UI::FEditorUiModule uiModule{};
+    InitializeUi(uiModule, sys);
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 10, 8);
+    input.OnMouseButtonDown(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+
+    const auto output = TickUi(uiModule);
+    REQUIRE(output.mViewportRequest.bUiBlockingInput);
+
+    uiModule.Shutdown();
     DestroyDebugGuiSystem(sys);
 }

@@ -298,7 +298,57 @@ namespace AltinaEngine::DebugGui {
                 if (uiScale <= 0.01f) {
                     return;
                 }
+                auto ScaleSurface = [uiScale](FDebugGuiSurfaceStyle& style) {
+                    style.mCornerRadius *= uiScale;
+                    style.mBorderThickness *= uiScale;
+                };
+                auto ScaleTabStyle = [uiScale](FDebugGuiTabStyle& style) {
+                    style.mHeight *= uiScale;
+                    style.mTextPadX *= uiScale;
+                    style.mTextPadY *= uiScale;
+                    style.mIconSize *= uiScale;
+                    style.mIconPadX *= uiScale;
+                    style.mUnderlineHeight *= uiScale;
+                };
+                auto ScaleMenuStyle = [uiScale](FDebugGuiMenuStyle& style) {
+                    style.mHeight *= uiScale;
+                    style.mItemHeight *= uiScale;
+                    style.mItemPadX *= uiScale;
+                    style.mPopupPad *= uiScale;
+                    style.mPopupRadius *= uiScale;
+                };
+                auto ScaleSectionStyle = [uiScale](FDebugGuiSectionStyle& style) {
+                    style.mSpacingY *= uiScale;
+                    style.mUnderlineThickness *= uiScale;
+                    style.mLabelPadX *= uiScale;
+                    style.mLabelPadY *= uiScale;
+                    style.mLabelRadius *= uiScale;
+                };
                 const FVector2f scaleVec(uiScale, uiScale);
+                theme.mFonts.mBody.mScale *= uiScale;
+                theme.mFonts.mSmall.mScale *= uiScale;
+                theme.mFonts.mWindowTitle.mScale *= uiScale;
+                theme.mFonts.mMenu.mScale *= uiScale;
+                theme.mFonts.mTab.mScale *= uiScale;
+                theme.mFonts.mSection.mScale *= uiScale;
+                theme.mFonts.mLabel.mScale *= uiScale;
+                theme.mFonts.mStatus.mScale *= uiScale;
+                ScaleSurface(theme.mEditor.mWindowSurface);
+                ScaleSurface(theme.mEditor.mPanelSurface);
+                ScaleSurface(theme.mEditor.mInsetSurface);
+                ScaleTabStyle(theme.mEditor.mTabs);
+                ScaleMenuStyle(theme.mEditor.mMenu);
+                ScaleSectionStyle(theme.mEditor.mSections);
+                theme.mEditor.mWorkspacePadding *= uiScale;
+                theme.mEditor.mSplitterSize *= uiScale;
+                theme.mEditor.mPanelPadding *= uiScale;
+                theme.mEditor.mMinPanelWidth *= uiScale;
+                theme.mEditor.mMinCenterWidth *= uiScale;
+                theme.mEditor.mMinTopHeight *= uiScale;
+                theme.mEditor.mMinBottomHeight *= uiScale;
+                theme.mEditor.mStatusBarHeight *= uiScale;
+                theme.mEditor.mPanelGap *= uiScale;
+                theme.mEditor.mMenuItemMarkerWidth *= uiScale;
                 theme.mWindowDefaultSize *= scaleVec;
                 theme.mWindowDefaultPos *= scaleVec;
                 theme.mWindowPadding *= uiScale;

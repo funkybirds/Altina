@@ -75,6 +75,40 @@ TEST_CASE("DebugGui panel drawing increases draw stats") {
     DestroyDebugGuiSystem(sys);
 }
 
+TEST_CASE("DebugGui theme round-trip and styled text measurement are available") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+
+    AltinaEngine::DebugGui::FDebugGuiTheme theme = sys->GetTheme();
+    theme.mFonts.mTab.mScale                     = 1.35f;
+    theme.mEditor.mTabs.mHeight                  = 54.0f;
+    theme.mEditor.mPanelSurface.mCornerRadius    = 18.0f;
+    sys->SetTheme(theme);
+
+    const auto roundTripped = sys->GetTheme();
+    REQUIRE_CLOSE(roundTripped.mFonts.mTab.mScale, 1.35f, 0.0001f);
+    REQUIRE_CLOSE(roundTripped.mEditor.mTabs.mHeight, 54.0f, 0.0001f);
+    REQUIRE_CLOSE(roundTripped.mEditor.mPanelSurface.mCornerRadius, 18.0f, 0.0001f);
+
+    sys->SetEnabled(true);
+    FVector2f measured(0.0f, 0.0f);
+    sys->RegisterPanel(TEXT("ThemeMeasure"), [&](IDebugGui& gui) {
+        measured =
+            gui.MeasureText(TEXT("Viewport"), AltinaEngine::DebugGui::EDebugGuiFontRole::Tab);
+        gui.DrawTextStyled(FVector2f(10.0f, 10.0f), MakeColor32(255, 255, 255, 255),
+            TEXT("Viewport"), AltinaEngine::DebugGui::EDebugGuiFontRole::Tab);
+    });
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 640, 480, 10, 10);
+    sys->TickGameThread(input, 1.0f / 60.0f, 640, 480);
+
+    REQUIRE(measured.X() > 0.0f);
+    REQUIRE(measured.Y() > 0.0f);
+
+    DestroyDebugGuiSystem(sys);
+}
+
 TEST_CASE("DebugGui primitives: RoundedRect/Capsule increase draw stats") {
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);

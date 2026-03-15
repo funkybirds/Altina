@@ -110,12 +110,16 @@ namespace AltinaEngine::DebugGui::Private {
             }
         }
 
-        const bool active = (mUi->mActiveId == id);
-        DrawRectFilled(r, active ? mTheme->mInputActiveBg : mTheme->mInputBg);
-        DrawRect(r, active ? mTheme->mInputActiveBorder : mTheme->mInputBorder, 1.0f);
-        DrawText(
+        const bool active   = (mUi->mActiveId == id);
+        const f32  rounding = mTheme->mEditor.mPanelSurface.mCornerRadius;
+        DrawRoundedRectFilled(r, active ? mTheme->mInputActiveBg : mTheme->mInputBg, rounding);
+        if (((active ? mTheme->mInputActiveBorder : mTheme->mInputBorder) >> 24U) != 0U) {
+            DrawRoundedRect(
+                r, active ? mTheme->mInputActiveBorder : mTheme->mInputBorder, rounding, 1.0f);
+        }
+        DrawTextStyled(
             FVector2f(r.Min.X() + mTheme->mInputTextOffsetX, r.Min.Y() + mTheme->mInputTextOffsetY),
-            mTheme->mInputText, value.ToView());
+            mTheme->mInputText, value.ToView(), EDebugGuiFontRole::Body);
 
         AdvanceItem(FVector2f(w, h));
         return changed;

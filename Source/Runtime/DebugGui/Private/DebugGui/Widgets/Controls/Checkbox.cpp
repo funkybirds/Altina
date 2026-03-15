@@ -30,15 +30,18 @@ namespace AltinaEngine::DebugGui::Private {
             mUi->mActiveId = 0ULL;
         }
 
-        DrawRectFilled(boxRect, mTheme->mCheckboxBoxBg);
-        DrawRect(boxRect, mTheme->mCheckboxBoxBorder, 1.0f);
+        const f32 rounding = mTheme->mEditor.mPanelSurface.mCornerRadius;
+        DrawRoundedRectFilled(boxRect, mTheme->mCheckboxBoxBg, rounding);
+        if ((mTheme->mCheckboxBoxBorder >> 24U) != 0U) {
+            DrawRoundedRect(boxRect, mTheme->mCheckboxBoxBorder, rounding, 1.0f);
+        }
         if (value) {
             const f32   inset = mTheme->mCheckboxMarkInset;
             const FRect mark{ FVector2f(boxRect.Min.X() + inset, boxRect.Min.Y() + inset),
                 FVector2f(boxRect.Max.X() - inset, boxRect.Max.Y() - inset) };
-            DrawRectFilled(mark, mTheme->mCheckboxMark);
+            DrawRoundedRectFilled(mark, mTheme->mCheckboxMark, rounding * 0.75f);
         }
-        DrawText(textPos, mTheme->mText, label);
+        DrawTextStyled(textPos, mTheme->mText, label, EDebugGuiFontRole::Body);
 
         AdvanceItem(FVector2f(w, h));
         return changed;

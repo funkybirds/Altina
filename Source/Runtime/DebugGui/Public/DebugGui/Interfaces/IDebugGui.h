@@ -15,11 +15,12 @@ namespace AltinaEngine::DebugGui {
         virtual void PushClipRect(const FRect& rect) = 0;
         virtual void PopClipRect()                   = 0;
 
-        virtual void DrawRectFilled(const FRect& rect, FColor32 color)                      = 0;
-        virtual void DrawRect(const FRect& rect, FColor32 color, f32 thickness)             = 0;
-        virtual void DrawRoundedRectFilled(const FRect& rect, FColor32 color, f32 rounding) = 0;
-        virtual void DrawRoundedRect(
-            const FRect& rect, FColor32 color, f32 rounding, f32 thickness) = 0;
+        virtual void DrawRectFilled(const FRect& rect, FColor32 color)          = 0;
+        virtual void DrawRect(const FRect& rect, FColor32 color, f32 thickness) = 0;
+        virtual void DrawRoundedRectFilled(const FRect& rect, FColor32 color, f32 rounding,
+            EDebugGuiCornerFlags cornerFlags = EDebugGuiCornerFlags::All)       = 0;
+        virtual void DrawRoundedRect(const FRect& rect, FColor32 color, f32 rounding, f32 thickness,
+            EDebugGuiCornerFlags cornerFlags = EDebugGuiCornerFlags::All)       = 0;
         virtual void DrawCapsuleFilled(
             const FVector2f& a, const FVector2f& b, f32 radius, FColor32 color) = 0;
         virtual void DrawCapsule(
@@ -29,7 +30,11 @@ namespace AltinaEngine::DebugGui {
         virtual void DrawTriangleFilled(
             const FVector2f& p0, const FVector2f& p1, const FVector2f& p2, FColor32 color) = 0;
         virtual void DrawText(const FVector2f& pos, FColor32 color, FStringView text)      = 0;
-        virtual void DrawImage(const FRect& rect, u64 imageId, FColor32 tint)              = 0;
+        virtual void DrawTextStyled(
+            const FVector2f& pos, FColor32 color, FStringView text, EDebugGuiFontRole role) = 0;
+        virtual void               DrawImage(const FRect& rect, u64 imageId, FColor32 tint) = 0;
+        [[nodiscard]] virtual auto MeasureText(FStringView text, EDebugGuiFontRole role) const
+            -> FVector2f = 0;
 
         [[nodiscard]] virtual auto GetDisplaySize() const noexcept -> FVector2f = 0;
         [[nodiscard]] virtual auto GetMousePos() const noexcept -> FVector2f    = 0;

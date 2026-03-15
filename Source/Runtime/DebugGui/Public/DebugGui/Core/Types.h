@@ -12,6 +12,34 @@ namespace AltinaEngine::DebugGui {
     using Core::Container::TFunction;
     using Core::Math::FVector2f;
 
+    enum class EDebugGuiCornerFlags : u8 {
+        None        = 0U,
+        TopLeft     = 1U << 0U,
+        TopRight    = 1U << 1U,
+        BottomRight = 1U << 2U,
+        BottomLeft  = 1U << 3U,
+        Top         = TopLeft | TopRight,
+        Bottom      = BottomLeft | BottomRight,
+        Left        = TopLeft | BottomLeft,
+        Right       = TopRight | BottomRight,
+        All         = Top | Bottom
+    };
+
+    [[nodiscard]] constexpr auto operator|(
+        EDebugGuiCornerFlags lhs, EDebugGuiCornerFlags rhs) noexcept -> EDebugGuiCornerFlags {
+        return static_cast<EDebugGuiCornerFlags>(static_cast<u8>(lhs) | static_cast<u8>(rhs));
+    }
+
+    [[nodiscard]] constexpr auto operator&(
+        EDebugGuiCornerFlags lhs, EDebugGuiCornerFlags rhs) noexcept -> EDebugGuiCornerFlags {
+        return static_cast<EDebugGuiCornerFlags>(static_cast<u8>(lhs) & static_cast<u8>(rhs));
+    }
+
+    [[nodiscard]] constexpr auto HasAnyCornerFlag(
+        EDebugGuiCornerFlags value, EDebugGuiCornerFlags flags) noexcept -> bool {
+        return static_cast<u8>(value & flags) != 0U;
+    }
+
     struct FRect {
         FVector2f Min = FVector2f(0.0f, 0.0f);
         FVector2f Max = FVector2f(0.0f, 0.0f);

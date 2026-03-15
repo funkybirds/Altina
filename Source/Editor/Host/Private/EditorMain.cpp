@@ -291,22 +291,30 @@ namespace {
             ViewportBootstrap.EnsureDefaultWorld(session);
             PlaySession.Start();
 
-            auto services = session.GetServices();
-            UiModule.RegisterDefaultPanels(services.DebugGuiSystem,
-                mProjectSettings.AssetRootOverride.ToView(), mProjectSettings.SourcePath.ToView());
+            auto                          services = session.GetServices();
+            Editor::UI::FEditorUiInitDesc uiInitDesc{};
+            uiInitDesc.mDebugGuiSystem    = services.DebugGuiSystem;
+            uiInitDesc.mAssetRoot         = mProjectSettings.AssetRootOverride.ToView();
+            uiInitDesc.mProjectSourcePath = mProjectSettings.SourcePath.ToView();
+            UiModule.Initialize(uiInitDesc);
             return true;
         }
 
         auto OnHostFrame(Launch::IRuntimeSession& session,
             const Launch::FFrameContext&          frameContext) -> bool override {
             (void)frameContext;
-            auto        services      = session.GetServices();
-            const auto* platformInput = ResolvePlatformInput(session, services.InputSystem);
-            UiModule.SetWorldHierarchySnapshot((services.WorldManager != nullptr)
-                    ? BuildHierarchySnapshot(services.WorldManager->GetActiveWorld())
-                    : Editor::UI::FEditorWorldHierarchySnapshot{});
-            const auto commands = UiModule.ConsumeUiCommands();
-            for (auto cmd : commands) {
+            auto        services          = session.GetServices();
+            const auto* platformInput     = ResolvePlatformInput(session, services.InputSystem);
+            const auto  hierarchySnapshot = (services.WorldManager != nullptr)
+                 ? BuildHierarchySnapshot(services.WorldManager->GetActiveWorld())
+                 : Editor::UI::FEditorWorldHierarchySnapshot{};
+
+            Editor::UI::FEditorUiFrameContext uiFrameContext{};
+            uiFrameContext.mHierarchySnapshot  = &hierarchySnapshot;
+            uiFrameContext.bClearCommandBuffer = true;
+            mUiFrameOutput                     = UiModule.TickUi(uiFrameContext);
+
+            for (auto cmd : mUiFrameOutput.mCommands) {
                 switch (cmd) {
                     case Editor::UI::EEditorUiCommand::Play:
                         PlaySession.RequestPlay();
@@ -357,7 +365,7 @@ namespace {
             Launch::FRenderTick tick{};
             tick.bRedirectPrimaryViewToOffscreen = true;
             tick.PrimaryViewImageId              = Editor::UI::kEditorViewportImageId;
-            const auto viewportRequest           = UiModule.GetViewportRequest();
+            const auto viewportRequest           = mUiFrameOutput.mViewportRequest;
             if (viewportRequest.bHasContent && viewportRequest.Width > 0U
                 && viewportRequest.Height > 0U) {
                 tick.RenderWidth  = viewportRequest.Width;
@@ -378,6 +386,7 @@ namespace {
             if (auto* engineLoop = dynamic_cast<Launch::FEngineLoop*>(&session)) {
                 engineLoop->SetRuntimeInputOverride(nullptr);
             }
+            UiModule.Shutdown();
             PlaySession.Shutdown();
             CoreModule.Shutdown(EditorContext);
         }
@@ -412,7 +421,7 @@ namespace {
 
             const bool allowRuntimeInput = PlaySession.ShouldTickSimulation();
             (void)debugGuiSystem;
-            InputRouter.Route(platformInput, UiModule.GetViewportRequest(), allowRuntimeInput);
+            InputRouter.Route(platformInput, mUiFrameOutput.mViewportRequest, allowRuntimeInput);
             engineLoop->SetRuntimeInputOverride(InputRouter.GetRoutedInput());
         }
 
@@ -421,6 +430,7 @@ namespace {
         Editor::Viewport::FEditorViewportBootstrap ViewportBootstrap{};
         Editor::PlaySession::FEditorPlaySession    PlaySession{};
         Editor::UI::FEditorUiModule                UiModule{};
+        Editor::UI::FEditorUiFrameOutput           mUiFrameOutput{};
         Editor::Core::FEditorProjectSettings       mProjectSettings{};
         FEditorRuntimeInputRouter                  InputRouter{};
         bool                                       bExitRequested = false;

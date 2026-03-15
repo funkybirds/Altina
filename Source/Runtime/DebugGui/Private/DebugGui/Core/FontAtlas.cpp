@@ -5,6 +5,31 @@
 namespace AltinaEngine::DebugGui::Private {
 #include "DebugGui/FontAtlasMSDF64x64.inl"
 
+    auto ResolveFontRoleScale(const FDebugGuiTheme& theme, EDebugGuiFontRole role) noexcept -> f32 {
+        const auto ResolveScale = [](const FDebugGuiFontStyle& style) {
+            return (style.mScale > 0.01f) ? style.mScale : 1.0f;
+        };
+        switch (role) {
+            case EDebugGuiFontRole::Small:
+                return ResolveScale(theme.mFonts.mSmall);
+            case EDebugGuiFontRole::WindowTitle:
+                return ResolveScale(theme.mFonts.mWindowTitle);
+            case EDebugGuiFontRole::Menu:
+                return ResolveScale(theme.mFonts.mMenu);
+            case EDebugGuiFontRole::Tab:
+                return ResolveScale(theme.mFonts.mTab);
+            case EDebugGuiFontRole::Section:
+                return ResolveScale(theme.mFonts.mSection);
+            case EDebugGuiFontRole::Label:
+                return ResolveScale(theme.mFonts.mLabel);
+            case EDebugGuiFontRole::Status:
+                return ResolveScale(theme.mFonts.mStatus);
+            case EDebugGuiFontRole::Body:
+            default:
+                return ResolveScale(theme.mFonts.mBody);
+        }
+    }
+
     void FFontAtlas::Build() {
         mPixels.Resize(static_cast<usize>(kAtlasW) * static_cast<usize>(kAtlasH) * 4U);
         mGlyphMetrics.Resize(static_cast<usize>(kGlyphCount));
@@ -85,6 +110,16 @@ namespace AltinaEngine::DebugGui::Private {
     auto FFontAtlas::GetGlyphHeight(f32 fontScale) noexcept -> f32 {
         const f32 safeScale = (fontScale > 0.01f) ? fontScale : 1.0f;
         return static_cast<f32>(kDrawGlyphH) * safeScale;
+    }
+
+    auto FFontAtlas::GetGlyphWidth(const FDebugGuiTheme& theme, EDebugGuiFontRole role) noexcept
+        -> f32 {
+        return GetGlyphWidth(ResolveFontRoleScale(theme, role));
+    }
+
+    auto FFontAtlas::GetGlyphHeight(const FDebugGuiTheme& theme, EDebugGuiFontRole role) noexcept
+        -> f32 {
+        return GetGlyphHeight(ResolveFontRoleScale(theme, role));
     }
 
     auto FFontAtlas::GetGlyphMetrics(u32 ch) const noexcept -> FFontGlyphMetrics {

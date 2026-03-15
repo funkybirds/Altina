@@ -62,12 +62,13 @@ namespace AltinaEngine::DebugGui::Private {
         void DrawRect(const FRect& rect, FColor32 color, f32 thickness) override {
             AddRect(rect, color, thickness);
         }
-        void DrawRoundedRectFilled(const FRect& rect, FColor32 color, f32 rounding) override {
-            AddRoundedRectFilled(rect, color, rounding);
+        void DrawRoundedRectFilled(const FRect& rect, FColor32 color, f32 rounding,
+            EDebugGuiCornerFlags cornerFlags = EDebugGuiCornerFlags::All) override {
+            AddRoundedRectFilled(rect, color, rounding, cornerFlags);
         }
-        void DrawRoundedRect(
-            const FRect& rect, FColor32 color, f32 rounding, f32 thickness) override {
-            AddRoundedRect(rect, color, rounding, thickness);
+        void DrawRoundedRect(const FRect& rect, FColor32 color, f32 rounding, f32 thickness,
+            EDebugGuiCornerFlags cornerFlags = EDebugGuiCornerFlags::All) override {
+            AddRoundedRect(rect, color, rounding, thickness, cornerFlags);
         }
         void DrawCapsuleFilled(
             const FVector2f& a, const FVector2f& b, f32 radius, FColor32 color) override {
@@ -86,7 +87,11 @@ namespace AltinaEngine::DebugGui::Private {
             AddTriangleFilled(p0, p1, p2, color);
         }
         void DrawText(const FVector2f& pos, FColor32 color, FStringView text) override {
-            AddText(pos, color, text);
+            AddText(pos, color, text, mFontScale);
+        }
+        void DrawTextStyled(const FVector2f& pos, FColor32 color, FStringView text,
+            EDebugGuiFontRole role) override {
+            AddText(pos, color, text, ResolveFontScale(role));
         }
         void DrawImage(const FRect& rect, u64 imageId, FColor32 tint) override {
             if (imageId == 0ULL) {
@@ -94,6 +99,10 @@ namespace AltinaEngine::DebugGui::Private {
             }
             AddQuad(rect.Min, FVector2f(rect.Max.X(), rect.Min.Y()), rect.Max,
                 FVector2f(rect.Min.X(), rect.Max.Y()), 0.0f, 0.0f, 1.0f, 1.0f, tint, imageId);
+        }
+        [[nodiscard]] auto MeasureText(FStringView text, EDebugGuiFontRole role) const
+            -> FVector2f override {
+            return FVector2f(CalcTextWidth(text, ResolveFontScale(role)), GetGlyphHeight(role));
         }
 
         [[nodiscard]] auto GetDisplaySize() const noexcept -> FVector2f override {
@@ -256,12 +265,15 @@ namespace AltinaEngine::DebugGui::Private {
 
             const bool btnHoveredDraw = PointInRect(mInput.mMousePos, btnRect);
 
-            DrawRectFilled(windowRect, th.mWindowBg);
-            DrawRect(windowRect, th.mWindowBorder, 1.0f);
-            DrawRectFilled(titleRect, th.mTitleBarBg);
-            DrawText(FVector2f(
-                         mWindowPos.X() + th.mWindowPadding, mWindowPos.Y() + th.mTitleTextOffsetY),
-                th.mTitleText, title);
+            const f32  windowRadius = th.mEditor.mWindowSurface.mCornerRadius;
+            DrawRoundedRectFilled(windowRect, th.mWindowBg, windowRadius);
+            if ((th.mWindowBorder >> 24U) != 0U) {
+                DrawRoundedRect(windowRect, th.mWindowBorder, windowRadius, 1.0f);
+            }
+            DrawRoundedRectFilled(titleRect, th.mTitleBarBg, windowRadius);
+            DrawTextStyled(FVector2f(mWindowPos.X() + th.mWindowPadding,
+                               mWindowPos.Y() + th.mTitleTextOffsetY),
+                th.mTitleText, title, EDebugGuiFontRole::WindowTitle);
 
             // Collapse button visuals.
             const bool     btnActive = (mUi->mActiveId == collapseId);
@@ -320,7 +332,7 @@ namespace AltinaEngine::DebugGui::Private {
                 AdvanceLine();
                 return;
             }
-            DrawText(mCursor, mTheme->mText, text);
+            DrawTextStyled(mCursor, mTheme->mText, text, EDebugGuiFontRole::Body);
             AdvanceLine();
         }
 
@@ -356,6 +368,18 @@ namespace AltinaEngine::DebugGui::Private {
             return FFontAtlas::GetGlyphHeight(mFontScale);
         }
 
+        [[nodiscard]] auto ResolveFontScale(EDebugGuiFontRole role) const noexcept -> f32 {
+            return ResolveFontRoleScale(*mTheme, role);
+        }
+
+        [[nodiscard]] auto GetGlyphWidth(EDebugGuiFontRole role) const noexcept -> f32 {
+            return FFontAtlas::GetGlyphWidth(*mTheme, role);
+        }
+
+        [[nodiscard]] auto GetGlyphHeight(EDebugGuiFontRole role) const noexcept -> f32 {
+            return FFontAtlas::GetGlyphHeight(*mTheme, role);
+        }
+
         void AdvanceLine() {
             mCursor =
                 FVector2f(mContentMin.X(), mCursor.Y() + GetGlyphHeight() + mTheme->mItemSpacingY);
@@ -366,18 +390,22 @@ namespace AltinaEngine::DebugGui::Private {
                 FVector2f(mContentMin.X(), mCursor.Y() + itemSize.Y() + mTheme->mItemSpacingY);
         }
 
-        [[nodiscard]] auto CalcTextWidth(FStringView s) const noexcept -> f32 {
+        [[nodiscard]] auto CalcTextWidth(FStringView s, f32 fontScale) const noexcept -> f32 {
             if (mAtlas == nullptr) {
-                return static_cast<f32>(s.Length()) * GetGlyphWidth();
+                return static_cast<f32>(s.Length()) * FFontAtlas::GetGlyphWidth(fontScale);
             }
             f32 width = 0.0f;
             for (usize i = 0; i < s.Length(); ++i) {
                 const auto metrics = mAtlas->GetGlyphMetrics(static_cast<u32>(s[i]));
-                const f32  adv =
-                    (metrics.mAdvance > 0.0f) ? (metrics.mAdvance * mFontScale) : GetGlyphWidth();
+                const f32  adv     = (metrics.mAdvance > 0.0f) ? (metrics.mAdvance * fontScale)
+                                                               : FFontAtlas::GetGlyphWidth(fontScale);
                 width += adv;
             }
             return width;
+        }
+
+        [[nodiscard]] auto CalcTextWidth(FStringView s) const noexcept -> f32 {
+            return CalcTextWidth(s, mFontScale);
         }
 
         [[nodiscard]] auto CalcButtonSize(FStringView label) const noexcept -> FVector2f {
@@ -578,7 +606,8 @@ namespace AltinaEngine::DebugGui::Private {
             }
         }
 
-        void AddRoundedRectFilled(const FRect& rect, FColor32 color, f32 rounding) {
+        void AddRoundedRectFilled(
+            const FRect& rect, FColor32 color, f32 rounding, EDebugGuiCornerFlags cornerFlags) {
             const f32 w = rect.Max.X() - rect.Min.X();
             const f32 h = rect.Max.Y() - rect.Min.Y();
             if (w <= 0.0f || h <= 0.0f) {
@@ -592,38 +621,67 @@ namespace AltinaEngine::DebugGui::Private {
                 return;
             }
 
-            const f32 minX = rect.Min.X();
-            const f32 minY = rect.Min.Y();
-            const f32 maxX = rect.Max.X();
-            const f32 maxY = rect.Max.Y();
+            const f32 tl = HasAnyCornerFlag(cornerFlags, EDebugGuiCornerFlags::TopLeft) ? r : 0.0f;
+            const f32 tr = HasAnyCornerFlag(cornerFlags, EDebugGuiCornerFlags::TopRight) ? r : 0.0f;
+            const f32 br =
+                HasAnyCornerFlag(cornerFlags, EDebugGuiCornerFlags::BottomRight) ? r : 0.0f;
+            const f32 bl =
+                HasAnyCornerFlag(cornerFlags, EDebugGuiCornerFlags::BottomLeft) ? r : 0.0f;
 
-            // 5 non-overlapping quads + 4 corner sectors.
-            AddRectFilled(
-                { .Min = FVector2f(minX + r, minY + r), .Max = FVector2f(maxX - r, maxY - r) },
-                color);
-            AddRectFilled(
-                { .Min = FVector2f(minX + r, minY), .Max = FVector2f(maxX - r, minY + r) }, color);
-            AddRectFilled(
-                { .Min = FVector2f(minX + r, maxY - r), .Max = FVector2f(maxX - r, maxY) }, color);
-            AddRectFilled(
-                { .Min = FVector2f(minX, minY + r), .Max = FVector2f(minX + r, maxY - r) }, color);
-            AddRectFilled(
-                { .Min = FVector2f(maxX - r, minY + r), .Max = FVector2f(maxX, maxY - r) }, color);
+            const f32 minX        = rect.Min.X();
+            const f32 minY        = rect.Min.Y();
+            const f32 maxX        = rect.Max.X();
+            const f32 maxY        = rect.Max.Y();
+            const f32 leftInset   = Core::Math::Max(tl, bl);
+            const f32 rightInset  = Core::Math::Max(tr, br);
+            const f32 topInset    = Core::Math::Max(tl, tr);
+            const f32 bottomInset = Core::Math::Max(bl, br);
+
+            if (maxX - rightInset > minX + leftInset) {
+                AddRectFilled({ .Min   = FVector2f(minX + leftInset, minY),
+                                  .Max = FVector2f(maxX - rightInset, maxY) },
+                    color);
+            }
+            if (topInset > 0.0f && maxX - tr > minX + tl) {
+                AddRectFilled({ .Min   = FVector2f(minX + tl, minY),
+                                  .Max = FVector2f(maxX - tr, minY + topInset) },
+                    color);
+            }
+            if (bottomInset > 0.0f && maxX - br > minX + bl) {
+                AddRectFilled({ .Min   = FVector2f(minX + bl, maxY - bottomInset),
+                                  .Max = FVector2f(maxX - br, maxY) },
+                    color);
+            }
+            if (leftInset > 0.0f && maxY - bl > minY + tl) {
+                AddRectFilled({ .Min   = FVector2f(minX, minY + tl),
+                                  .Max = FVector2f(minX + leftInset, maxY - bl) },
+                    color);
+            }
+            if (rightInset > 0.0f && maxY - br > minY + tr) {
+                AddRectFilled({ .Min   = FVector2f(maxX - rightInset, minY + tr),
+                                  .Max = FVector2f(maxX, maxY - br) },
+                    color);
+            }
 
             constexpr f32 kPi   = Core::Math::kPiF;
             const u32     seg90 = CalcArcSegments90(r);
 
-            // Top-left (pi .. 3pi/2).
-            AddArcFilled(FVector2f(minX + r, minY + r), r, kPi, 1.5f * kPi, seg90, color);
-            // Top-right (-pi/2 .. 0).
-            AddArcFilled(FVector2f(maxX - r, minY + r), r, -0.5f * kPi, 0.0f, seg90, color);
-            // Bottom-right (0 .. pi/2).
-            AddArcFilled(FVector2f(maxX - r, maxY - r), r, 0.0f, 0.5f * kPi, seg90, color);
-            // Bottom-left (pi/2 .. pi).
-            AddArcFilled(FVector2f(minX + r, maxY - r), r, 0.5f * kPi, kPi, seg90, color);
+            if (tl > 0.0f) {
+                AddArcFilled(FVector2f(minX + tl, minY + tl), tl, kPi, 1.5f * kPi, seg90, color);
+            }
+            if (tr > 0.0f) {
+                AddArcFilled(FVector2f(maxX - tr, minY + tr), tr, -0.5f * kPi, 0.0f, seg90, color);
+            }
+            if (br > 0.0f) {
+                AddArcFilled(FVector2f(maxX - br, maxY - br), br, 0.0f, 0.5f * kPi, seg90, color);
+            }
+            if (bl > 0.0f) {
+                AddArcFilled(FVector2f(minX + bl, maxY - bl), bl, 0.5f * kPi, kPi, seg90, color);
+            }
         }
 
-        void AddRoundedRect(const FRect& rect, FColor32 color, f32 rounding, f32 thickness) {
+        void AddRoundedRect(const FRect& rect, FColor32 color, f32 rounding, f32 thickness,
+            EDebugGuiCornerFlags cornerFlags) {
             const f32 w = rect.Max.X() - rect.Min.X();
             const f32 h = rect.Max.Y() - rect.Min.Y();
             if (w <= 0.0f || h <= 0.0f) {
@@ -637,6 +695,13 @@ namespace AltinaEngine::DebugGui::Private {
                 return;
             }
 
+            const f32 tl = HasAnyCornerFlag(cornerFlags, EDebugGuiCornerFlags::TopLeft) ? r : 0.0f;
+            const f32 tr = HasAnyCornerFlag(cornerFlags, EDebugGuiCornerFlags::TopRight) ? r : 0.0f;
+            const f32 br =
+                HasAnyCornerFlag(cornerFlags, EDebugGuiCornerFlags::BottomRight) ? r : 0.0f;
+            const f32 bl =
+                HasAnyCornerFlag(cornerFlags, EDebugGuiCornerFlags::BottomLeft) ? r : 0.0f;
+
             constexpr f32 kPi   = Core::Math::kPiF;
             const u32     seg90 = CalcArcSegments90(r);
 
@@ -646,20 +711,28 @@ namespace AltinaEngine::DebugGui::Private {
             const f32     maxY = rect.Max.Y();
 
             // Edges.
-            AddLine(FVector2f(minX + r, minY), FVector2f(maxX - r, minY), color, thickness);
-            AddLine(FVector2f(maxX, minY + r), FVector2f(maxX, maxY - r), color, thickness);
-            AddLine(FVector2f(maxX - r, maxY), FVector2f(minX + r, maxY), color, thickness);
-            AddLine(FVector2f(minX, maxY - r), FVector2f(minX, minY + r), color, thickness);
+            AddLine(FVector2f(minX + tl, minY), FVector2f(maxX - tr, minY), color, thickness);
+            AddLine(FVector2f(maxX, minY + tr), FVector2f(maxX, maxY - br), color, thickness);
+            AddLine(FVector2f(maxX - br, maxY), FVector2f(minX + bl, maxY), color, thickness);
+            AddLine(FVector2f(minX, maxY - bl), FVector2f(minX, minY + tl), color, thickness);
 
             // Corners.
-            AddArcStroke(
-                FVector2f(maxX - r, minY + r), r, -0.5f * kPi, 0.0f, seg90, color, thickness);
-            AddArcStroke(
-                FVector2f(maxX - r, maxY - r), r, 0.0f, 0.5f * kPi, seg90, color, thickness);
-            AddArcStroke(
-                FVector2f(minX + r, maxY - r), r, 0.5f * kPi, kPi, seg90, color, thickness);
-            AddArcStroke(
-                FVector2f(minX + r, minY + r), r, kPi, 1.5f * kPi, seg90, color, thickness);
+            if (tr > 0.0f) {
+                AddArcStroke(FVector2f(maxX - tr, minY + tr), tr, -0.5f * kPi, 0.0f, seg90, color,
+                    thickness);
+            }
+            if (br > 0.0f) {
+                AddArcStroke(
+                    FVector2f(maxX - br, maxY - br), br, 0.0f, 0.5f * kPi, seg90, color, thickness);
+            }
+            if (bl > 0.0f) {
+                AddArcStroke(
+                    FVector2f(minX + bl, maxY - bl), bl, 0.5f * kPi, kPi, seg90, color, thickness);
+            }
+            if (tl > 0.0f) {
+                AddArcStroke(
+                    FVector2f(minX + tl, minY + tl), tl, kPi, 1.5f * kPi, seg90, color, thickness);
+            }
         }
 
         void AddCapsuleFilled(const FVector2f& a, const FVector2f& b, f32 radius, FColor32 color) {
@@ -745,12 +818,12 @@ namespace AltinaEngine::DebugGui::Private {
                 color);
         }
 
-        void AddText(const FVector2f& pos, FColor32 color, FStringView text) {
+        void AddText(const FVector2f& pos, FColor32 color, FStringView text, f32 fontScale) {
             if (text.IsEmpty()) {
                 return;
             }
-            const f32 glyphW = GetGlyphWidth();
-            const f32 glyphH = GetGlyphHeight();
+            const f32 glyphW = FFontAtlas::GetGlyphWidth(fontScale);
+            const f32 glyphH = FFontAtlas::GetGlyphHeight(fontScale);
             const f32 baseX  = SnapToPixel(pos.X());
             FVector2f cursor(baseX, SnapToPixel(pos.Y()));
             for (usize i = 0; i < text.Length(); ++i) {
@@ -777,9 +850,8 @@ namespace AltinaEngine::DebugGui::Private {
                 const FVector2f p3(x0, y1);
                 AddQuad(p0, p1, p2, p3, u0, v0, u1, v1, color);
                 const auto metrics = mAtlas->GetGlyphMetrics(static_cast<u32>(c));
-                const f32  adv =
-                    (metrics.mAdvance > 0.0f) ? (metrics.mAdvance * mFontScale) : glyphW;
-                cursor = FVector2f(cursor.X() + adv, cursor.Y());
+                const f32 adv = (metrics.mAdvance > 0.0f) ? (metrics.mAdvance * fontScale) : glyphW;
+                cursor        = FVector2f(cursor.X() + adv, cursor.Y());
             }
         }
 

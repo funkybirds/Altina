@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Altina Editor Prototype</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-shell">
+        <div class="ambient ambient-a"></div>
+        <div class="ambient ambient-b"></div>
+
+        <header class="topbar panel">
+            <div class="topbar__group topbar__brand">
+                <span class="label label-primary">Editor</span>
+                <div>
+                    <p class="eyebrow">Altina Engine</p>
+                    <h1>Project Workspace</h1>
+                </div>
+            </div>
+
+            <nav class="menu-bar" aria-label="Main menu">
+                <button class="menu-button" data-menu-target="menu-file">File</button>
+                <button class="menu-button" data-menu-target="menu-view">View</button>
+                <button class="menu-button" data-menu-target="menu-play">Play</button>
+
+                <div class="menu-dropdown" id="menu-file">
+                    <button class="menu-item">New Project</button>
+                    <button class="menu-item">Open Project</button>
+                    <button class="menu-item">Save</button>
+                    <button class="menu-item">Save All</button>
+                    <button class="menu-item">Exit</button>
+                </div>
+
+                <div class="menu-dropdown" id="menu-view">
+                    <button class="menu-item">Hierarchy</button>
+                    <button class="menu-item">Viewport</button>
+                    <button class="menu-item">Inspector</button>
+                    <button class="menu-item">Asset</button>
+                    <button class="menu-item">Output</button>
+                </div>
+
+                <div class="menu-dropdown" id="menu-play">
+                    <button class="menu-item">Play</button>
+                    <button class="menu-item">Pause</button>
+                    <button class="menu-item">Step</button>
+                    <button class="menu-item">Stop</button>
+                </div>
+            </nav>
+
+            <div class="topbar__group topbar__actions">
+                <button class="tool-pill is-active">Edit</button>
+                <button class="tool-pill">Simulate</button>
+                <button class="tool-pill warning">Preview</button>
+            </div>
+        </header>
+
+        <main class="workspace" id="workspace">
+            <section class="dock dock-left panel" data-dock="left">
+                <div class="panel-tabs" data-tab-group="left">
+                    <button class="panel-tab is-active" data-tab-target="tab-hierarchy"><i class="mdi mdi-file-tree-outline" aria-hidden="true"></i><span>Hierarchy</span></button>
+                </div>
+                <div class="panel-body">
+                    <div class="tab-panel is-active" id="tab-hierarchy">
+                        <div class="section-head">
+                            <span class="label label-inline label-inline-muted">World</span>
+                            <span class="section-note">17 live objects</span>
+                        </div>
+                        <div class="tree-list" id="hierarchy-tree"></div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="splitter splitter-vertical" data-splitter="left" aria-label="Resize left panel"></div>
+
+            <section class="dock dock-center panel" data-dock="center">
+                <div class="panel-tabs" data-tab-group="center">
+                    <button class="panel-tab is-active" data-tab-target="tab-viewport"><i class="mdi mdi-monitor-dashboard" aria-hidden="true"></i><span>Viewport</span></button>
+                    <button class="panel-tab" data-tab-target="tab-scene"><i class="mdi mdi-chart-timeline-variant" aria-hidden="true"></i><span>Scene Debug</span></button>
+                </div>
+                <div class="panel-body">
+                    <div class="tab-panel is-active" id="tab-viewport">
+                        <div class="viewport-card">
+                            <div class="viewport-canvas">
+                                <div class="viewport-grid"></div>
+                                <div class="viewport-sun"></div>
+                                <div class="viewport-mesh viewport-mesh-main"></div>
+                                <div class="viewport-mesh viewport-mesh-side"></div>
+                                <div class="viewport-overlay">
+                                    <div class="overlay-card">
+                                        <span class="label label-secondary">Camera</span>
+                                        <p>Exposure auto-tune settled at 0.84 EV.</p>
+                                    </div>
+                                    <div class="overlay-card">
+                                        <span class="label label-primary">Selection</span>
+                                        <p id="viewport-selection">RootScene / CameraRig</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="viewport-status">
+                                <span>GPU 6.4 ms</span>
+                                <span>Frame 144 Hz</span>
+                                <span>View 1920 x 1080</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-panel" id="tab-scene">
+                        <div class="placeholder-card">
+                            <span class="label label-inline label-inline-muted">Diagnostics</span>
+                            <h2>Scene debug surfaces</h2>
+                            <p>Use this tab to prototype overlays for buffer visualization, culling summaries, and render timing notes.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="splitter splitter-vertical" data-splitter="right" aria-label="Resize right panel"></div>
+
+            <section class="dock dock-right panel" data-dock="right">
+                <div class="panel-tabs" data-tab-group="right">
+                    <button class="panel-tab is-active" data-tab-target="tab-inspector"><i class="mdi mdi-tune-vertical-variant" aria-hidden="true"></i><span>Inspector</span></button>
+                </div>
+                <div class="panel-body">
+                    <div class="tab-panel is-active" id="tab-inspector">
+                        <div class="section-head">
+                            <span class="label label-inline label-inline-accent">Selected</span>
+                            <span class="section-note" id="inspector-kind">Actor</span>
+                        </div>
+                        <div class="inspector-card">
+                            <h2 id="inspector-title">CameraRig</h2>
+                            <p class="inspector-subtitle" id="inspector-path">WorldRoot / Gameplay / CameraRig</p>
+                            <div class="inspector-fields" id="inspector-fields"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="splitter splitter-horizontal" data-splitter="bottom" aria-label="Resize bottom panels"></div>
+
+            <section class="dock dock-bottom panel" data-dock="bottom">
+                <div class="panel-tabs" data-tab-group="bottom">
+                    <button class="panel-tab is-active" data-tab-target="tab-assets"><i class="mdi mdi-folder-multiple-outline" aria-hidden="true"></i><span>Asset</span></button>
+                    <button class="panel-tab" data-tab-target="tab-output"><i class="mdi mdi-console-line" aria-hidden="true"></i><span>Output</span></button>
+                </div>
+                <div class="panel-body">
+                    <div class="tab-panel is-active" id="tab-assets">
+                        <div class="asset-workspace">
+                            <aside class="asset-tree panel inset">
+                                <div class="section-head">
+                                    <span class="label label-inline label-inline-muted">Folders</span>
+                                    <span class="section-note">Project assets</span>
+                                </div>
+                                <div class="asset-tree__list" id="asset-tree"></div>
+                            </aside>
+
+                            <div class="splitter splitter-vertical splitter-inner" data-splitter="asset" aria-label="Resize asset tree"></div>
+
+                            <section class="asset-grid panel inset">
+                                <div class="section-head">
+                                    <span class="label label-inline label-inline-accent">Browser</span>
+                                    <span class="section-note" id="asset-folder-note">Assets / Environments</span>
+                                </div>
+                                <div class="asset-grid__content" id="asset-grid"></div>
+                            </section>
+                        </div>
+                    </div>
+
+                    <div class="tab-panel" id="tab-output">
+                        <div class="output-feed" id="output-feed"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

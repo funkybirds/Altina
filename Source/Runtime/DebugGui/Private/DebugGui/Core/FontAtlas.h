@@ -1,9 +1,13 @@
 ﻿#pragma once
 
+#include "DebugGui/Core/Theme.h"
 #include "Container/Vector.h"
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::DebugGui::Private {
+    [[nodiscard]] auto ResolveFontRoleScale(
+        const FDebugGuiTheme& theme, EDebugGuiFontRole role) noexcept -> f32;
+
     struct FFontGlyphMetrics {
         f32 mAdvance  = 7.0f;
         f32 mBearingX = 0.0f;
@@ -35,8 +39,12 @@ namespace AltinaEngine::DebugGui::Private {
         void GetGlyphUV(u32 ch, f32& outU0, f32& outV0, f32& outU1, f32& outV1) const noexcept;
         [[nodiscard]] static auto GetGlyphWidth(f32 fontScale) noexcept -> f32;
         [[nodiscard]] static auto GetGlyphHeight(f32 fontScale) noexcept -> f32;
-        [[nodiscard]] auto        GetGlyphMetrics(u32 ch) const noexcept -> FFontGlyphMetrics;
-        [[nodiscard]] auto        GetRecommendedStretchX() const noexcept -> f32 {
+        [[nodiscard]] static auto GetGlyphWidth(
+            const FDebugGuiTheme& theme, EDebugGuiFontRole role) noexcept -> f32;
+        [[nodiscard]] static auto GetGlyphHeight(
+            const FDebugGuiTheme& theme, EDebugGuiFontRole role) noexcept -> f32;
+        [[nodiscard]] auto GetGlyphMetrics(u32 ch) const noexcept -> FFontGlyphMetrics;
+        [[nodiscard]] auto GetRecommendedStretchX() const noexcept -> f32 {
             return mRecommendedStretchX;
         }
     };

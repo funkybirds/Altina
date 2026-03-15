@@ -97,8 +97,11 @@ namespace AltinaEngine::DebugGui::Private {
             return base;
         };
 
-        DrawRectFilled(r, mTheme->mGizmoBg);
-        DrawRect(r, mTheme->mGizmoBorder, 1.0f);
+        const f32 rounding = mTheme->mEditor.mPanelSurface.mCornerRadius;
+        DrawRoundedRectFilled(r, mTheme->mGizmoBg, rounding);
+        if ((mTheme->mGizmoBorder >> 24U) != 0U) {
+            DrawRoundedRect(r, mTheme->mGizmoBorder, rounding, 1.0f);
+        }
 
         const FColor32 xCol  = ResolveAxisColor(idX, mTheme->mGizmoAxisX);
         const FColor32 yCol  = ResolveAxisColor(idY, mTheme->mGizmoAxisY);
@@ -108,15 +111,18 @@ namespace AltinaEngine::DebugGui::Private {
         DrawRectFilled(centerRect, xyCol);
         DrawRect(centerRect, mTheme->mGizmoBorder, 1.0f);
 
-        DrawText(FVector2f(xEnd.X() + 3.0f, xEnd.Y() - 6.0f), xCol, TEXT("X"));
-        DrawText(FVector2f(yEnd.X() + 3.0f, yEnd.Y() - 6.0f), yCol, TEXT("Y"));
+        DrawTextStyled(
+            FVector2f(xEnd.X() + 3.0f, xEnd.Y() - 6.0f), xCol, TEXT("X"), EDebugGuiFontRole::Small);
+        DrawTextStyled(
+            FVector2f(yEnd.X() + 3.0f, yEnd.Y() - 6.0f), yCol, TEXT("Y"), EDebugGuiFontRole::Small);
 
         FString valueText;
         valueText.Assign(TEXT("x="));
         valueText.AppendNumber(value.X());
         valueText.Append(TEXT(" y="));
         valueText.AppendNumber(value.Y());
-        DrawText(FVector2f(r.Min.X(), r.Max.Y() + 3.0f), mTheme->mText, valueText.ToView());
+        DrawTextStyled(FVector2f(r.Min.X(), r.Max.Y() + 3.0f), mTheme->mText, valueText.ToView(),
+            EDebugGuiFontRole::Small);
 
         AdvanceItem(FVector2f(size, size + mTheme->mGizmoBottomSpacingY + 14.0f));
         return changed;

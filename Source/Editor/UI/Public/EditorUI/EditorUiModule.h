@@ -120,39 +120,61 @@ namespace AltinaEngine::Editor::UI {
         bool bUiBlockingInput = false;
     };
 
+    enum class EEditorDockArea : u8 {
+        Left = 0,
+        Center,
+        Right,
+        Bottom
+    };
+
+    struct FEditorPanelDescriptor {
+        ::AltinaEngine::Core::Container::FString mId;
+        ::AltinaEngine::Core::Container::FString mTitle;
+        EEditorDockArea                          mDockArea = EEditorDockArea::Center;
+        bool                                     bVisible  = true;
+        i32                                      mPriority = 0;
+    };
+
+    struct FEditorUiInitDesc {
+        DebugGui::IDebugGuiSystem*                                       mDebugGuiSystem = nullptr;
+        ::AltinaEngine::Core::Container::FStringView                     mAssetRoot;
+        ::AltinaEngine::Core::Container::FStringView                     mProjectSourcePath;
+        ::AltinaEngine::Core::Container::TVector<FEditorPanelDescriptor> mPanels;
+    };
+
+    struct FEditorUiFrameContext {
+        const FEditorWorldHierarchySnapshot* mHierarchySnapshot  = nullptr;
+        bool                                 bClearCommandBuffer = false;
+    };
+
+    struct FEditorUiFrameOutput {
+        FEditorViewportRequest                                     mViewportRequest{};
+        ::AltinaEngine::Core::Container::TVector<EEditorUiCommand> mCommands;
+    };
+
+    namespace Testing {
+        class FEditorUiTestingAccess;
+    }
+
     class AE_EDITOR_UI_API FEditorUiModule final {
     public:
-        void               RegisterDefaultPanels(DebugGui::IDebugGuiSystem* debugGuiSystem,
-                          ::AltinaEngine::Core::Container::FStringView      assetRoot         = {},
-                          ::AltinaEngine::Core::Container::FStringView      projectSourcePath = {});
-        void               SetWorldHierarchySnapshot(const FEditorWorldHierarchySnapshot& snapshot);
-        [[nodiscard]] auto GetViewportRequest() const noexcept -> FEditorViewportRequest;
-        [[nodiscard]] auto ConsumeUiCommands()
-            -> ::AltinaEngine::Core::Container::TVector<EEditorUiCommand>;
-        [[nodiscard]] auto DebugGetAssetItemsForTest() const
-            -> ::AltinaEngine::Core::Container::TVector<::AltinaEngine::Core::Container::FString>;
-        [[nodiscard]] auto DebugGetCurrentAssetPathForTest() const
-            -> ::AltinaEngine::Core::Container::FString;
-        [[nodiscard]] auto DebugGetHierarchyItemsForTest() const
-            -> ::AltinaEngine::Core::Container::TVector<FEditorHierarchyDebugItem>;
-        [[nodiscard]] auto DebugGetSelectionInfoForTest() const -> FEditorSelectionInfo;
-        void               DebugSelectGameObjectForTest(FEditorGameObjectRuntimeId id);
-        void               DebugSelectComponentForTest(FEditorComponentRuntimeId id);
-        auto               DebugOpenAssetPathForTest(
-                          ::AltinaEngine::Core::Container::FStringView path, EAssetItemType type) -> bool;
+        void               Initialize(const FEditorUiInitDesc& initDesc);
+        [[nodiscard]] auto TickUi(const FEditorUiFrameContext& frameContext)
+            -> FEditorUiFrameOutput;
+        void               Shutdown();
+
+        [[nodiscard]] auto IsInitialized() const noexcept -> bool { return mRegistered; }
 
     private:
-        enum class EDockArea : u8 {
-            Left = 0,
-            Center,
-            Right,
-            Bottom
-        };
+        friend class Testing::FEditorUiTestingAccess;
+        using EDockArea = EEditorDockArea;
 
         struct FPanelState {
             ::AltinaEngine::Core::Container::FString Name;
-            EDockArea                                Area     = EDockArea::Center;
-            bool                                     bVisible = true;
+            ::AltinaEngine::Core::Container::FString mId;
+            EEditorDockArea                          Area      = EEditorDockArea::Center;
+            bool                                     bVisible  = true;
+            i32                                      mPriority = 0;
         };
 
         struct FDockState {
@@ -189,10 +211,67 @@ namespace AltinaEngine::Editor::UI {
                 ::AltinaEngine::Core::Math::FVector2f(0.0f, 0.0f);
         };
 
+        struct FEditorUiStateStore {
+            FEditorViewportRequest                                     mViewportRequest{};
+            ::AltinaEngine::Core::Container::TVector<EEditorUiCommand> mPendingCommands;
+            FEditorUiFrameOutput                                       mCachedOutput{};
+            u64                                                        mFrameCounter = 0ULL;
+        };
+
+        class FEditorUiRootController final {
+        public:
+            void Draw(FEditorUiModule& module, DebugGui::IDebugGuiSystem* debugGuiSystem,
+                DebugGui::IDebugGui& gui) const;
+        };
+
+        class FHierarchyPanelController final {
+        public:
+            void Draw(FEditorUiModule& module, DebugGui::IDebugGui& gui,
+                const DebugGui::FRect&                       contentRect,
+                const ::AltinaEngine::Core::Math::FVector2f& mouse, bool blockWorkspaceInput) const;
+        };
+
+        class FAssetPanelController final {
+        public:
+            void Draw(FEditorUiModule& module, DebugGui::IDebugGui& gui,
+                const DebugGui::FRect&                       contentRect,
+                const ::AltinaEngine::Core::Math::FVector2f& mouse, bool blockWorkspaceInput) const;
+        };
+
+        class FInspectorPanelController final {
+        public:
+            void Draw(const FEditorUiModule& module, DebugGui::IDebugGui& gui,
+                const DebugGui::FRect& contentRect) const;
+        };
+
+        void               RegisterDefaultPanels(DebugGui::IDebugGuiSystem* debugGuiSystem,
+                          ::AltinaEngine::Core::Container::FStringView      assetRoot         = {},
+                          ::AltinaEngine::Core::Container::FStringView      projectSourcePath = {});
+        void               SetWorldHierarchySnapshot(const FEditorWorldHierarchySnapshot& snapshot);
+
+        [[nodiscard]] auto GetViewportRequest() const noexcept -> FEditorViewportRequest;
+        [[nodiscard]] auto ConsumeUiCommands()
+            -> ::AltinaEngine::Core::Container::TVector<EEditorUiCommand>;
+
+        [[nodiscard]] auto DebugGetAssetItemsForTest() const
+            -> ::AltinaEngine::Core::Container::TVector<::AltinaEngine::Core::Container::FString>;
+        [[nodiscard]] auto DebugGetCurrentAssetPathForTest() const
+            -> ::AltinaEngine::Core::Container::FString;
+        [[nodiscard]] auto DebugGetHierarchyItemsForTest() const
+            -> ::AltinaEngine::Core::Container::TVector<FEditorHierarchyDebugItem>;
+        [[nodiscard]] auto DebugGetSelectionInfoForTest() const -> FEditorSelectionInfo;
+        void               DebugSelectGameObjectForTest(FEditorGameObjectRuntimeId id);
+        void               DebugSelectComponentForTest(FEditorComponentRuntimeId id);
+        auto               DebugOpenAssetPathForTest(
+                          ::AltinaEngine::Core::Container::FStringView path, EAssetItemType type) -> bool;
+
         void DrawRootUi(DebugGui::IDebugGuiSystem* debugGuiSystem, DebugGui::IDebugGui& gui);
         void DrawHierarchyPanel(DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect,
             const ::AltinaEngine::Core::Math::FVector2f& mouse, bool blockWorkspaceInput);
         void DrawInspectorPanel(DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect) const;
+        void DrawAssetPanel(DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect,
+            const ::AltinaEngine::Core::Math::FVector2f& mouse, bool blockWorkspaceInput);
+
         void RefreshHierarchyCache();
         void RefreshHierarchyDebugItems();
         void SelectGameObject(FEditorGameObjectRuntimeId id);
@@ -206,10 +285,9 @@ namespace AltinaEngine::Editor::UI {
         [[nodiscard]] auto FindGameObjectIndex(FEditorGameObjectRuntimeId id) const -> i32;
         [[nodiscard]] auto FindComponentSnapshot(FEditorComponentRuntimeId id) const
             -> const FEditorComponentSnapshot*;
-        void DrawAssetPanel(DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect,
-            const ::AltinaEngine::Core::Math::FVector2f& mouse, bool blockWorkspaceInput);
-        void RefreshAssetCache(bool force);
-        void BuildAssetItemsForCurrentFolder();
+
+        void               RefreshAssetCache(bool force);
+        void               BuildAssetItemsForCurrentFolder();
         [[nodiscard]] auto ResolveAssetRoot(
             ::AltinaEngine::Core::Container::FStringView requestedRoot) const
             -> ::AltinaEngine::Core::Container::FString;
@@ -226,17 +304,25 @@ namespace AltinaEngine::Editor::UI {
         void               OpenPathInAssetView(
                           ::AltinaEngine::Core::Container::FStringView path, EAssetItemType type);
 
-        DebugGui::IDebugGuiSystem*                                 mDebugGuiSystem  = nullptr;
-        bool                                                       mRegistered      = false;
-        bool                                                       mFocusedViewport = false;
-        i32                                                        mOpenMenu        = -1;
-        i32                                                        mDraggingPanel   = -1;
-        i32                                                        mActiveSplitter  = 0;
-        FDockState                                                 mDock{};
-        FEditorViewportRequest                                     mViewportRequest{};
-        ::AltinaEngine::Core::Container::TVector<FPanelState>      mPanels;
-        ::AltinaEngine::Core::Container::TVector<EEditorUiCommand> mPendingCommands;
-        FEditorWorldHierarchySnapshot                              mHierarchySnapshot{};
+        DebugGui::IDebugGuiSystem*                            mDebugGuiSystem          = nullptr;
+        bool                                                  mRegistered              = false;
+        bool                                                  mFocusedViewport         = false;
+        i32                                                   mOpenMenu                = -1;
+        bool                                                  mOpenMenuUseLegacyAnchor = false;
+        i32                                                   mDraggingPanel           = -1;
+        bool                                                  mLegacyViewportDragArmed = false;
+        i32                                                   mActiveSplitter          = 0;
+        FDockState                                            mDock{};
+        ::AltinaEngine::Core::Container::TVector<FPanelState> mPanels;
+        ::AltinaEngine::Core::Container::TVector<FEditorPanelDescriptor> mPanelDescriptors;
+
+        FEditorUiStateStore                                              mStateStore{};
+        FHierarchyPanelController     mHierarchyPanelController{};
+        FAssetPanelController         mAssetPanelController{};
+        FInspectorPanelController     mInspectorPanelController{};
+        FEditorUiRootController       mRootController{};
+
+        FEditorWorldHierarchySnapshot mHierarchySnapshot{};
         ::AltinaEngine::Core::Container::TVector<::AltinaEngine::Core::Container::TVector<i32>>
                                                       mHierarchyChildren;
         ::AltinaEngine::Core::Container::TVector<i32> mHierarchyRoots;
@@ -260,7 +346,6 @@ namespace AltinaEngine::Editor::UI {
                                                              mAssetNodeLookup;
         ::AltinaEngine::Core::Container::TVector<FAssetItem> mAssetItems;
         FAssetContextMenuState                               mAssetContextMenu;
-        u64                                                  mFrameCounter               = 0ULL;
         u64                                                  mAssetLastRefreshFrame      = 0ULL;
         u64                                                  mLastAssetClickId           = 0ULL;
         u64                                                  mLastAssetClickFrame        = 0ULL;
@@ -270,6 +355,9 @@ namespace AltinaEngine::Editor::UI {
         f32                                                  mAssetTreeScrollY           = 0.0f;
         f32                                                  mAssetTreeScrollDragOffsetY = 0.0f;
         bool                                                 mAssetTreeScrollDragging    = false;
+        f32                                                  mOutputScrollY              = 0.0f;
+        f32                                                  mOutputScrollDragOffsetY    = 0.0f;
+        bool                                                 mOutputScrollDragging       = false;
         bool                                                 mAssetNeedsRefresh          = true;
         u64 mAssetFolderIconImageId = 0xE17D1001ULL;
         u64 mAssetFileIconImageId   = 0xE17D1002ULL;

@@ -26,16 +26,19 @@ namespace AltinaEngine::DebugGui::Private {
             }
         }
 
-        FColor32 bg = hovered ? mTheme->mButtonHoveredBg : mTheme->mButtonBg;
+        const f32 buttonRadius = mTheme->mEditor.mPanelSurface.mCornerRadius;
+        FColor32  bg           = hovered ? mTheme->mButtonHoveredBg : mTheme->mButtonBg;
         if (mUi->mActiveId == id) {
             bg = mTheme->mButtonActiveBg;
         }
-        DrawRectFilled(r, bg);
-        DrawRect(r, mTheme->mButtonBorder, 1.0f);
+        DrawRoundedRectFilled(r, bg, buttonRadius);
+        if ((mTheme->mButtonBorder >> 24U) != 0U) {
+            DrawRoundedRect(r, mTheme->mButtonBorder, buttonRadius, 1.0f);
+        }
 
         const FVector2f textPos(
             r.Min.X() + mTheme->mButtonPaddingX, r.Min.Y() + mTheme->mButtonPaddingY);
-        DrawText(textPos, mTheme->mButtonText, label);
+        DrawTextStyled(textPos, mTheme->mButtonText, label, EDebugGuiFontRole::Body);
 
         AdvanceItem(size);
         return pressed;
@@ -50,13 +53,17 @@ namespace AltinaEngine::DebugGui::Private {
         const f32   rowHeight  = (mTheme->mTreeRowHeight > 0.0f) ? mTheme->mTreeRowHeight : 18.0f;
         const f32   indentStep = (mTheme->mTreeIndent > 0.0f) ? mTheme->mTreeIndent : 14.0f;
         const f32   arrowSize  = (mTheme->mTreeArrowSize > 0.0f) ? mTheme->mTreeArrowSize : 6.0f;
+        const f32   bodyHeight = GetGlyphHeight(EDebugGuiFontRole::Body);
 
         const f32   indent   = static_cast<f32>(desc.mDepth) * indentStep;
         const FRect clipRect = mClip->Current(mDisplaySize);
         const f32 rowMaxX = (clipRect.Max.X() > mCursor.X()) ? clipRect.Max.X() : mDisplaySize.X();
         const FRect rowRect{ mCursor, FVector2f(rowMaxX, mCursor.Y() + rowHeight) };
-        const f32 textStartX = rowRect.Min.X() + indent + arrowSize + mTheme->mTreeTextPadX + 3.0f;
-        const f32 textWidth  = static_cast<f32>(desc.mLabel.Length()) * GetGlyphWidth();
+        const f32   rootIndentBias = (desc.mDepth == 0U) ? 6.0f : 0.0f;
+        const f32   textStartX =
+            rowRect.Min.X() + rootIndentBias + indent + arrowSize + mTheme->mTreeTextPadX;
+        const f32 textWidth =
+            static_cast<f32>(desc.mLabel.Length()) * GetGlyphWidth(EDebugGuiFontRole::Body);
         const FRect textHitRect{ FVector2f(textStartX - 2.0f, rowRect.Min.Y()),
             FVector2f(textStartX + textWidth + 4.0f, rowRect.Max.Y()) };
 
@@ -97,17 +104,26 @@ namespace AltinaEngine::DebugGui::Private {
             rowColor = mTheme->mHoveredRowBg;
         }
         if ((rowColor >> 24U) != 0U) {
-            DrawRectFilled(rowRect, rowColor);
-        }
-        if (hovered) {
-            DrawRect(rowRect, mTheme->mTreeExpandIcon, 1.0f);
+            const f32 rowWidth = rowRect.Max.X() - rowRect.Min.X();
+            const f32 radius   = rowHeight * 0.5f;
+            if (rowWidth > radius * 2.0f) {
+                DrawCapsuleFilled(FVector2f(rowRect.Min.X() + radius, rowRect.Min.Y() + radius),
+                    FVector2f(rowRect.Max.X() - radius, rowRect.Min.Y() + radius), radius,
+                    rowColor);
+            } else {
+                DrawRoundedRectFilled(
+                    rowRect, rowColor, mTheme->mEditor.mInsetSurface.mCornerRadius);
+            }
         }
 
-        const f32 arrowCenterX = rowRect.Min.X() + indent + arrowSize * 0.5f + 2.0f;
+        const f32 arrowCenterX =
+            rowRect.Min.X() + rootIndentBias + indent + arrowSize * 0.5f + 2.0f;
         const f32 arrowCenterY = rowRect.Min.Y() + rowHeight * 0.5f;
         if (desc.mHasChildren) {
-            const FRect toggleHitRect{ FVector2f(rowRect.Min.X() + indent, rowRect.Min.Y()),
-                FVector2f(rowRect.Min.X() + indent + arrowSize + mTheme->mTreeTextPadX + 4.0f,
+            const FRect toggleHitRect{ FVector2f(rowRect.Min.X() + rootIndentBias + indent,
+                                           rowRect.Min.Y()),
+                FVector2f(rowRect.Min.X() + rootIndentBias + indent + arrowSize
+                        + mTheme->mTreeTextPadX + 4.0f,
                     rowRect.Max.Y()) };
             const bool  arrowHovered = PointInRect(mInput.mMousePos, toggleHitRect);
             if (arrowHovered && mInput.mMousePressed) {
@@ -131,7 +147,10 @@ namespace AltinaEngine::DebugGui::Private {
             }
         }
 
-        DrawText(FVector2f(textStartX, rowRect.Min.Y() + 3.0f), mTheme->mTreeText, desc.mLabel);
+        const FColor32 textColor =
+            desc.mSelected ? mTheme->mEditor.mPanelContentText : mTheme->mTreeText;
+        DrawTextStyled(FVector2f(textStartX, rowRect.Min.Y() + (rowHeight - bodyHeight) * 0.5f),
+            textColor, desc.mLabel, EDebugGuiFontRole::Body);
 
         auto trailingWidgetDraw = desc.mTrailingWidgetDraw;
         if (trailingWidgetDraw) {
@@ -181,29 +200,30 @@ namespace AltinaEngine::DebugGui::Private {
             mUi->mWantsCaptureMouse      = true;
         }
 
-        FColor32 bg = 0U;
+        FColor32 bg = MakeColor32(255, 255, 255, 184);
         if (desc.mSelected) {
-            bg = mTheme->mSelectedRowBg;
+            bg = MakeColor32(71, 143, 255, 36);
         } else if (hovered) {
-            bg = mTheme->mHoveredRowBg;
+            bg = MakeColor32(255, 255, 255, 214);
         }
-        if ((bg >> 24U) != 0U) {
-            DrawRectFilled(itemRect, bg);
-        }
+        DrawRectFilled(itemRect, bg);
 
-        const f32   labelHeight = GetGlyphHeight() + mTheme->mIconLabelPadY;
         const f32   innerPad    = mTheme->mIconInnerPadding;
+        const f32   iconBoxSize = 60.0f;
         const FRect iconRect{ FVector2f(itemRect.Min.X() + innerPad, itemRect.Min.Y() + innerPad),
-            FVector2f(itemRect.Max.X() - innerPad, itemRect.Max.Y() - labelHeight) };
-        const FColor32 placeholder =
-            desc.mIsDirectory ? mTheme->mIconPlaceholderDirectory : mTheme->mIconPlaceholderFile;
-        DrawRoundedRectFilled(iconRect, placeholder, 4.0f);
-        DrawRoundedRect(iconRect, mTheme->mIconItemBorder, 4.0f, 1.0f);
-        DrawImage(iconRect, desc.mImageId, MakeColor32(255, 255, 255, 255));
+            FVector2f(itemRect.Min.X() + innerPad + iconBoxSize,
+                itemRect.Min.Y() + innerPad + iconBoxSize) };
+        DrawRoundedRectFilled(iconRect, mTheme->mEditor.mPlaceholderIconBg, 8.0f);
+        if ((mTheme->mIconItemBorder >> 24U) != 0U) {
+            DrawRoundedRect(iconRect, mTheme->mIconItemBorder, 8.0f, 1.0f);
+        }
+        DrawImage(iconRect, desc.mImageId,
+            desc.mSelected ? mTheme->mEditor.mPlaceholderIconFg : mTheme->mEditor.mTabs.mUnderline);
 
         const f32 textX = itemRect.Min.X() + innerPad;
-        const f32 textY = itemRect.Max.Y() - GetGlyphHeight() - 1.0f;
-        DrawText(FVector2f(textX, textY), mTheme->mTreeText, desc.mLabel);
+        const f32 textY = itemRect.Max.Y() - GetGlyphHeight(EDebugGuiFontRole::Small) - innerPad;
+        DrawTextStyled(
+            FVector2f(textX, textY), mTheme->mTreeText, desc.mLabel, EDebugGuiFontRole::Small);
         return result;
     }
 } // namespace AltinaEngine::DebugGui::Private

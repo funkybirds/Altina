@@ -628,55 +628,79 @@ namespace AltinaEngine::DebugGui::Private {
             const f32 bl =
                 HasAnyCornerFlag(cornerFlags, EDebugGuiCornerFlags::BottomLeft) ? r : 0.0f;
 
-            const f32 minX        = rect.Min.X();
-            const f32 minY        = rect.Min.Y();
-            const f32 maxX        = rect.Max.X();
-            const f32 maxY        = rect.Max.Y();
-            const f32 leftInset   = Core::Math::Max(tl, bl);
-            const f32 rightInset  = Core::Math::Max(tr, br);
-            const f32 topInset    = Core::Math::Max(tl, tr);
-            const f32 bottomInset = Core::Math::Max(bl, br);
+            const f32          minX = rect.Min.X();
+            const f32          minY = rect.Min.Y();
+            const f32          maxX = rect.Max.X();
+            const f32          maxY = rect.Max.Y();
 
-            if (maxX - rightInset > minX + leftInset) {
-                AddRectFilled({ .Min   = FVector2f(minX + leftInset, minY),
-                                  .Max = FVector2f(maxX - rightInset, maxY) },
-                    color);
-            }
-            if (topInset > 0.0f && maxX - tr > minX + tl) {
-                AddRectFilled({ .Min   = FVector2f(minX + tl, minY),
-                                  .Max = FVector2f(maxX - tr, minY + topInset) },
-                    color);
-            }
-            if (bottomInset > 0.0f && maxX - br > minX + bl) {
-                AddRectFilled({ .Min   = FVector2f(minX + bl, maxY - bottomInset),
-                                  .Max = FVector2f(maxX - br, maxY) },
-                    color);
-            }
-            if (leftInset > 0.0f && maxY - bl > minY + tl) {
-                AddRectFilled({ .Min   = FVector2f(minX, minY + tl),
-                                  .Max = FVector2f(minX + leftInset, maxY - bl) },
-                    color);
-            }
-            if (rightInset > 0.0f && maxY - br > minY + tr) {
-                AddRectFilled({ .Min   = FVector2f(maxX - rightInset, minY + tr),
-                                  .Max = FVector2f(maxX, maxY - br) },
-                    color);
-            }
+            TVector<FVector2f> points;
+            points.Reserve(static_cast<usize>(CalcArcSegments90(r) * 4U + 8U));
 
-            constexpr f32 kPi   = Core::Math::kPiF;
-            const u32     seg90 = CalcArcSegments90(r);
+            const auto pushPoint = [&points](const FVector2f& point) {
+                if (!points.IsEmpty()) {
+                    const auto& last = points.Back();
+                    if (Core::Math::Abs(last.X() - point.X()) <= 0.001f
+                        && Core::Math::Abs(last.Y() - point.Y()) <= 0.001f) {
+                        return;
+                    }
+                }
+                points.PushBack(point);
+            };
 
-            if (tl > 0.0f) {
-                AddArcFilled(FVector2f(minX + tl, minY + tl), tl, kPi, 1.5f * kPi, seg90, color);
-            }
+            const auto appendArc = [&](const FVector2f& center, f32 radius, f32 startAngle,
+                                       f32 endAngle) {
+                if (radius <= 0.0f) {
+                    return;
+                }
+                const u32 seg  = CalcArcSegments90(radius);
+                const f32 step = (endAngle - startAngle) / static_cast<f32>(seg);
+                for (u32 i = 0U; i <= seg; ++i) {
+                    const f32 angle = startAngle + step * static_cast<f32>(i);
+                    pushPoint(FVector2f(center.X() + Core::Math::Cos(angle) * radius,
+                        center.Y() + Core::Math::Sin(angle) * radius));
+                }
+            };
+
+            constexpr f32 kPi = Core::Math::kPiF;
+
+            pushPoint(FVector2f(minX + tl, minY));
+            pushPoint(FVector2f(maxX - tr, minY));
             if (tr > 0.0f) {
-                AddArcFilled(FVector2f(maxX - tr, minY + tr), tr, -0.5f * kPi, 0.0f, seg90, color);
+                appendArc(FVector2f(maxX - tr, minY + tr), tr, -0.5f * kPi, 0.0f);
+            } else {
+                pushPoint(FVector2f(maxX, minY));
             }
+
+            pushPoint(FVector2f(maxX, maxY - br));
             if (br > 0.0f) {
-                AddArcFilled(FVector2f(maxX - br, maxY - br), br, 0.0f, 0.5f * kPi, seg90, color);
+                appendArc(FVector2f(maxX - br, maxY - br), br, 0.0f, 0.5f * kPi);
+            } else {
+                pushPoint(FVector2f(maxX, maxY));
             }
+
+            pushPoint(FVector2f(minX + bl, maxY));
             if (bl > 0.0f) {
-                AddArcFilled(FVector2f(minX + bl, maxY - bl), bl, 0.5f * kPi, kPi, seg90, color);
+                appendArc(FVector2f(minX + bl, maxY - bl), bl, 0.5f * kPi, kPi);
+            } else {
+                pushPoint(FVector2f(minX, maxY));
+            }
+
+            pushPoint(FVector2f(minX, minY + tl));
+            if (tl > 0.0f) {
+                appendArc(FVector2f(minX + tl, minY + tl), tl, kPi, 1.5f * kPi);
+            } else {
+                pushPoint(FVector2f(minX, minY));
+            }
+
+            if (points.Size() < 3U) {
+                AddRectFilled(rect, color);
+                return;
+            }
+
+            const FVector2f center((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
+            for (usize i = 0U; i < points.Size(); ++i) {
+                const usize next = (i + 1U < points.Size()) ? (i + 1U) : 0U;
+                AddTriangleFilled(center, points[i], points[next], color);
             }
         }
 

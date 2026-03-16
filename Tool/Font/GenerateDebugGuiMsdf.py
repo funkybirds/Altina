@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import struct
 from dataclasses import dataclass
 from pathlib import Path
@@ -599,10 +600,59 @@ def write_inl(
         f.write("}\n")
 
 
+def parse_metric_values(text: str, function_name: str) -> list[float]:
+    pattern = (
+        r"inline auto\s+"
+        + re.escape(function_name)
+        + r"\(u8 ch\)\s+noexcept\s+->\s+f32\s*\{.*?"
+        + r"static constexpr f32 kValues\[kGlyphCount\]\s*=\s*\{(.*?)\};"
+    )
+    match = re.search(pattern, text, re.S)
+    if not match:
+        raise RuntimeError(f"failed to parse metric block: {function_name}")
+    values: list[float] = []
+    for token in match.group(1).replace("\n", " ").split(","):
+        value = token.strip()
+        if not value:
+            continue
+        if value.endswith("f"):
+            value = value[:-1]
+        values.append(float(value))
+    return values
+
+
+def parse_scalar_value(text: str, function_name: str) -> float:
+    pattern = (
+        r"inline auto\s+"
+        + re.escape(function_name)
+        + r"\(\)\s+noexcept\s+->\s+f32\s*\{\s*return\s+([0-9eE+\-.]+)f;\s*\}"
+    )
+    match = re.search(pattern, text, re.S)
+    if not match:
+        raise RuntimeError(f"failed to parse scalar block: {function_name}")
+    return float(match.group(1))
+
+
+def load_legacy_metrics(inl_path: Path) -> tuple[list[float], list[float], list[float], float, float]:
+    text = inl_path.read_text(encoding="ascii")
+    advances = parse_metric_values(text, "GetFont32x32GlyphAdvance")
+    bearings_x = parse_metric_values(text, "GetFont32x32GlyphBearingX")
+    bearings_y = parse_metric_values(text, "GetFont32x32GlyphBearingY")
+    recommended_stretch_x = parse_scalar_value(text, "GetFont32x32RecommendedStretchX")
+    nominal_aspect = parse_scalar_value(text, "GetFont32x32NominalAspect")
+    return advances, bearings_x, bearings_y, nominal_aspect, recommended_stretch_x
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate DebugGui MSDF atlas from TTF.")
     parser.add_argument("--ttf", type=str, required=True, help="Input TrueType file.")
     parser.add_argument("--out", type=str, required=True, help="Output .inl path.")
+    parser.add_argument(
+        "--metrics-from",
+        type=str,
+        default="",
+        help="Optional existing atlas .inl to reuse metrics/stretch/aspect from.",
+    )
     parser.add_argument("--debug-grid-out", type=str, default="", help="Optional debug PNG output.")
     args = parser.parse_args()
 
@@ -611,10 +661,6 @@ def main() -> None:
     data = ttf_path.read_bytes()
     font = TtfFont(data)
 
-    union_min_x = 1e9
-    union_min_y = 1e9
-    union_max_x = -1e9
-    union_max_y = -1e9
     cap_min_y = 1e9
     cap_max_y = -1e9
     cap_width_sum = 0.0
@@ -631,14 +677,6 @@ def main() -> None:
             for p in c:
                 glyph_has = True
                 has_outline = True
-                if p.x < union_min_x:
-                    union_min_x = p.x
-                if p.y < union_min_y:
-                    union_min_y = p.y
-                if p.x > union_max_x:
-                    union_max_x = p.x
-                if p.y > union_max_y:
-                    union_max_y = p.y
                 if ord("A") <= code <= ord("Z"):
                     has_caps = True
                     if p.y < cap_min_y:
@@ -657,10 +695,7 @@ def main() -> None:
     if not has_caps:
         raise TtfError("no cap outlines found for ASCII uppercase range")
 
-    union_h = union_max_y - union_min_y
     cap_h = cap_max_y - cap_min_y
-    if union_h <= 1.0:
-        raise TtfError("invalid union bbox height")
     if cap_h <= 1.0:
         raise TtfError("invalid cap height")
     if cap_count == 0:
@@ -670,32 +705,38 @@ def main() -> None:
     scale = target / cap_h
     baseline = PADDING + cap_max_y * scale
 
-    advances: list[float] = []
-    bearings_x: list[float] = []
-    bearings_y: list[float] = []
     glyph_data: list[int] = []
 
-    draw_scale = float(11.0) / cap_h
+    draw_scale = TARGET_DRAW_H / cap_h
     for code in range(FIRST_CHAR, LAST_CHAR + 1):
         gid = font.glyph_index(code)
         adv = float(font.advance_widths[gid]) if gid < len(font.advance_widths) else 0.0
-        lsb = float(font.left_side_bearings[gid]) if gid < len(font.left_side_bearings) else 0.0
         advance_px = adv * scale
         ox = (float(CELL_W) - advance_px) * 0.5
         glyph_pixels = build_glyph_msdf(font, gid, scale, ox, baseline)
         glyph_data.extend(glyph_pixels)
-        advances.append(adv * draw_scale)
-        bearings_x.append(lsb * draw_scale)
-        bearings_y.append(float(font.ascender) * draw_scale)
 
-    nominal_aspect = (float(sum(advances)) / len(advances)) / 11.0
-    font_aspect = cap_w_avg / cap_h
-    target_aspect = TARGET_DRAW_W / TARGET_DRAW_H
-    recommended_stretch_x = target_aspect / font_aspect if font_aspect > 1e-6 else 1.0
-    if recommended_stretch_x < 0.85:
-        recommended_stretch_x = 0.85
-    if recommended_stretch_x > 1.35:
-        recommended_stretch_x = 1.35
+    metrics_from = Path(args.metrics_from) if args.metrics_from else None
+    if metrics_from is not None and metrics_from.exists():
+        advances, bearings_x, bearings_y, nominal_aspect, recommended_stretch_x = load_legacy_metrics(
+            metrics_from
+        )
+    else:
+        advances = []
+        bearings_x = []
+        bearings_y = []
+        for code in range(FIRST_CHAR, LAST_CHAR + 1):
+            gid = font.glyph_index(code)
+            adv = float(font.advance_widths[gid]) if gid < len(font.advance_widths) else 0.0
+            lsb = float(font.left_side_bearings[gid]) if gid < len(font.left_side_bearings) else 0.0
+            advances.append(adv * draw_scale)
+            bearings_x.append(lsb * draw_scale)
+            bearings_y.append(float(font.ascender) * draw_scale)
+
+        nominal_aspect = (float(sum(advances)) / len(advances)) / TARGET_DRAW_H
+        font_aspect = cap_w_avg / cap_h
+        target_aspect = TARGET_DRAW_W / TARGET_DRAW_H
+        recommended_stretch_x = target_aspect / font_aspect if font_aspect > 1e-6 else 1.0
 
     write_inl(
         out_path,

@@ -51,6 +51,8 @@ float4 DebugGuiPSMain(VSOutput input) : SV_Target0
         float2 cellLocal = frac(uvCell);
         float stretchX = max(gFontStretchX, 0.01);
         cellLocal.x = saturate((cellLocal.x - 0.5) / stretchX + 0.5);
+        float2 cellInset = 0.5 / max(float2(gGlyphTexelW, gGlyphTexelH), float2(1.0, 1.0));
+        cellLocal = clamp(cellLocal, cellInset, 1.0 - cellInset);
         sampleUv = (cellBase + cellLocal) / cellCount;
     }
 
@@ -62,9 +64,13 @@ float4 DebugGuiPSMain(VSOutput input) : SV_Target0
 
     float msdf = max(min(tex.r, tex.g), min(max(tex.r, tex.g), tex.b));
     float edge = saturate(gSdfEdge);
-    float grad = max(fwidth(msdf), 1e-5);
-    float width = grad + gSdfSoftness;
-    width = clamp(width, 1e-5, 0.25);
-    float alpha = smoothstep(edge - width, edge + width, msdf);
+    float2 atlasTexelSize = max(float2(gAtlasWidth, gAtlasHeight), float2(1.0, 1.0));
+    float2 unitRange = float2(gSdfPixelRange, gSdfPixelRange) / atlasTexelSize;
+    float2 uvFwidth = max(fwidth(sampleUv), float2(1e-6, 1e-6));
+    float2 screenTexSize = 1.0 / uvFwidth;
+    float screenPxRange = max(0.5 * dot(unitRange, screenTexSize), 1.0);
+    float softness = gSdfSoftness * screenPxRange;
+    float screenPxDistance = (msdf - edge) * screenPxRange;
+    float alpha = saturate(screenPxDistance + 0.5 + softness);
     return float4(input.Color.rgb, input.Color.a * alpha);
 }

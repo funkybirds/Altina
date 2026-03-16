@@ -49,6 +49,19 @@ namespace AltinaEngine::Editor::UI {
         return nullptr;
     }
 
+    auto FEditorUiModule::FindSelectedGameObjectSnapshot() const
+        -> const FEditorGameObjectSnapshot* {
+        if (mSelection.mType != EEditorSelectionType::GameObject) {
+            return nullptr;
+        }
+        for (const auto& object : mHierarchySnapshot.mGameObjects) {
+            if (mSelection.mUuid == MakeGameObjectUuid(object.mId).ToView()) {
+                return &object;
+            }
+        }
+        return nullptr;
+    }
+
     auto FEditorUiModule::IsGameObjectSelected(FEditorGameObjectRuntimeId id) const -> bool {
         if (mSelection.mType != EEditorSelectionType::GameObject) {
             return false;
@@ -67,6 +80,7 @@ namespace AltinaEngine::Editor::UI {
         const i32 index = FindGameObjectIndex(id);
         if (index < 0 || index >= static_cast<i32>(mHierarchySnapshot.mGameObjects.Size())) {
             mSelection = {};
+            mInspectorNameInput.Clear();
             return;
         }
 
@@ -76,12 +90,14 @@ namespace AltinaEngine::Editor::UI {
         mSelection.mUuid   = MakeGameObjectUuid(object.mId);
         mSelection.mTypeName.Clear();
         mSelection.mTypeNamespace.Clear();
+        mInspectorNameInput = object.mName;
     }
 
     void FEditorUiModule::SelectComponent(FEditorComponentRuntimeId id) {
         const auto* component = FindComponentSnapshot(id);
         if (component == nullptr) {
             mSelection = {};
+            mInspectorNameInput.Clear();
             return;
         }
 
@@ -90,6 +106,7 @@ namespace AltinaEngine::Editor::UI {
         mSelection.mUuid          = MakeComponentUuid(component->mId);
         mSelection.mTypeName      = component->mTypeName;
         mSelection.mTypeNamespace = component->mTypeNamespace;
+        mInspectorNameInput.Clear();
     }
 
     void FEditorUiModule::RefreshHierarchyCache() {
@@ -185,22 +202,20 @@ namespace AltinaEngine::Editor::UI {
                     break;
                 }
             }
-        } else if (mSelection.mType == EEditorSelectionType::Component) {
-            for (const auto& object : mHierarchySnapshot.mGameObjects) {
-                for (const auto& component : object.mComponents) {
-                    if (mSelection.mUuid == MakeComponentUuid(component.mId).ToView()) {
-                        selectionValid = true;
-                        break;
-                    }
-                }
-                if (selectionValid) {
-                    break;
-                }
-            }
         }
 
         if (!selectionValid) {
             mSelection = {};
+            mInspectorNameInput.Clear();
+        } else if (mSelection.mType == EEditorSelectionType::GameObject) {
+            const auto* object = FindSelectedGameObjectSnapshot();
+            if (object != nullptr) {
+                mSelection.mName    = object->mName;
+                mInspectorNameInput = object->mName;
+            }
+        } else {
+            mSelection = {};
+            mInspectorNameInput.Clear();
         }
     }
 
@@ -236,14 +251,6 @@ namespace AltinaEngine::Editor::UI {
             objectItem.mDepth       = depth;
             objectItem.mIsComponent = false;
             mHierarchyDebugItems.PushBack(Move(objectItem));
-
-            for (const auto& component : object.mComponents) {
-                FEditorHierarchyDebugItem componentItem{};
-                componentItem.mLabel       = component.mName;
-                componentItem.mDepth       = depth + 1U;
-                componentItem.mIsComponent = true;
-                mHierarchyDebugItems.PushBack(Move(componentItem));
-            }
 
             const auto& children = mHierarchyChildren[static_cast<usize>(objectIndex)];
             for (isize child = static_cast<isize>(children.Size()) - 1; child >= 0; --child) {

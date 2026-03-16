@@ -62,7 +62,7 @@ namespace AltinaEngine::Editor::UI {
         module.DrawAssetPanel(gui, contentRect, mouse, blockWorkspaceInput);
     }
 
-    void FEditorUiModule::FInspectorPanelController::Draw(const FEditorUiModule& module,
+    void FEditorUiModule::FInspectorPanelController::Draw(FEditorUiModule& module,
         DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect) const {
         module.DrawInspectorPanel(gui, contentRect);
     }
@@ -210,6 +210,26 @@ namespace AltinaEngine::Editor::UI {
     auto FEditorUiModule::DebugGetSelectionInfoForTest() const -> FEditorSelectionInfo {
         return mSelection;
     }
+
+    auto FEditorUiModule::DebugGetHierarchySnapshotForTest() const
+        -> FEditorWorldHierarchySnapshot {
+        return mHierarchySnapshot;
+    }
+
+    auto FEditorUiModule::DebugIsInspectorComponentExpandedForTest(
+        FEditorComponentRuntimeId id) const -> bool {
+        auto it = mInspectorExpanded.FindIt(MakeComponentUuid(id));
+        if (it == mInspectorExpanded.end()) {
+            return false;
+        }
+        return it->second;
+    }
+
+    auto FEditorUiModule::DebugGetInspectorScrollYForTest() const -> f32 {
+        return mInspectorScrollY;
+    }
+
+    void FEditorUiModule::DebugSetInspectorScrollYForTest(f32 value) { mInspectorScrollY = value; }
 
     void FEditorUiModule::DebugSelectGameObjectForTest(FEditorGameObjectRuntimeId id) {
         SelectGameObject(id);

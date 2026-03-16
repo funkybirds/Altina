@@ -374,7 +374,6 @@ namespace AltinaEngine::Editor::UI {
                 if (!expanded) {
                     continue;
                 }
-                visibleRowCount += static_cast<i32>(object.mComponents.Size());
                 const auto& children = mHierarchyChildren[static_cast<usize>(objectIndex)];
                 for (isize child = static_cast<isize>(children.Size()) - 1; child >= 0; --child) {
                     countStack.PushBack(children[static_cast<usize>(child)]);
@@ -465,7 +464,7 @@ namespace AltinaEngine::Editor::UI {
             const auto  uuid     = MakeGameObjectUuid(object.mId);
             const auto  keyIt    = mHierarchyExpanded.FindIt(uuid);
             const bool  expanded = (keyIt != mHierarchyExpanded.end()) ? keyIt->second : false;
-            const bool  hasChildren = !children.IsEmpty() || !object.mComponents.IsEmpty();
+            const bool  hasChildren = !children.IsEmpty();
 
             DebugGui::FTreeViewItemDesc objectDesc{};
             objectDesc.mLabel       = object.mName.ToView();
@@ -497,20 +496,6 @@ namespace AltinaEngine::Editor::UI {
                     break;
                 }
             }
-
-            for (usize c = 0; c < object.mComponents.Size(); ++c) {
-                const auto&                 component = object.mComponents[c];
-                DebugGui::FTreeViewItemDesc componentDesc{};
-                componentDesc.mLabel       = component.mName.ToView();
-                componentDesc.mDepth       = depth + 1U;
-                componentDesc.mSelected    = IsComponentSelected(component.mId);
-                componentDesc.mExpanded    = false;
-                componentDesc.mHasChildren = false;
-                const auto componentResult = gui.TreeViewItem(componentDesc);
-                if (!blockWorkspaceInput && componentResult.mClicked) {
-                    SelectComponent(component.mId);
-                }
-            }
         }
 
         gui.PopClipRect();
@@ -531,79 +516,319 @@ namespace AltinaEngine::Editor::UI {
     }
 
     void FEditorUiModule::DrawInspectorPanel(
-        DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect) const {
+        DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect) {
         const f32                      uiScale = (mUiScale > 0.01f) ? mUiScale : 1.0f;
         const auto                     ScalePx = [uiScale](f32 value) { return value * uiScale; };
         const DebugGui::FDebugGuiTheme theme =
             (mDebugGuiSystem != nullptr) ? mDebugGuiSystem->GetTheme() : DebugGui::FDebugGuiTheme{};
-        const auto   colText       = theme.mEditor.mPanelContentText;
-        const auto   colMutedText  = theme.mEditor.mPanelContentMutedText;
-        const FRect  sectionRect   = MakeRect(contentRect.Min.X(), contentRect.Min.Y(),
-               contentRect.Max.X(), contentRect.Min.Y() + ScalePx(20.0f));
-        const TChar* selectionType = TEXT("None");
-        if (mSelection.mType == EEditorSelectionType::GameObject) {
-            selectionType = TEXT("Actor");
-        } else if (mSelection.mType == EEditorSelectionType::Component) {
-            selectionType = TEXT("Component");
-        }
-        DrawSectionHead(gui, theme, sectionRect, TEXT("Selected"), selectionType, true);
+        const auto  mouse         = gui.GetMousePos();
+        const bool  mousePressed  = gui.WasMousePressed();
+        const bool  mouseReleased = gui.WasMouseReleased();
+        const bool  mouseDown     = gui.IsMouseDown();
 
-        const FRect cardRect = MakeRect(contentRect.Min.X(), sectionRect.Max.Y() + ScalePx(3.0f),
-            contentRect.Max.X(), contentRect.Max.Y());
-        gui.DrawRoundedRectFilled(cardRect, DebugGui::MakeColor32(255, 255, 255, 168),
-            theme.mEditor.mInsetSurface.mCornerRadius);
-        const f32 x = cardRect.Min.X() + ScalePx(14.0f);
-        f32       y = cardRect.Min.Y() + ScalePx(16.0f);
+        const auto  colText           = theme.mEditor.mPanelContentText;
+        const auto  colMutedText      = theme.mEditor.mPanelContentMutedText;
+        const auto  colButtonBg       = theme.mButtonBg;
+        const auto  colButtonHoverBg  = theme.mButtonHoveredBg;
+        const auto  colButtonText     = theme.mButtonText;
+        const auto  colCollapseBg     = DebugGui::MakeColor32(134, 145, 159, 255);
+        const auto  colCollapseHover  = DebugGui::MakeColor32(146, 156, 171, 255);
+        const auto  colCollapseText   = DebugGui::MakeColor32(255, 255, 255, 255);
+        const auto  colCollapseIcon   = DebugGui::MakeColor32(229, 234, 239, 255);
+        const auto  colValueRowBg     = DebugGui::MakeColor32(248, 249, 250, 255);
+        const auto  colValueRowBorder = DebugGui::MakeColor32(248, 249, 250, 255);
 
-        if (mSelection.mType == EEditorSelectionType::None) {
+        const auto* object    = FindSelectedGameObjectSnapshot();
+        const FRect panelRect = contentRect;
+
+        const f32   outerPad             = ScalePx(8.0f);
+        const f32   sectionGap           = ScalePx(10.0f);
+        const f32   rowHeight            = ScalePx(22.0f);
+        const f32   rowGap               = ScalePx(3.0f);
+        const f32   buttonHeight         = ScalePx(24.0f);
+        const f32   propertyHeight       = ScalePx(22.0f);
+        const f32   collapseHeaderHeight = ScalePx(26.0f);
+        const f32   collapseGap          = ScalePx(6.0f);
+        const f32   labelColumnWidth     = ScalePx(132.0f);
+        const f32   renameButtonWidth    = ScalePx(82.0f);
+        const f32   rowTextPadX          = ScalePx(8.0f);
+        const f32   rowLabelTextY        = ScalePx(4.0f);
+        const f32   rowValueTextY        = ScalePx(3.0f);
+        const f32   scrollBarWidth =
+            ((theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 8.0f) * uiScale;
+        const f32 scrollBarPad =
+            ((theme.mScrollBarPadding > 0.0f) ? theme.mScrollBarPadding : 2.0f) * uiScale;
+        const f32 thumbMinH =
+            ((theme.mScrollBarThumbMinHeight > 0.0f) ? theme.mScrollBarThumbMinHeight : 14.0f)
+            * uiScale;
+
+        if (object == nullptr) {
+            const f32 x = panelRect.Min.X() + outerPad;
+            const f32 y = panelRect.Min.Y() + outerPad;
             gui.DrawTextStyled(FVector2f(x, y), colText, TEXT("Nothing selected"),
                 DebugGui::EDebugGuiFontRole::Section);
             gui.DrawTextStyled(FVector2f(x, y + ScalePx(24.0f)), colMutedText,
-                TEXT("Select a GameObject or Component."), DebugGui::EDebugGuiFontRole::Body);
+                TEXT("Select a GameObject from Hierarchy."), DebugGui::EDebugGuiFontRole::Body);
             return;
         }
 
-        gui.DrawTextStyled(FVector2f(x, y), colText, mSelection.mName.ToView(),
-            DebugGui::EDebugGuiFontRole::Section);
-        y += ScalePx(22.0f);
-        gui.DrawTextStyled(FVector2f(x, y), colMutedText, mSelection.mUuid.ToView(),
-            DebugGui::EDebugGuiFontRole::Small);
-        y += ScalePx(24.0f);
-
-        const f32 rowPadX      = ScalePx(6.0f);
-        const f32 labelInsetX  = ScalePx(7.0f);
-        const f32 labelColumnW = ScalePx(66.0f);
-        const f32 valueInsetX  = ScalePx(8.0f);
-        const f32 valueTextWidth =
-            (cardRect.Max.X() - ScalePx(14.0f)) - (x + labelColumnW + valueInsetX) - rowPadX;
-        const auto drawFieldRow = [&](FStringView label, FStringView value) {
-            const FRect rowRect =
-                MakeRect(x, y, cardRect.Max.X() - ScalePx(14.0f), y + ScalePx(28.0f));
-            gui.DrawRoundedRectFilled(rowRect, DebugGui::MakeColor32(255, 255, 255, 174),
-                theme.mEditor.mInsetSurface.mCornerRadius);
-            gui.DrawTextStyled(
-                FVector2f(rowRect.Min.X() + labelInsetX, rowRect.Min.Y() + ScalePx(6.0f)),
-                colMutedText, label, DebugGui::EDebugGuiFontRole::Small);
-            const auto wrappedLines = TruncateAssetLabel(value, valueTextWidth).ToView();
-            gui.DrawTextStyled(FVector2f(rowRect.Min.X() + labelColumnW + valueInsetX,
-                                   rowRect.Min.Y() + ScalePx(5.0f)),
-                colText, wrappedLines, DebugGui::EDebugGuiFontRole::Body);
-            y += ScalePx(32.0f);
+        const auto getComponentExpanded = [this](FStringView componentKey) -> bool {
+            auto it = mInspectorExpanded.FindIt(FString(componentKey));
+            if (it == mInspectorExpanded.end()) {
+                mInspectorExpanded[FString(componentKey)] = false;
+                return false;
+            }
+            return it->second;
         };
 
-        drawFieldRow(TEXT("Selection"), selectionType);
-        drawFieldRow(TEXT("Name"), mSelection.mName.ToView());
-        drawFieldRow(TEXT("UUID"), mSelection.mUuid.ToView());
+        const auto calcComponentsHeight = [&]() -> f32 {
+            f32 total = 0.0f;
+            for (const auto& component : object->mComponents) {
+                const auto componentKey = MakeComponentUuid(component.mId);
+                total += collapseHeaderHeight;
+                if (getComponentExpanded(componentKey.ToView())) {
+                    const usize propertyCount = component.mProperties.Size();
+                    total += collapseGap;
+                    if (propertyCount > 0U) {
+                        total += static_cast<f32>(propertyCount) * (propertyHeight + rowGap);
+                    } else {
+                        total += ScalePx(18.0f);
+                    }
+                    total += buttonHeight + rowGap;
+                }
+                total += collapseGap;
+            }
+            return total;
+        };
 
-        if (mSelection.mType == EEditorSelectionType::Component) {
-            drawFieldRow(TEXT("Type"), mSelection.mTypeName.ToView());
-            drawFieldRow(TEXT("Namespace"),
-                mSelection.mTypeNamespace.IsEmptyString() ? FStringView(TEXT("(global)"))
-                                                          : mSelection.mTypeNamespace.ToView());
+        const f32 basicHeaderHeight      = ScalePx(20.0f);
+        const f32 componentsHeaderHeight = ScalePx(20.0f);
+        const f32 basicContentHeight =
+            rowHeight * 2.0f + buttonHeight * 3.0f + rowGap * 4.0f + ScalePx(14.0f);
+        const f32 totalHeight = basicHeaderHeight + basicContentHeight + sectionGap
+            + componentsHeaderHeight + ScalePx(10.0f) + calcComponentsHeight();
+
+        const f32 viewHeight =
+            Core::Math::Max(0.0f, panelRect.Max.Y() - panelRect.Min.Y() - outerPad);
+        const f32 maxScrollY = Core::Math::Max(0.0f, totalHeight - viewHeight);
+        mInspectorScrollY    = Clamp(mInspectorScrollY, 0.0f, maxScrollY);
+
+        const bool needsScrollBar = maxScrollY > 0.0f
+            && (panelRect.Max.X() - panelRect.Min.X()
+                > (scrollBarWidth + scrollBarPad + ScalePx(40.0f)));
+        const FRect scrollTrackRect = needsScrollBar
+            ? MakeRect(panelRect.Max.X() - outerPad - scrollBarWidth, panelRect.Min.Y() + outerPad,
+                  panelRect.Max.X() - outerPad, panelRect.Max.Y() - outerPad)
+            : MakeRect(0.0f, 0.0f, 0.0f, 0.0f);
+        const FRect contentClipRect = needsScrollBar
+            ? MakeRect(panelRect.Min.X() + outerPad, panelRect.Min.Y() + outerPad,
+                  scrollTrackRect.Min.X() - scrollBarPad, panelRect.Max.Y() - outerPad)
+            : MakeRect(panelRect.Min.X() + outerPad, panelRect.Min.Y() + outerPad,
+                  panelRect.Max.X() - outerPad, panelRect.Max.Y() - outerPad);
+
+        if (!mouseDown) {
+            mInspectorScrollDragging = false;
+        }
+        if (needsScrollBar && mousePressed && IsInside(scrollTrackRect, mouse)) {
+            const f32 trackH = scrollTrackRect.Max.Y() - scrollTrackRect.Min.Y();
+            const f32 thumbHRaw =
+                (totalHeight > 0.0f) ? (viewHeight / totalHeight) * trackH : trackH;
+            const f32   thumbH         = Clamp(thumbHRaw, thumbMinH, trackH);
+            const f32   maxThumbTravel = Core::Math::Max(0.0f, trackH - thumbH);
+            const f32   t      = (maxScrollY > 0.0f) ? (mInspectorScrollY / maxScrollY) : 0.0f;
+            const f32   thumbY = scrollTrackRect.Min.Y() + maxThumbTravel * t;
+            const FRect thumbRect =
+                MakeRect(scrollTrackRect.Min.X(), thumbY, scrollTrackRect.Max.X(), thumbY + thumbH);
+            mInspectorScrollDragging = true;
+            mInspectorScrollDragOffsetY =
+                IsInside(thumbRect, mouse) ? (mouse.Y() - thumbY) : (thumbH * 0.5f);
+        }
+        if (needsScrollBar && mInspectorScrollDragging && mouseDown) {
+            const f32 trackH = scrollTrackRect.Max.Y() - scrollTrackRect.Min.Y();
+            const f32 thumbHRaw =
+                (totalHeight > 0.0f) ? (viewHeight / totalHeight) * trackH : trackH;
+            const f32 thumbH         = Clamp(thumbHRaw, thumbMinH, trackH);
+            const f32 maxThumbTravel = Core::Math::Max(0.0f, trackH - thumbH);
+            const f32 minY           = scrollTrackRect.Min.Y();
+            const f32 maxY           = scrollTrackRect.Max.Y() - thumbH;
+            const f32 desiredY       = Clamp(mouse.Y() - mInspectorScrollDragOffsetY, minY, maxY);
+            const f32 t = (maxThumbTravel > 0.0f) ? ((desiredY - minY) / maxThumbTravel) : 0.0f;
+            mInspectorScrollY = t * maxScrollY;
         }
 
-        gui.DrawTextStyled(FVector2f(x, y + ScalePx(4.0f)), colMutedText,
-            TEXT("Properties (Coming Soon)"), DebugGui::EDebugGuiFontRole::Small);
+        const auto drawCenteredButton = [&](const FRect& rect, FStringView label) -> bool {
+            const bool hovered = IsInside(rect, mouse);
+            const auto bg      = hovered ? colButtonHoverBg : colButtonBg;
+            gui.DrawRoundedRectFilled(rect, bg, theme.mEditor.mPanelSurface.mCornerRadius);
+            if ((theme.mButtonBorder >> 24U) != 0U) {
+                gui.DrawRoundedRect(
+                    rect, theme.mButtonBorder, theme.mEditor.mPanelSurface.mCornerRadius, 1.0f);
+            }
+            const auto textSize = gui.MeasureText(label, DebugGui::EDebugGuiFontRole::Body);
+            gui.DrawTextStyled(
+                FVector2f(rect.Min.X() + (rect.Max.X() - rect.Min.X() - textSize.X()) * 0.5f,
+                    rect.Min.Y() + (rect.Max.Y() - rect.Min.Y() - textSize.Y()) * 0.5f),
+                colButtonText, label, DebugGui::EDebugGuiFontRole::Body);
+            return hovered && mouseReleased;
+        };
+        const auto drawValueRow = [&](const FRect& rect, FStringView label, FStringView value) {
+            gui.DrawRoundedRectFilled(
+                rect, colValueRowBg, theme.mEditor.mPanelSurface.mCornerRadius);
+            gui.DrawRoundedRect(
+                rect, colValueRowBorder, theme.mEditor.mPanelSurface.mCornerRadius, 1.0f);
+            gui.DrawTextStyled(FVector2f(rect.Min.X() + rowTextPadX, rect.Min.Y() + rowLabelTextY),
+                colMutedText, label, DebugGui::EDebugGuiFontRole::Small);
+            gui.DrawTextStyled(
+                FVector2f(rect.Min.X() + labelColumnWidth, rect.Min.Y() + rowValueTextY), colText,
+                value, DebugGui::EDebugGuiFontRole::Body);
+        };
+
+        gui.PushClipRect(contentClipRect);
+        f32         y = contentClipRect.Min.Y() - mInspectorScrollY;
+
+        const FRect basicHeaderRect =
+            MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + basicHeaderHeight);
+        DrawSectionHead(gui, theme, basicHeaderRect, TEXT("Basic"),
+            object->bIsPrefabRoot ? TEXT("Prefab") : TEXT("GameObject"), true);
+        y = basicHeaderRect.Max.Y() + ScalePx(8.0f);
+
+        const f32 contentWidth = contentClipRect.Max.X() - contentClipRect.Min.X();
+        const f32 inputWidth = contentWidth - labelColumnWidth - renameButtonWidth - ScalePx(8.0f);
+
+        const FRect nameLabelRect = MakeRect(
+            contentClipRect.Min.X(), y, contentClipRect.Min.X() + labelColumnWidth, y + rowHeight);
+        const FRect nameInputRect =
+            MakeRect(nameLabelRect.Max.X(), y, nameLabelRect.Max.X() + inputWidth, y + rowHeight);
+        const FRect renameRect = MakeRect(
+            nameInputRect.Max.X() + ScalePx(8.0f), y, contentClipRect.Max.X(), y + rowHeight);
+        gui.DrawTextStyled(
+            FVector2f(nameLabelRect.Min.X() + rowTextPadX, nameLabelRect.Min.Y() + rowLabelTextY),
+            colMutedText, TEXT("Name"), DebugGui::EDebugGuiFontRole::Small);
+        gui.DrawRoundedRectFilled(
+            nameInputRect, colValueRowBg, theme.mEditor.mPanelSurface.mCornerRadius);
+        gui.DrawRoundedRect(
+            nameInputRect, colValueRowBorder, theme.mEditor.mPanelSurface.mCornerRadius, 1.0f);
+        gui.DrawTextStyled(FVector2f(nameInputRect.Min.X() + theme.mInputTextOffsetX,
+                               nameInputRect.Min.Y() + rowValueTextY),
+            theme.mInputText, mInspectorNameInput.ToView(), DebugGui::EDebugGuiFontRole::Body);
+        (void)drawCenteredButton(renameRect, TEXT("Rename"));
+        y += rowHeight + rowGap;
+
+        const FRect typeRowRect =
+            MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + rowHeight);
+        drawValueRow(
+            typeRowRect, TEXT("Type"), object->bIsPrefabRoot ? TEXT("Prefab") : TEXT("GameObject"));
+        y += rowHeight + rowGap;
+
+        const FRect addComponentRect =
+            MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + buttonHeight);
+        (void)drawCenteredButton(addComponentRect, TEXT("Add Component"));
+        y += buttonHeight + rowGap;
+
+        const FRect addGameObjectRect =
+            MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + buttonHeight);
+        (void)drawCenteredButton(addGameObjectRect, TEXT("Add GameObject"));
+        y += buttonHeight + rowGap;
+
+        const FRect removeRect =
+            MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + buttonHeight);
+        (void)drawCenteredButton(removeRect, TEXT("Remove"));
+        y += buttonHeight + sectionGap;
+
+        const FRect componentsHeaderRect = MakeRect(
+            contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + componentsHeaderHeight);
+        FString componentCountLabel;
+        componentCountLabel.AppendNumber(static_cast<i32>(object->mComponents.Size()));
+        componentCountLabel.Append(TEXT(" attached"));
+        DrawSectionHead(gui, theme, componentsHeaderRect, TEXT("Components"),
+            componentCountLabel.ToView(), true);
+        y = componentsHeaderRect.Max.Y() + ScalePx(8.0f);
+
+        if (object->mComponents.IsEmpty()) {
+            gui.DrawTextStyled(FVector2f(contentClipRect.Min.X(), y), colMutedText,
+                TEXT("No attached components."), DebugGui::EDebugGuiFontRole::Small);
+            y += ScalePx(18.0f);
+        }
+
+        for (const auto& component : object->mComponents) {
+            const auto  componentKey = MakeComponentUuid(component.mId);
+            const bool  expanded     = getComponentExpanded(componentKey.ToView());
+            const FRect headerRect   = MakeRect(
+                contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + collapseHeaderHeight);
+            const bool hovered = IsInside(headerRect, mouse);
+            gui.DrawRoundedRectFilled(headerRect, hovered ? colCollapseHover : colCollapseBg,
+                theme.mEditor.mInsetSurface.mCornerRadius);
+
+            const f32 triangleCenterX = headerRect.Min.X() + ScalePx(14.0f);
+            const f32 triangleCenterY = headerRect.Min.Y() + collapseHeaderHeight * 0.5f;
+            const f32 triangleHalfW   = ScalePx(4.0f);
+            const f32 triangleHalfH   = ScalePx(3.0f);
+            if (expanded) {
+                gui.DrawTriangleFilled(
+                    FVector2f(triangleCenterX - triangleHalfW, triangleCenterY - triangleHalfH),
+                    FVector2f(triangleCenterX + triangleHalfW, triangleCenterY - triangleHalfH),
+                    FVector2f(triangleCenterX, triangleCenterY + triangleHalfH), colCollapseIcon);
+            } else {
+                gui.DrawTriangleFilled(
+                    FVector2f(triangleCenterX - triangleHalfH, triangleCenterY - triangleHalfW),
+                    FVector2f(triangleCenterX - triangleHalfH, triangleCenterY + triangleHalfW),
+                    FVector2f(triangleCenterX + triangleHalfH, triangleCenterY), colCollapseIcon);
+            }
+
+            const FRect iconRect =
+                MakeRect(headerRect.Min.X() + ScalePx(24.0f), headerRect.Min.Y() + ScalePx(7.0f),
+                    headerRect.Min.X() + ScalePx(40.0f), headerRect.Min.Y() + ScalePx(23.0f));
+            gui.DrawRoundedRectFilled(
+                iconRect, DebugGui::MakeColor32(255, 255, 255, 56), ScalePx(5.0f));
+            gui.DrawTextStyled(
+                FVector2f(headerRect.Min.X() + ScalePx(48.0f), headerRect.Min.Y() + ScalePx(6.0f)),
+                colCollapseText, component.mName.ToView(), DebugGui::EDebugGuiFontRole::Body);
+
+            if (hovered && mouseReleased) {
+                mInspectorExpanded[FString(componentKey)] = !expanded;
+            }
+
+            y += collapseHeaderHeight + collapseGap;
+            if (!expanded) {
+                continue;
+            }
+
+            if (component.mProperties.IsEmpty()) {
+                gui.DrawTextStyled(FVector2f(contentClipRect.Min.X() + ScalePx(8.0f), y),
+                    colMutedText, TEXT("No reflected properties available."),
+                    DebugGui::EDebugGuiFontRole::Small);
+                y += ScalePx(18.0f);
+            } else {
+                for (const auto& property : component.mProperties) {
+                    const FRect propertyRect = MakeRect(
+                        contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + propertyHeight);
+                    const auto truncatedValue = TruncateAssetLabel(property.mDisplayValue.ToView(),
+                        contentWidth - labelColumnWidth - ScalePx(18.0f));
+                    drawValueRow(propertyRect, property.mName.ToView(), truncatedValue.ToView());
+                    y += propertyHeight + rowGap;
+                }
+            }
+
+            const FRect removeComponentRect =
+                MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + buttonHeight);
+            (void)drawCenteredButton(removeComponentRect, TEXT("Remove Component"));
+            y += buttonHeight + collapseGap;
+        }
+
+        gui.PopClipRect();
+        if (needsScrollBar) {
+            const f32 trackH = scrollTrackRect.Max.Y() - scrollTrackRect.Min.Y();
+            const f32 thumbHRaw =
+                (totalHeight > 0.0f) ? (viewHeight / totalHeight) * trackH : trackH;
+            const f32   thumbH         = Clamp(thumbHRaw, thumbMinH, trackH);
+            const f32   maxThumbTravel = Core::Math::Max(0.0f, trackH - thumbH);
+            const f32   t      = (maxScrollY > 0.0f) ? (mInspectorScrollY / maxScrollY) : 0.0f;
+            const f32   thumbY = scrollTrackRect.Min.Y() + maxThumbTravel * t;
+            const FRect thumbRect =
+                MakeRect(scrollTrackRect.Min.X(), thumbY, scrollTrackRect.Max.X(), thumbY + thumbH);
+            DrawScrollBar(gui, theme, scrollTrackRect, thumbRect, IsInside(thumbRect, mouse),
+                mInspectorScrollDragging);
+        }
     }
 
     void FEditorUiModule::DrawAssetPanel(DebugGui::IDebugGui& gui,

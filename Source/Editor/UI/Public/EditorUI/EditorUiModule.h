@@ -55,17 +55,34 @@ namespace AltinaEngine::Editor::UI {
         }
     };
 
-    struct FEditorComponentSnapshot {
-        FEditorComponentRuntimeId                mId{};
+    enum class EEditorPropertyValueKind : u8 {
+        Unknown = 0,
+        Scalar,
+        Boolean,
+        String,
+        Array,
+        Object
+    };
+
+    struct FEditorPropertySnapshot {
         ::AltinaEngine::Core::Container::FString mName;
-        ::AltinaEngine::Core::Container::FString mTypeName;
-        ::AltinaEngine::Core::Container::FString mTypeNamespace;
+        ::AltinaEngine::Core::Container::FString mDisplayValue;
+        EEditorPropertyValueKind                 mValueKind = EEditorPropertyValueKind::Unknown;
+    };
+
+    struct FEditorComponentSnapshot {
+        FEditorComponentRuntimeId                                         mId{};
+        ::AltinaEngine::Core::Container::FString                          mName;
+        ::AltinaEngine::Core::Container::FString                          mTypeName;
+        ::AltinaEngine::Core::Container::FString                          mTypeNamespace;
+        ::AltinaEngine::Core::Container::TVector<FEditorPropertySnapshot> mProperties;
     };
 
     struct FEditorGameObjectSnapshot {
         FEditorGameObjectRuntimeId                                         mId{};
         FEditorGameObjectRuntimeId                                         mParentId{};
         ::AltinaEngine::Core::Container::FString                           mName;
+        bool                                                               bIsPrefabRoot = false;
         ::AltinaEngine::Core::Container::TVector<FEditorComponentSnapshot> mComponents;
     };
 
@@ -240,7 +257,7 @@ namespace AltinaEngine::Editor::UI {
 
         class FInspectorPanelController final {
         public:
-            void Draw(const FEditorUiModule& module, DebugGui::IDebugGui& gui,
+            void Draw(FEditorUiModule& module, DebugGui::IDebugGui& gui,
                 const DebugGui::FRect& contentRect) const;
         };
 
@@ -260,6 +277,12 @@ namespace AltinaEngine::Editor::UI {
         [[nodiscard]] auto DebugGetHierarchyItemsForTest() const
             -> ::AltinaEngine::Core::Container::TVector<FEditorHierarchyDebugItem>;
         [[nodiscard]] auto DebugGetSelectionInfoForTest() const -> FEditorSelectionInfo;
+        [[nodiscard]] auto DebugGetHierarchySnapshotForTest() const
+            -> FEditorWorldHierarchySnapshot;
+        [[nodiscard]] auto DebugIsInspectorComponentExpandedForTest(
+            FEditorComponentRuntimeId id) const -> bool;
+        [[nodiscard]] auto DebugGetInspectorScrollYForTest() const -> f32;
+        void               DebugSetInspectorScrollYForTest(f32 value);
         void               DebugSelectGameObjectForTest(FEditorGameObjectRuntimeId id);
         void               DebugSelectComponentForTest(FEditorComponentRuntimeId id);
         auto               DebugOpenAssetPathForTest(
@@ -268,7 +291,7 @@ namespace AltinaEngine::Editor::UI {
         void DrawRootUi(DebugGui::IDebugGuiSystem* debugGuiSystem, DebugGui::IDebugGui& gui);
         void DrawHierarchyPanel(DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect,
             const ::AltinaEngine::Core::Math::FVector2f& mouse, bool blockWorkspaceInput);
-        void DrawInspectorPanel(DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect) const;
+        void DrawInspectorPanel(DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect);
         void DrawAssetPanel(DebugGui::IDebugGui& gui, const DebugGui::FRect& contentRect,
             const ::AltinaEngine::Core::Math::FVector2f& mouse, bool blockWorkspaceInput);
 
@@ -285,6 +308,8 @@ namespace AltinaEngine::Editor::UI {
         [[nodiscard]] auto FindGameObjectIndex(FEditorGameObjectRuntimeId id) const -> i32;
         [[nodiscard]] auto FindComponentSnapshot(FEditorComponentRuntimeId id) const
             -> const FEditorComponentSnapshot*;
+        [[nodiscard]] auto FindSelectedGameObjectSnapshot() const
+            -> const FEditorGameObjectSnapshot*;
 
         void               RefreshAssetCache(bool force);
         void               BuildAssetItemsForCurrentFolder();
@@ -333,6 +358,12 @@ namespace AltinaEngine::Editor::UI {
                                                                             mHierarchyExpanded;
         ::AltinaEngine::Core::Container::TVector<FEditorHierarchyDebugItem> mHierarchyDebugItems;
         FEditorSelectionInfo                                                mSelection{};
+        ::AltinaEngine::Core::Container::FString                            mInspectorNameInput;
+        ::AltinaEngine::Core::Container::THashMap<::AltinaEngine::Core::Container::FString, bool>
+                                                 mInspectorExpanded;
+        f32                                      mInspectorScrollY           = 0.0f;
+        f32                                      mInspectorScrollDragOffsetY = 0.0f;
+        bool                                     mInspectorScrollDragging    = false;
         f32                                      mHierarchyScrollY           = 0.0f;
         f32                                      mHierarchyScrollDragOffsetY = 0.0f;
         bool                                     mHierarchyScrollDragging    = false;

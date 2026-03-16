@@ -50,6 +50,117 @@ namespace {
         context.bClearCommandBuffer = clearCommands;
         return uiModule.TickUi(context);
     }
+
+    struct FInspectorTestLayout {
+        AltinaEngine::i32 mPanelMinX             = 0;
+        AltinaEngine::i32 mPanelMinY             = 0;
+        AltinaEngine::i32 mPanelMaxX             = 0;
+        AltinaEngine::i32 mPanelMaxY             = 0;
+        AltinaEngine::i32 mFirstComponentHeaderX = 0;
+        AltinaEngine::i32 mFirstComponentHeaderY = 0;
+        AltinaEngine::i32 mScrollBarX            = 0;
+        AltinaEngine::i32 mScrollBarY            = 0;
+        AltinaEngine::i32 mScrollTrackMinY       = 0;
+        AltinaEngine::i32 mScrollTrackMaxY       = 0;
+    };
+
+    auto BuildInspectorTestLayout(AltinaEngine::DebugGui::IDebugGuiSystem* sys,
+        AltinaEngine::u32 displayWidth, AltinaEngine::u32 displayHeight) -> FInspectorTestLayout {
+        const auto theme      = sys->GetTheme();
+        const auto uiScale    = (theme.mUiScale > 0.01f) ? theme.mUiScale : 1.0f;
+        const auto ScalePx    = [uiScale](float value) { return value * uiScale; };
+        const auto ClampValue = [](float value, float minValue, float maxValue) {
+            if (value < minValue) {
+                return minValue;
+            }
+            if (value > maxValue) {
+                return maxValue;
+            }
+            return value;
+        };
+        const auto menuBarHeight =
+            (theme.mEditor.mMenu.mHeight > 0.0f) ? theme.mEditor.mMenu.mHeight : ScalePx(84.0f);
+        const auto workspacePad = (theme.mEditor.mWorkspacePadding > 0.0f)
+            ? theme.mEditor.mWorkspacePadding
+            : ScalePx(18.0f);
+        const auto splitterSize =
+            (theme.mEditor.mSplitterSize > 0.0f) ? theme.mEditor.mSplitterSize : ScalePx(10.0f);
+        const auto tabBarHeight =
+            (theme.mEditor.mTabs.mHeight > 0.0f) ? theme.mEditor.mTabs.mHeight : ScalePx(48.0f);
+        const auto panelPadding =
+            (theme.mEditor.mPanelPadding > 0.0f) ? theme.mEditor.mPanelPadding : ScalePx(14.0f);
+        const auto minPanelWidth =
+            (theme.mEditor.mMinPanelWidth > 0.0f) ? theme.mEditor.mMinPanelWidth : ScalePx(140.0f);
+        const auto minCenterWidth = (theme.mEditor.mMinCenterWidth > 0.0f)
+            ? theme.mEditor.mMinCenterWidth
+            : ScalePx(260.0f);
+        const auto minTopHeight =
+            (theme.mEditor.mMinTopHeight > 0.0f) ? theme.mEditor.mMinTopHeight : ScalePx(180.0f);
+        const auto  minBottomHeight = (theme.mEditor.mMinBottomHeight > 0.0f)
+             ? theme.mEditor.mMinBottomHeight
+             : ScalePx(100.0f);
+
+        const float workspaceMinX = workspacePad;
+        const float workspaceMinY = workspacePad + menuBarHeight + workspacePad;
+        const float workspaceMaxX = static_cast<float>(displayWidth) - workspacePad;
+        const float workspaceMaxY = static_cast<float>(displayHeight) - workspacePad;
+        const float workspaceW    = workspaceMaxX - workspaceMinX;
+        const float workspaceH    = workspaceMaxY - workspaceMinY;
+
+        float       leftW  = ClampValue(workspaceW * 0.2f, minPanelWidth,
+                   workspaceW - minCenterWidth - minPanelWidth - 2.0f * splitterSize);
+        float       rightW = ClampValue(workspaceW * 0.24f, minPanelWidth,
+                  workspaceW - minCenterWidth - leftW - 2.0f * splitterSize);
+        if (leftW + rightW + minCenterWidth + 2.0f * splitterSize > workspaceW) {
+            rightW = workspaceW - leftW - minCenterWidth - 2.0f * splitterSize;
+            if (rightW < minPanelWidth) {
+                rightW = minPanelWidth;
+                leftW  = workspaceW - rightW - minCenterWidth - 2.0f * splitterSize;
+            }
+        }
+        const float topH = ClampValue(
+            workspaceH * (1.0f - 0.28f), minTopHeight, workspaceH - minBottomHeight - splitterSize);
+
+        const float centerMinX = workspaceMinX + leftW + splitterSize;
+        const float centerMaxX = centerMinX + (workspaceW - leftW - rightW - 2.0f * splitterSize);
+        const float rightMinX  = centerMaxX + splitterSize;
+        const float rightMaxX  = workspaceMaxX;
+        const float rightMinY  = workspaceMinY;
+        const float rightMaxY  = workspaceMinY + topH;
+
+        const float contentMinX = rightMinX + panelPadding;
+        const float contentMinY = rightMinY + tabBarHeight + panelPadding;
+        const float contentMaxX = rightMaxX - panelPadding;
+        const float contentMaxY = rightMaxY - panelPadding;
+
+        const float panelMinY       = contentMinY;
+        const float panelMaxY       = contentMaxY;
+        const float outerPad        = ScalePx(8.0f);
+        const float contentClipMinY = panelMinY + outerPad;
+        const float scrollBarWidth =
+            ((theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 8.0f) * uiScale;
+        const float          scrollTrackMinX = contentMaxX - outerPad - scrollBarWidth;
+        const float          scrollTrackMaxX = contentMaxX - outerPad;
+        const float          scrollTrackMinY = panelMinY + outerPad;
+        const float          scrollTrackMaxY = panelMaxY - outerPad;
+        const float          scrollTrackH    = scrollTrackMaxY - scrollTrackMinY;
+
+        FInspectorTestLayout layout{};
+        layout.mPanelMinX = static_cast<AltinaEngine::i32>(contentMinX);
+        layout.mPanelMinY = static_cast<AltinaEngine::i32>(contentMinY);
+        layout.mPanelMaxX = static_cast<AltinaEngine::i32>(contentMaxX);
+        layout.mPanelMaxY = static_cast<AltinaEngine::i32>(contentMaxY);
+        layout.mFirstComponentHeaderX =
+            static_cast<AltinaEngine::i32>(contentMinX + ScalePx(48.0f));
+        layout.mFirstComponentHeaderY =
+            static_cast<AltinaEngine::i32>(contentClipMinY + ScalePx(207.0f));
+        layout.mScrollBarX = static_cast<AltinaEngine::i32>(
+            scrollTrackMinX + (scrollTrackMaxX - scrollTrackMinX) * 0.5f);
+        layout.mScrollBarY = static_cast<AltinaEngine::i32>(scrollTrackMinY + scrollTrackH * 0.75f);
+        layout.mScrollTrackMinY = static_cast<AltinaEngine::i32>(scrollTrackMinY);
+        layout.mScrollTrackMaxY = static_cast<AltinaEngine::i32>(scrollTrackMaxY);
+        return layout;
+    }
 } // namespace
 
 TEST_CASE("EditorUiModule reports viewport render request after registration") {
@@ -202,9 +313,11 @@ TEST_CASE("EditorUiModule play menu enqueues command and clear is caller-control
 
 TEST_CASE("EditorUiModule hierarchy snapshot and inspector selection") {
     using AltinaEngine::Core::Container::FString;
+    using AltinaEngine::Editor::UI::EEditorPropertyValueKind;
     using AltinaEngine::Editor::UI::EEditorSelectionType;
     using AltinaEngine::Editor::UI::FEditorComponentRuntimeId;
     using AltinaEngine::Editor::UI::FEditorGameObjectRuntimeId;
+    using AltinaEngine::Editor::UI::FEditorPropertySnapshot;
     using AltinaEngine::Editor::UI::FEditorUiModule;
     using AltinaEngine::Editor::UI::FEditorWorldHierarchySnapshot;
 
@@ -213,16 +326,23 @@ TEST_CASE("EditorUiModule hierarchy snapshot and inspector selection") {
     snapshot.mWorldId = 99U;
 
     AltinaEngine::Editor::UI::FEditorGameObjectSnapshot root{};
-    root.mId       = { 99U, 1U, 1U };
-    root.mParentId = {};
-    root.mName     = FString(TEXT("Root"));
-    root.mComponents.PushBack({ { 101ULL, 1U, 1U }, FString(TEXT("CameraComponent")) });
+    root.mId           = { 99U, 1U, 1U };
+    root.mParentId     = {};
+    root.mName         = FString(TEXT("Root"));
+    root.bIsPrefabRoot = true;
+    root.mComponents.PushBack({ { 101ULL, 1U, 1U }, FString(TEXT("CameraComponent")),
+        FString(TEXT("CameraComponent")), FString(),
+        { { FString(TEXT("nearPlane")), FString(TEXT("0.1")),
+            EEditorPropertyValueKind::Scalar } } });
 
     AltinaEngine::Editor::UI::FEditorGameObjectSnapshot child{};
     child.mId       = { 99U, 2U, 1U };
     child.mParentId = { 99U, 1U, 1U };
     child.mName     = FString(TEXT("Child"));
-    child.mComponents.PushBack({ { 202ULL, 2U, 1U }, FString(TEXT("ScriptComponent")) });
+    child.mComponents.PushBack({ { 202ULL, 2U, 1U }, FString(TEXT("ScriptComponent")),
+        FString(TEXT("ScriptComponent")), FString(TEXT("AltinaEngine::GameScene")),
+        { FEditorPropertySnapshot{ FString(TEXT("typeName")), FString(TEXT("PlayerController")),
+            EEditorPropertyValueKind::String } } });
 
     AltinaEngine::Editor::UI::FEditorGameObjectSnapshot lone{};
     lone.mId       = { 99U, 3U, 1U };
@@ -236,22 +356,25 @@ TEST_CASE("EditorUiModule hierarchy snapshot and inspector selection") {
 
     const auto hierarchyItems =
         AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetHierarchyItems(uiModule);
-    REQUIRE_EQ(hierarchyItems.Size(), 5U);
+    REQUIRE_EQ(hierarchyItems.Size(), 3U);
     REQUIRE(hierarchyItems[0].mLabel == TEXT("Root"));
     REQUIRE(hierarchyItems[0].mDepth == 0U);
     REQUIRE(!hierarchyItems[0].mIsComponent);
-    REQUIRE(hierarchyItems[1].mLabel == TEXT("CameraComponent"));
+    REQUIRE(hierarchyItems[1].mLabel == TEXT("Child"));
     REQUIRE(hierarchyItems[1].mDepth == 1U);
-    REQUIRE(hierarchyItems[1].mIsComponent);
-    REQUIRE(hierarchyItems[2].mLabel == TEXT("Child"));
-    REQUIRE(hierarchyItems[2].mDepth == 1U);
+    REQUIRE(!hierarchyItems[1].mIsComponent);
+    REQUIRE(hierarchyItems[2].mLabel == TEXT("Lone"));
+    REQUIRE(hierarchyItems[2].mDepth == 0U);
     REQUIRE(!hierarchyItems[2].mIsComponent);
-    REQUIRE(hierarchyItems[3].mLabel == TEXT("ScriptComponent"));
-    REQUIRE(hierarchyItems[3].mDepth == 2U);
-    REQUIRE(hierarchyItems[3].mIsComponent);
-    REQUIRE(hierarchyItems[4].mLabel == TEXT("Lone"));
-    REQUIRE(hierarchyItems[4].mDepth == 0U);
-    REQUIRE(!hierarchyItems[4].mIsComponent);
+
+    const auto roundTrippedSnapshot =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetHierarchySnapshot(uiModule);
+    REQUIRE(roundTrippedSnapshot.mGameObjects[0].bIsPrefabRoot);
+    REQUIRE_EQ(roundTrippedSnapshot.mGameObjects[0].mComponents[0].mProperties.Size(), 1U);
+    REQUIRE(roundTrippedSnapshot.mGameObjects[0].mComponents[0].mProperties[0].mName
+        == TEXT("nearPlane"));
+    REQUIRE(roundTrippedSnapshot.mGameObjects[0].mComponents[0].mProperties[0].mDisplayValue
+        == TEXT("0.1"));
 
     AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::SelectGameObject(
         uiModule, FEditorGameObjectRuntimeId{ 99U, 2U, 1U });
@@ -269,8 +392,7 @@ TEST_CASE("EditorUiModule hierarchy snapshot and inspector selection") {
     REQUIRE(selection.mName == TEXT("ScriptComponent"));
     REQUIRE(selection.mUuid == TEXT("202-2-1"));
 
-    FEditorWorldHierarchySnapshot emptySnapshot{};
-    TickUi(uiModule, &emptySnapshot);
+    TickUi(uiModule, &snapshot);
     selection =
         AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetSelectionInfo(uiModule);
     REQUIRE(selection.mType == EEditorSelectionType::None);
@@ -424,6 +546,146 @@ TEST_CASE("EditorUiModule viewport tab docking changes viewport request extent")
     REQUIRE(afterDock.bHasContent);
     REQUIRE(afterDock.Width > 0U);
     REQUIRE(afterDock.Width < beforeDock.Width);
+
+    uiModule.Shutdown();
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("EditorUiModule inspector collapse toggles and handles empty states") {
+    using AltinaEngine::Core::Container::FString;
+    using AltinaEngine::DebugGui::CreateDebugGuiSystem;
+    using AltinaEngine::DebugGui::DestroyDebugGuiSystem;
+    using AltinaEngine::Editor::UI::EEditorPropertyValueKind;
+    using AltinaEngine::Editor::UI::FEditorComponentRuntimeId;
+    using AltinaEngine::Editor::UI::FEditorUiModule;
+    using AltinaEngine::Editor::UI::FEditorWorldHierarchySnapshot;
+
+    auto* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    FEditorUiModule uiModule{};
+    InitializeUi(uiModule, sys);
+
+    FEditorWorldHierarchySnapshot snapshot{};
+    snapshot.mWorldId = 7U;
+
+    AltinaEngine::Editor::UI::FEditorGameObjectSnapshot object{};
+    object.mId           = { 7U, 1U, 1U };
+    object.mName         = FString(TEXT("InspectorTarget"));
+    object.bIsPrefabRoot = false;
+    object.mComponents.PushBack({ { 1001ULL, 2U, 1U }, FString(TEXT("CameraComponent")),
+        FString(TEXT("CameraComponent")), FString(),
+        { { FString(TEXT("nearPlane")), FString(TEXT("0.1")), EEditorPropertyValueKind::Scalar },
+            { FString(TEXT("farPlane")), FString(TEXT("1000")),
+                EEditorPropertyValueKind::Scalar } } });
+    snapshot.mGameObjects.PushBack(object);
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 1100, 200);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule, &snapshot);
+
+    AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::SelectGameObject(
+        uiModule, { 7U, 1U, 1U });
+
+    PrepareInput(input, 1280, 720, 1100, 200);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule, &snapshot);
+
+    const auto layout      = BuildInspectorTestLayout(sys, 1280U, 720U);
+    const auto componentId = FEditorComponentRuntimeId{ 1001ULL, 2U, 1U };
+    REQUIRE(
+        !AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::IsInspectorComponentExpanded(
+            uiModule, componentId));
+
+    PrepareInput(input, 1280, 720, layout.mFirstComponentHeaderX, layout.mFirstComponentHeaderY);
+    input.OnMouseButtonDown(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule, &snapshot);
+
+    PrepareInput(input, 1280, 720, layout.mFirstComponentHeaderX, layout.mFirstComponentHeaderY);
+    input.OnMouseButtonUp(0U);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule, &snapshot);
+
+    REQUIRE(AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::IsInspectorComponentExpanded(
+        uiModule, componentId));
+
+    FEditorWorldHierarchySnapshot emptySnapshot{};
+    PrepareInput(input, 1280, 720, 1100, 200);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule, &emptySnapshot);
+
+    const auto selection =
+        AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetSelectionInfo(uiModule);
+    REQUIRE(selection.mType == AltinaEngine::Editor::UI::EEditorSelectionType::None);
+
+    uiModule.Shutdown();
+    DestroyDebugGuiSystem(sys);
+}
+
+TEST_CASE("EditorUiModule inspector scrolls for large component lists") {
+    using AltinaEngine::Core::Container::FString;
+    using AltinaEngine::DebugGui::CreateDebugGuiSystem;
+    using AltinaEngine::DebugGui::DestroyDebugGuiSystem;
+    using AltinaEngine::Editor::UI::EEditorPropertyValueKind;
+    using AltinaEngine::Editor::UI::FEditorUiModule;
+    using AltinaEngine::Editor::UI::FEditorWorldHierarchySnapshot;
+
+    auto* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    FEditorUiModule uiModule{};
+    InitializeUi(uiModule, sys);
+
+    FEditorWorldHierarchySnapshot snapshot{};
+    snapshot.mWorldId = 9U;
+    AltinaEngine::Editor::UI::FEditorGameObjectSnapshot object{};
+    object.mId   = { 9U, 1U, 1U };
+    object.mName = FString(TEXT("ManyComponents"));
+    for (AltinaEngine::u32 index = 0U; index < 12U; ++index) {
+        FString componentName(TEXT("Component"));
+        componentName.AppendNumber(static_cast<AltinaEngine::i32>(index));
+        AltinaEngine::Editor::UI::FEditorComponentSnapshot component{};
+        component.mId       = { 3000ULL + index, index + 1U, 1U };
+        component.mName     = componentName;
+        component.mTypeName = componentName;
+        for (AltinaEngine::u32 propIndex = 0U; propIndex < 4U; ++propIndex) {
+            FString propName(TEXT("Value"));
+            propName.AppendNumber(static_cast<AltinaEngine::i32>(propIndex));
+            FString propValue(TEXT("Text"));
+            propValue.AppendNumber(static_cast<AltinaEngine::i32>(propIndex));
+            component.mProperties.PushBack(
+                { propName, propValue, EEditorPropertyValueKind::String });
+        }
+        object.mComponents.PushBack(component);
+    }
+    snapshot.mGameObjects.PushBack(object);
+
+    AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::SelectGameObject(
+        uiModule, { 9U, 1U, 1U });
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 1100, 200);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule, &snapshot);
+
+    AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::SetInspectorScrollY(
+        uiModule, 180.0f);
+    PrepareInput(input, 1280, 720, 1100, 260);
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    TickUi(uiModule, &snapshot);
+
+    REQUIRE(AltinaEngine::Editor::UI::Testing::FEditorUiTestingAccess::GetInspectorScrollY(uiModule)
+        > 0.0f);
 
     uiModule.Shutdown();
     DestroyDebugGuiSystem(sys);

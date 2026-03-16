@@ -25,6 +25,24 @@ namespace AltinaEngine::Editor::UI::Testing {
             return module.DebugGetSelectionInfoForTest();
         }
 
+        [[nodiscard]] static auto GetHierarchySnapshot(const FEditorUiModule& module)
+            -> FEditorWorldHierarchySnapshot {
+            return module.DebugGetHierarchySnapshotForTest();
+        }
+
+        [[nodiscard]] static auto IsInspectorComponentExpanded(
+            const FEditorUiModule& module, FEditorComponentRuntimeId id) -> bool {
+            return module.DebugIsInspectorComponentExpandedForTest(id);
+        }
+
+        [[nodiscard]] static auto GetInspectorScrollY(const FEditorUiModule& module) -> f32 {
+            return module.DebugGetInspectorScrollYForTest();
+        }
+
+        static void SetInspectorScrollY(FEditorUiModule& module, f32 value) {
+            module.DebugSetInspectorScrollYForTest(value);
+        }
+
         static void SelectGameObject(FEditorUiModule& module, FEditorGameObjectRuntimeId id) {
             module.DebugSelectGameObjectForTest(id);
         }

@@ -4,22 +4,166 @@
 #include "EditorPlaySession/EditorPlaySession.h"
 #include "EditorUI/EditorUiModule.h"
 #include "EditorViewport/EditorViewportBootstrap.h"
+#include "Reflection/JsonSerializer.h"
 #include "Engine/GameScene/ComponentRegistry.h"
 #include "Launch/DemoRuntime.h"
 #include "Launch/EngineLoop.h"
 #include "Launch/HostApplicationLoop.h"
 #include "Launch/RuntimeSession.h"
 #include "Utility/EngineConfig/EngineConfig.h"
+#include "Utility/Json.h"
 #include "Utility/String/CodeConvert.h"
 #include "DebugGui/DebugGui.h"
 
 using namespace AltinaEngine;
 
 namespace {
+    using AltinaEngine::Core::Reflection::FJsonSerializer;
+
     struct FComponentTypeLabel {
         Core::Container::FString mTypeName;
         Core::Container::FString mTypeNamespace;
     };
+
+    auto ToEditorPropertyKind(Core::Utility::Json::EJsonType type)
+        -> Editor::UI::EEditorPropertyValueKind {
+        using EJsonType = Core::Utility::Json::EJsonType;
+        using EKind     = Editor::UI::EEditorPropertyValueKind;
+        switch (type) {
+            case EJsonType::Bool:
+                return EKind::Boolean;
+            case EJsonType::Number:
+                return EKind::Scalar;
+            case EJsonType::String:
+                return EKind::String;
+            case EJsonType::Array:
+                return EKind::Array;
+            case EJsonType::Object:
+                return EKind::Object;
+            default:
+                return EKind::Unknown;
+        }
+    }
+
+    auto FormatJsonValueCompact(const Core::Utility::Json::FJsonValue& value, i32 depth = 0)
+        -> Core::Container::FString {
+        using Core::Container::FString;
+        using Core::Utility::Json::EJsonType;
+
+        constexpr i32 kMaxDepth      = 2;
+        constexpr i32 kMaxArrayItems = 4;
+        constexpr i32 kMaxObjectKeys = 4;
+
+        switch (value.Type) {
+            case EJsonType::Null:
+                return FString(TEXT("null"));
+            case EJsonType::Bool:
+                return FString(value.Bool ? TEXT("true") : TEXT("false"));
+            case EJsonType::Number:
+                return FString::ToString(value.Number);
+            case EJsonType::String:
+                return Core::Utility::String::FromUtf8(value.String);
+            case EJsonType::Array:
+            {
+                FString   out(TEXT("["));
+                const i32 count = static_cast<i32>(value.Array.Size());
+                const i32 limit = (count < kMaxArrayItems) ? count : kMaxArrayItems;
+                if (depth >= kMaxDepth) {
+                    out.Append(TEXT("..."));
+                } else {
+                    for (i32 i = 0; i < limit; ++i) {
+                        if (i > 0) {
+                            out.Append(TEXT(", "));
+                        }
+                        out.Append(
+                            FormatJsonValueCompact(*value.Array[static_cast<usize>(i)], depth + 1));
+                    }
+                    if (count > limit) {
+                        if (limit > 0) {
+                            out.Append(TEXT(", "));
+                        }
+                        out.Append(TEXT("..."));
+                    }
+                }
+                out.Append(TEXT("]"));
+                return out;
+            }
+            case EJsonType::Object:
+            {
+                FString   out(TEXT("{"));
+                const i32 count = static_cast<i32>(value.Object.Size());
+                const i32 limit = (count < kMaxObjectKeys) ? count : kMaxObjectKeys;
+                if (depth >= kMaxDepth) {
+                    out.Append(TEXT("..."));
+                } else {
+                    for (i32 i = 0; i < limit; ++i) {
+                        if (i > 0) {
+                            out.Append(TEXT(", "));
+                        }
+                        out.Append(Core::Utility::String::FromUtf8(
+                            value.Object[static_cast<usize>(i)].Key));
+                        out.Append(TEXT(": "));
+                        out.Append(FormatJsonValueCompact(
+                            *value.Object[static_cast<usize>(i)].Value, depth + 1));
+                    }
+                    if (count > limit) {
+                        if (limit > 0) {
+                            out.Append(TEXT(", "));
+                        }
+                        out.Append(TEXT("..."));
+                    }
+                }
+                out.Append(TEXT("}"));
+                return out;
+            }
+            default:
+                return FString(TEXT("(unknown)"));
+        }
+    }
+
+    auto BuildComponentPropertySnapshots(const GameScene::FWorld& world,
+        const GameScene::FComponentRegistry& componentRegistry, GameScene::FComponentId componentId)
+        -> Core::Container::TVector<Editor::UI::FEditorPropertySnapshot> {
+        using Core::Container::TVector;
+        using Core::Utility::Json::EJsonType;
+        using Core::Utility::Json::FJsonDocument;
+        using Editor::UI::FEditorPropertySnapshot;
+
+        TVector<FEditorPropertySnapshot> properties;
+        const auto* componentTypeEntry = componentRegistry.Find(componentId.Type);
+        if (componentTypeEntry == nullptr || componentTypeEntry->SerializeJson == nullptr) {
+            return properties;
+        }
+
+        FJsonSerializer serializer{};
+        componentTypeEntry->SerializeJson(
+            const_cast<GameScene::FWorld&>(world), componentId, serializer);
+
+        FJsonDocument document{};
+        if (!document.Parse(serializer.GetText())) {
+            return properties;
+        }
+
+        const auto* root = document.GetRoot();
+        if (root == nullptr || root->Type != EJsonType::Object) {
+            return properties;
+        }
+
+        properties.Reserve(root->Object.Size());
+        for (const auto& propertyPair : root->Object) {
+            if (propertyPair.Value == nullptr) {
+                continue;
+            }
+
+            FEditorPropertySnapshot propertySnapshot{};
+            propertySnapshot.mName         = Core::Utility::String::FromUtf8(propertyPair.Key);
+            propertySnapshot.mDisplayValue = FormatJsonValueCompact(*propertyPair.Value);
+            propertySnapshot.mValueKind    = ToEditorPropertyKind(propertyPair.Value->Type);
+            properties.PushBack(Move(propertySnapshot));
+        }
+
+        return properties;
+    }
 
     auto ParseComponentTypeLabel(Core::Container::FNativeStringView typeName)
         -> FComponentTypeLabel {
@@ -78,6 +222,7 @@ namespace {
             objectSnapshot.mParentId.mIndex      = parent.Index;
             objectSnapshot.mParentId.mGeneration = parent.Generation;
             objectSnapshot.mName                 = objectView.GetName();
+            objectSnapshot.bIsPrefabRoot         = world->IsPrefabRoot(objectId);
 
             const auto componentIds = objectView.GetAllComponents();
             objectSnapshot.mComponents.Reserve(componentIds.Size());
@@ -98,6 +243,8 @@ namespace {
                     componentSnapshot.mTypeName      = componentSnapshot.mName;
                     componentSnapshot.mTypeNamespace = Core::Container::FString();
                 }
+                componentSnapshot.mProperties =
+                    BuildComponentPropertySnapshots(*world, componentRegistry, componentId);
                 objectSnapshot.mComponents.PushBack(Move(componentSnapshot));
             }
 

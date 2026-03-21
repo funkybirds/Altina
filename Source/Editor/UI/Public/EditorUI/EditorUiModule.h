@@ -120,6 +120,11 @@ namespace AltinaEngine::Editor::UI {
         Exit
     };
 
+    enum class EEditorUiPlayState : u8 {
+        Stopped = 0,
+        Running
+    };
+
     enum class EAssetItemType : u8 {
         None = 0,
         Directory,
@@ -162,6 +167,7 @@ namespace AltinaEngine::Editor::UI {
     struct FEditorUiFrameContext {
         const FEditorWorldHierarchySnapshot* mHierarchySnapshot  = nullptr;
         bool                                 bClearCommandBuffer = false;
+        EEditorUiPlayState                   mPlayState          = EEditorUiPlayState::Stopped;
     };
 
     struct FEditorUiFrameOutput {
@@ -390,5 +396,6 @@ namespace AltinaEngine::Editor::UI {
         f32                                                  mOutputScrollDragOffsetY    = 0.0f;
         bool                                                 mOutputScrollDragging       = false;
         bool                                                 mAssetNeedsRefresh          = true;
+        EEditorUiPlayState mPlayState = EEditorUiPlayState::Stopped;
     };
 } // namespace AltinaEngine::Editor::UI

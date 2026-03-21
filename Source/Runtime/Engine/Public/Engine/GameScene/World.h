@@ -34,6 +34,11 @@ namespace AltinaEngine::GameScene {
     /**
      * @brief Runtime container for game objects and components.
      */
+    enum class EWorldDeserializeMode : u8 {
+        NormalRuntime = 0,
+        EditorRestore
+    };
+
     class AE_ENGINE_API FWorld {
     public:
         FWorld();
@@ -109,9 +114,11 @@ namespace AltinaEngine::GameScene {
         void               Serialize(Core::Reflection::ISerializer& serializer) const;
         void               SerializeJson(Core::Reflection::ISerializer& serializer) const;
         static auto        Deserialize(Core::Reflection::IDeserializer& deserializer,
-                   Asset::FAssetManager&                                assetManager) -> TOwner<FWorld>;
+                   Asset::FAssetManager&                                assetManager,
+                   EWorldDeserializeMode mode = EWorldDeserializeMode::NormalRuntime) -> TOwner<FWorld>;
         static auto        DeserializeJson(Core::Container::FNativeStringView jsonText,
-                   Asset::FAssetManager& assetManager) -> TOwner<FWorld>;
+                   Asset::FAssetManager&                                      assetManager,
+                   EWorldDeserializeMode mode = EWorldDeserializeMode::NormalRuntime) -> TOwner<FWorld>;
 
     private:
         [[nodiscard]] auto CreateGameObjectId(FStringView name = {}) -> FGameObjectId;
@@ -160,9 +167,11 @@ namespace AltinaEngine::GameScene {
 
                 auto* component = slot.Handle.Get();
                 world.InitializeComponent(*component, id, owner);
-                component->OnCreate();
-                if (component->IsEnabled()) {
-                    component->OnEnable();
+                if (world.ShouldInvokeComponentLifecycles()) {
+                    component->OnCreate();
+                    if (component->IsEnabled()) {
+                        component->OnEnable();
+                    }
                 }
 
                 world.LinkComponentToOwner(owner, id);
@@ -196,9 +205,11 @@ namespace AltinaEngine::GameScene {
                 world.InitializeComponent(*component, id, owner);
                 init(*component);
 
-                component->OnCreate();
-                if (component->IsEnabled()) {
-                    component->OnEnable();
+                if (world.ShouldInvokeComponentLifecycles()) {
+                    component->OnCreate();
+                    if (component->IsEnabled()) {
+                        component->OnEnable();
+                    }
                 }
 
                 world.LinkComponentToOwner(owner, id);
@@ -353,6 +364,8 @@ namespace AltinaEngine::GameScene {
         [[nodiscard]] auto FindComponentStorage() const -> TComponentStorage<T>*;
         template <typename T>
         [[nodiscard]] auto GetOrCreateComponentStorage() -> TComponentStorage<T>&;
+        [[nodiscard]] auto ShouldInvokeComponentLifecycles() const noexcept -> bool;
+        void               SetDeserializeMode(EWorldDeserializeMode mode) noexcept;
 
         u32                mWorldId = 0;
         Core::Memory::TThreadSafeObjectPool<FGameObject>   mGameObjectPool{};
@@ -366,8 +379,9 @@ namespace AltinaEngine::GameScene {
         TVector<FComponentId>                              mActivePointLightComponents{};
         TVector<FComponentId>                              mActiveSkyCubeComponents{};
         THashMap<FGameObjectId, Engine::GameSceneAsset::FPrefabDescriptor, FGameObjectIdHash>
-            mPrefabRoots{};
-        u32 mTransformUpdateId = 0;
+                              mPrefabRoots{};
+        u32                   mTransformUpdateId = 0;
+        EWorldDeserializeMode mDeserializeMode   = EWorldDeserializeMode::NormalRuntime;
     };
 
     namespace Detail {

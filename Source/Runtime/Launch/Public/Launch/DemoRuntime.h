@@ -74,6 +74,8 @@ namespace AltinaEngine::Launch {
         auto LoadModules(IRuntimeSession& session) -> bool override;
         auto OnHostFrame(IRuntimeSession& session, const FFrameContext& frameContext)
             -> bool override;
+        auto ShouldTickHostedClient(IRuntimeSession& session, const FFrameContext& frameContext)
+            -> bool override;
         auto ShouldTickSimulation(IRuntimeSession& session, const FFrameContext& frameContext)
             -> bool override;
         auto BuildSimulationTick(IRuntimeSession& session, const FFrameContext& frameContext)

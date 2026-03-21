@@ -1352,6 +1352,8 @@ namespace AltinaEngine::Launch {
                 viewParams.DeltaTimeSeconds    = mLastDeltaTimeSeconds;
                 viewParams.ViewTarget.Type     = Engine::FSceneView::ETargetType::Viewport;
                 viewParams.ViewTarget.Viewport = viewport.Get();
+                viewParams.PrimaryCameraOverride =
+                    tick.bUseExternalPrimaryCamera ? &tick.ExternalPrimaryCamera : nullptr;
 
                 Engine::FSceneViewBuilder viewBuilder;
                 viewBuilder.Build(*world, viewParams, renderScene);

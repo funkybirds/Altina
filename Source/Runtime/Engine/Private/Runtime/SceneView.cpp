@@ -19,29 +19,14 @@ namespace AltinaEngine::Engine {
         outScene.SkyCubeAsset = {};
         outScene.bHasSkyCube  = false;
 
-        const auto& cameraIds = world.GetActiveCameraComponents();
-        outScene.Views.Reserve(cameraIds.Size());
-        for (const auto& id : cameraIds) {
-            if (!world.IsAlive(id)) {
-                continue;
-            }
-
-            const auto& component = world.ResolveComponent<GameScene::FCameraComponent>(id);
-            if (!component.IsEnabled() || !world.IsGameObjectActive(component.GetOwner())) {
-                continue;
-            }
-
+        const auto appendView = [&](const RenderCore::View::FCameraData& cameraData,
+                                    GameScene::FComponentId              cameraId) {
             FSceneView sceneView{};
-            sceneView.CameraId = id;
+            sceneView.CameraId = cameraId;
             sceneView.Target   = params.ViewTarget;
 
-            auto& viewData                  = sceneView.View;
-            viewData.Camera.mProjectionType = RenderCore::View::ECameraProjectionType::Perspective;
-            viewData.Camera.mVerticalFovRadians = component.GetFovYRadians();
-            viewData.Camera.mNearPlane          = component.GetNearPlane();
-            viewData.Camera.mFarPlane           = component.GetFarPlane();
-            viewData.Camera.mTransform = world.Object(component.GetOwner()).GetWorldTransform();
-
+            auto& viewData               = sceneView.View;
+            viewData.Camera              = cameraData;
             viewData.ViewRect            = params.ViewRect;
             viewData.RenderTargetExtent  = params.RenderTargetExtent;
             viewData.FrameIndex          = params.FrameIndex;
@@ -50,6 +35,31 @@ namespace AltinaEngine::Engine {
             viewData.bReverseZ           = params.bReverseZ;
 
             outScene.Views.PushBack(Move(sceneView));
+        };
+
+        if (params.PrimaryCameraOverride != nullptr) {
+            appendView(*params.PrimaryCameraOverride, {});
+        } else {
+            const auto& cameraIds = world.GetActiveCameraComponents();
+            outScene.Views.Reserve(cameraIds.Size());
+            for (const auto& id : cameraIds) {
+                if (!world.IsAlive(id)) {
+                    continue;
+                }
+
+                const auto& component = world.ResolveComponent<GameScene::FCameraComponent>(id);
+                if (!component.IsEnabled() || !world.IsGameObjectActive(component.GetOwner())) {
+                    continue;
+                }
+
+                RenderCore::View::FCameraData cameraData{};
+                cameraData.mProjectionType = RenderCore::View::ECameraProjectionType::Perspective;
+                cameraData.mVerticalFovRadians = component.GetFovYRadians();
+                cameraData.mNearPlane          = component.GetNearPlane();
+                cameraData.mFarPlane           = component.GetFarPlane();
+                cameraData.mTransform = world.Object(component.GetOwner()).GetWorldTransform();
+                appendView(cameraData, id);
+            }
         }
 
         const auto& meshMaterialIds = world.GetActiveMeshMaterialComponents();

@@ -587,8 +587,9 @@ namespace AltinaEngine::Editor::UI {
         const auto  colValueFieldBorder = theme.mInputBorder;
         const auto  colValueFieldText   = theme.mInputText;
 
-        const auto* object    = FindSelectedGameObjectSnapshot();
-        const FRect panelRect = contentRect;
+        const auto* object     = FindSelectedGameObjectSnapshot();
+        const FRect panelRect  = contentRect;
+        const bool  isReadOnly = (mPlayState == EEditorUiPlayState::Running);
 
         const f32   outerPad             = ScalePx(8.0f);
         const f32   sectionGap           = ScalePx(10.0f);
@@ -705,9 +706,10 @@ namespace AltinaEngine::Editor::UI {
             mInspectorScrollY = t * maxScrollY;
         }
 
-        const auto drawCenteredButton = [&](const FRect& rect, FStringView label) -> bool {
+        const auto drawCenteredButton = [&](const FRect& rect, FStringView label,
+                                            bool enabled = true) -> bool {
             const bool hovered = IsInside(rect, mouse);
-            const auto bg      = hovered ? colButtonHoverBg : colButtonBg;
+            const auto bg = enabled ? (hovered ? colButtonHoverBg : colButtonBg) : colValueFieldBg;
             gui.DrawRoundedRectFilled(rect, bg, theme.mEditor.mPanelSurface.mCornerRadius);
             if ((theme.mButtonBorder >> 24U) != 0U) {
                 gui.DrawRoundedRect(
@@ -717,8 +719,8 @@ namespace AltinaEngine::Editor::UI {
             gui.DrawTextStyled(
                 FVector2f(rect.Min.X() + (rect.Max.X() - rect.Min.X() - textSize.X()) * 0.5f,
                     rect.Min.Y() + (rect.Max.Y() - rect.Min.Y() - textSize.Y()) * 0.5f),
-                colButtonText, label, DebugGui::EDebugGuiFontRole::Body);
-            return hovered && mouseReleased;
+                enabled ? colButtonText : colMutedText, label, DebugGui::EDebugGuiFontRole::Body);
+            return enabled && hovered && mouseReleased;
         };
         const auto drawValueRow = [&](const FRect& rect, FStringView label, FStringView value) {
             const FRect valueRect =
@@ -762,7 +764,7 @@ namespace AltinaEngine::Editor::UI {
         gui.DrawTextStyled(FVector2f(nameInputRect.Min.X() + theme.mInputTextOffsetX,
                                nameInputRect.Min.Y() + rowValueTextY),
             colValueFieldText, mInspectorNameInput.ToView(), DebugGui::EDebugGuiFontRole::Body);
-        (void)drawCenteredButton(renameRect, TEXT("Rename"));
+        (void)drawCenteredButton(renameRect, TEXT("Rename"), !isReadOnly);
         y += rowHeight + rowGap;
 
         const FRect typeRowRect =
@@ -773,17 +775,17 @@ namespace AltinaEngine::Editor::UI {
 
         const FRect addComponentRect =
             MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + buttonHeight);
-        (void)drawCenteredButton(addComponentRect, TEXT("Add Component"));
+        (void)drawCenteredButton(addComponentRect, TEXT("Add Component"), !isReadOnly);
         y += buttonHeight + rowGap;
 
         const FRect addGameObjectRect =
             MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + buttonHeight);
-        (void)drawCenteredButton(addGameObjectRect, TEXT("Add GameObject"));
+        (void)drawCenteredButton(addGameObjectRect, TEXT("Add GameObject"), !isReadOnly);
         y += buttonHeight + rowGap;
 
         const FRect removeRect =
             MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + buttonHeight);
-        (void)drawCenteredButton(removeRect, TEXT("Remove"));
+        (void)drawCenteredButton(removeRect, TEXT("Remove"), !isReadOnly);
         y += buttonHeight + sectionGap;
 
         const FRect componentsHeaderRect = MakeRect(
@@ -864,7 +866,7 @@ namespace AltinaEngine::Editor::UI {
 
             const FRect removeComponentRect =
                 MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + buttonHeight);
-            (void)drawCenteredButton(removeComponentRect, TEXT("Remove Component"));
+            (void)drawCenteredButton(removeComponentRect, TEXT("Remove Component"), !isReadOnly);
             y += buttonHeight + collapseGap;
         }
 

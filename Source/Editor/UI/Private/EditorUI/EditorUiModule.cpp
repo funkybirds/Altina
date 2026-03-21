@@ -26,6 +26,7 @@ namespace AltinaEngine::Editor::UI {
         if (frameContext.mHierarchySnapshot != nullptr) {
             SetWorldHierarchySnapshot(*frameContext.mHierarchySnapshot);
         }
+        mPlayState = frameContext.mPlayState;
 
         mStateStore.mCachedOutput.mViewportRequest = GetViewportRequest();
         mStateStore.mCachedOutput.mCommands        = mStateStore.mPendingCommands;

@@ -87,6 +87,7 @@ namespace AltinaEngine::Engine {
         f32                                     DeltaTimeSeconds    = 0.0f;
         bool                                    bReverseZ           = true;
         FSceneView::FTargetHandle               ViewTarget{};
+        const RenderCore::View::FCameraData*    PrimaryCameraOverride = nullptr;
     };
 
     class AE_ENGINE_API FSceneViewBuilder {

@@ -114,6 +114,14 @@ namespace {
             return true;
         }
 
+        auto ShouldTickHostedClient(AltinaEngine::Launch::IRuntimeSession& session,
+            const AltinaEngine::Launch::FFrameContext& frameContext) -> bool override {
+            (void)session;
+            (void)frameContext;
+            ++HostedClientGateCount;
+            return false;
+        }
+
         void OnShutdown(AltinaEngine::Launch::IRuntimeSession& session) override {
             (void)session;
             ++ShutdownCount;
@@ -125,10 +133,11 @@ namespace {
             return frameContext.FrameIndex < 2ULL;
         }
 
-        int PreInitCount   = 0;
-        int InitCount      = 0;
-        int HostFrameCount = 0;
-        int ShutdownCount  = 0;
+        int PreInitCount          = 0;
+        int InitCount             = 0;
+        int HostFrameCount        = 0;
+        int ShutdownCount         = 0;
+        int HostedClientGateCount = 0;
     };
 } // namespace
 
@@ -204,6 +213,7 @@ TEST_CASE("DemoHostHooks forwards wrapped hooks on fallback path") {
     REQUIRE_EQ(wrapped.PreInitCount, 1);
     REQUIRE_EQ(wrapped.InitCount, 1);
     REQUIRE_EQ(wrapped.HostFrameCount, 2);
+    REQUIRE_EQ(wrapped.HostedClientGateCount, 2);
     REQUIRE_EQ(wrapped.ShutdownCount, 1);
 }
 
@@ -213,4 +223,5 @@ TEST_CASE("RenderTick defaults to swapchain present path") {
     REQUIRE_EQ(tick.RenderHeight, 0U);
     REQUIRE(!tick.bRedirectPrimaryViewToOffscreen);
     REQUIRE_EQ(tick.PrimaryViewImageId, 0ULL);
+    REQUIRE(!tick.bUseExternalPrimaryCamera);
 }

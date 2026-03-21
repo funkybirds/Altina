@@ -436,7 +436,7 @@ namespace {
             }
 
             ViewportBootstrap.EnsureDefaultWorld(session);
-            PlaySession.Start();
+            PlaySession.Start(session);
 
             auto                          services = session.GetServices();
             Editor::UI::FEditorUiInitDesc uiInitDesc{};
@@ -459,12 +459,16 @@ namespace {
             Editor::UI::FEditorUiFrameContext uiFrameContext{};
             uiFrameContext.mHierarchySnapshot  = &hierarchySnapshot;
             uiFrameContext.bClearCommandBuffer = true;
-            mUiFrameOutput                     = UiModule.TickUi(uiFrameContext);
+            uiFrameContext.mPlayState =
+                (PlaySession.GetState() == Launch::EEditorRuntimeState::Running)
+                ? Editor::UI::EEditorUiPlayState::Running
+                : Editor::UI::EEditorUiPlayState::Stopped;
+            mUiFrameOutput = UiModule.TickUi(uiFrameContext);
 
             for (auto cmd : mUiFrameOutput.mCommands) {
                 switch (cmd) {
                     case Editor::UI::EEditorUiCommand::Play:
-                        PlaySession.RequestPlay();
+                        (void)PlaySession.RequestPlay(session);
                         break;
                     case Editor::UI::EEditorUiCommand::Pause:
                         PlaySession.RequestPause();
@@ -473,7 +477,7 @@ namespace {
                         PlaySession.RequestStep();
                         break;
                     case Editor::UI::EEditorUiCommand::Stop:
-                        PlaySession.RequestStop();
+                        (void)PlaySession.RequestStop(session);
                         break;
                     case Editor::UI::EEditorUiCommand::Exit:
                         bExitRequested = true;
@@ -486,9 +490,25 @@ namespace {
             const bool allowHotkeys = (services.DebugGuiSystem == nullptr)
                 || !services.DebugGuiSystem->WantsCaptureKeyboard();
             PlaySession.HandleFrameInput(platformInput, allowHotkeys);
+            if (allowHotkeys && platformInput != nullptr) {
+                if (platformInput->WasKeyPressed(Input::EKey::F5)) {
+                    (void)PlaySession.RequestPlay(session);
+                }
+                if (platformInput->WasKeyPressed(Input::EKey::F8)) {
+                    (void)PlaySession.RequestStop(session);
+                }
+            }
+            PlaySession.UpdateEditorCamera(platformInput, services.MainWindow,
+                ConvertViewportRequest(mUiFrameOutput.mViewportRequest), frameContext);
             UpdateRuntimeInputRouting(session, platformInput, services.DebugGuiSystem);
-            return !bExitRequested
-                && PlaySession.GetState() != Launch::EEditorRuntimeState::Stopped;
+            return !bExitRequested;
+        }
+
+        auto ShouldTickHostedClient(Launch::IRuntimeSession& session,
+            const Launch::FFrameContext&                     frameContext) -> bool override {
+            (void)session;
+            (void)frameContext;
+            return PlaySession.GetState() == Launch::EEditorRuntimeState::Running;
         }
 
         auto ShouldTickSimulation(Launch::IRuntimeSession& session,
@@ -509,15 +529,10 @@ namespace {
             (void)session;
             (void)frameContext;
 
-            Launch::FRenderTick tick{};
+            Launch::FRenderTick tick = PlaySession.BuildRenderTick(
+                ConvertViewportRequest(mUiFrameOutput.mViewportRequest));
             tick.bRedirectPrimaryViewToOffscreen = true;
             tick.PrimaryViewImageId              = Editor::UI::kEditorViewportImageId;
-            const auto viewportRequest           = mUiFrameOutput.mViewportRequest;
-            if (viewportRequest.bHasContent && viewportRequest.Width > 0U
-                && viewportRequest.Height > 0U) {
-                tick.RenderWidth  = viewportRequest.Width;
-                tick.RenderHeight = viewportRequest.Height;
-            }
             return tick;
         }
 
@@ -534,18 +549,32 @@ namespace {
                 engineLoop->SetRuntimeInputOverride(nullptr);
             }
             UiModule.Shutdown();
-            PlaySession.Shutdown();
+            PlaySession.Shutdown(session.GetServices().MainWindow);
             CoreModule.Shutdown(EditorContext);
         }
 
         [[nodiscard]] auto ShouldContinue(const Launch::IRuntimeSession& session,
             const Launch::FFrameContext& frameContext) const -> bool override {
             (void)frameContext;
-            return session.IsRunning() && !bExitRequested
-                && PlaySession.GetState() != Launch::EEditorRuntimeState::Stopped;
+            return session.IsRunning() && !bExitRequested;
         }
 
     private:
+        [[nodiscard]] static auto ConvertViewportRequest(
+            const Editor::UI::FEditorViewportRequest& viewportRequest)
+            -> Editor::PlaySession::FEditorViewportInteraction {
+            Editor::PlaySession::FEditorViewportInteraction interaction{};
+            interaction.mWidth           = viewportRequest.Width;
+            interaction.mHeight          = viewportRequest.Height;
+            interaction.mContentMinX     = viewportRequest.ContentMinX;
+            interaction.mContentMinY     = viewportRequest.ContentMinY;
+            interaction.bHovered         = viewportRequest.bHovered;
+            interaction.bFocused         = viewportRequest.bFocused;
+            interaction.bHasContent      = viewportRequest.bHasContent;
+            interaction.bUiBlockingInput = viewportRequest.bUiBlockingInput;
+            return interaction;
+        }
+
         [[nodiscard]] static auto ResolvePlatformInput(Launch::IRuntimeSession& session,
             const Input::FInputSystem* fallback) -> const Input::FInputSystem* {
             if (auto* engineLoop = dynamic_cast<Launch::FEngineLoop*>(&session)) {
@@ -567,7 +596,11 @@ namespace {
             }
 
             const bool allowRuntimeInput = PlaySession.ShouldTickSimulation();
-            (void)debugGuiSystem;
+            if (!allowRuntimeInput) {
+                (void)debugGuiSystem;
+                engineLoop->SetRuntimeInputOverride(nullptr);
+                return;
+            }
             InputRouter.Route(platformInput, mUiFrameOutput.mViewportRequest, allowRuntimeInput);
             engineLoop->SetRuntimeInputOverride(InputRouter.GetRoutedInput());
         }

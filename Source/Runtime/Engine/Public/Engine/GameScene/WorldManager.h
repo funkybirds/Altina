@@ -36,6 +36,7 @@ namespace AltinaEngine::GameScene {
 
         [[nodiscard]] auto CreateWorld() -> FWorldHandle;
         [[nodiscard]] auto AddWorld(TOwner<FWorld> world) -> FWorldHandle;
+        [[nodiscard]] auto ReplaceWorld(FWorldHandle handle, TOwner<FWorld> world) -> FWorldHandle;
         void               DestroyWorld(FWorldHandle handle);
 
         [[nodiscard]] auto GetWorld(FWorldHandle handle) noexcept -> FWorld*;

@@ -186,12 +186,24 @@ namespace AltinaEngine::Launch {
             return false;
         }
 
+        if (!ShouldTickHostedClient(session, frameContext)) {
+            return true;
+        }
+
         auto* client = mModuleLoader.GetClient();
         if (client == nullptr) {
             return true;
         }
         auto context = BuildContext(session, &frameContext);
         return client->OnTick(context, frameContext.DeltaSeconds);
+    }
+
+    auto FDemoHostHooks::ShouldTickHostedClient(
+        IRuntimeSession& session, const FFrameContext& frameContext) -> bool {
+        if (mWrappedHooks == nullptr) {
+            return true;
+        }
+        return mWrappedHooks->ShouldTickHostedClient(session, frameContext);
     }
 
     auto FDemoHostHooks::ShouldTickSimulation(

@@ -34,6 +34,12 @@ namespace AltinaEngine::Launch {
             (void)frameContext;
             return true;
         }
+        virtual auto ShouldTickHostedClient(
+            IRuntimeSession& session, const FFrameContext& frameContext) -> bool {
+            (void)session;
+            (void)frameContext;
+            return true;
+        }
         virtual auto ShouldTickSimulation(
             IRuntimeSession& session, const FFrameContext& frameContext) -> bool {
             (void)session;

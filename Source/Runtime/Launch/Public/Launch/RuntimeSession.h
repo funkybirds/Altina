@@ -3,6 +3,7 @@
 #include "Base/LaunchAPI.h"
 #include "CoreMinimal.h"
 #include "Container/SmartPtr.h"
+#include "View/CameraData.h"
 
 namespace AltinaEngine::Application {
     class FPlatformWindow;
@@ -41,10 +42,12 @@ namespace AltinaEngine::Launch {
     };
 
     struct FRenderTick {
-        u32  RenderWidth                     = 0U;
-        u32  RenderHeight                    = 0U;
-        bool bRedirectPrimaryViewToOffscreen = false;
-        u64  PrimaryViewImageId              = 0ULL;
+        u32                           RenderWidth                     = 0U;
+        u32                           RenderHeight                    = 0U;
+        bool                          bRedirectPrimaryViewToOffscreen = false;
+        u64                           PrimaryViewImageId              = 0ULL;
+        bool                          bUseExternalPrimaryCamera       = false;
+        RenderCore::View::FCameraData ExternalPrimaryCamera{};
     };
 
     struct FRuntimeServices {

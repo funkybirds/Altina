@@ -843,13 +843,15 @@ namespace AltinaEngine::Editor::UI {
                     debugGuiSystem != nullptr,
                     [&]() { debugGuiSystem->SetShowCVars(!cvarsShown); });
             } else {
-                drawMenuItem(itemRect(0), TEXT("Play"), false, true,
+                const bool isStopped = (mPlayState == EEditorUiPlayState::Stopped);
+                const bool isRunning = (mPlayState == EEditorUiPlayState::Running);
+                drawMenuItem(itemRect(0), TEXT("Play"), false, isStopped,
                     [&]() { queueCommand(EEditorUiCommand::Play); });
-                drawMenuItem(itemRect(1), TEXT("Pause"), false, true,
+                drawMenuItem(itemRect(1), TEXT("Pause"), false, false,
                     [&]() { queueCommand(EEditorUiCommand::Pause); });
-                drawMenuItem(itemRect(2), TEXT("Step"), false, true,
+                drawMenuItem(itemRect(2), TEXT("Step"), false, false,
                     [&]() { queueCommand(EEditorUiCommand::Step); });
-                drawMenuItem(itemRect(3), TEXT("Stop"), false, true,
+                drawMenuItem(itemRect(3), TEXT("Stop"), false, isRunning,
                     [&]() { queueCommand(EEditorUiCommand::Stop); });
                 drawMenuItem(itemRect(4), TEXT("Simulate"), false, false, [] {});
             }

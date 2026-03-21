@@ -18,7 +18,8 @@ namespace AltinaEngine::Engine::GameSceneAsset {
     }
 
     auto LoadWorldFromLevelAsset(const Asset::FAssetHandle& levelHandle,
-        Asset::FAssetManager& manager) -> Core::Container::TOwner<GameScene::FWorld> {
+        Asset::FAssetManager& manager, GameScene::EWorldDeserializeMode mode)
+        -> Core::Container::TOwner<GameScene::FWorld> {
         const auto asset = manager.Load(levelHandle);
         if (!asset) {
             return {};
@@ -33,7 +34,7 @@ namespace AltinaEngine::Engine::GameSceneAsset {
         if (levelAsset->GetEncoding() == Asset::kLevelEncodingWorldBinary) {
             Core::Reflection::FBinaryDeserializer deserializer{};
             deserializer.SetBuffer(payload);
-            return GameScene::FWorld::Deserialize(deserializer, manager);
+            return GameScene::FWorld::Deserialize(deserializer, manager, mode);
         }
 
         if (levelAsset->GetEncoding() == Asset::kLevelEncodingWorldJson) {
@@ -41,7 +42,7 @@ namespace AltinaEngine::Engine::GameSceneAsset {
             if (!payload.IsEmpty()) {
                 jsonText.Append(reinterpret_cast<const char*>(payload.Data()), payload.Size());
             }
-            return GameScene::FWorld::DeserializeJson(jsonText.ToView(), manager);
+            return GameScene::FWorld::DeserializeJson(jsonText.ToView(), manager, mode);
         }
 
         return {};

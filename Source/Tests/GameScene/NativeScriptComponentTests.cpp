@@ -1,6 +1,7 @@
 #include "TestHarness.h"
 
 #include "Base/AltinaBase.h"
+#include "Asset/AssetManager.h"
 #include "Engine/EngineReflection.h"
 #include "Engine/GameScene/ComponentRegistry.h"
 #include "Engine/GameScene/NativeScriptComponent.h"
@@ -114,4 +115,37 @@ TEST_CASE("GameScene.NativeScriptComponent.TickAndSerializationV2Raw") {
     REQUIRE(deserializer.Read<FComponentTypeHash>() == GetComponentTypeHash<FTestNativeScript>());
     REQUIRE(deserializer.Read<bool>() == true);
     REQUIRE(deserializer.Read<i32>() == 1234);
+}
+
+TEST_CASE("GameScene.WorldDeserializeEditorRestoreSkipsComponentLifecycles") {
+    AltinaEngine::Engine::RegisterEngineReflection();
+    RegisterTestNativeScriptComponent();
+
+    FWorld     world(91);
+    auto       obj = world.CreateGameObject(TEXT("EditorRestoreOwner"));
+    const auto id  = world.CreateComponent<FTestNativeScript>(
+        obj.GetId(), [](FTestNativeScript& c) { c.Value = 77; });
+    REQUIRE(id.IsValid());
+
+    AltinaEngine::Core::Reflection::FBinarySerializer serializer;
+    world.Serialize(serializer);
+
+    AltinaEngine::Core::Reflection::FBinaryDeserializer deserializer;
+    deserializer.SetBuffer(serializer.GetBuffer());
+
+    AltinaEngine::Asset::FAssetManager assetManager{};
+    const auto                         restored =
+        FWorld::Deserialize(deserializer, assetManager, EWorldDeserializeMode::EditorRestore);
+    REQUIRE(restored);
+
+    const auto restoredObjects = restored->GetAllGameObjectIds();
+    REQUIRE_EQ(restoredObjects.Size(), 1U);
+    const auto restoredComponentId = restored->GetComponent<FTestNativeScript>(restoredObjects[0]);
+    REQUIRE(restoredComponentId.IsValid());
+
+    auto& restoredScript = restored->ResolveComponent<FTestNativeScript>(restoredComponentId);
+    REQUIRE_EQ(restoredScript.Value, 77);
+    REQUIRE_EQ(restoredScript.OnCreateCount, 0);
+    REQUIRE_EQ(restoredScript.OnEnableCount, 0);
+    REQUIRE(restoredScript.IsEnabled());
 }

@@ -773,7 +773,7 @@ namespace AltinaEngine::GameScene {
     }
 
     auto FWorld::DeserializeJson(Core::Container::FNativeStringView jsonText,
-        Asset::FAssetManager& assetManager) -> TOwner<FWorld> {
+        Asset::FAssetManager& assetManager, EWorldDeserializeMode mode) -> TOwner<FWorld> {
         using Core::Utility::Json::EJsonType;
         using Core::Utility::Json::FindObjectValueInsensitive;
         using Core::Utility::Json::FJsonDocument;
@@ -908,8 +908,9 @@ namespace AltinaEngine::GameScene {
             return {};
         }
 
-        auto  world    = Core::Container::MakeUnique<FWorld>(static_cast<u32>(worldIdNumber));
-        auto& registry = GetComponentRegistry();
+        auto world = Core::Container::MakeUnique<FWorld>(static_cast<u32>(worldIdNumber));
+        world->SetDeserializeMode(mode);
+        auto&                                                     registry = GetComponentRegistry();
 
         THashMap<FGameObjectId, FGameObjectId, FGameObjectIdHash> objectIdRemap{};
         TVector<FPendingParentLink>                               pendingParents{};
@@ -1120,12 +1121,13 @@ namespace AltinaEngine::GameScene {
             }
         }
 
+        world->SetDeserializeMode(EWorldDeserializeMode::NormalRuntime);
         world->UpdateTransforms();
         return world;
     }
 
     auto FWorld::Deserialize(Core::Reflection::IDeserializer& deserializer,
-        Asset::FAssetManager&                                 assetManager) -> TOwner<FWorld> {
+        Asset::FAssetManager& assetManager, EWorldDeserializeMode mode) -> TOwner<FWorld> {
         struct FPendingParentLink {
             FGameObjectId mChild{};
             FGameObjectId mParentSerialized{};
@@ -1139,8 +1141,9 @@ namespace AltinaEngine::GameScene {
         const u32 worldId     = deserializer.Read<u32>();
         const u32 objectCount = deserializer.Read<u32>();
 
-        auto      world    = Core::Container::MakeUnique<FWorld>(worldId);
-        auto&     registry = GetComponentRegistry();
+        auto      world = Core::Container::MakeUnique<FWorld>(worldId);
+        world->SetDeserializeMode(mode);
+        auto&                                                     registry = GetComponentRegistry();
 
         THashMap<FGameObjectId, FGameObjectId, FGameObjectIdHash> objectIdRemap{};
         TVector<FPendingParentLink>                               pendingParents{};
@@ -1272,8 +1275,17 @@ namespace AltinaEngine::GameScene {
             }
         }
 
+        world->SetDeserializeMode(EWorldDeserializeMode::NormalRuntime);
         world->UpdateTransforms();
         return world;
+    }
+
+    auto FWorld::ShouldInvokeComponentLifecycles() const noexcept -> bool {
+        return mDeserializeMode == EWorldDeserializeMode::NormalRuntime;
+    }
+
+    void FWorld::SetDeserializeMode(EWorldDeserializeMode mode) noexcept {
+        mDeserializeMode = mode;
     }
 
     void FWorld::AddActiveComponent(TVector<FComponentId>& list, FComponentId id) {

@@ -321,6 +321,56 @@ TEST_CASE("EditorUiModule play menu enqueues command and clear is caller-control
     DestroyDebugGuiSystem(sys);
 }
 
+TEST_CASE("EditorUiModule play menu disables unavailable commands by play state") {
+    using AltinaEngine::DebugGui::CreateDebugGuiSystem;
+    using AltinaEngine::DebugGui::DestroyDebugGuiSystem;
+    using AltinaEngine::Editor::UI::EEditorUiCommand;
+    using AltinaEngine::Editor::UI::EEditorUiPlayState;
+
+    auto* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    AltinaEngine::Editor::UI::FEditorUiModule uiModule{};
+    InitializeUi(uiModule, sys);
+
+    AltinaEngine::Input::FInputSystem input;
+
+    auto tickWithState = [&](EEditorUiPlayState playState, AltinaEngine::i32 x, AltinaEngine::i32 y,
+                             bool mouseDown, bool mouseUp) {
+        PrepareInput(input, 1280, 720, x, y);
+        if (mouseDown) {
+            input.OnMouseButtonDown(0U);
+        }
+        if (mouseUp) {
+            input.OnMouseButtonUp(0U);
+        }
+        sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+        AltinaEngine::Editor::UI::FEditorUiFrameContext context{};
+        context.bClearCommandBuffer = true;
+        context.mPlayState          = playState;
+        return uiModule.TickUi(context);
+    };
+
+    (void)tickWithState(EEditorUiPlayState::Running, 124, 8, true, false);
+    (void)tickWithState(EEditorUiPlayState::Running, 124, 8, false, true);
+    const auto runningOutput = tickWithState(EEditorUiPlayState::Running, 128, 30, true, false);
+    bool       hasPlay       = false;
+    for (auto cmd : runningOutput.mCommands) {
+        if (cmd == EEditorUiCommand::Play) {
+            hasPlay = true;
+            break;
+        }
+    }
+    REQUIRE(!hasPlay);
+
+    uiModule.Shutdown();
+    DestroyDebugGuiSystem(sys);
+}
+
 TEST_CASE("EditorUiModule hierarchy snapshot and inspector selection") {
     using AltinaEngine::Core::Container::FString;
     using AltinaEngine::Editor::UI::EEditorPropertyValueKind;

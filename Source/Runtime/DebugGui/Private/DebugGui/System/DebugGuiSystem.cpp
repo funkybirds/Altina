@@ -15,6 +15,7 @@
 
 #include "DebugGui/Core/DebugGuiCoreTypes.h"
 #include "DebugGui/Core/FontAtlas.h"
+#include "DebugGui/Core/IconAtlas.h"
 #include "DebugGui/Widgets/DebugGuiContext.h"
 #include "DebugGui/Rendering/DebugGuiRendererD3D11.h"
 
@@ -36,7 +37,10 @@ namespace AltinaEngine::DebugGui {
         using namespace AltinaEngine::DebugGui::Private;
         class FDebugGuiSystem final : public IDebugGuiSystem {
         public:
-            FDebugGuiSystem() { mFont.Build(); }
+            FDebugGuiSystem() {
+                mFont.Build();
+                mIconAtlas.Build();
+            }
             ~FDebugGuiSystem() override { DetachLogSinkIfOwned(); }
 
             void SetEnabled(bool enabled) noexcept override {
@@ -217,7 +221,7 @@ namespace AltinaEngine::DebugGui {
                 guiInput.mKeyEnterPressed     = input.WasKeyPressed(Input::EKey::Enter);
                 guiInput.mKeyBackspacePressed = input.WasKeyPressed(Input::EKey::Backspace);
 
-                FDebugGuiContext ctx(mPending, mClip, guiInput, mUi, displaySize, mFont,
+                FDebugGuiContext ctx(mPending, mClip, guiInput, mUi, displaySize, mFont, mIconAtlas,
                     scaledTheme, mWindowOrder, mWindows, mDraggingWindowKey, mWindowDragOffset);
                 ctx.PushClipRect({ FVector2f(0.0f, 0.0f), displaySize });
 
@@ -278,7 +282,7 @@ namespace AltinaEngine::DebugGui {
                     return;
                 }
                 mRenderer.SetExternalTextures(imageTextures);
-                mRenderer.Render(device, viewport, drawData, mFont);
+                mRenderer.Render(device, viewport, drawData, mFont, mIconAtlas);
             }
 
             [[nodiscard]] auto WantsCaptureKeyboard() const noexcept -> bool override {
@@ -860,6 +864,7 @@ namespace AltinaEngine::DebugGui {
 
             FUIState                                 mUi{};
             FFontAtlas                               mFont{};
+            FIconAtlas                               mIconAtlas{};
             FClipRectStack                           mClip{};
             FDrawData                                mPending{};
             FDrawData                                mRender{};

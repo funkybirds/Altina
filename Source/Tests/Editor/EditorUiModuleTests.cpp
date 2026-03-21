@@ -146,14 +146,24 @@ namespace {
         const float          scrollTrackH    = scrollTrackMaxY - scrollTrackMinY;
 
         FInspectorTestLayout layout{};
-        layout.mPanelMinX = static_cast<AltinaEngine::i32>(contentMinX);
-        layout.mPanelMinY = static_cast<AltinaEngine::i32>(contentMinY);
-        layout.mPanelMaxX = static_cast<AltinaEngine::i32>(contentMaxX);
-        layout.mPanelMaxY = static_cast<AltinaEngine::i32>(contentMaxY);
+        layout.mPanelMinX                  = static_cast<AltinaEngine::i32>(contentMinX);
+        layout.mPanelMinY                  = static_cast<AltinaEngine::i32>(contentMinY);
+        layout.mPanelMaxX                  = static_cast<AltinaEngine::i32>(contentMaxX);
+        layout.mPanelMaxY                  = static_cast<AltinaEngine::i32>(contentMaxY);
+        const float rowHeight              = ScalePx(20.0f);
+        const float rowGap                 = ScalePx(2.0f);
+        const float buttonHeight           = ScalePx(22.0f);
+        const float sectionGap             = ScalePx(10.0f);
+        const float basicHeaderHeight      = ScalePx(20.0f);
+        const float componentsHeaderHeight = ScalePx(20.0f);
+        const float collapseHeaderHeight   = ScalePx(26.0f);
+        const float firstComponentHeaderY  = contentClipMinY + basicHeaderHeight + ScalePx(8.0f)
+            + (rowHeight + rowGap) * 2.0f + (buttonHeight + rowGap) * 2.0f + buttonHeight
+            + sectionGap + componentsHeaderHeight + ScalePx(8.0f);
         layout.mFirstComponentHeaderX =
             static_cast<AltinaEngine::i32>(contentMinX + ScalePx(48.0f));
         layout.mFirstComponentHeaderY =
-            static_cast<AltinaEngine::i32>(contentClipMinY + ScalePx(207.0f));
+            static_cast<AltinaEngine::i32>(firstComponentHeaderY + collapseHeaderHeight * 0.5f);
         layout.mScrollBarX = static_cast<AltinaEngine::i32>(
             scrollTrackMinX + (scrollTrackMaxX - scrollTrackMinX) * 0.5f);
         layout.mScrollBarY = static_cast<AltinaEngine::i32>(scrollTrackMinY + scrollTrackH * 0.75f);

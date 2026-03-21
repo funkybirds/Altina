@@ -2,6 +2,7 @@
 
 #include "DebugGui/Core/DebugGuiCoreTypes.h"
 #include "DebugGui/Core/FontAtlas.h"
+#include "DebugGui/Core/IconAtlas.h"
 
 #include "Container/HashMap.h"
 
@@ -30,7 +31,7 @@ namespace AltinaEngine::DebugGui::Private {
 
         void SetExternalTextures(const FImageTextureMap& textures);
         void Render(Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport, const FDrawData& drawData,
-            const FFontAtlas& atlas);
+            const FFontAtlas& atlas, const FIconAtlas& iconAtlas);
 
     private:
         struct FConstants {
@@ -49,7 +50,8 @@ namespace AltinaEngine::DebugGui::Private {
             f32 GlyphTexelH   = static_cast<f32>(FFontAtlas::kAtlasGlyphH);
         };
 
-        bool EnsureResources(Rhi::FRhiDevice& device, const FFontAtlas& atlas);
+        bool EnsureResources(
+            Rhi::FRhiDevice& device, const FFontAtlas& atlas, const FIconAtlas& iconAtlas);
         bool EnsureBackBufferRtv(Rhi::FRhiDevice& device, Rhi::FRhiTexture* backBuffer);
         bool EnsureAuxiliaryRtvs(
             Rhi::FRhiDevice& device, u32 width, u32 height, Rhi::ERhiFormat format);
@@ -57,17 +59,22 @@ namespace AltinaEngine::DebugGui::Private {
         bool EnsureBindGroupForTexture(Rhi::FRhiDevice& device, u64 imageId,
             Rhi::FRhiTexture* texture, Rhi::FRhiBindGroupRef& out);
         void PruneExternalTextureCache();
-        void UpdateConstants(u32 w, u32 h, const FDrawData& drawData, const FFontAtlas& atlas);
+        void UpdateConstants(u32 w, u32 h, const FDrawData& drawData, const FFontAtlas& atlas,
+            const FIconAtlas& iconAtlas);
         bool CompileShaders(Rhi::FRhiDevice& device);
 
         Rhi::FRhiTextureRef                            mFontTexture;
+        Rhi::FRhiTextureRef                            mIconTexture;
         Rhi::FRhiShaderResourceViewRef                 mFontSrv;
+        Rhi::FRhiShaderResourceViewRef                 mIconSrv;
         Rhi::FRhiSamplerRef                            mSampler;
         Rhi::FRhiBufferRef                             mConstantsBufferSdf;
+        Rhi::FRhiBufferRef                             mConstantsBufferIcon;
         Rhi::FRhiBufferRef                             mConstantsBufferImage;
         Rhi::FRhiBindGroupLayoutRef                    mLayout;
         Rhi::FRhiPipelineLayoutRef                     mPipelineLayout;
-        Rhi::FRhiBindGroupRef                          mBindGroup;
+        Rhi::FRhiBindGroupRef                          mFontBindGroup;
+        Rhi::FRhiBindGroupRef                          mIconBindGroup;
         Rhi::FRhiShaderRef                             mVertexShader;
         Rhi::FRhiShaderRef                             mPixelShader;
         Rhi::FRhiPipelineRef                           mPipeline;
@@ -89,6 +96,7 @@ namespace AltinaEngine::DebugGui::Private {
         Rhi::FRhiBufferRef           mVertexBuffer;
         Rhi::FRhiBufferRef           mIndexBuffer;
         FConstants                   mConstantsSdfValue{};
+        FConstants                   mConstantsIconValue{};
         FConstants                   mConstantsImageValue{};
         u64                          mVertexBufferSize = 0ULL;
         u64                          mIndexBufferSize  = 0ULL;

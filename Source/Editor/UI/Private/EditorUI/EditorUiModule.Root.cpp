@@ -1,5 +1,7 @@
 #include "EditorUI/EditorUiModule.h"
 
+#include "EditorIcons.h"
+
 #include "DebugGui/DebugGui.h"
 #include "Math/Common.h"
 #include "Math/Vector.h"
@@ -199,7 +201,12 @@ namespace AltinaEngine::Editor::UI {
                 gui.DrawRoundedRectFilled(
                     menus[i].Rect, colMenuHover, menuTheme.mPopupRadius * 0.8f);
             }
-            gui.DrawTextStyled(FVector2f(menuX + menuItemPadX, menuTextY),
+            const FVector2f labelSize =
+                gui.MeasureText(FStringView(menuNames[i]), DebugGui::EDebugGuiFontRole::Menu);
+            gui.DrawTextStyled(
+                FVector2f(menus[i].Rect.Min.X()
+                        + (menus[i].Rect.Max.X() - menus[i].Rect.Min.X() - labelSize.X()) * 0.5f,
+                    menuTextY),
                 (hovered || opened) ? tabTheme.mUnderline : menuTheme.mItemText,
                 FStringView(menuNames[i]), DebugGui::EDebugGuiFontRole::Menu);
             if (hovered && mousePressed) {
@@ -485,14 +492,14 @@ namespace AltinaEngine::Editor::UI {
                         FVector2f(tabRect.Min.X(), tabRect.Max.Y()), tabTheme.mDivider, 1.0f);
                 }
 
-                const f32   iconSize = tabTheme.mIconSize;
+                const f32   iconSize = tabTheme.mIconSize + ScalePx(6.0f);
                 const f32   iconPadX = tabTheme.mTextPadX;
                 const f32   iconPadY = (tabBarHeight - iconSize) * 0.5f;
                 const FRect iconRect = MakeRect(tabRect.Min.X() + iconPadX,
                     tabRect.Min.Y() + iconPadY, tabRect.Min.X() + iconPadX + iconSize,
                     tabRect.Min.Y() + iconPadY + iconSize);
-                gui.DrawRoundedRectFilled(
-                    iconRect, selected ? tabTheme.mIconActive : tabTheme.mIcon, iconSize * 0.35f);
+                gui.DrawIcon(iconRect, Private::GetPanelIconId(panel.Name.ToView()),
+                    selected ? tabTheme.mIconActive : tabTheme.mIcon);
                 gui.DrawTextStyled(FVector2f(iconRect.Max.X() + tabTheme.mIconPadX,
                                        tabRect.Min.Y()
                                            + (tabBarHeight
@@ -695,8 +702,8 @@ namespace AltinaEngine::Editor::UI {
                 const f32   entryHeight = entryPadY * 2.0f + lineHeight * lineCount;
                 const FRect rect        = MakeRect(
                     feedContentRect.Min.X(), entryY, feedContentRect.Max.X(), entryY + entryHeight);
-                gui.DrawRoundedRectFilled(rect, DebugGui::MakeColor32(255, 255, 255, 152),
-                    editorTheme.mInsetSurface.mCornerRadius);
+                gui.DrawRoundedRectFilled(
+                    rect, editorTheme.mInsetSurface.mBg, editorTheme.mInsetSurface.mCornerRadius);
                 gui.DrawTextStyled(FVector2f(rect.Min.X() + entryPadX, rect.Min.Y() + entryPadY),
                     colMutedText, time, DebugGui::EDebugGuiFontRole::Small);
                 gui.DrawTextStyled(

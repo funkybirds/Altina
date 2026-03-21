@@ -124,9 +124,6 @@ namespace AltinaEngine::Editor::UI {
         mDock.ActiveRight  = 2;
         mDock.ActiveBottom = 3;
 
-        mDebugGuiSystem->SetImageTexture(mAssetFolderIconImageId, nullptr);
-        mDebugGuiSystem->SetImageTexture(mAssetFileIconImageId, nullptr);
-
         debugGuiSystem->RegisterBackgroundOverlay(
             TEXT("Editor.UI.Root"), [this, debugGuiSystem](DebugGui::IDebugGui& gui) {
                 mRootController.Draw(*this, debugGuiSystem, gui);

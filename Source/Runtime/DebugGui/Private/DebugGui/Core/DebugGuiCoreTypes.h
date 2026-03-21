@@ -20,11 +20,18 @@ namespace AltinaEngine::DebugGui::Private {
         u32 mColor = 0U; // RGBA8
     };
 
+    enum class EDrawTextureMode : u8 {
+        InternalFont = 0U,
+        ExternalImage,
+        InternalIcon
+    };
+
     struct FDrawCmd {
-        u32   mIndexCount  = 0U;
-        u32   mIndexOffset = 0U;
-        u64   mTextureId   = 0ULL; // 0 = internal font/solid texture.
-        FRect mClipRect{};
+        u32              mIndexCount  = 0U;
+        u32              mIndexOffset = 0U;
+        u64              mTextureId   = 0ULL;
+        EDrawTextureMode mTextureMode = EDrawTextureMode::InternalFont;
+        FRect            mClipRect{};
     };
 
     struct FDrawData {

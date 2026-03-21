@@ -30,24 +30,24 @@ namespace AltinaEngine::DebugGui {
     };
 
     struct FDebugGuiSurfaceStyle {
-        FColor32 mBg              = MakeColor32(252, 254, 255, 178);
-        FColor32 mBorder          = MakeColor32(255, 255, 255, 0);
+        FColor32 mBg              = MakeColor32(34, 36, 40, 228);
+        FColor32 mBorder          = MakeColor32(255, 153, 64, 42);
         f32      mCornerRadius    = 10.0f;
         f32      mBorderThickness = 0.0f;
     };
 
     struct FDebugGuiTabStyle {
-        FColor32 mBarBg            = MakeColor32(255, 255, 255, 250);
+        FColor32 mBarBg            = MakeColor32(28, 30, 34, 250);
         FColor32 mBarSeparator     = MakeColor32(0, 0, 0, 0);
-        FColor32 mText             = MakeColor32(93, 112, 136, 255);
+        FColor32 mText             = MakeColor32(181, 186, 194, 255);
         FColor32 mTextActive       = MakeColor32(255, 255, 255, 255);
         FColor32 mItemBg           = MakeColor32(0, 0, 0, 0);
-        FColor32 mItemHoveredBg    = MakeColor32(233, 243, 255, 245);
-        FColor32 mItemActiveBg     = MakeColor32(71, 143, 255, 255);
-        FColor32 mUnderline        = MakeColor32(71, 143, 255, 255);
-        FColor32 mUnderlineHovered = MakeColor32(71, 143, 255, 56);
-        FColor32 mDivider          = MakeColor32(111, 142, 178, 20);
-        FColor32 mIcon             = MakeColor32(93, 112, 136, 224);
+        FColor32 mItemHoveredBg    = MakeColor32(50, 43, 38, 236);
+        FColor32 mItemActiveBg     = MakeColor32(168, 98, 40, 232);
+        FColor32 mUnderline        = MakeColor32(214, 122, 48, 224);
+        FColor32 mUnderlineHovered = MakeColor32(214, 122, 48, 84);
+        FColor32 mDivider          = MakeColor32(255, 153, 64, 20);
+        FColor32 mIcon             = MakeColor32(208, 213, 220, 224);
         FColor32 mIconActive       = MakeColor32(255, 255, 255, 255);
         f32      mHeight           = 48.0f;
         f32      mTextPadX         = 16.0f;
@@ -58,13 +58,13 @@ namespace AltinaEngine::DebugGui {
     };
 
     struct FDebugGuiMenuStyle {
-        FColor32 mBarBg           = MakeColor32(255, 255, 255, 225);
-        FColor32 mPopupBg         = MakeColor32(250, 252, 255, 245);
-        FColor32 mItemBgHovered   = MakeColor32(233, 243, 255, 245);
-        FColor32 mItemText        = MakeColor32(38, 53, 73, 255);
-        FColor32 mItemTextMuted   = MakeColor32(127, 144, 166, 255);
-        FColor32 mSeparator       = MakeColor32(111, 142, 178, 36);
-        FColor32 mSelectionMarker = MakeColor32(71, 143, 255, 255);
+        FColor32 mBarBg           = MakeColor32(30, 32, 36, 232);
+        FColor32 mPopupBg         = MakeColor32(36, 38, 43, 248);
+        FColor32 mItemBgHovered   = MakeColor32(62, 51, 42, 245);
+        FColor32 mItemText        = MakeColor32(227, 230, 235, 255);
+        FColor32 mItemTextMuted   = MakeColor32(147, 153, 162, 255);
+        FColor32 mSeparator       = MakeColor32(255, 153, 64, 30);
+        FColor32 mSelectionMarker = MakeColor32(255, 140, 48, 255);
         f32      mHeight          = 84.0f;
         f32      mItemHeight      = 34.0f;
         f32      mItemPadX        = 16.0f;
@@ -73,13 +73,13 @@ namespace AltinaEngine::DebugGui {
     };
 
     struct FDebugGuiSectionStyle {
-        FColor32 mLine               = MakeColor32(111, 142, 178, 46);
-        FColor32 mLabelText          = MakeColor32(38, 53, 73, 255);
-        FColor32 mSecondaryText      = MakeColor32(127, 144, 166, 255);
-        FColor32 mPrimaryLabelBg     = MakeColor32(71, 143, 255, 255);
+        FColor32 mLine               = MakeColor32(255, 153, 64, 40);
+        FColor32 mLabelText          = MakeColor32(227, 230, 235, 255);
+        FColor32 mSecondaryText      = MakeColor32(147, 153, 162, 255);
+        FColor32 mPrimaryLabelBg     = MakeColor32(255, 140, 48, 255);
         FColor32 mPrimaryLabelText   = MakeColor32(255, 255, 255, 255);
-        FColor32 mSecondaryLabelBg   = MakeColor32(188, 198, 211, 255);
-        FColor32 mSecondaryLabelText = MakeColor32(255, 255, 255, 255);
+        FColor32 mSecondaryLabelBg   = MakeColor32(78, 83, 91, 255);
+        FColor32 mSecondaryLabelText = MakeColor32(235, 237, 240, 255);
         f32      mSpacingY           = 14.0f;
         f32      mUnderlineThickness = 2.0f;
         f32      mLabelPadX          = 12.0f;
@@ -88,24 +88,24 @@ namespace AltinaEngine::DebugGui {
     };
 
     struct FDebugGuiEditorStyle {
-        FColor32              mAppBg                 = MakeColor32(212, 217, 223, 255);
-        FColor32              mAppGlowA              = MakeColor32(255, 255, 255, 36);
-        FColor32              mAppGlowB              = MakeColor32(184, 200, 198, 20);
+        FColor32              mAppBg                 = MakeColor32(22, 23, 26, 255);
+        FColor32              mAppGlowA              = MakeColor32(255, 140, 48, 14);
+        FColor32              mAppGlowB              = MakeColor32(255, 180, 96, 10);
         FColor32              mPanelBodyBg           = MakeColor32(255, 255, 255, 0);
-        FColor32              mPanelBodyFallbackBg   = MakeColor32(245, 249, 253, 96);
-        FColor32              mPanelContentText      = MakeColor32(38, 53, 73, 255);
-        FColor32              mPanelContentMutedText = MakeColor32(127, 144, 166, 255);
-        FColor32              mViewportBg            = MakeColor32(183, 221, 255, 210);
-        FColor32              mViewportStatusText    = MakeColor32(127, 144, 166, 255);
+        FColor32              mPanelBodyFallbackBg   = MakeColor32(38, 40, 45, 132);
+        FColor32              mPanelContentText      = MakeColor32(227, 230, 235, 255);
+        FColor32              mPanelContentMutedText = MakeColor32(147, 153, 162, 255);
+        FColor32              mViewportBg            = MakeColor32(18, 19, 22, 232);
+        FColor32              mViewportStatusText    = MakeColor32(160, 166, 175, 255);
         FColor32              mSplitter              = MakeColor32(111, 142, 178, 0);
-        FColor32              mSplitterHovered       = MakeColor32(71, 143, 255, 86);
-        FColor32              mDropHint              = MakeColor32(71, 143, 255, 48);
-        FColor32              mPlaceholderIconBg     = MakeColor32(71, 143, 255, 48);
-        FColor32              mPlaceholderIconFg     = MakeColor32(71, 143, 255, 255);
+        FColor32              mSplitterHovered       = MakeColor32(255, 140, 48, 118);
+        FColor32              mDropHint              = MakeColor32(255, 140, 48, 52);
+        FColor32              mPlaceholderIconBg     = MakeColor32(255, 140, 48, 36);
+        FColor32              mPlaceholderIconFg     = MakeColor32(255, 167, 94, 255);
         FDebugGuiSurfaceStyle mWindowSurface{};
         FDebugGuiSurfaceStyle mPanelSurface{};
-        FDebugGuiSurfaceStyle mInsetSurface{ MakeColor32(255, 255, 255, 112),
-            MakeColor32(255, 255, 255, 0), 10.0f, 0.0f };
+        FDebugGuiSurfaceStyle mInsetSurface{ MakeColor32(42, 44, 49, 220),
+            MakeColor32(255, 153, 64, 26), 10.0f, 0.0f };
         FDebugGuiTabStyle     mTabs{};
         FDebugGuiMenuStyle    mMenu{};
         FDebugGuiSectionStyle mSections{};
@@ -126,61 +126,61 @@ namespace AltinaEngine::DebugGui {
         FDebugGuiEditorStyle mEditor{};
 
         // Colors.
-        FColor32             mWindowBg     = MakeColor32(252, 254, 255, 184);
-        FColor32             mWindowBorder = MakeColor32(255, 255, 255, 0);
-        FColor32             mTitleBarBg   = MakeColor32(255, 255, 255, 250);
-        FColor32             mText         = MakeColor32(38, 53, 73, 255);
-        FColor32             mTitleText    = MakeColor32(38, 53, 73, 255);
+        FColor32             mWindowBg     = MakeColor32(34, 36, 40, 232);
+        FColor32             mWindowBorder = MakeColor32(255, 153, 64, 24);
+        FColor32             mTitleBarBg   = MakeColor32(28, 30, 34, 252);
+        FColor32             mText         = MakeColor32(227, 230, 235, 255);
+        FColor32             mTitleText    = MakeColor32(244, 246, 248, 255);
 
-        FColor32             mSeparator = MakeColor32(111, 142, 178, 40);
+        FColor32             mSeparator = MakeColor32(255, 153, 64, 26);
 
-        FColor32             mButtonBg        = MakeColor32(255, 255, 255, 148);
-        FColor32             mButtonHoveredBg = MakeColor32(243, 248, 255, 255);
-        FColor32             mButtonActiveBg  = MakeColor32(233, 243, 255, 255);
-        FColor32             mButtonBorder    = MakeColor32(255, 255, 255, 0);
-        FColor32             mButtonText      = MakeColor32(38, 53, 73, 255);
+        FColor32             mButtonBg        = MakeColor32(58, 46, 37, 196);
+        FColor32             mButtonHoveredBg = MakeColor32(78, 58, 42, 255);
+        FColor32             mButtonActiveBg  = MakeColor32(97, 68, 44, 255);
+        FColor32             mButtonBorder    = MakeColor32(255, 153, 64, 30);
+        FColor32             mButtonText      = MakeColor32(244, 246, 248, 255);
 
-        FColor32             mCheckboxBoxBg     = MakeColor32(255, 255, 255, 168);
-        FColor32             mCheckboxBoxBorder = MakeColor32(111, 142, 178, 30);
-        FColor32             mCheckboxMark      = MakeColor32(71, 143, 255, 255);
+        FColor32             mCheckboxBoxBg     = MakeColor32(53, 56, 62, 216);
+        FColor32             mCheckboxBoxBorder = MakeColor32(255, 153, 64, 30);
+        FColor32             mCheckboxMark      = MakeColor32(255, 140, 48, 255);
 
-        FColor32             mSliderBg     = MakeColor32(255, 255, 255, 132);
-        FColor32             mSliderBorder = MakeColor32(111, 142, 178, 20);
-        FColor32             mSliderFill   = MakeColor32(71, 143, 255, 255);
+        FColor32             mSliderBg     = MakeColor32(48, 50, 56, 220);
+        FColor32             mSliderBorder = MakeColor32(255, 153, 64, 22);
+        FColor32             mSliderFill   = MakeColor32(255, 140, 48, 255);
 
-        FColor32             mInputBg           = MakeColor32(255, 255, 255, 132);
-        FColor32             mInputActiveBg     = MakeColor32(255, 255, 255, 186);
-        FColor32             mInputBorder       = MakeColor32(111, 142, 178, 20);
-        FColor32             mInputActiveBorder = MakeColor32(71, 143, 255, 92);
-        FColor32             mInputText         = MakeColor32(38, 53, 73, 255);
+        FColor32             mInputBg           = MakeColor32(48, 50, 56, 228);
+        FColor32             mInputActiveBg     = MakeColor32(58, 60, 66, 240);
+        FColor32             mInputBorder       = MakeColor32(255, 153, 64, 22);
+        FColor32             mInputActiveBorder = MakeColor32(255, 140, 48, 96);
+        FColor32             mInputText         = MakeColor32(232, 235, 239, 255);
 
-        FColor32             mGizmoBg         = MakeColor32(255, 255, 255, 120);
-        FColor32             mGizmoBorder     = MakeColor32(111, 142, 178, 30);
+        FColor32             mGizmoBg         = MakeColor32(42, 44, 49, 220);
+        FColor32             mGizmoBorder     = MakeColor32(255, 153, 64, 24);
         FColor32             mGizmoAxisX      = MakeColor32(220, 80, 80, 255);
         FColor32             mGizmoAxisY      = MakeColor32(100, 210, 120, 255);
-        FColor32             mGizmoAxisXy     = MakeColor32(120, 160, 220, 255);
+        FColor32             mGizmoAxisXy     = MakeColor32(255, 140, 48, 255);
         FColor32             mGizmoAxisHover  = MakeColor32(245, 245, 245, 255);
         FColor32             mGizmoAxisActive = MakeColor32(255, 210, 120, 255);
 
-        FColor32             mScrollBarTrackBg       = MakeColor32(255, 255, 255, 44);
+        FColor32             mScrollBarTrackBg       = MakeColor32(255, 255, 255, 18);
         FColor32             mScrollBarTrackBorder   = MakeColor32(255, 255, 255, 0);
-        FColor32             mScrollBarThumbBg       = MakeColor32(116, 148, 183, 92);
-        FColor32             mScrollBarThumbHoverBg  = MakeColor32(116, 148, 183, 132);
-        FColor32             mScrollBarThumbActiveBg = MakeColor32(71, 143, 255, 168);
+        FColor32             mScrollBarThumbBg       = MakeColor32(255, 153, 64, 88);
+        FColor32             mScrollBarThumbHoverBg  = MakeColor32(255, 153, 64, 128);
+        FColor32             mScrollBarThumbActiveBg = MakeColor32(255, 140, 48, 172);
         FColor32             mScrollBarThumbBorder   = MakeColor32(255, 255, 255, 0);
 
         FColor32             mCollapseButtonBg       = MakeColor32(255, 255, 255, 0);
-        FColor32             mCollapseButtonHoverBg  = MakeColor32(233, 243, 255, 255);
-        FColor32             mCollapseButtonActiveBg = MakeColor32(215, 234, 255, 255);
+        FColor32             mCollapseButtonHoverBg  = MakeColor32(70, 56, 44, 255);
+        FColor32             mCollapseButtonActiveBg = MakeColor32(92, 66, 43, 255);
         FColor32             mCollapseButtonBorder   = MakeColor32(255, 255, 255, 0);
-        FColor32             mCollapseIcon           = MakeColor32(93, 112, 136, 255);
+        FColor32             mCollapseIcon           = MakeColor32(214, 219, 226, 255);
 
-        FColor32             mSelectedRowBg            = MakeColor32(71, 143, 255, 32);
-        FColor32             mHoveredRowBg             = MakeColor32(71, 143, 255, 20);
-        FColor32             mTreeExpandIcon           = MakeColor32(127, 144, 166, 255);
-        FColor32             mTreeText                 = MakeColor32(93, 112, 136, 255);
-        FColor32             mIconPlaceholderFile      = MakeColor32(72, 98, 148, 255);
-        FColor32             mIconPlaceholderDirectory = MakeColor32(166, 132, 70, 255);
+        FColor32             mSelectedRowBg            = MakeColor32(255, 140, 48, 46);
+        FColor32             mHoveredRowBg             = MakeColor32(255, 140, 48, 24);
+        FColor32             mTreeExpandIcon           = MakeColor32(176, 183, 192, 255);
+        FColor32             mTreeText                 = MakeColor32(196, 201, 208, 255);
+        FColor32             mIconPlaceholderFile      = MakeColor32(255, 172, 96, 255);
+        FColor32             mIconPlaceholderDirectory = MakeColor32(255, 140, 48, 255);
         FColor32             mIconItemBorder           = MakeColor32(255, 255, 255, 0);
 
         // Metrics.
@@ -230,8 +230,8 @@ namespace AltinaEngine::DebugGui {
         f32                  mTreeIndent             = 18.0f;
         f32                  mTreeArrowSize          = 6.0f;
         f32                  mTreeTextPadX           = 8.0f;
-        f32                  mIconLabelPadY          = 4.0f;
-        f32                  mIconInnerPadding       = 10.0f;
+        f32                  mIconLabelPadY          = 3.0f;
+        f32                  mIconInnerPadding       = 8.0f;
 
         f32                  mFontScale       = 1.0f;
         f32                  mFontSdfSoftness = 0.0f;

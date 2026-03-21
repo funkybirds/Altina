@@ -135,7 +135,7 @@ namespace AltinaEngine::DebugGui::Private {
     }
 
     void FDebugGuiRendererD3D11::Render(Rhi::FRhiDevice& device, Rhi::FRhiViewport& viewport,
-        const FDrawData& drawData, const FFontAtlas& atlas) {
+        const FDrawData& drawData, const FFontAtlas& atlas, const FIconAtlas& iconAtlas) {
         auto* backBuffer = viewport.GetBackBuffer();
         if (backBuffer == nullptr) {
             return;
@@ -173,7 +173,7 @@ namespace AltinaEngine::DebugGui::Private {
             return;
         }
 
-        if (!EnsureResources(device, atlas)) {
+        if (!EnsureResources(device, atlas, iconAtlas)) {
             return;
         }
 
@@ -189,7 +189,7 @@ namespace AltinaEngine::DebugGui::Private {
         const u32   w      = bbDesc.mWidth;
         const u32   h      = bbDesc.mHeight;
 
-        UpdateConstants(w, h, drawData, atlas);
+        UpdateConstants(w, h, drawData, atlas, iconAtlas);
 
         ctx.RHISetGraphicsPipeline(mPipeline.Get());
         ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
@@ -211,6 +211,29 @@ namespace AltinaEngine::DebugGui::Private {
         toRenderTargetBatch.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
         toRenderTargetBatch.mDstQueue        = Rhi::ERhiQueueType::Graphics;
         ctx.RHIBeginTransition(toRenderTargetBatch);
+
+        Rhi::FRhiTransitionInfo sampledTransitions[2]{};
+        u32                     sampledTransitionCount = 0U;
+        if (mFontTexture) {
+            auto& transition     = sampledTransitions[sampledTransitionCount++];
+            transition.mResource = mFontTexture.Get();
+            transition.mBefore   = Rhi::ERhiResourceState::ShaderResource;
+            transition.mAfter    = Rhi::ERhiResourceState::ShaderResource;
+        }
+        if (mIconTexture) {
+            auto& transition     = sampledTransitions[sampledTransitionCount++];
+            transition.mResource = mIconTexture.Get();
+            transition.mBefore   = Rhi::ERhiResourceState::ShaderResource;
+            transition.mAfter    = Rhi::ERhiResourceState::ShaderResource;
+        }
+        if (sampledTransitionCount > 0U) {
+            Rhi::FRhiTransitionCreateInfo sampledTransitionBatch{};
+            sampledTransitionBatch.mTransitions     = sampledTransitions;
+            sampledTransitionBatch.mTransitionCount = sampledTransitionCount;
+            sampledTransitionBatch.mSrcQueue        = Rhi::ERhiQueueType::Graphics;
+            sampledTransitionBatch.mDstQueue        = Rhi::ERhiQueueType::Graphics;
+            ctx.RHIBeginTransition(sampledTransitionBatch);
+        }
 
         Rhi::FRhiRenderPassColorAttachment colorAtt[3]{};
         colorAtt[0].mView        = mBackBufferRtv.Get();
@@ -252,8 +275,10 @@ namespace AltinaEngine::DebugGui::Private {
         u32                 idxOffset = 0U;
         for (const auto& cmd : drawData.mCmds) {
             Rhi::FRhiBindGroupRef imageBindGroup;
-            if (cmd.mTextureId == 0ULL) {
-                imageBindGroup = mBindGroup;
+            if (cmd.mTextureMode == EDrawTextureMode::InternalFont) {
+                imageBindGroup = mFontBindGroup;
+            } else if (cmd.mTextureMode == EDrawTextureMode::InternalIcon) {
+                imageBindGroup = mIconBindGroup;
             } else {
                 auto* texturePtr = mExternalTextures.Find(cmd.mTextureId);
                 if (texturePtr == nullptr || *texturePtr == nullptr) {
@@ -312,7 +337,8 @@ namespace AltinaEngine::DebugGui::Private {
 
         commandContext->RHIFlushContextDevice({});
     }
-    bool FDebugGuiRendererD3D11::EnsureResources(Rhi::FRhiDevice& device, const FFontAtlas& atlas) {
+    bool FDebugGuiRendererD3D11::EnsureResources(
+        Rhi::FRhiDevice& device, const FFontAtlas& atlas, const FIconAtlas& iconAtlas) {
         if (!mVertexShader || !mPixelShader) {
             if (!CompileShaders(device)) {
                 return false;
@@ -348,6 +374,39 @@ namespace AltinaEngine::DebugGui::Private {
             mFontSrv     = device.CreateShaderResourceView(srv);
             if (!mFontSrv) {
                 LogError(TEXT("DebugGui: Failed to create font SRV."));
+                return false;
+            }
+        }
+
+        if (!mIconTexture) {
+            Rhi::FRhiTextureDesc desc{};
+            desc.mDebugName.Assign(TEXT("DebugGui.IconAtlas"));
+            desc.mWidth       = iconAtlas.mAtlasW;
+            desc.mHeight      = iconAtlas.mAtlasH;
+            desc.mDepth       = 1U;
+            desc.mMipLevels   = 1U;
+            desc.mArrayLayers = 1U;
+            desc.mFormat      = Rhi::ERhiFormat::R8G8B8A8Unorm;
+            desc.mBindFlags   = Rhi::ERhiTextureBindFlags::ShaderResource;
+            mIconTexture      = device.CreateTexture(desc);
+            if (!mIconTexture) {
+                LogError(TEXT("DebugGui: Failed to create icon texture."));
+                return false;
+            }
+
+            Rhi::FRhiTextureSubresource sub{};
+            const u32                   rowPitch   = iconAtlas.mAtlasW * 4U;
+            const u32                   slicePitch = rowPitch * iconAtlas.mAtlasH;
+            device.UpdateTextureSubresource(
+                mIconTexture.Get(), sub, iconAtlas.mPixels.Data(), rowPitch, slicePitch);
+
+            Rhi::FRhiShaderResourceViewDesc srv{};
+            srv.mDebugName.Assign(TEXT("DebugGui.IconAtlas.SRV"));
+            srv.mTexture = mIconTexture.Get();
+            srv.mFormat  = desc.mFormat;
+            mIconSrv     = device.CreateShaderResourceView(srv);
+            if (!mIconSrv) {
+                LogError(TEXT("DebugGui: Failed to create icon SRV."));
                 return false;
             }
         }
@@ -413,7 +472,7 @@ namespace AltinaEngine::DebugGui::Private {
             }
         }
 
-        if (!mConstantsBufferSdf || !mConstantsBufferImage) {
+        if (!mConstantsBufferSdf || !mConstantsBufferIcon || !mConstantsBufferImage) {
             Rhi::FRhiBufferDesc cb{};
             cb.mDebugName.Assign(TEXT("DebugGui.Constants.Sdf"));
             cb.mSizeBytes = sizeof(FConstants);
@@ -423,17 +482,21 @@ namespace AltinaEngine::DebugGui::Private {
             if (!mConstantsBufferSdf) {
                 mConstantsBufferSdf = device.CreateBuffer(cb);
             }
+            cb.mDebugName.Assign(TEXT("DebugGui.Constants.Icon"));
+            if (!mConstantsBufferIcon) {
+                mConstantsBufferIcon = device.CreateBuffer(cb);
+            }
             cb.mDebugName.Assign(TEXT("DebugGui.Constants.Image"));
             if (!mConstantsBufferImage) {
                 mConstantsBufferImage = device.CreateBuffer(cb);
             }
-            if (!mConstantsBufferSdf || !mConstantsBufferImage) {
+            if (!mConstantsBufferSdf || !mConstantsBufferIcon || !mConstantsBufferImage) {
                 LogError(TEXT("DebugGui: Failed to create constants buffers."));
                 return false;
             }
         }
 
-        if (!mBindGroup) {
+        if (!mFontBindGroup) {
             if (mConstantsBinding == RenderCore::ShaderBinding::kInvalidBinding
                 || mTextureBinding == RenderCore::ShaderBinding::kInvalidBinding
                 || mSamplerBinding == RenderCore::ShaderBinding::kInvalidBinding) {
@@ -462,15 +525,52 @@ namespace AltinaEngine::DebugGui::Private {
             }
 
             Rhi::FRhiBindGroupDesc bg{};
-            bg.mDebugName.Assign(TEXT("DebugGui.BindGroup"));
+            bg.mDebugName.Assign(TEXT("DebugGui.Font.BindGroup"));
             if (!builder.Build(bg)) {
                 LogError(
                     TEXT("DebugGui: Failed to build bind group desc (layout/entry mismatch)."));
                 return false;
             }
-            mBindGroup = device.CreateBindGroup(bg);
-            if (!mBindGroup) {
-                LogError(TEXT("DebugGui: Failed to create bind group."));
+            mFontBindGroup = device.CreateBindGroup(bg);
+            if (!mFontBindGroup) {
+                LogError(TEXT("DebugGui: Failed to create font bind group."));
+                return false;
+            }
+        }
+
+        if (!mIconBindGroup) {
+            if (mConstantsBinding == RenderCore::ShaderBinding::kInvalidBinding
+                || mTextureBinding == RenderCore::ShaderBinding::kInvalidBinding
+                || mSamplerBinding == RenderCore::ShaderBinding::kInvalidBinding) {
+                LogError(TEXT("DebugGui: Invalid bind-group binding lookup state."));
+                return false;
+            }
+
+            RenderCore::ShaderBinding::FBindGroupBuilder builder(mLayout.Get());
+            if (!builder.AddBuffer(mConstantsBinding, mConstantsBufferIcon.Get(), 0ULL,
+                    static_cast<u64>(sizeof(FConstants)))) {
+                LogError(TEXT("DebugGui: Failed to add icon constant-buffer entry."));
+                return false;
+            }
+            if (!builder.AddTexture(mTextureBinding, mIconTexture.Get())) {
+                LogError(TEXT("DebugGui: Failed to add icon-texture bind-group entry."));
+                return false;
+            }
+            if (!builder.AddSampler(mSamplerBinding, mSampler.Get())) {
+                LogError(TEXT("DebugGui: Failed to add sampler bind-group entry (binding={})."),
+                    mSamplerBinding);
+                return false;
+            }
+
+            Rhi::FRhiBindGroupDesc bg{};
+            bg.mDebugName.Assign(TEXT("DebugGui.Icon.BindGroup"));
+            if (!builder.Build(bg)) {
+                LogError(TEXT("DebugGui: Failed to build icon bind group desc."));
+                return false;
+            }
+            mIconBindGroup = device.CreateBindGroup(bg);
+            if (!mIconBindGroup) {
+                LogError(TEXT("DebugGui: Failed to create icon bind group."));
                 return false;
             }
         }
@@ -709,28 +809,37 @@ namespace AltinaEngine::DebugGui::Private {
         return true;
     }
 
-    void FDebugGuiRendererD3D11::UpdateConstants(
-        u32 w, u32 h, const FDrawData& drawData, const FFontAtlas& atlas) {
-        if (!mConstantsBufferSdf || !mConstantsBufferImage || w == 0U || h == 0U) {
+    void FDebugGuiRendererD3D11::UpdateConstants(u32 w, u32 h, const FDrawData& drawData,
+        const FFontAtlas& atlas, const FIconAtlas& iconAtlas) {
+        if (!mConstantsBufferSdf || !mConstantsBufferIcon || !mConstantsBufferImage || w == 0U
+            || h == 0U) {
             return;
         }
-        mConstantsSdfValue               = FConstants{};
-        mConstantsSdfValue.ScaleX        = 2.0f / static_cast<f32>(w);
-        mConstantsSdfValue.ScaleY        = 2.0f / static_cast<f32>(h);
-        mConstantsSdfValue.TranslateX    = -1.0f;
-        mConstantsSdfValue.TranslateY    = -1.0f;
-        mConstantsSdfValue.SdfEdge       = drawData.mFontSdfEdge;
-        mConstantsSdfValue.SdfSoftness   = drawData.mFontSdfSoftness;
-        mConstantsSdfValue.SdfPixelRange = FFontAtlas::kSdfPixelRange;
-        mConstantsSdfValue.AtlasWidth    = static_cast<f32>(FFontAtlas::kAtlasW);
-        mConstantsSdfValue.AtlasHeight   = static_cast<f32>(FFontAtlas::kAtlasH);
-        mConstantsSdfValue.UseSdf        = 1.0f;
-        mConstantsSdfValue.FontStretchX  = atlas.GetRecommendedStretchX();
-        mConstantsSdfValue.GlyphTexelW   = static_cast<f32>(FFontAtlas::kAtlasGlyphW);
-        mConstantsSdfValue.GlyphTexelH   = static_cast<f32>(FFontAtlas::kAtlasGlyphH);
-        mConstantsImageValue             = mConstantsSdfValue;
-        mConstantsImageValue.UseSdf      = 0.0f;
+        mConstantsSdfValue                = FConstants{};
+        mConstantsSdfValue.ScaleX         = 2.0f / static_cast<f32>(w);
+        mConstantsSdfValue.ScaleY         = 2.0f / static_cast<f32>(h);
+        mConstantsSdfValue.TranslateX     = -1.0f;
+        mConstantsSdfValue.TranslateY     = -1.0f;
+        mConstantsSdfValue.SdfEdge        = drawData.mFontSdfEdge;
+        mConstantsSdfValue.SdfSoftness    = drawData.mFontSdfSoftness;
+        mConstantsSdfValue.SdfPixelRange  = FFontAtlas::kSdfPixelRange;
+        mConstantsSdfValue.AtlasWidth     = static_cast<f32>(FFontAtlas::kAtlasW);
+        mConstantsSdfValue.AtlasHeight    = static_cast<f32>(FFontAtlas::kAtlasH);
+        mConstantsSdfValue.UseSdf         = 1.0f;
+        mConstantsSdfValue.FontStretchX   = atlas.GetRecommendedStretchX();
+        mConstantsSdfValue.GlyphTexelW    = static_cast<f32>(FFontAtlas::kAtlasGlyphW);
+        mConstantsSdfValue.GlyphTexelH    = static_cast<f32>(FFontAtlas::kAtlasGlyphH);
+        mConstantsIconValue               = mConstantsSdfValue;
+        mConstantsIconValue.SdfPixelRange = FIconAtlas::kSdfPixelRange;
+        mConstantsIconValue.AtlasWidth    = static_cast<f32>(iconAtlas.mAtlasW);
+        mConstantsIconValue.AtlasHeight   = static_cast<f32>(iconAtlas.mAtlasH);
+        mConstantsIconValue.FontStretchX  = 1.0f;
+        mConstantsIconValue.GlyphTexelW   = static_cast<f32>(FIconAtlas::kAtlasIconW);
+        mConstantsIconValue.GlyphTexelH   = static_cast<f32>(FIconAtlas::kAtlasIconH);
+        mConstantsImageValue              = mConstantsSdfValue;
+        mConstantsImageValue.UseSdf       = 0.0f;
         UploadDynamicBuffer(mConstantsBufferSdf.Get(), &mConstantsSdfValue, sizeof(FConstants));
+        UploadDynamicBuffer(mConstantsBufferIcon.Get(), &mConstantsIconValue, sizeof(FConstants));
         UploadDynamicBuffer(mConstantsBufferImage.Get(), &mConstantsImageValue, sizeof(FConstants));
     }
 

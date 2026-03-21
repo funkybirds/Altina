@@ -2,6 +2,7 @@
 
 #include "DebugGui/Core/DebugGuiCoreTypes.h"
 #include "DebugGui/Core/FontAtlas.h"
+#include "DebugGui/Core/IconAtlas.h"
 #include "Math/Common.h"
 
 namespace AltinaEngine::DebugGui::Private {
@@ -9,7 +10,7 @@ namespace AltinaEngine::DebugGui::Private {
     public:
         explicit FDebugGuiContext(FDrawData& drawData, FClipRectStack& clip, const FGuiInput& input,
             FUIState& ui, const FVector2f& displaySize, const FFontAtlas& atlas,
-            const FDebugGuiTheme& theme, TVector<FString>& windowOrder,
+            const FIconAtlas& iconAtlas, const FDebugGuiTheme& theme, TVector<FString>& windowOrder,
             Container::THashMap<u64, FWindowState>& windows, u64& draggingWindowKey,
             FVector2f& dragOffset)
             : mDrawData(&drawData)
@@ -18,6 +19,7 @@ namespace AltinaEngine::DebugGui::Private {
             , mUi(&ui)
             , mDisplaySize(displaySize)
             , mAtlas(&atlas)
+            , mIconAtlas(&iconAtlas)
             , mTheme(&theme)
             , mFontScale((theme.mFontScale > 0.01f) ? theme.mFontScale : 1.0f)
             // Inset by half a texel to avoid sampling bleed (linear sampler).
@@ -98,7 +100,25 @@ namespace AltinaEngine::DebugGui::Private {
                 return;
             }
             AddQuad(rect.Min, FVector2f(rect.Max.X(), rect.Min.Y()), rect.Max,
-                FVector2f(rect.Min.X(), rect.Max.Y()), 0.0f, 0.0f, 1.0f, 1.0f, tint, imageId);
+                FVector2f(rect.Min.X(), rect.Max.Y()), 0.0f, 0.0f, 1.0f, 1.0f, tint,
+                EDrawTextureMode::ExternalImage, imageId);
+        }
+        void DrawIcon(const FRect& rect, FDebugGuiIconId iconId, FColor32 tint) override {
+            if (iconId == kInvalidDebugGuiIconId || mIconAtlas == nullptr) {
+                return;
+            }
+
+            f32 u0 = 0.0f;
+            f32 v0 = 0.0f;
+            f32 u1 = 1.0f;
+            f32 v1 = 1.0f;
+            if (!mIconAtlas->TryGetIconUV(iconId, u0, v0, u1, v1)) {
+                return;
+            }
+
+            AddQuad(rect.Min, FVector2f(rect.Max.X(), rect.Min.Y()), rect.Max,
+                FVector2f(rect.Min.X(), rect.Max.Y()), u0, v0, u1, v1, tint,
+                EDrawTextureMode::InternalIcon);
         }
         [[nodiscard]] auto MeasureText(FStringView text, EDebugGuiFontRole role) const
             -> FVector2f override {
@@ -458,12 +478,13 @@ namespace AltinaEngine::DebugGui::Private {
             return h;
         }
 
-        void BeginCmdIfNeeded(u64 textureId) {
+        void BeginCmdIfNeeded(EDrawTextureMode textureMode, u64 textureId = 0ULL) {
             if (mDrawData->mCmds.IsEmpty()) {
                 FDrawCmd cmd{};
                 cmd.mIndexOffset = 0U;
                 cmd.mIndexCount  = 0U;
                 cmd.mTextureId   = textureId;
+                cmd.mTextureMode = textureMode;
                 cmd.mClipRect    = mClip->Current(mDisplaySize);
                 mDrawData->mCmds.PushBack(cmd);
                 return;
@@ -474,11 +495,13 @@ namespace AltinaEngine::DebugGui::Private {
             const bool  same = (cur.Min.X() == last.Min.X()) && (cur.Min.Y() == last.Min.Y())
                 && (cur.Max.X() == last.Max.X()) && (cur.Max.Y() == last.Max.Y());
             const bool sameTexture = (mDrawData->mCmds.Back().mTextureId == textureId);
-            if (!same || !sameTexture) {
+            const bool sameMode    = (mDrawData->mCmds.Back().mTextureMode == textureMode);
+            if (!same || !sameTexture || !sameMode) {
                 FDrawCmd cmd{};
                 cmd.mIndexOffset = static_cast<u32>(mDrawData->mIndices.Size());
                 cmd.mIndexCount  = 0U;
                 cmd.mTextureId   = textureId;
+                cmd.mTextureMode = textureMode;
                 cmd.mClipRect    = cur;
                 mDrawData->mCmds.PushBack(cmd);
             }
@@ -486,8 +509,8 @@ namespace AltinaEngine::DebugGui::Private {
 
         void AddQuad(const FVector2f& p0, const FVector2f& p1, const FVector2f& p2,
             const FVector2f& p3, f32 u0, f32 v0, f32 u1, f32 v1, FColor32 color,
-            u64 textureId = 0ULL) {
-            BeginCmdIfNeeded(textureId);
+            EDrawTextureMode textureMode = EDrawTextureMode::InternalFont, u64 textureId = 0ULL) {
+            BeginCmdIfNeeded(textureMode, textureId);
             const u32 base = static_cast<u32>(mDrawData->mVertices.Size());
             mDrawData->mVertices.PushBack(
                 { .mX = p0.X(), .mY = p0.Y(), .mU = u0, .mV = v0, .mColor = color });
@@ -510,7 +533,7 @@ namespace AltinaEngine::DebugGui::Private {
 
         void AddTriangleFilled(
             const FVector2f& p0, const FVector2f& p1, const FVector2f& p2, FColor32 color) {
-            BeginCmdIfNeeded(0ULL);
+            BeginCmdIfNeeded(EDrawTextureMode::InternalFont, 0ULL);
             const u32 base = static_cast<u32>(mDrawData->mVertices.Size());
             const f32 u    = (mSolidU0 + mSolidU1) * 0.5f;
             const f32 v    = (mSolidV0 + mSolidV1) * 0.5f;
@@ -885,6 +908,7 @@ namespace AltinaEngine::DebugGui::Private {
         FUIState*                               mUi          = nullptr;
         FVector2f                               mDisplaySize = FVector2f(0.0f, 0.0f);
         const FFontAtlas*                       mAtlas       = nullptr;
+        const FIconAtlas*                       mIconAtlas   = nullptr;
         const FDebugGuiTheme*                   mTheme       = nullptr;
         f32                                     mFontScale   = 1.0f;
         f32                                     mSolidU0     = 0.0f;

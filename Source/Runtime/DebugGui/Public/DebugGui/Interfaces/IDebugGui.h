@@ -32,7 +32,8 @@ namespace AltinaEngine::DebugGui {
         virtual void DrawText(const FVector2f& pos, FColor32 color, FStringView text)      = 0;
         virtual void DrawTextStyled(
             const FVector2f& pos, FColor32 color, FStringView text, EDebugGuiFontRole role) = 0;
-        virtual void               DrawImage(const FRect& rect, u64 imageId, FColor32 tint) = 0;
+        virtual void DrawImage(const FRect& rect, u64 imageId, FColor32 tint)               = 0;
+        virtual void DrawIcon(const FRect& rect, FDebugGuiIconId iconId, FColor32 tint)     = 0;
         [[nodiscard]] virtual auto MeasureText(FStringView text, EDebugGuiFontRole role) const
             -> FVector2f = 0;
 

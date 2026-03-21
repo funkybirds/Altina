@@ -45,6 +45,9 @@ namespace AltinaEngine::DebugGui {
         FVector2f Max = FVector2f(0.0f, 0.0f);
     };
 
+    using FDebugGuiIconId                                   = u32;
+    inline constexpr FDebugGuiIconId kInvalidDebugGuiIconId = 0U;
+
     // Packed RGBA8 in little-endian memory order: R | (G<<8) | (B<<16) | (A<<24).
     using FColor32 = u32;
 
@@ -69,6 +72,7 @@ namespace AltinaEngine::DebugGui {
 
     struct FTreeViewItemDesc {
         FStringView                               mLabel;
+        FDebugGuiIconId                           mIconId      = kInvalidDebugGuiIconId;
         u32                                       mDepth       = 0U;
         bool                                      mSelected    = false;
         bool                                      mExpanded    = false;
@@ -84,11 +88,12 @@ namespace AltinaEngine::DebugGui {
     };
 
     struct FTextedIconViewDesc {
-        FStringView mLabel;
-        u64         mImageId = 0ULL;
-        FRect       mRect{};
-        bool        mSelected    = false;
-        bool        mIsDirectory = false;
+        FStringView     mLabel;
+        u64             mImageId = 0ULL;
+        FDebugGuiIconId mIconId  = kInvalidDebugGuiIconId;
+        FRect           mRect{};
+        bool            mSelected    = false;
+        bool            mIsDirectory = false;
     };
 
     struct FTextedIconViewResult {

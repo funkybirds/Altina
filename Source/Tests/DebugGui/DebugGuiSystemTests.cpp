@@ -509,6 +509,39 @@ TEST_CASE("DebugGui DrawImage emits additional draw geometry") {
     DestroyDebugGuiSystem(sys);
 }
 
+TEST_CASE("DebugGui DrawIcon emits additional draw geometry") {
+    IDebugGuiSystem* sys = CreateDebugGuiSystem();
+    REQUIRE(sys != nullptr);
+    sys->SetEnabled(true);
+    sys->SetShowStats(false);
+    sys->SetShowConsole(false);
+    sys->SetShowCVars(false);
+
+    bool drawIcon = false;
+    sys->RegisterPanel(TEXT("IconDrawPanel"), [&](IDebugGui& gui) {
+        if (drawIcon) {
+            const FRect rect{ FVector2f(10.0f, 10.0f), FVector2f(58.0f, 58.0f) };
+            gui.DrawIcon(rect, 1U, MakeColor32(255, 255, 255, 255));
+        }
+    });
+
+    AltinaEngine::Input::FInputSystem input;
+    PrepareInput(input, 1280, 720, 20, 20);
+    drawIcon = false;
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto withoutIcon = sys->GetLastFrameStats();
+
+    PrepareInput(input, 1280, 720, 20, 20);
+    drawIcon = true;
+    sys->TickGameThread(input, 1.0f / 60.0f, 1280, 720);
+    const auto withIcon = sys->GetLastFrameStats();
+
+    REQUIRE(withIcon.mVertexCount > withoutIcon.mVertexCount);
+    REQUIRE(withIcon.mIndexCount > withoutIcon.mIndexCount);
+
+    DestroyDebugGuiSystem(sys);
+}
+
 TEST_CASE("DebugGui widget: TreeViewItem click/toggle/context menu") {
     IDebugGuiSystem* sys = CreateDebugGuiSystem();
     REQUIRE(sys != nullptr);
@@ -573,7 +606,7 @@ TEST_CASE("DebugGui widget: TextedIconView click/double-click/context menu") {
         AltinaEngine::DebugGui::FTextedIconViewDesc desc{};
         desc.mLabel       = TEXT("AssetA");
         desc.mRect        = { FVector2f(20.0f, 40.0f), FVector2f(120.0f, 130.0f) };
-        desc.mImageId     = 0ULL;
+        desc.mIconId      = 6U;
         desc.mIsDirectory = true;
         auto result       = gui.TextedIconView(desc);
         clicked           = clicked || result.mClicked;

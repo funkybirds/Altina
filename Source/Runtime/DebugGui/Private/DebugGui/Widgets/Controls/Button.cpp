@@ -60,8 +60,11 @@ namespace AltinaEngine::DebugGui::Private {
         const f32 rowMaxX = (clipRect.Max.X() > mCursor.X()) ? clipRect.Max.X() : mDisplaySize.X();
         const FRect rowRect{ mCursor, FVector2f(rowMaxX, mCursor.Y() + rowHeight) };
         const f32   rootIndentBias = (desc.mDepth == 0U) ? 6.0f : 0.0f;
-        const f32   textStartX =
-            rowRect.Min.X() + rootIndentBias + indent + arrowSize + mTheme->mTreeTextPadX;
+        const f32   iconSize       = rowHeight * 0.7f;
+        const f32   iconPadX       = (desc.mIconId != kInvalidDebugGuiIconId) ? 6.0f : 0.0f;
+        const f32   textStartX     = rowRect.Min.X() + rootIndentBias + indent + arrowSize
+            + mTheme->mTreeTextPadX
+            + ((desc.mIconId != kInvalidDebugGuiIconId) ? (iconSize + iconPadX) : 0.0f);
         const f32 textWidth =
             static_cast<f32>(desc.mLabel.Length()) * GetGlyphWidth(EDebugGuiFontRole::Body);
         const FRect textHitRect{ FVector2f(textStartX - 2.0f, rowRect.Min.Y()),
@@ -147,6 +150,16 @@ namespace AltinaEngine::DebugGui::Private {
             }
         }
 
+        if (desc.mIconId != kInvalidDebugGuiIconId) {
+            const f32 iconX =
+                rowRect.Min.X() + rootIndentBias + indent + arrowSize + mTheme->mTreeTextPadX;
+            const f32   iconY = rowRect.Min.Y() + (rowHeight - iconSize) * 0.5f;
+            const FRect iconRect{ FVector2f(iconX, iconY),
+                FVector2f(iconX + iconSize, iconY + iconSize) };
+            DrawIcon(iconRect, desc.mIconId,
+                desc.mSelected ? mTheme->mEditor.mPanelContentText : mTheme->mTreeExpandIcon);
+        }
+
         const FColor32 textColor =
             desc.mSelected ? mTheme->mEditor.mPanelContentText : mTheme->mTreeText;
         DrawTextStyled(FVector2f(textStartX, rowRect.Min.Y() + (rowHeight - bodyHeight) * 0.5f),
@@ -200,28 +213,42 @@ namespace AltinaEngine::DebugGui::Private {
             mUi->mWantsCaptureMouse      = true;
         }
 
-        FColor32 bg = MakeColor32(255, 255, 255, 184);
+        const f32   frameInset = 16.0f;
+        const FRect visualRect{ FVector2f(
+                                    itemRect.Min.X() + frameInset, itemRect.Min.Y() + frameInset),
+            FVector2f(itemRect.Max.X() - frameInset, itemRect.Max.Y() - frameInset) };
+
+        FColor32    bg = mTheme->mEditor.mInsetSurface.mBg;
         if (desc.mSelected) {
-            bg = MakeColor32(71, 143, 255, 36);
+            bg = mTheme->mSelectedRowBg;
         } else if (hovered) {
-            bg = MakeColor32(255, 255, 255, 214);
+            bg = mTheme->mHoveredRowBg;
         }
-        DrawRectFilled(itemRect, bg);
+        DrawRectFilled(visualRect, bg);
 
         const f32   innerPad    = mTheme->mIconInnerPadding;
-        const f32   iconBoxSize = 60.0f;
-        const FRect iconRect{ FVector2f(itemRect.Min.X() + innerPad, itemRect.Min.Y() + innerPad),
-            FVector2f(itemRect.Min.X() + innerPad + iconBoxSize,
-                itemRect.Min.Y() + innerPad + iconBoxSize) };
+        const f32   iconBoxSize = 48.0f;
+        const FRect iconRect{ FVector2f(
+                                  visualRect.Min.X() + innerPad, visualRect.Min.Y() + innerPad),
+            FVector2f(visualRect.Min.X() + innerPad + iconBoxSize,
+                visualRect.Min.Y() + innerPad + iconBoxSize) };
         DrawRoundedRectFilled(iconRect, mTheme->mEditor.mPlaceholderIconBg, 8.0f);
         if ((mTheme->mIconItemBorder >> 24U) != 0U) {
             DrawRoundedRect(iconRect, mTheme->mIconItemBorder, 8.0f, 1.0f);
         }
-        DrawImage(iconRect, desc.mImageId,
-            desc.mSelected ? mTheme->mEditor.mPlaceholderIconFg : mTheme->mEditor.mTabs.mUnderline);
-
-        const f32 textX = itemRect.Min.X() + innerPad;
-        const f32 textY = itemRect.Max.Y() - GetGlyphHeight(EDebugGuiFontRole::Small) - innerPad;
+        const auto iconTint =
+            desc.mSelected ? mTheme->mEditor.mPlaceholderIconFg : mTheme->mEditor.mTabs.mUnderline;
+        if (desc.mIconId != kInvalidDebugGuiIconId) {
+            const f32   iconInset = iconBoxSize * 0.18f;
+            const FRect drawIconRect{ FVector2f(iconRect.Min.X() + iconInset,
+                                          iconRect.Min.Y() + iconInset),
+                FVector2f(iconRect.Max.X() - iconInset, iconRect.Max.Y() - iconInset) };
+            DrawIcon(drawIconRect, desc.mIconId, iconTint);
+        } else {
+            DrawImage(iconRect, desc.mImageId, iconTint);
+        }
+        const f32 textX = visualRect.Min.X() + innerPad;
+        const f32 textY = iconRect.Max.Y() + mTheme->mIconLabelPadY;
         DrawTextStyled(
             FVector2f(textX, textY), mTheme->mTreeText, desc.mLabel, EDebugGuiFontRole::Small);
         return result;

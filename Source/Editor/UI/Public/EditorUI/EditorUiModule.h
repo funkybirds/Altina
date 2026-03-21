@@ -390,7 +390,5 @@ namespace AltinaEngine::Editor::UI {
         f32                                                  mOutputScrollDragOffsetY    = 0.0f;
         bool                                                 mOutputScrollDragging       = false;
         bool                                                 mAssetNeedsRefresh          = true;
-        u64 mAssetFolderIconImageId = 0xE17D1001ULL;
-        u64 mAssetFileIconImageId   = 0xE17D1002ULL;
     };
 } // namespace AltinaEngine::Editor::UI

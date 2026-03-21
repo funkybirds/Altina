@@ -1,5 +1,7 @@
 #include "EditorUI/EditorUiModule.h"
 
+#include "EditorIcons.h"
+
 #include "Algorithm/Sort.h"
 #include "DebugGui/DebugGui.h"
 #include "Logging/Log.h"
@@ -33,6 +35,51 @@ namespace AltinaEngine::Editor::UI {
 
         [[nodiscard]] auto TextWidth(FStringView text, f32 glyphWidth = kGlyphW) -> f32 {
             return static_cast<f32>(text.Length()) * glyphWidth;
+        }
+
+        [[nodiscard]] auto PrettifyInspectorLabel(FStringView label) -> FString {
+            FString output;
+            bool    prevWasSpace = true;
+            for (usize i = 0; i < label.Length(); ++i) {
+                const TChar ch          = label[i];
+                const bool  isUpper     = (ch >= TEXT('A') && ch <= TEXT('Z'));
+                const bool  isLower     = (ch >= TEXT('a') && ch <= TEXT('z'));
+                const bool  isDigit     = (ch >= TEXT('0') && ch <= TEXT('9'));
+                const bool  nextIsLower = (i + 1U < label.Length() && label[i + 1U] >= TEXT('a')
+                    && label[i + 1U] <= TEXT('z'));
+
+                if (i > 0U) {
+                    const TChar prev        = label[i - 1U];
+                    const bool  prevIsLower = (prev >= TEXT('a') && prev <= TEXT('z'));
+                    const bool  prevIsUpper = (prev >= TEXT('A') && prev <= TEXT('Z'));
+                    const bool  prevIsDigit = (prev >= TEXT('0') && prev <= TEXT('9'));
+                    const bool  needSpace =
+                        (isUpper && (prevIsLower || prevIsDigit || (prevIsUpper && nextIsLower)))
+                        || (isDigit && !prevIsDigit) || (!isDigit && prevIsDigit);
+                    if (needSpace && !prevWasSpace) {
+                        output.Append(TEXT(" "));
+                        prevWasSpace = true;
+                    }
+                }
+
+                if (ch == TEXT('_') || ch == TEXT('-')) {
+                    if (!prevWasSpace) {
+                        output.Append(TEXT(" "));
+                        prevWasSpace = true;
+                    }
+                    continue;
+                }
+
+                TChar outCh = ch;
+                if ((isLower || isUpper) && prevWasSpace) {
+                    if (ch >= TEXT('a') && ch <= TEXT('z')) {
+                        outCh = static_cast<TChar>(ch - TEXT('a') + TEXT('A'));
+                    }
+                }
+                output.Append(outCh);
+                prevWasSpace = false;
+            }
+            return output;
         }
 
         void DrawSectionHead(DebugGui::IDebugGui& gui, const DebugGui::FDebugGuiTheme& theme,
@@ -468,6 +515,7 @@ namespace AltinaEngine::Editor::UI {
 
             DebugGui::FTreeViewItemDesc objectDesc{};
             objectDesc.mLabel       = object.mName.ToView();
+            objectDesc.mIconId      = Private::ToIconId(Private::EEditorIconId::GameObject);
             objectDesc.mDepth       = depth;
             objectDesc.mSelected    = IsGameObjectSelected(object.mId);
             objectDesc.mExpanded    = expanded;
@@ -526,34 +574,35 @@ namespace AltinaEngine::Editor::UI {
         const bool  mouseReleased = gui.WasMouseReleased();
         const bool  mouseDown     = gui.IsMouseDown();
 
-        const auto  colText           = theme.mEditor.mPanelContentText;
-        const auto  colMutedText      = theme.mEditor.mPanelContentMutedText;
-        const auto  colButtonBg       = theme.mButtonBg;
-        const auto  colButtonHoverBg  = theme.mButtonHoveredBg;
-        const auto  colButtonText     = theme.mButtonText;
-        const auto  colCollapseBg     = DebugGui::MakeColor32(134, 145, 159, 255);
-        const auto  colCollapseHover  = DebugGui::MakeColor32(146, 156, 171, 255);
-        const auto  colCollapseText   = DebugGui::MakeColor32(255, 255, 255, 255);
-        const auto  colCollapseIcon   = DebugGui::MakeColor32(229, 234, 239, 255);
-        const auto  colValueRowBg     = DebugGui::MakeColor32(248, 249, 250, 255);
-        const auto  colValueRowBorder = DebugGui::MakeColor32(248, 249, 250, 255);
+        const auto  colText             = theme.mEditor.mPanelContentText;
+        const auto  colMutedText        = theme.mEditor.mPanelContentMutedText;
+        const auto  colButtonBg         = theme.mButtonBg;
+        const auto  colButtonHoverBg    = theme.mButtonHoveredBg;
+        const auto  colButtonText       = theme.mButtonText;
+        const auto  colCollapseBg       = theme.mEditor.mTabs.mBarBg;
+        const auto  colCollapseHover    = theme.mEditor.mTabs.mItemHoveredBg;
+        const auto  colCollapseText     = theme.mEditor.mTabs.mTextActive;
+        const auto  colCollapseIcon     = theme.mEditor.mTabs.mIconActive;
+        const auto  colValueFieldBg     = theme.mInputBg;
+        const auto  colValueFieldBorder = theme.mInputBorder;
+        const auto  colValueFieldText   = theme.mInputText;
 
         const auto* object    = FindSelectedGameObjectSnapshot();
         const FRect panelRect = contentRect;
 
         const f32   outerPad             = ScalePx(8.0f);
         const f32   sectionGap           = ScalePx(10.0f);
-        const f32   rowHeight            = ScalePx(22.0f);
-        const f32   rowGap               = ScalePx(3.0f);
-        const f32   buttonHeight         = ScalePx(24.0f);
-        const f32   propertyHeight       = ScalePx(22.0f);
+        const f32   rowHeight            = ScalePx(20.0f);
+        const f32   rowGap               = ScalePx(2.0f);
+        const f32   buttonHeight         = ScalePx(22.0f);
+        const f32   propertyHeight       = ScalePx(20.0f);
         const f32   collapseHeaderHeight = ScalePx(26.0f);
-        const f32   collapseGap          = ScalePx(6.0f);
+        const f32   collapseGap          = ScalePx(5.0f);
         const f32   labelColumnWidth     = ScalePx(132.0f);
         const f32   renameButtonWidth    = ScalePx(82.0f);
         const f32   rowTextPadX          = ScalePx(8.0f);
-        const f32   rowLabelTextY        = ScalePx(4.0f);
-        const f32   rowValueTextY        = ScalePx(3.0f);
+        const f32   rowLabelTextY        = ScalePx(3.0f);
+        const f32   rowValueTextY        = ScalePx(2.0f);
         const f32   scrollBarWidth =
             ((theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 8.0f) * uiScale;
         const f32 scrollBarPad =
@@ -672,15 +721,17 @@ namespace AltinaEngine::Editor::UI {
             return hovered && mouseReleased;
         };
         const auto drawValueRow = [&](const FRect& rect, FStringView label, FStringView value) {
-            gui.DrawRoundedRectFilled(
-                rect, colValueRowBg, theme.mEditor.mPanelSurface.mCornerRadius);
-            gui.DrawRoundedRect(
-                rect, colValueRowBorder, theme.mEditor.mPanelSurface.mCornerRadius, 1.0f);
+            const FRect valueRect =
+                MakeRect(rect.Min.X() + labelColumnWidth, rect.Min.Y(), rect.Max.X(), rect.Max.Y());
             gui.DrawTextStyled(FVector2f(rect.Min.X() + rowTextPadX, rect.Min.Y() + rowLabelTextY),
                 colMutedText, label, DebugGui::EDebugGuiFontRole::Small);
-            gui.DrawTextStyled(
-                FVector2f(rect.Min.X() + labelColumnWidth, rect.Min.Y() + rowValueTextY), colText,
-                value, DebugGui::EDebugGuiFontRole::Body);
+            gui.DrawRoundedRectFilled(
+                valueRect, colValueFieldBg, theme.mEditor.mPanelSurface.mCornerRadius);
+            gui.DrawRoundedRect(
+                valueRect, colValueFieldBorder, theme.mEditor.mPanelSurface.mCornerRadius, 1.0f);
+            gui.DrawTextStyled(FVector2f(valueRect.Min.X() + theme.mInputTextOffsetX,
+                                   valueRect.Min.Y() + rowValueTextY),
+                colValueFieldText, value, DebugGui::EDebugGuiFontRole::Body);
         };
 
         gui.PushClipRect(contentClipRect);
@@ -705,12 +756,12 @@ namespace AltinaEngine::Editor::UI {
             FVector2f(nameLabelRect.Min.X() + rowTextPadX, nameLabelRect.Min.Y() + rowLabelTextY),
             colMutedText, TEXT("Name"), DebugGui::EDebugGuiFontRole::Small);
         gui.DrawRoundedRectFilled(
-            nameInputRect, colValueRowBg, theme.mEditor.mPanelSurface.mCornerRadius);
+            nameInputRect, colValueFieldBg, theme.mEditor.mPanelSurface.mCornerRadius);
         gui.DrawRoundedRect(
-            nameInputRect, colValueRowBorder, theme.mEditor.mPanelSurface.mCornerRadius, 1.0f);
+            nameInputRect, colValueFieldBorder, theme.mEditor.mPanelSurface.mCornerRadius, 1.0f);
         gui.DrawTextStyled(FVector2f(nameInputRect.Min.X() + theme.mInputTextOffsetX,
                                nameInputRect.Min.Y() + rowValueTextY),
-            theme.mInputText, mInspectorNameInput.ToView(), DebugGui::EDebugGuiFontRole::Body);
+            colValueFieldText, mInspectorNameInput.ToView(), DebugGui::EDebugGuiFontRole::Body);
         (void)drawCenteredButton(renameRect, TEXT("Rename"));
         y += rowHeight + rowGap;
 
@@ -776,10 +827,11 @@ namespace AltinaEngine::Editor::UI {
             }
 
             const FRect iconRect =
-                MakeRect(headerRect.Min.X() + ScalePx(24.0f), headerRect.Min.Y() + ScalePx(7.0f),
-                    headerRect.Min.X() + ScalePx(40.0f), headerRect.Min.Y() + ScalePx(23.0f));
-            gui.DrawRoundedRectFilled(
-                iconRect, DebugGui::MakeColor32(255, 255, 255, 56), ScalePx(5.0f));
+                MakeRect(headerRect.Min.X() + ScalePx(24.0f), headerRect.Min.Y() + ScalePx(2.0f),
+                    headerRect.Min.X() + ScalePx(44.0f), headerRect.Min.Y() + ScalePx(22.0f));
+            gui.DrawIcon(iconRect,
+                Private::GetComponentIconId(component.mName.ToView(), component.mTypeName.ToView()),
+                colCollapseIcon);
             gui.DrawTextStyled(
                 FVector2f(headerRect.Min.X() + ScalePx(48.0f), headerRect.Min.Y() + ScalePx(6.0f)),
                 colCollapseText, component.mName.ToView(), DebugGui::EDebugGuiFontRole::Body);
@@ -804,7 +856,8 @@ namespace AltinaEngine::Editor::UI {
                         contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + propertyHeight);
                     const auto truncatedValue = TruncateAssetLabel(property.mDisplayValue.ToView(),
                         contentWidth - labelColumnWidth - ScalePx(18.0f));
-                    drawValueRow(propertyRect, property.mName.ToView(), truncatedValue.ToView());
+                    const FString prettyLabel = PrettifyInspectorLabel(property.mName.ToView());
+                    drawValueRow(propertyRect, prettyLabel.ToView(), truncatedValue.ToView());
                     y += propertyHeight + rowGap;
                 }
             }
@@ -1069,9 +1122,9 @@ namespace AltinaEngine::Editor::UI {
                 gui, theme, treeScrollTrackRect, thumbRect, thumbHovered, mAssetTreeScrollDragging);
         }
 
-        const f32   itemWidth  = ScalePx(104.0f);
-        const f32   itemHeight = ScalePx(92.0f);
-        const f32   itemGap    = ScalePx(12.0f);
+        const f32   itemWidth  = ScalePx(84.0f);
+        const f32   itemHeight = ScalePx(72.0f);
+        const f32   itemGap    = ScalePx(8.0f);
         const FRect gridContentRect =
             MakeRect(gridRect.Min.X() + ScalePx(14.0f), gridSectionRect.Max.Y() + ScalePx(3.0f),
                 gridRect.Max.X() - ScalePx(14.0f), gridRect.Max.Y() - ScalePx(14.0f));
@@ -1100,11 +1153,11 @@ namespace AltinaEngine::Editor::UI {
             DebugGui::FTextedIconViewDesc itemDesc{};
             const auto                    truncatedName =
                 TruncateAssetLabel(item.mName.ToView(), itemWidth - ScalePx(12.0f));
-            itemDesc.mLabel    = truncatedName.ToView();
-            itemDesc.mRect     = itemRect;
-            itemDesc.mImageId  = (item.mType == EAssetItemType::Directory) ? mAssetFolderIconImageId
-                                                                           : mAssetFileIconImageId;
-            itemDesc.mSelected = (mSelectedAssetPath == item.mPath);
+            itemDesc.mLabel = truncatedName.ToView();
+            itemDesc.mRect  = itemRect;
+            itemDesc.mIconId =
+                Private::GetAssetIconId(item.mNavigateUp, item.mType == EAssetItemType::Directory);
+            itemDesc.mSelected    = (mSelectedAssetPath == item.mPath);
             itemDesc.mIsDirectory = (item.mType == EAssetItemType::Directory);
 
             const auto result = gui.TextedIconView(itemDesc);

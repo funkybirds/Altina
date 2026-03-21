@@ -48,7 +48,7 @@ namespace AltinaEngine::Asset {
 
         auto ComputeTightlyPackedSize(
             const FTexture2DBlobDesc& blobDesc, u32 bytesPerPixel, u64& outSize) noexcept -> bool {
-            if (bytesPerPixel == 0U) {
+            if (bytesPerPixel == 0U && !IsTextureBlockCompressed(blobDesc.mFormat)) {
                 return false;
             }
 
@@ -60,10 +60,17 @@ namespace AltinaEngine::Asset {
 
             u64 total = 0;
             for (u32 mip = 0; mip < blobDesc.mMipCount; ++mip) {
-                const u64 rowPitch = static_cast<u64>(width) * bytesPerPixel;
-                const u64 mipSize  = rowPitch * static_cast<u64>(height);
+                const u64 rowPitch = GetTextureMipRowPitch(blobDesc.mFormat, width, bytesPerPixel);
+                const u64 mipSize =
+                    GetTextureMipSlicePitch(blobDesc.mFormat, width, height, bytesPerPixel);
                 if (rowPitch == 0U || mipSize / rowPitch != height) {
-                    return false;
+                    if (!IsTextureBlockCompressed(blobDesc.mFormat)) {
+                        return false;
+                    }
+                    const u32 blocksY = (height + 3U) / 4U;
+                    if (rowPitch == 0U || blocksY == 0U || mipSize / rowPitch != blocksY) {
+                        return false;
+                    }
                 }
                 if (total > TNumericProperty<u64>::Max - mipSize) {
                     return false;
@@ -120,12 +127,13 @@ namespace AltinaEngine::Asset {
         }
 
         const u32 bytesPerPixel = GetTextureBytesPerPixel(blobDesc.mFormat);
-        if (bytesPerPixel == 0 || blobDesc.mWidth == 0 || blobDesc.mHeight == 0
-            || blobDesc.mMipCount == 0) {
+        if ((bytesPerPixel == 0 && !IsTextureBlockCompressed(blobDesc.mFormat))
+            || blobDesc.mWidth == 0 || blobDesc.mHeight == 0 || blobDesc.mMipCount == 0) {
             return {};
         }
 
-        const u64 minRowPitch = static_cast<u64>(blobDesc.mWidth) * bytesPerPixel;
+        const u64 minRowPitch =
+            GetTextureMipRowPitch(blobDesc.mFormat, blobDesc.mWidth, bytesPerPixel);
         if (blobDesc.mRowPitch != minRowPitch) {
             return {};
         }

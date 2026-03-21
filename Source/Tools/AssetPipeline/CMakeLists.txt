@@ -125,6 +125,7 @@ set(Target_Private_Sources
     Private/Importers/Model/PmxImporter.cpp
     Private/Importers/Model/UsdzImporter.cpp
     Private/Importers/Shader/ShaderImporter.cpp
+    Private/Importers/Texture/DirectDrawSurfaceImporter.cpp
     Private/Importers/Texture/TextureImporter.cpp
 )
 

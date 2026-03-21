@@ -191,6 +191,14 @@ if(TARGET AltinaEngineAssetTool)
     set_tests_properties(AltinaEngineAssetToolSelfTestEnvMap PROPERTIES
         PASS_REGULAR_EXPRESSION "EnvMapSelfTest ok"
     )
+
+    add_test(NAME AltinaEngineAssetToolSelfTestDds
+        COMMAND $<TARGET_FILE:AltinaEngineAssetTool> selftest --dds
+    )
+
+    set_tests_properties(AltinaEngineAssetToolSelfTestDds PROPERTIES
+        PASS_REGULAR_EXPRESSION "DirectDrawSurfaceSelfTest ok"
+    )
     set_tests_properties(AltinaEngineTestsAsset PROPERTIES
         FIXTURES_REQUIRED AssetCook
     )

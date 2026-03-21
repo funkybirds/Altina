@@ -196,6 +196,11 @@ namespace AltinaEngine::Asset {
     constexpr u32                kTextureFormatRGB8    = 2;
     constexpr u32                kTextureFormatRGBA8   = 3;
     constexpr u32                kTextureFormatRGBA16F = 4;
+    constexpr u32                kTextureFormatBC1     = 5;
+    constexpr u32                kTextureFormatBC2     = 6;
+    constexpr u32                kTextureFormatBC3     = 7;
+    constexpr u32                kTextureFormatBC4     = 8;
+    constexpr u32                kTextureFormatBC5     = 9;
 
     [[nodiscard]] constexpr auto GetTextureBytesPerPixel(u32 format) noexcept -> u32 {
         switch (format) {
@@ -210,6 +215,59 @@ namespace AltinaEngine::Asset {
             default:
                 return 0;
         }
+    }
+
+    [[nodiscard]] constexpr auto IsTextureBlockCompressed(u32 format) noexcept -> bool {
+        switch (format) {
+            case kTextureFormatBC1:
+            case kTextureFormatBC2:
+            case kTextureFormatBC3:
+            case kTextureFormatBC4:
+            case kTextureFormatBC5:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    [[nodiscard]] constexpr auto GetTextureBlockBytes(u32 format) noexcept -> u32 {
+        switch (format) {
+            case kTextureFormatBC1:
+            case kTextureFormatBC4:
+                return 8;
+            case kTextureFormatBC2:
+            case kTextureFormatBC3:
+            case kTextureFormatBC5:
+                return 16;
+            default:
+                return 0;
+        }
+    }
+
+    [[nodiscard]] constexpr auto GetTextureMipRowPitch(
+        u32 format, u32 width, u32 bytesPerPixel = 0) noexcept -> u32 {
+        if (width == 0U) {
+            return 0U;
+        }
+        if (IsTextureBlockCompressed(format)) {
+            const u32 blockBytes = GetTextureBlockBytes(format);
+            const u32 blocksX    = (width + 3U) / 4U;
+            return blocksX * blockBytes;
+        }
+        return width * bytesPerPixel;
+    }
+
+    [[nodiscard]] constexpr auto GetTextureMipSlicePitch(
+        u32 format, u32 width, u32 height, u32 bytesPerPixel = 0) noexcept -> u32 {
+        if (width == 0U || height == 0U) {
+            return 0U;
+        }
+        if (IsTextureBlockCompressed(format)) {
+            const u32 rowPitch = GetTextureMipRowPitch(format, width, bytesPerPixel);
+            const u32 blocksY  = (height + 3U) / 4U;
+            return rowPitch * blocksY;
+        }
+        return GetTextureMipRowPitch(format, width, bytesPerPixel) * height;
     }
 
     constexpr u32                kMeshIndexTypeUint16 = 0;

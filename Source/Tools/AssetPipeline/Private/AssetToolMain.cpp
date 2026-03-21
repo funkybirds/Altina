@@ -10,6 +10,7 @@
 #include "Importers/Mesh/MeshImporter.h"
 #include "Importers/Model/ModelImporter.h"
 #include "Importers/Shader/ShaderImporter.h"
+#include "Importers/Texture/DirectDrawSurfaceImporter.h"
 #include "Importers/Texture/TextureImporter.h"
 #include "Types/Aliases.h"
 #include "Utility/Json.h"
@@ -310,6 +311,9 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 if (ext == ".hdr") {
                     return "EnvMapImporter";
                 }
+                if (ext == ".dds") {
+                    return "DirectDrawSurfaceImporter";
+                }
             }
             if (type == Asset::EAssetType::CubeMap) {
                 std::string ext = sourcePath.extension().string();
@@ -325,7 +329,7 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::string ext = path.extension().string();
             ToLowerAscii(ext);
             return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".hdr"
-                || ext == ".exr";
+                || ext == ".exr" || ext == ".dds";
         }
 
         auto IsMeshExtension(const std::filesystem::path& path) -> bool {
@@ -814,21 +818,32 @@ namespace AltinaEngine::Tools::AssetPipeline {
             std::cout << "  clean    --root <repoRoot> [--build-root <BuildRoot>] --cache\n";
             std::cout << "  modelinfo --source <PathToModel> [--target-radius <R>]\n";
             std::cout << "  selftest --envmap\n";
+            std::cout << "  selftest --dds\n";
         }
 
         auto SelfTest(const FCommandLine& command) -> int {
             const bool envmap = command.Options.find("envmap") != command.Options.end();
-            if (!envmap) {
-                std::cerr << "Specify --envmap.\n";
+            const bool dds    = command.Options.find("dds") != command.Options.end();
+            if (!envmap && !dds) {
+                std::cerr << "Specify --envmap or --dds.\n";
                 return 1;
             }
 
             std::string error;
-            if (!RunEnvMapSelfTest(error)) {
-                std::cerr << error << "\n";
-                return 1;
+            if (envmap) {
+                if (!RunEnvMapSelfTest(error)) {
+                    std::cerr << error << "\n";
+                    return 1;
+                }
+                std::cout << "EnvMapSelfTest ok\n";
             }
-
+            if (dds) {
+                if (!RunDirectDrawSurfaceSelfTest(error)) {
+                    std::cerr << error << "\n";
+                    return 1;
+                }
+                std::cout << "DirectDrawSurfaceSelfTest ok\n";
+            }
             return 0;
         }
 
@@ -1288,7 +1303,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             continue;
                         }
                         constexpr bool kDefaultSrgb = true;
-                        if (!CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc)) {
+                        const bool     isDds        = (ext == ".dds");
+                        const bool     cooked       = isDds
+                                      ? CookDirectDrawSurfaceTexture2D(
+                                  bytes, kDefaultSrgb, cookedBytes, textureDesc)
+                                      : CookTexture2D(bytes, kDefaultSrgb, cookedBytes, textureDesc);
+                        if (!cooked) {
                             std::cerr << "Failed to cook texture: " << asset.SourcePath.string()
                                       << "\n";
                             timing.Result = "cook_failed";

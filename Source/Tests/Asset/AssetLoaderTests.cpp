@@ -133,7 +133,8 @@ namespace {
 
     auto ComputePackedMipSize(const FTexture2DDesc& desc) -> u64 {
         const u32 bytesPerPixel = GetTextureBytesPerPixel(desc.Format);
-        if (bytesPerPixel == 0U || desc.Width == 0U || desc.Height == 0U || desc.MipCount == 0U) {
+        if ((bytesPerPixel == 0U && !AltinaEngine::Asset::IsTextureBlockCompressed(desc.Format))
+            || desc.Width == 0U || desc.Height == 0U || desc.MipCount == 0U) {
             return 0U;
         }
 
@@ -141,7 +142,8 @@ namespace {
         u32 height = desc.Height;
         u64 total  = 0U;
         for (u32 mip = 0; mip < desc.MipCount; ++mip) {
-            total += static_cast<u64>(width) * static_cast<u64>(height) * bytesPerPixel;
+            total += AltinaEngine::Asset::GetTextureMipSlicePitch(
+                desc.Format, width, height, bytesPerPixel);
             width  = (width > 1U) ? (width >> 1U) : 1U;
             height = (height > 1U) ? (height >> 1U) : 1U;
         }
@@ -237,6 +239,55 @@ TEST_CASE("Asset.Mesh.EngineFormat.Load") {
 
     manager.UnregisterLoader(&loader);
     manager.SetRegistry(nullptr);
+}
+
+TEST_CASE("Asset.Texture2D.BlockCompressed.Load") {
+    AltinaEngine::Asset::FTexture2DBlobDesc blobDesc{};
+    blobDesc.mWidth    = 8U;
+    blobDesc.mHeight   = 8U;
+    blobDesc.mFormat   = AltinaEngine::Asset::kTextureFormatBC1;
+    blobDesc.mMipCount = 2U;
+    blobDesc.mRowPitch =
+        AltinaEngine::Asset::GetTextureMipRowPitch(blobDesc.mFormat, blobDesc.mWidth, 0U);
+
+    const u32 payloadSize =
+        AltinaEngine::Asset::GetTextureMipSlicePitch(blobDesc.mFormat, 8U, 8U, 0U)
+        + AltinaEngine::Asset::GetTextureMipSlicePitch(blobDesc.mFormat, 4U, 4U, 0U);
+
+    AltinaEngine::Asset::FAssetBlobHeader header{};
+    header.mType     = static_cast<u8>(AltinaEngine::Asset::EAssetType::Texture2D);
+    header.mDescSize = static_cast<u32>(sizeof(blobDesc));
+    header.mDataSize = payloadSize;
+
+    TVector<u8> cooked{};
+    cooked.Resize(sizeof(header) + sizeof(blobDesc) + payloadSize);
+    std::memcpy(cooked.Data(), &header, sizeof(header));
+    std::memcpy(cooked.Data() + sizeof(header), &blobDesc, sizeof(blobDesc));
+    for (u32 index = 0U; index < payloadSize; ++index) {
+        cooked[sizeof(header) + sizeof(blobDesc) + index] = static_cast<u8>(index + 1U);
+    }
+
+    FTestAssetStream stream(cooked);
+    FTexture2DLoader loader{};
+
+    FAssetDesc       desc{};
+    desc.mTexture.Width    = blobDesc.mWidth;
+    desc.mTexture.Height   = blobDesc.mHeight;
+    desc.mTexture.MipCount = blobDesc.mMipCount;
+    desc.mTexture.Format   = blobDesc.mFormat;
+    desc.mTexture.SRGB     = false;
+
+    auto asset = loader.Load(desc, stream);
+    REQUIRE(asset);
+
+    auto* texture = static_cast<FTexture2DAsset*>(asset.Get());
+    REQUIRE(texture != nullptr);
+    REQUIRE_EQ(texture->GetDesc().Format, AltinaEngine::Asset::kTextureFormatBC1);
+    REQUIRE_EQ(texture->GetDesc().MipCount, 2U);
+    REQUIRE_EQ(texture->GetPixels().Size(), static_cast<usize>(payloadSize));
+    REQUIRE(std::memcmp(texture->GetPixels().Data(),
+                cooked.Data() + sizeof(header) + sizeof(blobDesc), payloadSize)
+        == 0);
 }
 
 TEST_CASE("Asset.MaterialTemplate.Json.Load") {

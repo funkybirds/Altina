@@ -3,6 +3,7 @@
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/PbrSkyComponent.h"
 #include "Engine/GameScene/PointLightComponent.h"
 #include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
@@ -32,6 +33,7 @@ namespace AltinaEngine::GameScene {
         const FComponentTypeHash kPointLightComponentType =
             GetComponentTypeHash<FPointLightComponent>();
         const FComponentTypeHash kSkyCubeComponentType = GetComponentTypeHash<FSkyCubeComponent>();
+        const FComponentTypeHash kPbrSkyComponentType  = GetComponentTypeHash<FPbrSkyComponent>();
 
         enum class EWorldObjectRecordKind : u8 {
             Raw    = 0U,
@@ -516,6 +518,10 @@ namespace AltinaEngine::GameScene {
 
     auto FWorld::GetActiveSkyCubeComponents() const noexcept -> const TVector<FComponentId>& {
         return mActiveSkyCubeComponents;
+    }
+
+    auto FWorld::GetActivePbrSkyComponents() const noexcept -> const TVector<FComponentId>& {
+        return mActivePbrSkyComponents;
     }
 
     void FWorld::RegisterPrefabRoot(
@@ -1360,6 +1366,14 @@ namespace AltinaEngine::GameScene {
             if (component.IsEnabled()) {
                 AddActiveComponent(mActiveSkyCubeComponents, id);
             }
+            return;
+        }
+
+        if (id.Type == kPbrSkyComponentType) {
+            const auto& component = ResolveComponent<FPbrSkyComponent>(id);
+            if (component.IsEnabled()) {
+                AddActiveComponent(mActivePbrSkyComponents, id);
+            }
         }
     }
 
@@ -1391,6 +1405,11 @@ namespace AltinaEngine::GameScene {
 
         if (id.Type == kSkyCubeComponentType) {
             RemoveActiveComponent(mActiveSkyCubeComponents, id);
+            return;
+        }
+
+        if (id.Type == kPbrSkyComponentType) {
+            RemoveActiveComponent(mActivePbrSkyComponents, id);
         }
     }
 
@@ -1445,6 +1464,15 @@ namespace AltinaEngine::GameScene {
                 AddActiveComponent(mActiveSkyCubeComponents, id);
             } else {
                 RemoveActiveComponent(mActiveSkyCubeComponents, id);
+            }
+            return;
+        }
+
+        if (id.Type == kPbrSkyComponentType) {
+            if (enabled && IsGameObjectActive(owner)) {
+                AddActiveComponent(mActivePbrSkyComponents, id);
+            } else {
+                RemoveActiveComponent(mActivePbrSkyComponents, id);
             }
         }
     }
@@ -1511,6 +1539,15 @@ namespace AltinaEngine::GameScene {
                     AddActiveComponent(mActiveSkyCubeComponents, id);
                 } else {
                     RemoveActiveComponent(mActiveSkyCubeComponents, id);
+                }
+                continue;
+            }
+
+            if (id.Type == kPbrSkyComponentType) {
+                if (active && ResolveComponent<FPbrSkyComponent>(id).IsEnabled()) {
+                    AddActiveComponent(mActivePbrSkyComponents, id);
+                } else {
+                    RemoveActiveComponent(mActivePbrSkyComponents, id);
                 }
             }
         }

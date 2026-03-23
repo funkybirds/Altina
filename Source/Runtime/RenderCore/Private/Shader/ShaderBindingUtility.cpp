@@ -500,6 +500,19 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
         return true;
     }
 
+    auto FBindGroupBuilder::AddStorageTexture(u32 binding, Rhi::FRhiTexture* texture) -> bool {
+        if (!HasLayoutBinding(binding, Rhi::ERhiBindingType::StorageTexture)
+            || HasEntry(binding, Rhi::ERhiBindingType::StorageTexture)) {
+            return false;
+        }
+        Rhi::FRhiBindGroupEntry entry{};
+        entry.mBinding = binding;
+        entry.mType    = Rhi::ERhiBindingType::StorageTexture;
+        entry.mTexture = texture;
+        mEntries.PushBack(entry);
+        return true;
+    }
+
     auto FBindGroupBuilder::AddSampler(u32 binding, Rhi::FRhiSampler* sampler) -> bool {
         if (!HasLayoutBinding(binding, Rhi::ERhiBindingType::Sampler)
             || HasEntry(binding, Rhi::ERhiBindingType::Sampler)) {

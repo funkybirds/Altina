@@ -2,6 +2,7 @@
 #include "Engine/GameScene/ComponentRegistry.h"
 #include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/PbrSkyComponent.h"
 #include "Engine/GameScene/PointLightComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
 #include "Engine/GameScene/SkyCubeComponent.h"
@@ -408,6 +409,124 @@ namespace AltinaEngine::GameScene {
             component.SetCubeMapAsset(handle);
         }
 
+        void SerializePbrSkyComponentJson(
+            FWorld& world, FComponentId id, Core::Reflection::ISerializer& serializer) {
+            const auto& component  = world.ResolveComponent<FPbrSkyComponent>(id);
+            const auto& parameters = component.GetParameters();
+
+            auto WriteVec3 = [&serializer](const TChar* name, const Core::Math::FVector3f& value) {
+                serializer.WriteFieldName(name);
+                serializer.BeginArray(3);
+                serializer.Write(value.X());
+                serializer.Write(value.Y());
+                serializer.Write(value.Z());
+                serializer.EndArray();
+            };
+
+            serializer.BeginObject({});
+            WriteVec3(TEXT("rayleighScattering"), parameters.mRayleighScattering);
+            serializer.WriteFieldName(TEXT("rayleighScaleHeightKm"));
+            serializer.Write(parameters.mRayleighScaleHeightKm);
+            WriteVec3(TEXT("mieScattering"), parameters.mMieScattering);
+            WriteVec3(TEXT("mieAbsorption"), parameters.mMieAbsorption);
+            serializer.WriteFieldName(TEXT("mieScaleHeightKm"));
+            serializer.Write(parameters.mMieScaleHeightKm);
+            serializer.WriteFieldName(TEXT("mieAnisotropy"));
+            serializer.Write(parameters.mMieAnisotropy);
+            WriteVec3(TEXT("ozoneAbsorption"), parameters.mOzoneAbsorption);
+            serializer.WriteFieldName(TEXT("ozoneCenterHeightKm"));
+            serializer.Write(parameters.mOzoneCenterHeightKm);
+            serializer.WriteFieldName(TEXT("ozoneThicknessKm"));
+            serializer.Write(parameters.mOzoneThicknessKm);
+            WriteVec3(TEXT("groundAlbedo"), parameters.mGroundAlbedo);
+            WriteVec3(TEXT("solarTint"), parameters.mSolarTint);
+            serializer.WriteFieldName(TEXT("solarIlluminance"));
+            serializer.Write(parameters.mSolarIlluminance);
+            serializer.WriteFieldName(TEXT("sunAngularRadius"));
+            serializer.Write(parameters.mSunAngularRadius);
+            serializer.WriteFieldName(TEXT("planetRadiusKm"));
+            serializer.Write(parameters.mPlanetRadiusKm);
+            serializer.WriteFieldName(TEXT("atmosphereHeightKm"));
+            serializer.Write(parameters.mAtmosphereHeightKm);
+            serializer.WriteFieldName(TEXT("viewHeightKm"));
+            serializer.Write(parameters.mViewHeightKm);
+            serializer.WriteFieldName(TEXT("exposure"));
+            serializer.Write(parameters.mExposure);
+            serializer.WriteFieldName(TEXT("version"));
+            serializer.Write(component.GetVersion());
+            serializer.EndObject();
+        }
+
+        void DeserializePbrSkyComponentJson(
+            FWorld& world, FComponentId id, const FJsonValue& value) {
+            if (value.Type != EJsonType::Object) {
+                return;
+            }
+
+            auto ReadVec3 = [&](const TChar* name, Core::Math::FVector3f& outValue) {
+                const auto* vecValue = FindObjectValueInsensitive(value, name);
+                if (vecValue == nullptr || vecValue->Type != EJsonType::Array
+                    || vecValue->Array.Size() < 3) {
+                    return;
+                }
+
+                double x = 0.0;
+                double y = 0.0;
+                double z = 0.0;
+                if (GetNumberValue(vecValue->Array[0], x) && GetNumberValue(vecValue->Array[1], y)
+                    && GetNumberValue(vecValue->Array[2], z)) {
+                    outValue = Core::Math::FVector3f(
+                        static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(z));
+                }
+            };
+
+            auto&  component  = world.ResolveComponent<FPbrSkyComponent>(id);
+            auto&  parameters = component.mParameters;
+            double number     = 0.0;
+
+            ReadVec3(TEXT("rayleighScattering"), parameters.mRayleighScattering);
+            if (GetNumberValue(
+                    FindObjectValueInsensitive(value, "rayleighScaleHeightKm"), number)) {
+                parameters.mRayleighScaleHeightKm = static_cast<f32>(number);
+            }
+            ReadVec3(TEXT("mieScattering"), parameters.mMieScattering);
+            ReadVec3(TEXT("mieAbsorption"), parameters.mMieAbsorption);
+            if (GetNumberValue(FindObjectValueInsensitive(value, "mieScaleHeightKm"), number)) {
+                parameters.mMieScaleHeightKm = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "mieAnisotropy"), number)) {
+                parameters.mMieAnisotropy = static_cast<f32>(number);
+            }
+            ReadVec3(TEXT("ozoneAbsorption"), parameters.mOzoneAbsorption);
+            if (GetNumberValue(FindObjectValueInsensitive(value, "ozoneCenterHeightKm"), number)) {
+                parameters.mOzoneCenterHeightKm = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "ozoneThicknessKm"), number)) {
+                parameters.mOzoneThicknessKm = static_cast<f32>(number);
+            }
+            ReadVec3(TEXT("groundAlbedo"), parameters.mGroundAlbedo);
+            ReadVec3(TEXT("solarTint"), parameters.mSolarTint);
+            if (GetNumberValue(FindObjectValueInsensitive(value, "solarIlluminance"), number)) {
+                parameters.mSolarIlluminance = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "sunAngularRadius"), number)) {
+                parameters.mSunAngularRadius = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "planetRadiusKm"), number)) {
+                parameters.mPlanetRadiusKm = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "atmosphereHeightKm"), number)) {
+                parameters.mAtmosphereHeightKm = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "viewHeightKm"), number)) {
+                parameters.mViewHeightKm = static_cast<f32>(number);
+            }
+            if (GetNumberValue(FindObjectValueInsensitive(value, "exposure"), number)) {
+                parameters.mExposure = static_cast<f32>(number);
+            }
+            component.MarkDirty();
+        }
+
         template <typename T>
         void RegisterJsonSerializer(FnSerializeJson serializer, FnDeserializeJson deserializer) {
             auto&                    registry = GetComponentRegistry();
@@ -448,5 +567,7 @@ namespace AltinaEngine::GameScene {
             &SerializeScriptComponentJson, &DeserializeScriptComponentJson);
         RegisterJsonSerializer<FSkyCubeComponent>(
             &SerializeSkyCubeComponentJson, &DeserializeSkyCubeComponentJson);
+        RegisterJsonSerializer<FPbrSkyComponent>(
+            &SerializePbrSkyComponentJson, &DeserializePbrSkyComponentJson);
     }
 } // namespace AltinaEngine::GameScene

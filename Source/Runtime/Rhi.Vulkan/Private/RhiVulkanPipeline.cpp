@@ -505,7 +505,9 @@ namespace AltinaEngine::Rhi {
                     continue;
                 }
                 VkDescriptorImageInfo ii{};
-                ii.imageView   = vkTex->GetDefaultView();
+                ii.imageView   = (entry.mType == ERhiBindingType::StorageTexture)
+                      ? vkTex->GetStorageView()
+                      : vkTex->GetDefaultView();
                 ii.imageLayout = (entry.mType == ERhiBindingType::StorageTexture)
                     ? VK_IMAGE_LAYOUT_GENERAL
                     : (Vulkan::Detail::IsDepthFormat(entry.mTexture->GetDesc().mFormat)

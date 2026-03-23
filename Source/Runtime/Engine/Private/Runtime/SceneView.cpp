@@ -3,21 +3,53 @@
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/DirectionalLightComponent.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
+#include "Engine/GameScene/PbrSkyComponent.h"
 #include "Engine/GameScene/PointLightComponent.h"
 #include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 #include "Engine/GameScene/World.h"
+#include "Utility/Assert.h"
 #include "Math/LinAlg/Common.h"
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Engine {
+    namespace {
+        auto BuildPbrSkyParameters(const GameScene::FPbrSkyComponent& component)
+            -> FPbrSkySceneParameters {
+            FPbrSkySceneParameters out{};
+            const auto&            parameters = component.GetParameters();
+            out.RayleighScattering            = parameters.mRayleighScattering;
+            out.RayleighScaleHeightKm         = parameters.mRayleighScaleHeightKm;
+            out.MieScattering                 = parameters.mMieScattering;
+            out.MieAbsorption                 = parameters.mMieAbsorption;
+            out.MieScaleHeightKm              = parameters.mMieScaleHeightKm;
+            out.MieAnisotropy                 = parameters.mMieAnisotropy;
+            out.OzoneAbsorption               = parameters.mOzoneAbsorption;
+            out.OzoneCenterHeightKm           = parameters.mOzoneCenterHeightKm;
+            out.OzoneThicknessKm              = parameters.mOzoneThicknessKm;
+            out.GroundAlbedo                  = parameters.mGroundAlbedo;
+            out.SolarTint                     = parameters.mSolarTint;
+            out.SolarIlluminance              = parameters.mSolarIlluminance;
+            out.SunAngularRadius              = parameters.mSunAngularRadius;
+            out.PlanetRadiusKm                = parameters.mPlanetRadiusKm;
+            out.AtmosphereHeightKm            = parameters.mAtmosphereHeightKm;
+            out.ViewHeightKm                  = parameters.mViewHeightKm;
+            out.Exposure                      = parameters.mExposure;
+            out.Version                       = component.GetVersion();
+            return out;
+        }
+    } // namespace
+
     void FSceneViewBuilder::Build(const GameScene::FWorld& world,
         const FSceneViewBuildParams& params, FRenderScene& outScene) const {
         outScene.Views.Clear();
         outScene.StaticMeshes.Clear();
         outScene.Lights.Clear();
+        outScene.SkyProvider  = ESkyProviderType::None;
         outScene.SkyCubeAsset = {};
         outScene.bHasSkyCube  = false;
+        outScene.PbrSky       = {};
+        outScene.bHasPbrSky   = false;
 
         const auto appendView = [&](const RenderCore::View::FCameraData& cameraData,
                                     GameScene::FComponentId              cameraId) {
@@ -180,8 +212,8 @@ namespace AltinaEngine::Engine {
             outScene.Lights.mMainDirectionalLight.mShadowReceiverBias = 0.0015f;
         }
 
-        // Sky cube: first enabled instance with a valid asset handle wins.
-        const auto& skyCubeIds = world.GetActiveSkyCubeComponents();
+        u32         activeSkyProviderCount = 0U;
+        const auto& skyCubeIds             = world.GetActiveSkyCubeComponents();
         for (const auto& id : skyCubeIds) {
             if (!world.IsAlive(id)) {
                 continue;
@@ -197,9 +229,30 @@ namespace AltinaEngine::Engine {
                 continue;
             }
 
+            ++activeSkyProviderCount;
+            outScene.SkyProvider  = ESkyProviderType::SkyCube;
             outScene.SkyCubeAsset = handle;
             outScene.bHasSkyCube  = true;
-            break;
         }
+
+        const auto& pbrSkyIds = world.GetActivePbrSkyComponents();
+        for (const auto& id : pbrSkyIds) {
+            if (!world.IsAlive(id)) {
+                continue;
+            }
+
+            const auto& component = world.ResolveComponent<GameScene::FPbrSkyComponent>(id);
+            if (!component.IsEnabled() || !world.IsGameObjectActive(component.GetOwner())) {
+                continue;
+            }
+
+            ++activeSkyProviderCount;
+            outScene.SkyProvider = ESkyProviderType::PbrSky;
+            outScene.PbrSky      = BuildPbrSkyParameters(component);
+            outScene.bHasPbrSky  = true;
+        }
+
+        Core::Utility::Assert(activeSkyProviderCount <= 1U, TEXT("Engine.SceneView"),
+            "Only one active sky provider is allowed. activeCount={}", activeSkyProviderCount);
     }
 } // namespace AltinaEngine::Engine

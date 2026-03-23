@@ -6,6 +6,7 @@
 #include "Container/Vector.h"
 #include "Lighting/LightTypes.h"
 #include "Math/Matrix.h"
+#include "Math/Vector.h"
 #include "Types/Aliases.h"
 #include "View/ViewData.h"
 
@@ -25,6 +26,37 @@ namespace AltinaEngine::RenderCore::Geometry {
 namespace AltinaEngine::Engine {
     namespace Container = Core::Container;
     using Container::TVector;
+
+    enum class ESkyProviderType : u8 {
+        None = 0,
+        SkyCube,
+        PbrSky,
+    };
+
+    struct AE_ENGINE_API FPbrSkySceneParameters {
+        Core::Math::FVector3f RayleighScattering    = Core::Math::FVector3f(0.0f);
+        f32                   RayleighScaleHeightKm = 0.0f;
+
+        Core::Math::FVector3f MieScattering    = Core::Math::FVector3f(0.0f);
+        Core::Math::FVector3f MieAbsorption    = Core::Math::FVector3f(0.0f);
+        f32                   MieScaleHeightKm = 0.0f;
+        f32                   MieAnisotropy    = 0.0f;
+
+        Core::Math::FVector3f OzoneAbsorption     = Core::Math::FVector3f(0.0f);
+        f32                   OzoneCenterHeightKm = 0.0f;
+        f32                   OzoneThicknessKm    = 0.0f;
+
+        Core::Math::FVector3f GroundAlbedo     = Core::Math::FVector3f(0.0f);
+        Core::Math::FVector3f SolarTint        = Core::Math::FVector3f(0.0f);
+        f32                   SolarIlluminance = 0.0f;
+        f32                   SunAngularRadius = 0.0f;
+
+        f32                   PlanetRadiusKm     = 0.0f;
+        f32                   AtmosphereHeightKm = 0.0f;
+        f32                   ViewHeightKm       = 0.0f;
+        f32                   Exposure           = 0.0f;
+        u64                   Version            = 0ULL;
+    };
 
     struct AE_ENGINE_API FSceneView {
         GameScene::FComponentId     CameraId{};
@@ -74,9 +106,11 @@ namespace AltinaEngine::Engine {
         TVector<FSceneStaticMesh>             StaticMeshes{};
         RenderCore::Lighting::FLightSceneData Lights{};
 
-        // Optional skybox cubemap (asset handle only; GPU resource is render-side).
+        ESkyProviderType                      SkyProvider = ESkyProviderType::None;
         Asset::FAssetHandle                   SkyCubeAsset{};
         bool                                  bHasSkyCube = false;
+        FPbrSkySceneParameters                PbrSky{};
+        bool                                  bHasPbrSky = false;
     };
 
     struct AE_ENGINE_API FSceneViewBuildParams {

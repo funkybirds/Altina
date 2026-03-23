@@ -14,19 +14,24 @@ namespace AltinaEngine::Rendering::Deferred {
         using Core::Utility::Assert;
         using Core::Utility::DebugAssert;
 
-        constexpr auto     kNameDeferredView  = TEXT("DeferredView");
-        constexpr auto     kNameIblConstants  = TEXT("IblConstants");
-        constexpr auto     kNameGBufferA      = TEXT("GBufferA");
-        constexpr auto     kNameGBufferB      = TEXT("GBufferB");
-        constexpr auto     kNameGBufferC      = TEXT("GBufferC");
-        constexpr auto     kNameSceneDepth    = TEXT("SceneDepth");
-        constexpr auto     kNameShadowMap     = TEXT("ShadowMap");
-        constexpr auto     kNameSkyIrrCube    = TEXT("SkyIrradianceCube");
-        constexpr auto     kNameSkySpecCube   = TEXT("SkySpecularCube");
-        constexpr auto     kNameBrdfLut       = TEXT("BrdfLut");
-        constexpr auto     kNameSsaoTex       = TEXT("SsaoTex");
-        constexpr auto     kNameLinearSampler = TEXT("LinearSampler");
-        constexpr auto     kNameSkyCube       = TEXT("SkyCube");
+        constexpr auto     kNameDeferredView           = TEXT("DeferredView");
+        constexpr auto     kNameIblConstants           = TEXT("IblConstants");
+        constexpr auto     kNameGBufferA               = TEXT("GBufferA");
+        constexpr auto     kNameGBufferB               = TEXT("GBufferB");
+        constexpr auto     kNameGBufferC               = TEXT("GBufferC");
+        constexpr auto     kNameSceneDepth             = TEXT("SceneDepth");
+        constexpr auto     kNameShadowMap              = TEXT("ShadowMap");
+        constexpr auto     kNameSkyIrrCube             = TEXT("SkyIrradianceCube");
+        constexpr auto     kNameSkySpecCube            = TEXT("SkySpecularCube");
+        constexpr auto     kNameBrdfLut                = TEXT("BrdfLut");
+        constexpr auto     kNameSsaoTex                = TEXT("SsaoTex");
+        constexpr auto     kNameLinearSampler          = TEXT("LinearSampler");
+        constexpr auto     kNameSkyCube                = TEXT("SkyCube");
+        constexpr auto     kNameAtmosphereParams       = TEXT("AtmosphereParams");
+        constexpr auto     kNameTransmittanceLut       = TEXT("TransmittanceLut");
+        constexpr auto     kNameScatteringLut          = TEXT("ScatteringLut");
+        constexpr auto     kNameSingleMieScatteringLut = TEXT("SingleMieScatteringLut");
+        constexpr u64      kAtmosphereParamsSize       = 9ULL * 4ULL * sizeof(float);
 
         [[nodiscard]] auto RequireBinding(
             const RenderCore::ShaderBinding::FBindingLookupTable& table, const TChar* name,
@@ -388,6 +393,157 @@ namespace AltinaEngine::Rendering::Deferred {
                 Rhi::FRhiBindGroupDesc groupDesc{};
                 DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
                     "SkyBox bind group: builder/layout mismatch.");
+                auto bindGroup = device->CreateBindGroup(groupDesc);
+                if (!bindGroup) {
+                    return;
+                }
+
+                ctx.RHISetGraphicsPipeline(pipeline);
+
+                Rhi::FRhiViewportRect viewport{};
+                viewport.mX        = static_cast<f32>(viewRect.X);
+                viewport.mY        = static_cast<f32>(viewRect.Y);
+                viewport.mWidth    = static_cast<f32>(viewRect.Width);
+                viewport.mHeight   = static_cast<f32>(viewRect.Height);
+                viewport.mMinDepth = 0.0f;
+                viewport.mMaxDepth = 1.0f;
+                ctx.RHISetViewport(viewport);
+
+                Rhi::FRhiScissorRect scissor{};
+                scissor.mX      = viewRect.X;
+                scissor.mY      = viewRect.Y;
+                scissor.mWidth  = viewRect.Width;
+                scissor.mHeight = viewRect.Height;
+                ctx.RHISetScissor(scissor);
+
+                ctx.RHISetBindGroup(0U, bindGroup.Get(), nullptr, 0U);
+                ctx.RHISetPrimitiveTopology(Rhi::ERhiPrimitiveTopology::TriangleList);
+                ctx.RHIDraw(3U, 1U, 0U, 0U);
+            });
+    }
+
+    void AddDeferredAtmosphereSkyPass(FDeferredAtmosphereSkyPassInputs& inputs) {
+        DebugAssert(inputs.Graph != nullptr, TEXT("BasicDeferredRenderer"),
+            "AtmosphereSky: frame graph input is null.");
+        DebugAssert(inputs.ViewRect != nullptr, TEXT("BasicDeferredRenderer"),
+            "AtmosphereSky: view rect input is null.");
+        if (inputs.Graph == nullptr || inputs.ViewRect == nullptr || !inputs.Pipeline
+            || !inputs.Layout || !inputs.Sampler || !inputs.Bindings || !inputs.PerFrameBuffer
+            || !inputs.AtmosphereParamsBuffer || !inputs.TransmittanceLut || !inputs.ScatteringLut
+            || !inputs.SingleMieScatteringLut || !inputs.SceneDepth.IsValid()
+            || !inputs.SceneColorHDR.IsValid()) {
+            return;
+        }
+
+        auto& graph = *inputs.Graph;
+
+        struct FAtmosphereSkyPassData {
+            RenderCore::FFrameGraphTextureRef Depth;
+            RenderCore::FFrameGraphTextureRef Output;
+            RenderCore::FFrameGraphRTVRef     OutputRTV;
+        };
+
+        RenderCore::FFrameGraphPassDesc passDesc{};
+        passDesc.mName  = "BasicDeferred.AtmosphereSky";
+        passDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
+        passDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
+
+        graph.AddPass<FAtmosphereSkyPassData>(
+            passDesc,
+            [&](RenderCore::FFrameGraphPassBuilder& builder, FAtmosphereSkyPassData& data) {
+                data.Depth =
+                    builder.Read(inputs.SceneDepth, Rhi::ERhiResourceState::ShaderResource);
+                const auto transmittanceRef =
+                    graph.ImportTexture(inputs.TransmittanceLut, Rhi::ERhiResourceState::Common);
+                if (transmittanceRef.IsValid()) {
+                    builder.Read(transmittanceRef, Rhi::ERhiResourceState::ShaderResource);
+                }
+                const auto scatteringRef =
+                    graph.ImportTexture(inputs.ScatteringLut, Rhi::ERhiResourceState::Common);
+                if (scatteringRef.IsValid()) {
+                    builder.Read(scatteringRef, Rhi::ERhiResourceState::ShaderResource);
+                }
+                const auto singleMieScatteringRef = graph.ImportTexture(
+                    inputs.SingleMieScatteringLut, Rhi::ERhiResourceState::Common);
+                if (singleMieScatteringRef.IsValid()) {
+                    builder.Read(singleMieScatteringRef, Rhi::ERhiResourceState::ShaderResource);
+                }
+                data.Output =
+                    builder.Write(inputs.SceneColorHDR, Rhi::ERhiResourceState::RenderTarget);
+
+                Rhi::FRhiTextureViewRange viewRange{};
+                viewRange.mMipCount        = 1U;
+                viewRange.mLayerCount      = 1U;
+                viewRange.mDepthSliceCount = 1U;
+
+                Rhi::FRhiRenderTargetViewDesc rtvDesc{};
+                rtvDesc.mDebugName.Assign(TEXT("SceneColorHDR.AtmosphereSky.RTV"));
+                rtvDesc.mFormat = Rhi::ERhiFormat::R16G16B16A16Float;
+                rtvDesc.mRange  = viewRange;
+                data.OutputRTV  = builder.CreateRTV(data.Output, rtvDesc);
+
+                RenderCore::FRdgRenderTargetBinding rtvBinding{};
+                rtvBinding.mRTV     = data.OutputRTV;
+                rtvBinding.mLoadOp  = Rhi::ERhiLoadOp::Load;
+                rtvBinding.mStoreOp = Rhi::ERhiStoreOp::Store;
+                builder.SetRenderTargets(&rtvBinding, 1U, nullptr);
+            },
+            [viewRect = *inputs.ViewRect, pipeline = inputs.Pipeline, layout = inputs.Layout,
+                sampler = inputs.Sampler, bindings = inputs.Bindings,
+                perFrameBuffer         = inputs.PerFrameBuffer,
+                atmosphereParamsBuffer = inputs.AtmosphereParamsBuffer,
+                transmittanceLut = inputs.TransmittanceLut, scatteringLut = inputs.ScatteringLut,
+                singleMieScatteringLut = inputs.SingleMieScatteringLut](Rhi::FRhiCmdContext& ctx,
+                const RenderCore::FFrameGraphPassResources&                                  res,
+                const FAtmosphereSkyPassData& data) -> void {
+                Rhi::FRhiDebugMarker marker(ctx, TEXT("Deferred.AtmosphereSky"));
+                auto*                depthTex = res.GetTexture(data.Depth);
+                auto*                device   = Rhi::RHIGetDevice();
+                if (!depthTex || !device) {
+                    return;
+                }
+
+                const u32 perFrameBinding         = RequireBinding(*bindings, kNameDeferredView,
+                            Rhi::ERhiBindingType::ConstantBuffer, TEXT("AtmosphereSky"));
+                const u32 atmosphereParamsBinding = RequireBinding(*bindings, kNameAtmosphereParams,
+                    Rhi::ERhiBindingType::ConstantBuffer, TEXT("AtmosphereSky"));
+                const u32 depthBinding            = RequireBinding(*bindings, kNameSceneDepth,
+                               Rhi::ERhiBindingType::SampledTexture, TEXT("AtmosphereSky"));
+                const u32 transmittanceBinding    = RequireBinding(*bindings, kNameTransmittanceLut,
+                       Rhi::ERhiBindingType::SampledTexture, TEXT("AtmosphereSky"));
+                const u32 scatteringBinding       = RequireBinding(*bindings, kNameScatteringLut,
+                          Rhi::ERhiBindingType::SampledTexture, TEXT("AtmosphereSky"));
+                const u32 singleMieScatteringBinding =
+                    RequireBinding(*bindings, kNameSingleMieScatteringLut,
+                        Rhi::ERhiBindingType::SampledTexture, TEXT("AtmosphereSky"));
+                const u32 samplerBinding = RequireBinding(*bindings, kNameLinearSampler,
+                    Rhi::ERhiBindingType::Sampler, TEXT("AtmosphereSky"));
+
+                RenderCore::ShaderBinding::FBindGroupBuilder builder(layout);
+                DebugAssert(builder.AddBuffer(perFrameBinding, perFrameBuffer, 0ULL,
+                                static_cast<u64>(sizeof(FPerFrameConstants))),
+                    TEXT("BasicDeferredRenderer"),
+                    "AtmosphereSky bind group: add per-frame failed.");
+                DebugAssert(builder.AddBuffer(atmosphereParamsBinding, atmosphereParamsBuffer, 0ULL,
+                                kAtmosphereParamsSize),
+                    TEXT("BasicDeferredRenderer"), "AtmosphereSky bind group: add params failed.");
+                DebugAssert(builder.AddTexture(depthBinding, depthTex),
+                    TEXT("BasicDeferredRenderer"), "AtmosphereSky bind group: add depth failed.");
+                DebugAssert(builder.AddTexture(transmittanceBinding, transmittanceLut),
+                    TEXT("BasicDeferredRenderer"),
+                    "AtmosphereSky bind group: add transmittance failed.");
+                DebugAssert(builder.AddTexture(scatteringBinding, scatteringLut),
+                    TEXT("BasicDeferredRenderer"),
+                    "AtmosphereSky bind group: add scattering failed.");
+                DebugAssert(builder.AddTexture(singleMieScatteringBinding, singleMieScatteringLut),
+                    TEXT("BasicDeferredRenderer"),
+                    "AtmosphereSky bind group: add single mie scattering failed.");
+                DebugAssert(builder.AddSampler(samplerBinding, sampler),
+                    TEXT("BasicDeferredRenderer"), "AtmosphereSky bind group: add sampler failed.");
+
+                Rhi::FRhiBindGroupDesc groupDesc{};
+                DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
+                    "AtmosphereSky bind group: builder/layout mismatch.");
                 auto bindGroup = device->CreateBindGroup(groupDesc);
                 if (!bindGroup) {
                     return;

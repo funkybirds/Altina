@@ -239,6 +239,7 @@ namespace AltinaEngine::Rhi {
         VkDevice                                mDevice        = VK_NULL_HANDLE;
         VkImage                                 mImage         = VK_NULL_HANDLE;
         VkImageView                             mDefaultView   = VK_NULL_HANDLE;
+        VkImageView                             mStorageView   = VK_NULL_HANDLE;
         VkImageLayout                           mCurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         bool                                    mOwnsImage     = true;
         Vulkan::Detail::FVulkanMemoryAllocator* mAllocator     = nullptr;
@@ -247,6 +248,23 @@ namespace AltinaEngine::Rhi {
         u64                                     mPendingUploadValue     = 0ULL;
         bool                                    mHasPendingUpload       = false;
     };
+
+    namespace {
+        [[nodiscard]] auto CreateTextureView(VkDevice device, VkImage image,
+            const FRhiTextureDesc& desc, VkImageViewType viewType, VkImageView& outView) -> bool {
+            VkImageViewCreateInfo view{};
+            view.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            view.image                           = image;
+            view.viewType                        = viewType;
+            view.format                          = Vulkan::Detail::ToVkFormat(desc.mFormat);
+            view.subresourceRange.aspectMask     = Vulkan::Detail::ToVkAspectFlags(desc.mFormat);
+            view.subresourceRange.baseMipLevel   = 0;
+            view.subresourceRange.levelCount     = desc.mMipLevels;
+            view.subresourceRange.baseArrayLayer = 0;
+            view.subresourceRange.layerCount     = desc.mArrayLayers;
+            return vkCreateImageView(device, &view, nullptr, &outView) == VK_SUCCESS;
+        }
+    } // namespace
 
     FRhiVulkanTexture::FRhiVulkanTexture(const FRhiTextureDesc& desc, VkDevice device)
         : FRhiTexture(desc) {
@@ -334,18 +352,8 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
-        VkImageViewCreateInfo view{};
-        view.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        view.image                           = mState->mImage;
-        view.viewType                        = ToVkViewType(desc.mDimension, desc.mArrayLayers > 1);
-        view.format                          = vkFormat;
-        view.subresourceRange.aspectMask     = Vulkan::Detail::ToVkAspectFlags(desc.mFormat);
-        view.subresourceRange.baseMipLevel   = 0;
-        view.subresourceRange.levelCount     = desc.mMipLevels;
-        view.subresourceRange.baseArrayLayer = 0;
-        view.subresourceRange.layerCount     = desc.mArrayLayers;
-        if (vkCreateImageView(mState->mDevice, &view, nullptr, &mState->mDefaultView)
-            != VK_SUCCESS) {
+        if (!CreateTextureView(mState->mDevice, mState->mImage, desc,
+                ToVkViewType(desc.mDimension, desc.mArrayLayers > 1), mState->mDefaultView)) {
             mState->mDefaultView = VK_NULL_HANDLE;
             if (mState->mAllocator && mState->mAlloc.IsValid()) {
                 mState->mAllocator->Free(mState->mAlloc);
@@ -360,6 +368,22 @@ namespace AltinaEngine::Rhi {
                 VK_OBJECT_TYPE_IMAGE_VIEW, desc.mDebugName.ToView(), TEXT("RhiVulkan.Texture"),
                 TEXT("DefaultVkImageView"));
         }
+
+        mState->mStorageView = mState->mDefaultView;
+        if ((desc.mDimension == ERhiTextureDimension::Cube
+                || desc.mDimension == ERhiTextureDimension::CubeArray)
+            && HasAnyFlags(desc.mBindFlags, ERhiTextureBindFlags::UnorderedAccess)) {
+            if (CreateTextureView(mState->mDevice, mState->mImage, desc,
+                    VK_IMAGE_VIEW_TYPE_2D_ARRAY, mState->mStorageView)) {
+                FString storageViewName(desc.mDebugName);
+                storageViewName.Append(TEXT(".Storage"));
+                Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mStorageView,
+                    VK_OBJECT_TYPE_IMAGE_VIEW, storageViewName.ToView(), TEXT("RhiVulkan.Texture"),
+                    TEXT("StorageVkImageView"));
+            } else {
+                mState->mStorageView = mState->mDefaultView;
+            }
+        }
     }
 
     FRhiVulkanTexture::FRhiVulkanTexture(const FRhiTextureDesc& desc, VkDevice device,
@@ -369,6 +393,7 @@ namespace AltinaEngine::Rhi {
         mState->mDevice      = device;
         mState->mImage       = image;
         mState->mDefaultView = view;
+        mState->mStorageView = view;
         mState->mOwnsImage   = ownsImage;
         mState->mAllocator   = GetAllocator();
         Vulkan::Detail::SetVkObjectDebugName(mState->mDevice, mState->mImage, VK_OBJECT_TYPE_IMAGE,
@@ -381,6 +406,10 @@ namespace AltinaEngine::Rhi {
     FRhiVulkanTexture::~FRhiVulkanTexture() {
         if (!mState) {
             return;
+        }
+        if (mState->mDevice && mState->mStorageView
+            && mState->mStorageView != mState->mDefaultView) {
+            vkDestroyImageView(mState->mDevice, mState->mStorageView, nullptr);
         }
         if (mState->mDevice && mState->mDefaultView) {
             vkDestroyImageView(mState->mDevice, mState->mDefaultView, nullptr);
@@ -401,6 +430,10 @@ namespace AltinaEngine::Rhi {
 
     auto FRhiVulkanTexture::GetDefaultView() const noexcept -> VkImageView {
         return (mState != nullptr) ? mState->mDefaultView : VK_NULL_HANDLE;
+    }
+
+    auto FRhiVulkanTexture::GetStorageView() const noexcept -> VkImageView {
+        return (mState != nullptr) ? mState->mStorageView : VK_NULL_HANDLE;
     }
 
     auto FRhiVulkanTexture::GetCurrentLayout() const noexcept -> VkImageLayout {

@@ -141,6 +141,8 @@ namespace AltinaEngine::Rendering {
             RenderCore::FShaderRegistry::FShaderKey           SsaoPSKey;
             RenderCore::FShaderRegistry::FShaderKey           SkyBoxVSKey;
             RenderCore::FShaderRegistry::FShaderKey           SkyBoxPSKey;
+            RenderCore::FShaderRegistry::FShaderKey           AtmosphereSkyVSKey;
+            RenderCore::FShaderRegistry::FShaderKey           AtmosphereSkyPSKey;
             RenderCore::FMaterialPassDesc                     DefaultPassDesc;
             RenderCore::FMaterialPassDesc                     DefaultShadowPassDesc;
             Container::TShared<RenderCore::FMaterialTemplate> DefaultTemplate;
@@ -180,6 +182,12 @@ namespace AltinaEngine::Rendering {
             RenderCore::ShaderBinding::FBindingLookupTable    SkyBoxBindings;
             Rhi::FRhiPipelineLayoutRef                        SkyBoxPipelineLayout;
             Rhi::FRhiPipelineRef                              SkyBoxPipeline;
+
+            // Atmosphere sky (FSQ -> SceneColorHDR).
+            Rhi::FRhiBindGroupLayoutRef                       AtmosphereSkyLayout;
+            RenderCore::ShaderBinding::FBindingLookupTable    AtmosphereSkyBindings;
+            Rhi::FRhiPipelineLayoutRef                        AtmosphereSkyPipelineLayout;
+            Rhi::FRhiPipelineRef                              AtmosphereSkyPipeline;
 
             THashMap<u64, Rhi::FRhiPipelineRef>               BasePipelines;
             THashMap<u64, Rhi::FRhiPipelineRef>               ShadowPipelines;
@@ -457,6 +465,46 @@ namespace AltinaEngine::Rendering {
             resources.SkyBoxPipeline      = device.CreateGraphicsPipeline(desc);
 
             return resources.SkyBoxPipeline.Get() != nullptr;
+        }
+
+        auto EnsureAtmosphereSkyPipeline(
+            Rhi::FRhiDevice& device, FDeferredSharedResources& resources) -> bool {
+            if (resources.AtmosphereSkyPipeline) {
+                return true;
+            }
+
+            if (!resources.AtmosphereSkyVSKey.IsValid()
+                || !resources.AtmosphereSkyPSKey.IsValid()) {
+                return false;
+            }
+
+            auto vs = resources.Registry.FindShader(resources.AtmosphereSkyVSKey);
+            auto ps = resources.Registry.FindShader(resources.AtmosphereSkyPSKey);
+            if (!vs || !ps) {
+                LogError(TEXT("Deferred atmosphere sky shaders are not registered."));
+                return false;
+            }
+
+            if (!resources.AtmosphereSkyPipelineLayout) {
+                LogError(TEXT("Deferred atmosphere sky pipeline layout is missing."));
+                return false;
+            }
+
+            Rhi::FRhiGraphicsPipelineDesc desc{};
+            desc.mDebugName.Assign(TEXT("BasicDeferred.AtmosphereSkyPipeline"));
+            desc.mVertexShader              = vs.Get();
+            desc.mPixelShader               = ps.Get();
+            desc.mPipelineLayout            = resources.AtmosphereSkyPipelineLayout.Get();
+            desc.mVertexLayout              = {};
+            desc.mRasterState               = {};
+            desc.mDepthState                = {};
+            desc.mBlendState                = {};
+            desc.mRasterState.mCullMode     = Rhi::ERhiRasterCullMode::None;
+            desc.mDepthState.mDepthEnable   = false;
+            desc.mDepthState.mDepthWrite    = false;
+            resources.AtmosphereSkyPipeline = device.CreateGraphicsPipeline(desc);
+
+            return resources.AtmosphereSkyPipeline.Get() != nullptr;
         }
 
         void EnsureLayouts(Rhi::FRhiDevice& device, FDeferredSharedResources& resources) {
@@ -825,6 +873,38 @@ namespace AltinaEngine::Rendering {
                 }
                 resources.SkyBoxPipelineLayout = device.CreatePipelineLayout(layoutDesc);
             }
+
+            if (!resources.AtmosphereSkyLayout) {
+                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
+                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
+                if (resources.AtmosphereSkyVSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.AtmosphereSkyVSKey);
+                }
+                if (resources.AtmosphereSkyPSKey.IsValid()) {
+                    shaderKeys.PushBack(resources.AtmosphereSkyPSKey);
+                }
+                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
+                    resources.Registry, shaderKeys, 0U, layoutDesc);
+                DebugAssert(built, TEXT("BasicDeferredRenderer"),
+                    "Failed to build atmosphere sky bind group layout from shader reflection.");
+                if (built) {
+                    resources.AtmosphereSkyLayout = device.CreateBindGroupLayout(layoutDesc);
+                    DebugAssert(
+                        RenderCore::ShaderBinding::BuildBindingLookupTable(resources.Registry,
+                            shaderKeys, 0U, resources.AtmosphereSkyLayout.Get(),
+                            resources.AtmosphereSkyBindings),
+                        TEXT("BasicDeferredRenderer"),
+                        "Failed to build atmosphere sky binding lookup table from shader reflection.");
+                }
+            }
+
+            if (!resources.AtmosphereSkyPipelineLayout) {
+                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
+                if (resources.AtmosphereSkyLayout) {
+                    layoutDesc.mBindGroupLayouts.PushBack(resources.AtmosphereSkyLayout.Get());
+                }
+                resources.AtmosphereSkyPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+            }
         }
 
         void EnsureVertexLayout(FDeferredSharedResources& resources) {
@@ -1172,6 +1252,15 @@ namespace AltinaEngine::Rendering {
         resources.SkyBoxPipeline.Reset();
     }
 
+    void FBasicDeferredRenderer::SetAtmosphereSkyShaderKeys(
+        const RenderCore::FShaderRegistry::FShaderKey& vs,
+        const RenderCore::FShaderRegistry::FShaderKey& ps) noexcept {
+        auto& resources              = GetSharedResources();
+        resources.AtmosphereSkyVSKey = vs;
+        resources.AtmosphereSkyPSKey = ps;
+        resources.AtmosphereSkyPipeline.Reset();
+    }
+
     auto FBasicDeferredRenderer::RegisterShader(
         const RenderCore::FShaderRegistry::FShaderKey& key, Rhi::FRhiShaderRef shader) -> bool {
         auto& resources = GetSharedResources();
@@ -1200,6 +1289,11 @@ namespace AltinaEngine::Rendering {
         resources.SkyBoxLayout.Reset();
         resources.SkyBoxBindings.Reset();
 
+        resources.AtmosphereSkyPipeline.Reset();
+        resources.AtmosphereSkyPipelineLayout.Reset();
+        resources.AtmosphereSkyLayout.Reset();
+        resources.AtmosphereSkyBindings.Reset();
+
         resources.IblBlackCube.Reset();
         resources.IblBlack2D.Reset();
         resources.ShadowMapCSM.Reset();
@@ -1219,14 +1313,16 @@ namespace AltinaEngine::Rendering {
         resources.DefaultPassDesc       = {};
         resources.DefaultShadowPassDesc = {};
 
-        resources.OutputVSKey   = {};
-        resources.OutputPSKey   = {};
-        resources.LightingVSKey = {};
-        resources.LightingPSKey = {};
-        resources.SsaoVSKey     = {};
-        resources.SsaoPSKey     = {};
-        resources.SkyBoxVSKey   = {};
-        resources.SkyBoxPSKey   = {};
+        resources.OutputVSKey        = {};
+        resources.OutputPSKey        = {};
+        resources.LightingVSKey      = {};
+        resources.LightingPSKey      = {};
+        resources.SsaoVSKey          = {};
+        resources.SsaoPSKey          = {};
+        resources.SkyBoxVSKey        = {};
+        resources.SkyBoxPSKey        = {};
+        resources.AtmosphereSkyVSKey = {};
+        resources.AtmosphereSkyPSKey = {};
 
         resources.Registry.Clear();
     }
@@ -1948,10 +2044,7 @@ namespace AltinaEngine::Rendering {
                 lightingInputs.BrdfLut                    = mViewContext.BrdfLutTexture;
                 lightingInputs.IblBlackCube               = shared.IblBlackCube.Get();
                 lightingInputs.IblBlack2D                 = shared.IblBlack2D.Get();
-                lightingInputs.RuntimeSettings.bEnableIbl = (rIblEnable.GetRenderValue() != 0)
-                    && mViewContext.bHasSkyIbl && (mViewContext.SkyIrradianceCube != nullptr)
-                    && (mViewContext.SkySpecularCube != nullptr)
-                    && (mViewContext.BrdfLutTexture != nullptr);
+                lightingInputs.RuntimeSettings.bEnableIbl = false;
                 lightingInputs.RuntimeSettings.IblDiffuseIntensity =
                     rIblDiffuseIntensity.GetRenderValue();
                 lightingInputs.RuntimeSettings.IblSpecularIntensity =
@@ -1965,7 +2058,30 @@ namespace AltinaEngine::Rendering {
                     "DeferredLighting skipped: shared pipeline/layout/sampler missing.");
             }
 
-            if (mViewContext.bHasSkyCube && (mViewContext.SkyCubeTexture != nullptr)
+            if (mViewContext.bHasAtmosphereSky && (mViewContext.AtmosphereParamsBuffer != nullptr)
+                && (mViewContext.AtmosphereTransmittanceLut != nullptr)
+                && (mViewContext.AtmosphereScatteringLut != nullptr)
+                && (mViewContext.AtmosphereSingleMieScatteringLut != nullptr)
+                && sceneColorHDR.IsValid() && sceneDepth.IsValid() && shared.AtmosphereSkyLayout
+                && EnsureAtmosphereSkyPipeline(*device, shared) && shared.AtmosphereSkyPipeline
+                && shared.OutputSampler) {
+                Deferred::FDeferredAtmosphereSkyPassInputs atmosphereInputs{};
+                atmosphereInputs.Graph                  = &graph;
+                atmosphereInputs.ViewRect               = &viewRect;
+                atmosphereInputs.Pipeline               = shared.AtmosphereSkyPipeline.Get();
+                atmosphereInputs.Layout                 = shared.AtmosphereSkyLayout.Get();
+                atmosphereInputs.Sampler                = shared.OutputSampler.Get();
+                atmosphereInputs.Bindings               = &shared.AtmosphereSkyBindings;
+                atmosphereInputs.PerFrameBuffer         = mPerFrameBuffer.Get();
+                atmosphereInputs.AtmosphereParamsBuffer = mViewContext.AtmosphereParamsBuffer;
+                atmosphereInputs.TransmittanceLut       = mViewContext.AtmosphereTransmittanceLut;
+                atmosphereInputs.ScatteringLut          = mViewContext.AtmosphereScatteringLut;
+                atmosphereInputs.SingleMieScatteringLut =
+                    mViewContext.AtmosphereSingleMieScatteringLut;
+                atmosphereInputs.SceneDepth    = sceneDepth;
+                atmosphereInputs.SceneColorHDR = sceneColorHDR;
+                Deferred::AddDeferredAtmosphereSkyPass(atmosphereInputs);
+            } else if (mViewContext.bHasSkyCube && (mViewContext.SkyCubeTexture != nullptr)
                 && sceneColorHDR.IsValid() && sceneDepth.IsValid() && shared.SkyBoxLayout
                 && EnsureSkyBoxPipeline(*device, shared) && shared.SkyBoxPipeline
                 && shared.OutputSampler) {

@@ -65,7 +65,24 @@ namespace AltinaEngine::Rendering::Deferred {
         RenderCore::FFrameGraphTextureRef                     SceneColorHDR;
     };
 
+    struct FDeferredAtmosphereSkyPassInputs {
+        RenderCore::FFrameGraph*                              Graph                  = nullptr;
+        const RenderCore::View::FViewRect*                    ViewRect               = nullptr;
+        Rhi::FRhiPipeline*                                    Pipeline               = nullptr;
+        Rhi::FRhiBindGroupLayout*                             Layout                 = nullptr;
+        Rhi::FRhiSampler*                                     Sampler                = nullptr;
+        const RenderCore::ShaderBinding::FBindingLookupTable* Bindings               = nullptr;
+        Rhi::FRhiBuffer*                                      PerFrameBuffer         = nullptr;
+        Rhi::FRhiBuffer*                                      AtmosphereParamsBuffer = nullptr;
+        Rhi::FRhiTexture*                                     TransmittanceLut       = nullptr;
+        Rhi::FRhiTexture*                                     ScatteringLut          = nullptr;
+        Rhi::FRhiTexture*                                     SingleMieScatteringLut = nullptr;
+        RenderCore::FFrameGraphTextureRef                     SceneDepth;
+        RenderCore::FFrameGraphTextureRef                     SceneColorHDR;
+    };
+
     void AddDeferredLightingPass(
         FDeferredLightingPassInputs& inputs, RenderCore::FFrameGraphTextureRef& outSceneColorHDR);
     void AddDeferredSkyBoxPass(FDeferredSkyBoxPassInputs& inputs);
+    void AddDeferredAtmosphereSkyPass(FDeferredAtmosphereSkyPassInputs& inputs);
 } // namespace AltinaEngine::Rendering::Deferred

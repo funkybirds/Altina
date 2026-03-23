@@ -72,6 +72,13 @@ namespace AltinaEngine::Rendering {
         constexpr FStringView kDeferredSkyBoxShaderSourcePath =
             TEXT("Source/Shader/Deferred/SkyBox.hlsl");
 
+        constexpr FStringView kAtmosphereSkyShaderAssetsRelPath =
+            TEXT("Assets/Shader/Atmosphere/AtmosphereSky.hlsl");
+        constexpr FStringView kAtmosphereSkyShaderRelPath =
+            TEXT("Shader/Atmosphere/AtmosphereSky.hlsl");
+        constexpr FStringView kAtmosphereSkyShaderSourcePath =
+            TEXT("Source/Shader/Atmosphere/AtmosphereSky.hlsl");
+
         constexpr FStringView kShadowDepthShaderAssetsRelPath =
             TEXT("Assets/Shader/Shadow/ShadowDepth.hlsl");
         constexpr FStringView kShadowDepthShaderRelPath = TEXT("Shader/Shadow/ShadowDepth.hlsl");
@@ -443,12 +450,21 @@ namespace AltinaEngine::Rendering {
             return;
         }
 
+        const auto atmosphereSkyShaderPath =
+            FindBuiltinShaderPath(kAtmosphereSkyShaderAssetsRelPath, kAtmosphereSkyShaderRelPath,
+                kAtmosphereSkyShaderSourcePath);
+        if (atmosphereSkyShaderPath.IsEmpty() || !atmosphereSkyShaderPath.Exists()) {
+            LogError(TEXT("Builtin atmosphere sky shader not found. Expected {}."),
+                kAtmosphereSkyShaderRelPath);
+            return;
+        }
+
         LogInfo(
             TEXT(
-                "Deferred shader paths: base='{}' lighting='{}' ssao='{}' skybox='{}' shadow='{}'"),
+                "Deferred shader paths: base='{}' lighting='{}' ssao='{}' skybox='{}' atmosphere='{}' shadow='{}'"),
             shaderPath.GetString().ToView(), lightingShaderPath.GetString().ToView(),
             ssaoShaderPath.GetString().ToView(), skyBoxShaderPath.GetString().ToView(),
-            shadowShaderPath.GetString().ToView());
+            atmosphereSkyShaderPath.GetString().ToView(), shadowShaderPath.GetString().ToView());
 
         // Require refactor
         RenderCore::FShaderRegistry::FShaderKey vsKey{};
@@ -460,6 +476,8 @@ namespace AltinaEngine::Rendering {
         RenderCore::FShaderRegistry::FShaderKey ssaoPsKey{};
         RenderCore::FShaderRegistry::FShaderKey skyBoxVsKey{};
         RenderCore::FShaderRegistry::FShaderKey skyBoxPsKey{};
+        RenderCore::FShaderRegistry::FShaderKey atmosphereSkyVsKey{};
+        RenderCore::FShaderRegistry::FShaderKey atmosphereSkyPsKey{};
         RenderCore::FShaderRegistry::FShaderKey shadowVsKey{};
         RenderCore::FShaderRegistry::FShaderKey shadowPsKey{};
         FShaderCompileResult                    vsResult{};
@@ -471,6 +489,8 @@ namespace AltinaEngine::Rendering {
         FShaderCompileResult                    ssaoPsResult{};
         FShaderCompileResult                    skyBoxVsResult{};
         FShaderCompileResult                    skyBoxPsResult{};
+        FShaderCompileResult                    atmosphereSkyVsResult{};
+        FShaderCompileResult                    atmosphereSkyPsResult{};
         FShaderCompileResult                    shadowVsResult{};
         FShaderCompileResult                    shadowPsResult{};
 
@@ -506,6 +526,14 @@ namespace AltinaEngine::Rendering {
                 shadowPsResult)) {
             return;
         }
+
+        const bool bAtmosphereSkyCompiled =
+            CompileShaderFromFile(atmosphereSkyShaderPath, TEXT("VSFullScreenTriangle"),
+                Shader::EShaderStage::Vertex, TEXT("Builtin/Atmosphere/Sky"), atmosphereSkyVsKey,
+                atmosphereSkyVsResult)
+            && CompileShaderFromFile(atmosphereSkyShaderPath, TEXT("PSAtmosphereSky"),
+                Shader::EShaderStage::Pixel, TEXT("Builtin/Atmosphere/Sky"), atmosphereSkyPsKey,
+                atmosphereSkyPsResult);
 
         auto templ = Container::MakeShared<RenderCore::FMaterialTemplate>();
         RenderCore::FMaterialPassDesc passDesc{};
@@ -544,9 +572,18 @@ namespace AltinaEngine::Rendering {
         templ->SetPassDesc(EMaterialPass::ShadowPass, Move(shadowPass));
 
         FBasicDeferredRenderer::SetDefaultMaterialTemplate(templ);
+        FBasicDeferredRenderer::SetOutputShaderKeys(fsqVsKey, psKey);
         FBasicDeferredRenderer::SetLightingShaderKeys(lightingVsKey, lightingPsKey);
         FBasicDeferredRenderer::SetSsaoShaderKeys(ssaoVsKey, ssaoPsKey);
         FBasicDeferredRenderer::SetSkyBoxShaderKeys(skyBoxVsKey, skyBoxPsKey);
+        if (bAtmosphereSkyCompiled) {
+            FBasicDeferredRenderer::SetAtmosphereSkyShaderKeys(
+                atmosphereSkyVsKey, atmosphereSkyPsKey);
+        } else {
+            FBasicDeferredRenderer::SetAtmosphereSkyShaderKeys({}, {});
+            LogWarning(TEXT(
+                "Atmosphere sky shader compile failed; continuing without atmosphere sky pass."));
+        }
         LogInfo(TEXT("Deferred lighting shader keys configured: vs='{}' ps='{}'"),
             lightingVsKey.mName.ToView(), lightingPsKey.mName.ToView());
         sInitialized = true;

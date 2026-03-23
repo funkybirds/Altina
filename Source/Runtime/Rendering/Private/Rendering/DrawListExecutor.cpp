@@ -115,6 +115,8 @@ namespace AltinaEngine::Rendering {
 
         u32 batchCount          = 0U;
         u32 drawCallCount       = 0U;
+        u32 totalInstanceCount  = 0U;
+        u32 maxBatchInstCount   = 0U;
         u32 skippedNullMesh     = 0U;
         u32 skippedInvalidLod   = 0U;
         u32 skippedNullSection  = 0U;
@@ -183,6 +185,10 @@ namespace AltinaEngine::Rendering {
                 ++skippedZeroInst;
                 continue;
             }
+            totalInstanceCount += instanceCount;
+            if (instanceCount > maxBatchInstCount) {
+                maxBatchInstCount = instanceCount;
+            }
 
             ctx.RHIDrawIndexed(
                 section->IndexCount, instanceCount, section->FirstIndex, section->BaseVertex, 0U);
@@ -199,9 +205,10 @@ namespace AltinaEngine::Rendering {
 
         if ((sBasePassExecCount % 120ULL) == 0ULL) {
             LogInfoCat(TEXT("Rendering.DrawList"),
-                "ExecuteBasePass summary: draws={}, batches={}, skips(nullMesh={}, invalidLod={}, nullSection={}, nullPipeline={}, nullIndex={}, zeroInstance={}).",
-                drawCallCount, batchCount, skippedNullMesh, skippedInvalidLod, skippedNullSection,
-                skippedNullPipeline, skippedNullIndex, skippedZeroInst);
+                "ExecuteBasePass summary: draws={}, batches={}, instances={}, maxBatchInstances={}, skips(nullMesh={}, invalidLod={}, nullSection={}, nullPipeline={}, nullIndex={}, zeroInstance={}).",
+                drawCallCount, batchCount, totalInstanceCount, maxBatchInstCount, skippedNullMesh,
+                skippedInvalidLod, skippedNullSection, skippedNullPipeline, skippedNullIndex,
+                skippedZeroInst);
         }
     }
 } // namespace AltinaEngine::Rendering

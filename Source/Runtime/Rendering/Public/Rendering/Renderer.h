@@ -3,6 +3,7 @@
 #include "Rendering/RenderingAPI.h"
 
 #include "FrameGraph/FrameGraph.h"
+#include "Rhi/RhiBuffer.h"
 #include "Rhi/RhiTexture.h"
 
 namespace AltinaEngine::RenderCore::View {
@@ -33,8 +34,14 @@ namespace AltinaEngine::Rendering {
         const RenderCore::Render::FDrawList*         ShadowDrawList = nullptr;
 
         // Optional sky cubemap (for skybox rendering).
-        Rhi::FRhiTexture*                            SkyCubeTexture = nullptr;
-        bool                                         bHasSkyCube    = false;
+        Rhi::FRhiTexture*                            SkyCubeTexture                   = nullptr;
+        bool                                         bHasSkyCube                      = false;
+        Rhi::FRhiBuffer*                             AtmosphereParamsBuffer           = nullptr;
+        Rhi::FRhiTexture*                            AtmosphereTransmittanceLut       = nullptr;
+        Rhi::FRhiTexture*                            AtmosphereIrradianceLut          = nullptr;
+        Rhi::FRhiTexture*                            AtmosphereScatteringLut          = nullptr;
+        Rhi::FRhiTexture*                            AtmosphereSingleMieScatteringLut = nullptr;
+        bool                                         bHasAtmosphereSky                = false;
 
         // Optional environment IBL (diffuse irradiance + specular prefilter + BRDF LUT).
         // These are GPU resources (not asset handles) and are expected to be persistent across

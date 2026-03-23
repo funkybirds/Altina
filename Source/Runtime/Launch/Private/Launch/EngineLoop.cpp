@@ -8,6 +8,7 @@
 #include "Engine/Runtime/SceneBatching.h"
 #include "Engine/Runtime/SceneView.h"
 #include "Rendering/BasicDeferredRenderer.h"
+#include "Atmosphere/AtmosphereSystem.h"
 #include "Rendering/BasicForwardRenderer.h"
 #include "Rendering/CommonRendererResource.h"
 #include "Rendering/PostProcess/PostProcess.h"
@@ -542,6 +543,53 @@ namespace AltinaEngine::Launch {
             caches.HasBrdfLutTexture = false;
         }
 
+        void EnsureFallbackBrdfLutTexture(Rhi::FRhiTextureRef& outTexture, bool& outHasTexture) {
+            if (outHasTexture && outTexture) {
+                return;
+            }
+
+            auto* rhiDevice = Rhi::RHIGetDevice();
+            if (rhiDevice == nullptr) {
+                return;
+            }
+
+            constexpr u32        kSize = 128U;
+            Rhi::FRhiTextureDesc texDesc{};
+            texDesc.mDebugName.Assign(TEXT("IBL.BrdfLut.Fallback"));
+            texDesc.mDimension = Rhi::ERhiTextureDimension::Tex2D;
+            texDesc.mWidth     = kSize;
+            texDesc.mHeight    = kSize;
+            texDesc.mMipLevels = 1U;
+            texDesc.mFormat    = Rhi::ERhiFormat::R8G8B8A8Unorm;
+            texDesc.mBindFlags = Rhi::ERhiTextureBindFlags::ShaderResource;
+
+            outTexture = Rhi::RHICreateTexture(texDesc);
+            if (!outTexture) {
+                return;
+            }
+
+            Core::Container::TVector<u8> pixels{};
+            pixels.Reserve(static_cast<usize>(kSize) * static_cast<usize>(kSize) * 4U);
+            for (u32 y = 0U; y < kSize; ++y) {
+                const f32 roughness = static_cast<f32>(y) / static_cast<f32>(kSize - 1U);
+                for (u32 x = 0U; x < kSize; ++x) {
+                    const f32 ndv = static_cast<f32>(x) / static_cast<f32>(kSize - 1U);
+                    const f32 scale =
+                        Core::Math::Clamp(0.04f + (1.0f - roughness) * 0.5f * ndv, 0.0f, 1.0f);
+                    const f32 bias =
+                        Core::Math::Clamp(roughness * 0.25f + (1.0f - ndv) * 0.1f, 0.0f, 1.0f);
+                    pixels.PushBack(static_cast<u8>(scale * 255.0f));
+                    pixels.PushBack(static_cast<u8>(bias * 255.0f));
+                    pixels.PushBack(0U);
+                    pixels.PushBack(255U);
+                }
+            }
+
+            rhiDevice->UpdateTextureSubresource(outTexture.Get(), Rhi::FRhiTextureSubresource{},
+                pixels.Data(), kSize * 4U, kSize * 4U * kSize);
+            outHasTexture = true;
+        }
+
         void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
             Engine::FRenderScene& scene, const TVector<RenderCore::Render::FDrawList>& drawLists,
             const TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
@@ -576,8 +624,14 @@ namespace AltinaEngine::Launch {
             auto&             sBrdfLutTexture      = cache.BrdfLutTexture;
             bool&             sHasBrdfLutTexture   = cache.HasBrdfLutTexture;
 
-            Rhi::FRhiTexture* skyCubeTexture = nullptr;
-            bool              bHasSkyCube    = false;
+            Rhi::FRhiTexture* skyCubeTexture                   = nullptr;
+            Rhi::FRhiBuffer*  atmosphereParamsBuffer           = nullptr;
+            Rhi::FRhiTexture* atmosphereTransmittanceLut       = nullptr;
+            Rhi::FRhiTexture* atmosphereIrradianceLut          = nullptr;
+            Rhi::FRhiTexture* atmosphereScatteringLut          = nullptr;
+            Rhi::FRhiTexture* atmosphereSingleMieScatteringLut = nullptr;
+            bool              bHasSkyCube                      = false;
+            bool              bHasAtmosphereSky                = false;
             if (scene.bHasSkyCube && scene.SkyCubeAsset.IsValid()) {
                 bHasSkyCube = true;
                 if (!GameScene::FSkyCubeComponent::AssetToSkyCubeConverter) {
@@ -763,6 +817,54 @@ namespace AltinaEngine::Launch {
                 }
             }
 
+            if (scene.bHasPbrSky) {
+                Rendering::Atmosphere::FAtmosphereSkyDesc atmosphereDesc{};
+                atmosphereDesc.mRayleighScattering    = scene.PbrSky.RayleighScattering;
+                atmosphereDesc.mRayleighScaleHeightKm = scene.PbrSky.RayleighScaleHeightKm;
+                atmosphereDesc.mMieScattering         = scene.PbrSky.MieScattering;
+                atmosphereDesc.mMieAbsorption         = scene.PbrSky.MieAbsorption;
+                atmosphereDesc.mMieScaleHeightKm      = scene.PbrSky.MieScaleHeightKm;
+                atmosphereDesc.mMieAnisotropy         = scene.PbrSky.MieAnisotropy;
+                atmosphereDesc.mOzoneAbsorption       = scene.PbrSky.OzoneAbsorption;
+                atmosphereDesc.mOzoneCenterHeightKm   = scene.PbrSky.OzoneCenterHeightKm;
+                atmosphereDesc.mOzoneThicknessKm      = scene.PbrSky.OzoneThicknessKm;
+                atmosphereDesc.mGroundAlbedo          = scene.PbrSky.GroundAlbedo;
+                atmosphereDesc.mSolarTint             = scene.PbrSky.SolarTint;
+                atmosphereDesc.mSolarIlluminance      = scene.PbrSky.SolarIlluminance;
+                atmosphereDesc.mSunAngularRadius      = scene.PbrSky.SunAngularRadius;
+                atmosphereDesc.mPlanetRadiusKm        = scene.PbrSky.PlanetRadiusKm;
+                atmosphereDesc.mAtmosphereHeightKm    = scene.PbrSky.AtmosphereHeightKm;
+                atmosphereDesc.mViewHeightKm          = scene.PbrSky.ViewHeightKm;
+                atmosphereDesc.mExposure              = scene.PbrSky.Exposure;
+                atmosphereDesc.mVersion               = scene.PbrSky.Version;
+
+                Core::Math::FVector3f sunDirection(0.4f, 0.6f, 0.7f);
+                if (scene.Lights.mHasMainDirectionalLight) {
+                    sunDirection = scene.Lights.mMainDirectionalLight.mDirectionWS;
+                }
+
+                const auto* atmosphereResources =
+                    Rendering::Atmosphere::FAtmosphereSystem::Get().EnsureSkyResources(
+                        atmosphereDesc, sunDirection);
+                if (atmosphereResources != nullptr && atmosphereResources->IsValid()) {
+                    atmosphereParamsBuffer     = atmosphereResources->mParamsBuffer.Get();
+                    atmosphereTransmittanceLut = atmosphereResources->mTransmittanceLut.Get();
+                    atmosphereIrradianceLut    = atmosphereResources->mIrradianceLut.Get();
+                    atmosphereScatteringLut    = atmosphereResources->mScatteringLut.Get();
+                    atmosphereSingleMieScatteringLut =
+                        atmosphereResources->mSingleMieScatteringLut.Get();
+                    bHasAtmosphereSky = (atmosphereParamsBuffer != nullptr)
+                        && (atmosphereTransmittanceLut != nullptr)
+                        && (atmosphereScatteringLut != nullptr)
+                        && (atmosphereSingleMieScatteringLut != nullptr);
+                    skyIrradiance  = nullptr;
+                    skySpecular    = nullptr;
+                    brdfLut        = nullptr;
+                    specularMaxLod = 0.0f;
+                    bHasSkyIbl     = false;
+                }
+            }
+
             Rendering::FBasicDeferredRenderer deferredRenderer;
             Rendering::FBasicForwardRenderer  forwardRenderer;
             Rendering::IRenderer* renderer = (rendererType == Rendering::ERendererType::Deferred)
@@ -816,17 +918,23 @@ namespace AltinaEngine::Launch {
                 viewContext.OutputTarget = outputTarget;
                 const auto* swapchainBackBuffer =
                     (defaultViewport != nullptr) ? defaultViewport->GetBackBuffer() : nullptr;
-                viewContext.OutputFinalState  = (outputTarget == swapchainBackBuffer)
-                     ? Rhi::ERhiResourceState::Present
-                     : Rhi::ERhiResourceState::ShaderResource;
-                viewContext.Lights            = &scene.Lights;
-                viewContext.SkyCubeTexture    = skyCubeTexture;
-                viewContext.bHasSkyCube       = bHasSkyCube;
-                viewContext.SkyIrradianceCube = skyIrradiance;
-                viewContext.SkySpecularCube   = skySpecular;
-                viewContext.BrdfLutTexture    = brdfLut;
-                viewContext.SkySpecularMaxLod = specularMaxLod;
-                viewContext.bHasSkyIbl        = bHasSkyIbl;
+                viewContext.OutputFinalState                 = (outputTarget == swapchainBackBuffer)
+                                    ? Rhi::ERhiResourceState::Present
+                                    : Rhi::ERhiResourceState::ShaderResource;
+                viewContext.Lights                           = &scene.Lights;
+                viewContext.SkyCubeTexture                   = skyCubeTexture;
+                viewContext.bHasSkyCube                      = bHasSkyCube;
+                viewContext.AtmosphereParamsBuffer           = atmosphereParamsBuffer;
+                viewContext.AtmosphereTransmittanceLut       = atmosphereTransmittanceLut;
+                viewContext.AtmosphereIrradianceLut          = atmosphereIrradianceLut;
+                viewContext.AtmosphereScatteringLut          = atmosphereScatteringLut;
+                viewContext.AtmosphereSingleMieScatteringLut = atmosphereSingleMieScatteringLut;
+                viewContext.bHasAtmosphereSky                = bHasAtmosphereSky;
+                viewContext.SkyIrradianceCube                = skyIrradiance;
+                viewContext.SkySpecularCube                  = skySpecular;
+                viewContext.BrdfLutTexture                   = brdfLut;
+                viewContext.SkySpecularMaxLod                = specularMaxLod;
+                viewContext.bHasSkyIbl                       = bHasSkyIbl;
                 renderer->SetViewContext(viewContext);
 
                 RenderCore::FFrameGraph graph(device);
@@ -1361,6 +1469,10 @@ namespace AltinaEngine::Launch {
                 if (!renderScene.Views.IsEmpty()) {
                     Engine::FSceneBatchBuilder     batchBuilder;
                     Engine::FSceneBatchBuildParams batchParams{};
+                    // Instancing stays disabled until the renderer uploads/binds per-instance
+                    // transforms for every entry in batch.mInstances. The current base-pass path
+                    // only consumes batch.mInstances[0], so enabling batching here would collapse
+                    // multiple objects onto the first transform.
                     batchParams.bAllowInstancing = false;
                     drawLists.Resize(renderScene.Views.Size());
                     shadowDrawLists.Resize(renderScene.Views.Size());
@@ -1582,6 +1694,7 @@ namespace AltinaEngine::Launch {
         Rendering::TemporalAA::ShutdownTemporalAA();
         Rendering::ShutdownPostProcess();
         Rendering::FBasicDeferredRenderer::ShutdownSharedResources();
+        Rendering::Atmosphere::FAtmosphereSystem::Get().Reset();
         RenderCore::ShutdownMaterialFallbacks();
 
         if (mRhiDevice) {

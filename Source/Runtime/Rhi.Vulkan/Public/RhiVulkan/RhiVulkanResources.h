@@ -33,6 +33,7 @@ namespace AltinaEngine::Rhi {
 
         [[nodiscard]] auto GetNativeImage() const noexcept -> VkImage;
         [[nodiscard]] auto GetDefaultView() const noexcept -> VkImageView;
+        [[nodiscard]] auto GetStorageView() const noexcept -> VkImageView;
         [[nodiscard]] auto GetCurrentLayout() const noexcept -> VkImageLayout;
         void               SetCurrentLayout(VkImageLayout layout) noexcept;
 

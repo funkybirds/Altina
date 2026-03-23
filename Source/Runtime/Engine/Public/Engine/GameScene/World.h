@@ -103,6 +103,8 @@ namespace AltinaEngine::GameScene {
             -> const TVector<FComponentId>&;
         [[nodiscard]] auto GetActiveSkyCubeComponents() const noexcept
             -> const TVector<FComponentId>&;
+        [[nodiscard]] auto GetActivePbrSkyComponents() const noexcept
+            -> const TVector<FComponentId>&;
 
         void RegisterPrefabRoot(
             FGameObjectId root, const Engine::GameSceneAsset::FPrefabDescriptor& descriptor);
@@ -378,6 +380,7 @@ namespace AltinaEngine::GameScene {
         TVector<FComponentId>                              mActiveDirectionalLightComponents{};
         TVector<FComponentId>                              mActivePointLightComponents{};
         TVector<FComponentId>                              mActiveSkyCubeComponents{};
+        TVector<FComponentId>                              mActivePbrSkyComponents{};
         THashMap<FGameObjectId, Engine::GameSceneAsset::FPrefabDescriptor, FGameObjectIdHash>
                               mPrefabRoots{};
         u32                   mTransformUpdateId = 0;

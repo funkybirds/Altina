@@ -204,6 +204,9 @@ TEST_CASE("RenderCore.ShaderBindingUtility.BindGroupBuilderValidatesEntries") {
         .mType                               = ERhiBindingType::SampledTexture,
         .mVisibility                         = ERhiShaderStageFlags::Pixel });
     layoutDesc.mEntries.PushBack({ .mBinding = 2U,
+        .mType                               = ERhiBindingType::StorageTexture,
+        .mVisibility                         = ERhiShaderStageFlags::Compute });
+    layoutDesc.mEntries.PushBack({ .mBinding = 3U,
         .mType                               = ERhiBindingType::Sampler,
         .mVisibility                         = ERhiShaderStageFlags::Pixel });
 
@@ -214,10 +217,11 @@ TEST_CASE("RenderCore.ShaderBindingUtility.BindGroupBuilderValidatesEntries") {
 
     REQUIRE(builder.AddBuffer(0U, reinterpret_cast<FRhiBuffer*>(1ULL), 0ULL, 256ULL));
     REQUIRE(builder.AddTexture(1U, reinterpret_cast<FRhiTexture*>(2ULL)));
-    REQUIRE(!builder.AddTexture(1U, reinterpret_cast<FRhiTexture*>(3ULL)));
+    REQUIRE(builder.AddStorageTexture(2U, reinterpret_cast<FRhiTexture*>(3ULL)));
+    REQUIRE(!builder.AddTexture(1U, reinterpret_cast<FRhiTexture*>(4ULL)));
     REQUIRE(!builder.Build(outDesc));
 
-    REQUIRE(builder.AddSampler(2U, reinterpret_cast<FRhiSampler*>(4ULL)));
+    REQUIRE(builder.AddSampler(3U, reinterpret_cast<FRhiSampler*>(5ULL)));
     REQUIRE(builder.Build(outDesc));
-    REQUIRE_EQ(outDesc.mEntries.Size(), 3U);
+    REQUIRE_EQ(outDesc.mEntries.Size(), 4U);
 }

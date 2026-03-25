@@ -4,6 +4,7 @@
 #include "Asset/AssetBinary.h"
 #include "AssetToolIO.h"
 #include "Importers/Mesh/MeshBuild.h"
+#include "Importers/Texture/DirectDrawSurfaceImporter.h"
 #include "Importers/Texture/TextureImporter.h"
 #include "Imaging/Image.h"
 #include "Imaging/ImageIO.h"
@@ -15,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdlib>
 #include <functional>
 #include <cstring>
@@ -813,10 +815,20 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
                 Asset::FTexture2DDesc texDesc{};
                 std::vector<u8>       cookedTex;
-                if (!CookTexture2D(textureBytes, srgb, cookedTex, texDesc)) {
+                std::string           textureExt;
+                if (!textureKey.empty()) {
+                    textureExt = std::filesystem::path(textureKey).extension().string();
+                    std::transform(textureExt.begin(), textureExt.end(), textureExt.begin(),
+                        [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                }
+                const bool cooked = (textureExt == ".dds")
+                    ? CookDirectDrawSurfaceTexture2D(textureBytes, srgb, cookedTex, texDesc)
+                    : CookTexture2D(textureBytes, srgb, cookedTex, texDesc);
+                if (!cooked) {
                     if (debugTextures) {
                         std::cout << "    [Texture] " << matNameRaw << " " << paramName
-                                  << " CookTexture2D=FAIL (maybe unsupported format)\n";
+                                  << " CookTexture2D=FAIL ext='" << textureExt
+                                  << "' (maybe unsupported format)\n";
                     }
                     return;
                 }

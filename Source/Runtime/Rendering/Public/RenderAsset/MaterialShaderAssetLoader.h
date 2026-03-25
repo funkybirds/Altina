@@ -30,4 +30,6 @@ namespace AltinaEngine::Rendering {
     [[nodiscard]] auto AE_RENDERING_API BuildRenderMaterialFromAsset(
         const Asset::FAssetHandle& handle, const Asset::FMeshMaterialParameterBlock& parameters,
         Asset::FAssetRegistry& registry, Asset::FAssetManager& manager) -> RenderCore::FMaterial;
+
+    void AE_RENDERING_API ShutdownMaterialTextureSrvCache() noexcept;
 } // namespace AltinaEngine::Rendering

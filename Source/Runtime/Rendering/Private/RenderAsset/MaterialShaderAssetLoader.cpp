@@ -17,6 +17,7 @@
 #include "ShaderCompiler/ShaderPermutationParser.h"
 #include "ShaderCompiler/ShaderCompiler.h"
 #include "ShaderCompiler/ShaderRhiBindings.h"
+#include "Threading/Mutex.h"
 #include "Types/Traits.h"
 #include "Utility/String/CodeConvert.h"
 #include "Utility/Filesystem/Path.h"
@@ -31,7 +32,52 @@ namespace AltinaEngine::Rendering {
         namespace Container = Core::Container;
         using Container::FString;
         using Container::FStringView;
+        using Core::Threading::FMutex;
+        using Core::Threading::FScopedLock;
         using Core::Utility::Filesystem::FPath;
+
+        struct FTextureSrvCacheKey {
+            Asset::FAssetHandle mHandle{};
+
+            [[nodiscard]] auto operator==(const FTextureSrvCacheKey& other) const noexcept -> bool {
+                return mHandle == other.mHandle;
+            }
+        };
+
+        struct FTextureSrvCacheKeyHash {
+            auto operator()(const FTextureSrvCacheKey& key) const noexcept -> usize {
+                constexpr u64 kFnvOffset64 = 1469598103934665603ULL;
+                constexpr u64 kFnvPrime64  = 1099511628211ULL;
+
+                u64           hash  = kFnvOffset64;
+                const auto*   bytes = key.mHandle.mUuid.Data();
+                for (usize i = 0U; i < FUuid::kByteCount; ++i) {
+                    hash ^= bytes[i];
+                    hash *= kFnvPrime64;
+                }
+                hash ^= static_cast<u8>(key.mHandle.mType);
+                hash *= kFnvPrime64;
+                return static_cast<usize>(hash);
+            }
+        };
+
+        struct FTextureSrvCache {
+            FMutex mMutex{};
+            Container::THashMap<FTextureSrvCacheKey, Rhi::FRhiShaderResourceViewRef,
+                FTextureSrvCacheKeyHash>
+                mEntries;
+        };
+
+        auto GetTextureSrvCache() -> FTextureSrvCache& {
+            static FTextureSrvCache sCache{};
+            return sCache;
+        }
+
+        void ClearTextureSrvCache() noexcept {
+            auto&       cache = GetTextureSrvCache();
+            FScopedLock lock(cache.mMutex);
+            cache.mEntries.Clear();
+        }
 
         [[nodiscard]] auto ResolveShaderTargetBackend() noexcept -> Rhi::ERhiBackend {
             const auto backend = Rhi::RHIGetBackend();
@@ -529,8 +575,19 @@ namespace AltinaEngine::Rendering {
             }
         }
 
-        auto CreateTextureSrv(const Asset::FTexture2DAsset& asset)
-            -> Rhi::FRhiShaderResourceViewRef {
+        auto CreateTextureSrv(const Asset::FAssetHandle& handle,
+            const Asset::FTexture2DAsset&                asset) -> Rhi::FRhiShaderResourceViewRef {
+            if (handle.IsValid()) {
+                auto& cache = GetTextureSrvCache();
+                {
+                    FScopedLock lock(cache.mMutex);
+                    const auto  it = cache.mEntries.FindIt(FTextureSrvCacheKey{ handle });
+                    if (it != cache.mEntries.end()) {
+                        return it->second;
+                    }
+                }
+            }
+
             auto* device = Rhi::RHIGetDevice();
             if (device == nullptr) {
                 return {};
@@ -582,7 +639,13 @@ namespace AltinaEngine::Rendering {
             viewDesc.mTextureRange.mMipCount       = texDesc.mMipLevels;
             viewDesc.mTextureRange.mBaseArrayLayer = 0U;
             viewDesc.mTextureRange.mLayerCount     = texDesc.mArrayLayers;
-            return device->CreateShaderResourceView(viewDesc);
+            auto srv                               = device->CreateShaderResourceView(viewDesc);
+            if (srv && handle.IsValid()) {
+                auto&       cache = GetTextureSrvCache();
+                FScopedLock lock(cache.mMutex);
+                cache.mEntries.InsertOrAssign(FTextureSrvCacheKey{ handle }, srv);
+            }
+            return srv;
         }
 
         auto BuildTemplateOverrides(const Asset::FMeshMaterialParameterBlock& overrides)
@@ -894,7 +957,7 @@ namespace AltinaEngine::Rendering {
                        ? static_cast<Asset::FTexture2DAsset*>(textureAssetRef.Get())
                        : nullptr;
                 if (textureAsset != nullptr) {
-                    srv = CreateTextureSrv(*textureAsset);
+                    srv = CreateTextureSrv(param.mTexture, *textureAsset);
                 }
             }
 
@@ -916,7 +979,7 @@ namespace AltinaEngine::Rendering {
                        ? static_cast<Asset::FTexture2DAsset*>(textureAssetRef.Get())
                        : nullptr;
                 if (textureAsset != nullptr) {
-                    srv = CreateTextureSrv(*textureAsset);
+                    srv = CreateTextureSrv(param.mTexture, *textureAsset);
                 }
             }
 
@@ -963,4 +1026,6 @@ namespace AltinaEngine::Rendering {
 
         return material;
     }
+
+    void ShutdownMaterialTextureSrvCache() noexcept { ClearTextureSrvCache(); }
 } // namespace AltinaEngine::Rendering

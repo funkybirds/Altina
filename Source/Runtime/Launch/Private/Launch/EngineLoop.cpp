@@ -1695,6 +1695,7 @@ namespace AltinaEngine::Launch {
         Rendering::ShutdownPostProcess();
         Rendering::FBasicDeferredRenderer::ShutdownSharedResources();
         Rendering::Atmosphere::FAtmosphereSystem::Get().Reset();
+        Rendering::ShutdownMaterialTextureSrvCache();
         RenderCore::ShutdownMaterialFallbacks();
 
         if (mRhiDevice) {

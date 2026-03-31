@@ -7,7 +7,12 @@
 #include "Rhi/RhiStructs.h"
 
 namespace AltinaEngine::Rendering {
+    struct FDrawBatchExecutionParams {
+        u32 mFirstInstance = 0U;
+    };
+
     struct FDrawListBindings {
+        Rhi::FRhiBindGroup*              PerDraw              = nullptr;
         Rhi::FRhiBindGroup*              PerFrame             = nullptr;
         u32                              PerFrameSetIndex     = 0U;
         u32                              PerDrawSetIndex      = 1U;
@@ -18,8 +23,9 @@ namespace AltinaEngine::Rendering {
     using FDrawPipelineResolver =
         Rhi::FRhiPipeline* (*)(const RenderCore::Render::FDrawBatch& batch,
             const RenderCore::FMaterialPassDesc* passDesc, void* userData);
-    using FDrawBatchBinder = void (*)(
-        Rhi::FRhiCmdContext& ctx, const RenderCore::Render::FDrawBatch& batch, void* userData);
+    using FDrawBatchBinder = void (*)(Rhi::FRhiCmdContext& ctx,
+        const RenderCore::Render::FDrawBatch& batch, FDrawBatchExecutionParams& outParams,
+        void* userData);
 
     class AE_RENDERING_API FDrawListExecutor {
     public:

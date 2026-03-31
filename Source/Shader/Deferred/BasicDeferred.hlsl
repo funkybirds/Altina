@@ -13,11 +13,7 @@ AE_PER_FRAME_CBUFFER(ViewConstants)
     row_major float4x4 ViewProjection;
 };
 
-AE_PER_DRAW_CBUFFER(ObjectConstants)
-{
-    row_major float4x4 World;
-    row_major float4x4 NormalMatrix;
-};
+AE_PER_DRAW_SRV(ByteAddressBuffer, InstanceDataBuffer);
 
 AE_PER_MATERIAL_CBUFFER(MaterialConstants)
 {
@@ -43,9 +39,35 @@ struct VSOutput
     float2 TexCoord : TEXCOORD1;
 };
 
-VSOutput VSBase(VSInput input)
+static const uint AE_INSTANCE_MATRIX_SIZE_BYTES = 64u;
+static const uint AE_INSTANCE_STRIDE_BYTES      = 128u;
+
+float4 LoadInstanceFloat4(uint byteOffset)
+{
+    return asfloat(InstanceDataBuffer.Load4(byteOffset));
+}
+
+void LoadInstanceTransforms(
+    uint instanceId, out row_major float4x4 world, out row_major float4x4 normalMatrix)
+{
+    const uint baseOffset = instanceId * AE_INSTANCE_STRIDE_BYTES;
+    world[0] = LoadInstanceFloat4(baseOffset + 0u);
+    world[1] = LoadInstanceFloat4(baseOffset + 16u);
+    world[2] = LoadInstanceFloat4(baseOffset + 32u);
+    world[3] = LoadInstanceFloat4(baseOffset + 48u);
+
+    normalMatrix[0] = LoadInstanceFloat4(baseOffset + AE_INSTANCE_MATRIX_SIZE_BYTES + 0u);
+    normalMatrix[1] = LoadInstanceFloat4(baseOffset + AE_INSTANCE_MATRIX_SIZE_BYTES + 16u);
+    normalMatrix[2] = LoadInstanceFloat4(baseOffset + AE_INSTANCE_MATRIX_SIZE_BYTES + 32u);
+    normalMatrix[3] = LoadInstanceFloat4(baseOffset + AE_INSTANCE_MATRIX_SIZE_BYTES + 48u);
+}
+
+VSOutput VSBase(VSInput input, uint instanceId : SV_InstanceID)
 {
     VSOutput output;
+    row_major float4x4 World;
+    row_major float4x4 NormalMatrix;
+    LoadInstanceTransforms(instanceId, World, NormalMatrix);
     float4 worldPos = mul(World, float4(input.Position, 1.0f));
     output.Position = mul(ViewProjection, worldPos);
     output.Normal   = normalize(mul((float3x3)NormalMatrix, input.Normal));

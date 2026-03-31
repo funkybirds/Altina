@@ -487,6 +487,38 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
         return true;
     }
 
+    auto FBindGroupBuilder::AddSampledBuffer(
+        u32 binding, Rhi::FRhiBuffer* buffer, u64 offset, u64 size) -> bool {
+        if (!HasLayoutBinding(binding, Rhi::ERhiBindingType::SampledBuffer)
+            || HasEntry(binding, Rhi::ERhiBindingType::SampledBuffer)) {
+            return false;
+        }
+        Rhi::FRhiBindGroupEntry entry{};
+        entry.mBinding = binding;
+        entry.mType    = Rhi::ERhiBindingType::SampledBuffer;
+        entry.mBuffer  = buffer;
+        entry.mOffset  = offset;
+        entry.mSize    = size;
+        mEntries.PushBack(entry);
+        return true;
+    }
+
+    auto FBindGroupBuilder::AddStorageBuffer(
+        u32 binding, Rhi::FRhiBuffer* buffer, u64 offset, u64 size) -> bool {
+        if (!HasLayoutBinding(binding, Rhi::ERhiBindingType::StorageBuffer)
+            || HasEntry(binding, Rhi::ERhiBindingType::StorageBuffer)) {
+            return false;
+        }
+        Rhi::FRhiBindGroupEntry entry{};
+        entry.mBinding = binding;
+        entry.mType    = Rhi::ERhiBindingType::StorageBuffer;
+        entry.mBuffer  = buffer;
+        entry.mOffset  = offset;
+        entry.mSize    = size;
+        mEntries.PushBack(entry);
+        return true;
+    }
+
     auto FBindGroupBuilder::AddTexture(u32 binding, Rhi::FRhiTexture* texture) -> bool {
         if (!HasLayoutBinding(binding, Rhi::ERhiBindingType::SampledTexture)
             || HasEntry(binding, Rhi::ERhiBindingType::SampledTexture)) {

@@ -50,7 +50,7 @@ namespace AltinaEngine::Rendering::Deferred {
         FPointLight PointLights[kMaxPointLights]{};
     };
 
-    struct FPerDrawConstants {
+    struct FInstanceDrawData {
         FMatrix4x4f World;
         FMatrix4x4f NormalMatrix;
     };

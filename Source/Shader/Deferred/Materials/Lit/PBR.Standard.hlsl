@@ -85,7 +85,7 @@ float3 EvaluatePbrDirect(
 
 #if defined(AE_SHADER_TARGET_VULKAN)
     #define AE_PBR_REG_VIEW      register(b0, space0)
-    #define AE_PBR_REG_OBJECT    register(b0, space1)
+    #define AE_PBR_REG_OBJECT    register(t0, space1)
     #define AE_PBR_REG_MATERIAL  register(b0, space2)
     #define AE_PBR_REG_T0        register(t0, space2)
     #define AE_PBR_REG_T1        register(t1, space2)
@@ -105,7 +105,7 @@ float3 EvaluatePbrDirect(
     #define AE_PBR_REG_S7        register(s7, space2)
 #else
     #define AE_PBR_REG_VIEW      register(b0)
-    #define AE_PBR_REG_OBJECT    register(b4)
+    #define AE_PBR_REG_OBJECT    register(t4)
     #define AE_PBR_REG_MATERIAL  register(b8)
     #define AE_PBR_REG_T0        register(t32)
     #define AE_PBR_REG_T1        register(t33)
@@ -130,11 +130,7 @@ cbuffer ViewConstants : AE_PBR_REG_VIEW
     row_major float4x4 ViewProjection;
 };
 
-cbuffer ObjectConstants : AE_PBR_REG_OBJECT
-{
-    row_major float4x4 World;
-    row_major float4x4 NormalMatrix;
-};
+ByteAddressBuffer InstanceDataBuffer : AE_PBR_REG_OBJECT;
 
 cbuffer MaterialConstants : AE_PBR_REG_MATERIAL
 {
@@ -181,9 +177,35 @@ struct VSOutput
     float3 WorldPos : TEXCOORD2;
 };
 
-VSOutput VSBase(VSInput input)
+static const uint AE_INSTANCE_MATRIX_SIZE_BYTES = 64u;
+static const uint AE_INSTANCE_STRIDE_BYTES      = 128u;
+
+float4 LoadInstanceFloat4(uint byteOffset)
+{
+    return asfloat(InstanceDataBuffer.Load4(byteOffset));
+}
+
+void LoadInstanceTransforms(
+    uint instanceId, out row_major float4x4 world, out row_major float4x4 normalMatrix)
+{
+    const uint baseOffset = instanceId * AE_INSTANCE_STRIDE_BYTES;
+    world[0] = LoadInstanceFloat4(baseOffset + 0u);
+    world[1] = LoadInstanceFloat4(baseOffset + 16u);
+    world[2] = LoadInstanceFloat4(baseOffset + 32u);
+    world[3] = LoadInstanceFloat4(baseOffset + 48u);
+
+    normalMatrix[0] = LoadInstanceFloat4(baseOffset + AE_INSTANCE_MATRIX_SIZE_BYTES + 0u);
+    normalMatrix[1] = LoadInstanceFloat4(baseOffset + AE_INSTANCE_MATRIX_SIZE_BYTES + 16u);
+    normalMatrix[2] = LoadInstanceFloat4(baseOffset + AE_INSTANCE_MATRIX_SIZE_BYTES + 32u);
+    normalMatrix[3] = LoadInstanceFloat4(baseOffset + AE_INSTANCE_MATRIX_SIZE_BYTES + 48u);
+}
+
+VSOutput VSBase(VSInput input, uint instanceId : SV_InstanceID)
 {
     VSOutput output;
+    row_major float4x4 World;
+    row_major float4x4 NormalMatrix;
+    LoadInstanceTransforms(instanceId, World, NormalMatrix);
     float4 worldPos = mul(World, float4(input.Position, 1.0f));
     output.Position = mul(ViewProjection, worldPos);
     output.Normal   = normalize(mul((float3x3)NormalMatrix, input.Normal));

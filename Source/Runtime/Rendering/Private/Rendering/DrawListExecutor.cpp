@@ -160,6 +160,9 @@ namespace AltinaEngine::Rendering {
             if (bindings.PerFrame != nullptr) {
                 ctx.RHISetBindGroup(bindings.PerFrameSetIndex, bindings.PerFrame, nullptr, 0U);
             }
+            if (bindings.PerDraw != nullptr) {
+                ctx.RHISetBindGroup(bindings.PerDrawSetIndex, bindings.PerDraw, nullptr, 0U);
+            }
 
             if (bucket.mMaterial != nullptr) {
                 auto group = bucket.mMaterial->GetBindGroup(bucket.mPass);
@@ -187,8 +190,9 @@ namespace AltinaEngine::Rendering {
                 }
                 uniqueGeometryKeys.Insert(batch.mBatchKey.mGeometryKey);
 
+                FDrawBatchExecutionParams executionParams{};
                 if (batchBinder != nullptr) {
-                    batchBinder(ctx, batch, batchUserData);
+                    batchBinder(ctx, batch, executionParams, batchUserData);
                 }
 
                 const auto indexView = lod.mIndexBuffer.GetView();
@@ -213,7 +217,7 @@ namespace AltinaEngine::Rendering {
                 }
 
                 ctx.RHIDrawIndexed(section->IndexCount, instanceCount, section->FirstIndex,
-                    section->BaseVertex, 0U);
+                    section->BaseVertex, executionParams.mFirstInstance);
                 ++drawCallCount;
             }
         }

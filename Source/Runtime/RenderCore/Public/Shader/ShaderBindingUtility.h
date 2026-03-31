@@ -81,6 +81,8 @@ namespace AltinaEngine::RenderCore::ShaderBinding {
         void Reset(const Rhi::FRhiBindGroupLayout* layout) noexcept;
 
         auto AddBuffer(u32 binding, Rhi::FRhiBuffer* buffer, u64 offset, u64 size) -> bool;
+        auto AddSampledBuffer(u32 binding, Rhi::FRhiBuffer* buffer, u64 offset, u64 size) -> bool;
+        auto AddStorageBuffer(u32 binding, Rhi::FRhiBuffer* buffer, u64 offset, u64 size) -> bool;
         auto AddTexture(u32 binding, Rhi::FRhiTexture* texture) -> bool;
         auto AddStorageTexture(u32 binding, Rhi::FRhiTexture* texture) -> bool;
         auto AddSampler(u32 binding, Rhi::FRhiSampler* sampler) -> bool;

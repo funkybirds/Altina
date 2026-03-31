@@ -150,6 +150,8 @@ TEST_CASE("RenderCore.ShaderBindingUtility.ReflectionBuildAndResolve") {
         EShaderResourceAccess::ReadOnly, 0U, 3U);
     AddResourceReflection(psDesc, TEXT("LinearSampler"), EShaderResourceType::Sampler,
         EShaderResourceAccess::ReadOnly, 0U, 4U);
+    AddResourceReflection(psDesc, TEXT("InstanceDataBuffer"), EShaderResourceType::StorageBuffer,
+        EShaderResourceAccess::ReadOnly, 1U, 0U);
 
     const auto vsKey = RegisterShader(
         registry, *device, TEXT("BindUtil.Test"), EShaderStage::Vertex, vsDesc, 1ULL);
@@ -184,6 +186,12 @@ TEST_CASE("RenderCore.ShaderBindingUtility.ReflectionBuildAndResolve") {
     REQUIRE(!ResolveResourceBindingByName(registry, shaderKeys, TEXT("SceneColor"),
         ERhiBindingType::Sampler, outSet, outBinding, outStageMask));
 
+    REQUIRE(ResolveResourceBindingByName(registry, shaderKeys, TEXT("InstanceDataBuffer"),
+        ERhiBindingType::SampledBuffer, outSet, outBinding, outStageMask));
+    REQUIRE_EQ(outSet, 1U);
+    REQUIRE_EQ(outBinding, 0U);
+    REQUIRE_EQ(outStageMask, ERhiShaderStageFlags::Pixel);
+
     FRhiBindGroupLayout layout(layoutDesc);
     FBindingLookupTable table{};
     REQUIRE(BuildBindingLookupTable(registry, shaderKeys, 0U, &layout, table));
@@ -209,6 +217,12 @@ TEST_CASE("RenderCore.ShaderBindingUtility.BindGroupBuilderValidatesEntries") {
     layoutDesc.mEntries.PushBack({ .mBinding = 3U,
         .mType                               = ERhiBindingType::Sampler,
         .mVisibility                         = ERhiShaderStageFlags::Pixel });
+    layoutDesc.mEntries.PushBack({ .mBinding = 4U,
+        .mType                               = ERhiBindingType::SampledBuffer,
+        .mVisibility                         = ERhiShaderStageFlags::Vertex });
+    layoutDesc.mEntries.PushBack({ .mBinding = 5U,
+        .mType                               = ERhiBindingType::StorageBuffer,
+        .mVisibility                         = ERhiShaderStageFlags::Compute });
 
     FRhiBindGroupLayout layout(layoutDesc);
 
@@ -222,6 +236,8 @@ TEST_CASE("RenderCore.ShaderBindingUtility.BindGroupBuilderValidatesEntries") {
     REQUIRE(!builder.Build(outDesc));
 
     REQUIRE(builder.AddSampler(3U, reinterpret_cast<FRhiSampler*>(5ULL)));
+    REQUIRE(builder.AddSampledBuffer(4U, reinterpret_cast<FRhiBuffer*>(6ULL), 64ULL, 512ULL));
+    REQUIRE(builder.AddStorageBuffer(5U, reinterpret_cast<FRhiBuffer*>(7ULL), 128ULL, 1024ULL));
     REQUIRE(builder.Build(outDesc));
-    REQUIRE_EQ(outDesc.mEntries.Size(), 4U);
+    REQUIRE_EQ(outDesc.mEntries.Size(), 6U);
 }

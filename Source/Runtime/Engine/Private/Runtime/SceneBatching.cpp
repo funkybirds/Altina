@@ -7,10 +7,14 @@
 #include "Types/Conversion.h"
 #include "Algorithm/Sort.h"
 #include "Container/HashUtility.h"
+#include "Math/LinAlg/RenderingMath.h"
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Engine {
     namespace {
+        using Core::Math::FMatrix4x4f;
+        using Core::Math::FVector3f;
+        using Core::Math::FVector4f;
         using RenderCore::Render::FDrawItem;
         using RenderCore::Render::FDrawKey;
 
@@ -114,19 +118,121 @@ namespace AltinaEngine::Engine {
             bucketKey.mMaterialKey = key.mMaterialKey;
             return bucketKey;
         }
+
+        struct FFrustumPlane {
+            FVector3f mNormal   = FVector3f(0.0f);
+            f32       mDistance = 0.0f;
+        };
+
+        struct FFrustumCullContext {
+            FFrustumPlane mPlanes[6]{};
+            bool          mEnabled = false;
+        };
+
+        [[nodiscard]] auto NormalizePlane(const FFrustumPlane& plane) noexcept -> FFrustumPlane {
+            const f32 lengthSq = plane.mNormal[0] * plane.mNormal[0]
+                + plane.mNormal[1] * plane.mNormal[1] + plane.mNormal[2] * plane.mNormal[2];
+            if (lengthSq <= 1e-8f) {
+                return plane;
+            }
+
+            const f32     invLength = 1.0f / Core::Math::Sqrt(lengthSq);
+            FFrustumPlane out{};
+            out.mNormal[0] = plane.mNormal[0] * invLength;
+            out.mNormal[1] = plane.mNormal[1] * invLength;
+            out.mNormal[2] = plane.mNormal[2] * invLength;
+            out.mDistance  = plane.mDistance * invLength;
+            return out;
+        }
+
+        void ExtractFrustumPlanes(
+            const FMatrix4x4f& viewProj, FFrustumPlane (&outPlanes)[6]) noexcept {
+            const FVector4f row0(viewProj(0, 0), viewProj(0, 1), viewProj(0, 2), viewProj(0, 3));
+            const FVector4f row1(viewProj(1, 0), viewProj(1, 1), viewProj(1, 2), viewProj(1, 3));
+            const FVector4f row2(viewProj(2, 0), viewProj(2, 1), viewProj(2, 2), viewProj(2, 3));
+            const FVector4f row3(viewProj(3, 0), viewProj(3, 1), viewProj(3, 2), viewProj(3, 3));
+
+            const auto      setPlane = [&outPlanes](u32 index, const FVector4f& coeffs) {
+                FFrustumPlane plane{};
+                plane.mNormal[0] = coeffs[0];
+                plane.mNormal[1] = coeffs[1];
+                plane.mNormal[2] = coeffs[2];
+                plane.mDistance  = coeffs[3];
+                outPlanes[index] = NormalizePlane(plane);
+            };
+
+            setPlane(0U, row3 + row0); // left
+            setPlane(1U, row3 - row0); // right
+            setPlane(2U, row3 + row1); // bottom
+            setPlane(3U, row3 - row1); // top
+            setPlane(4U, row2);        // near (D3D/Vulkan z >= 0)
+            setPlane(5U, row3 - row2); // far
+        }
+
+        [[nodiscard]] auto IsOutsidePlane(const FFrustumPlane& plane, const FVector3f& minWS,
+            const FVector3f& maxWS) noexcept -> bool {
+            FVector3f support(0.0f);
+            support[0] = (plane.mNormal[0] >= 0.0f) ? maxWS[0] : minWS[0];
+            support[1] = (plane.mNormal[1] >= 0.0f) ? maxWS[1] : minWS[1];
+            support[2] = (plane.mNormal[2] >= 0.0f) ? maxWS[2] : minWS[2];
+
+            const f32 distance = plane.mNormal[0] * support[0] + plane.mNormal[1] * support[1]
+                + plane.mNormal[2] * support[2] + plane.mDistance;
+            return distance < 0.0f;
+        }
+
+        [[nodiscard]] auto BuildFrustumCullContext(const FSceneView& view,
+            const FSceneBatchBuildParams& params) noexcept -> FFrustumCullContext {
+            FFrustumCullContext context{};
+            if (!params.bEnableFrustumCulling || !view.View.IsValid()) {
+                return context;
+            }
+
+            ExtractFrustumPlanes(view.View.Matrices.ViewProj, context.mPlanes);
+            context.mEnabled = true;
+            return context;
+        }
+
+        [[nodiscard]] auto IsVisibleInFrustum(const RenderCore::Geometry::FStaticMeshData* mesh,
+            u32 lodIndex, const FMatrix4x4f& worldMatrix,
+            const FFrustumCullContext& context) noexcept -> bool {
+            if (mesh == nullptr || !context.mEnabled || lodIndex >= mesh->mLods.Size()) {
+                return true;
+            }
+
+            const auto& lodBounds = mesh->mLods[lodIndex].mBounds;
+            if (!lodBounds.IsValid()) {
+                return true;
+            }
+
+            FVector3f minWS(0.0f);
+            FVector3f maxWS(0.0f);
+            if (!Core::Math::LinAlg::TransformAabbToWorld(
+                    worldMatrix, lodBounds.Max, lodBounds.Min, minWS, maxWS)) {
+                return true;
+            }
+
+            for (const auto& plane : context.mPlanes) {
+                if (IsOutsidePlane(plane, minWS, maxWS)) {
+                    return false;
+                }
+            }
+            return true;
+        }
     } // namespace
 
     void FSceneBatchBuilder::Build(const FRenderScene& scene, const FSceneView& view,
         const FSceneBatchBuildParams& params, FMaterialCache& materialCache,
         RenderCore::Render::FDrawList& outDrawList) const {
-        (void)view;
         outDrawList.Clear();
 
         if (scene.StaticMeshes.IsEmpty()) {
             return;
         }
 
-        usize totalSections = 0;
+        const auto frustumContext = BuildFrustumCullContext(view, params);
+
+        usize      totalSections = 0;
         for (const auto& entry : scene.StaticMeshes) {
             if (entry.Mesh == nullptr) {
                 continue;
@@ -146,6 +252,11 @@ namespace AltinaEngine::Engine {
                 continue;
             }
             if (params.LodIndex >= entry.Mesh->mLods.Size()) {
+                continue;
+            }
+            if (params.bEnableFrustumCulling
+                && !IsVisibleInFrustum(
+                    entry.Mesh, params.LodIndex, entry.WorldMatrix, frustumContext)) {
                 continue;
             }
 

@@ -1508,11 +1508,8 @@ namespace AltinaEngine::Launch {
                 if (!renderScene.Views.IsEmpty()) {
                     Engine::FSceneBatchBuilder     batchBuilder;
                     Engine::FSceneBatchBuildParams batchParams{};
-                    // Instancing stays disabled until the renderer uploads/binds per-instance
-                    // transforms for every entry in batch.mInstances. The current base-pass path
-                    // only consumes batch.mInstances[0], so enabling batching here would collapse
-                    // multiple objects onto the first transform.
-                    batchParams.bAllowInstancing = false;
+                    batchParams.bAllowInstancing      = true;
+                    batchParams.bEnableFrustumCulling = true;
                     drawLists.Resize(renderScene.Views.Size());
                     shadowDrawLists.Resize(renderScene.Views.Size());
                     for (usize i = 0; i < renderScene.Views.Size(); ++i) {
@@ -1521,7 +1518,8 @@ namespace AltinaEngine::Launch {
 
                         // Shadow pass draw list (Directional CSM).
                         Engine::FSceneBatchBuildParams shadowParams = batchParams;
-                        shadowParams.Pass = RenderCore::EMaterialPass::ShadowPass;
+                        shadowParams.Pass                  = RenderCore::EMaterialPass::ShadowPass;
+                        shadowParams.bEnableFrustumCulling = false;
                         batchBuilder.Build(renderScene, renderScene.Views[i], shadowParams,
                             mMaterialCache, shadowDrawLists[i]);
                     }

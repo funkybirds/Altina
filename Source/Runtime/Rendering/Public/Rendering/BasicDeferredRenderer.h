@@ -39,23 +39,22 @@ namespace AltinaEngine::Rendering {
         void        FinalizeRendering() override;
 
     private:
-        static constexpr u32                           kShadowCascades    = 4U;
-        static constexpr u32                           kInstanceFrameRing = 4U;
+        static constexpr u32                              kShadowCascades    = 4U;
+        static constexpr u32                              kInstanceFrameRing = 4U;
 
-        Rhi::FRhiBufferRef                             mPerFrameBuffer;
-        Rhi::FRhiBindGroupRef                          mPerFrameGroup;
-        Rhi::FRhiBufferRef                             mPerDrawBuffer;
-        Rhi::FRhiBindGroupRef                          mPerDrawGroup;
-        u32                                            mPerDrawStrideBytes = 0U;
-        u32                                            mPerDrawCapacity    = 0U;
-        u32                                            mPerDrawWriteIndex  = 0U;
-        u32                                            mPerDrawFrameSlot   = 0U;
-        Rhi::FRhiBufferRef                             mIblConstantsBuffer;
-        Rhi::FRhiBufferRef                             mSsaoConstantsBuffer;
+        Rhi::FRhiBufferRef                                mPerFrameBuffer;
+        Rhi::FRhiBindGroupRef                             mPerFrameGroup;
+        Rhi::FRhiBufferRef                                mPerDrawBuffer;
+        TArray<Rhi::FRhiBindGroupRef, kInstanceFrameRing> mPerDrawGroups{};
+        u32                                               mPerDrawStrideBytes = 0U;
+        u32                                               mPerDrawCapacity    = 0U;
+        u32                                               mPerDrawFrameSlot   = 0U;
+        Rhi::FRhiBufferRef                                mIblConstantsBuffer;
+        Rhi::FRhiBufferRef                                mSsaoConstantsBuffer;
 
         // D3D11 deferred context: updating the same cbuffer multiple times while recording can
         // make all draws see the "last written" data at Execute time. Use per-cascade cbuffers.
-        TArray<Rhi::FRhiBufferRef, kShadowCascades>    mShadowPerFrameBuffers{};
-        TArray<Rhi::FRhiBindGroupRef, kShadowCascades> mShadowPerFrameGroups{};
+        TArray<Rhi::FRhiBufferRef, kShadowCascades>       mShadowPerFrameBuffers{};
+        TArray<Rhi::FRhiBindGroupRef, kShadowCascades>    mShadowPerFrameGroups{};
     };
 } // namespace AltinaEngine::Rendering

@@ -65,6 +65,7 @@ namespace AltinaEngine::Engine {
             viewData.TemporalSampleIndex = params.TemporalSampleIndex;
             viewData.DeltaTimeSeconds    = params.DeltaTimeSeconds;
             viewData.bReverseZ           = params.bReverseZ;
+            viewData.BeginFrame();
 
             outScene.Views.PushBack(Move(sceneView));
         };

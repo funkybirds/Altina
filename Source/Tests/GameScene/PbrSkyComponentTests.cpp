@@ -1,6 +1,7 @@
 #include "TestHarness.h"
 
 #include "Engine/EngineReflection.h"
+#include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/PbrSkyComponent.h"
 #include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/World.h"
@@ -13,12 +14,14 @@ namespace {
     using AltinaEngine::f32;
     using AltinaEngine::u32;
     using AltinaEngine::u8;
+    using AltinaEngine::Core::Math::FVector3f;
     using AltinaEngine::Core::Reflection::FBinaryDeserializer;
     using AltinaEngine::Core::Reflection::FBinarySerializer;
     using AltinaEngine::Engine::ESkyProviderType;
     using AltinaEngine::Engine::FRenderScene;
     using AltinaEngine::Engine::FSceneViewBuilder;
     using AltinaEngine::Engine::FSceneViewBuildParams;
+    using AltinaEngine::GameScene::FCameraComponent;
     using AltinaEngine::GameScene::FComponentId;
     using AltinaEngine::GameScene::FPbrSkyComponent;
     using AltinaEngine::GameScene::FSkyCubeComponent;
@@ -174,4 +177,36 @@ TEST_CASE("Engine.SceneViewBuilder.SkyProviderSelection") {
         REQUIRE_CLOSE(scene.PbrSky.Exposure, 1.25f, 1e-6f);
         REQUIRE_CLOSE(scene.PbrSky.SolarIlluminance, 25.0f, 1e-6f);
     }
+}
+
+TEST_CASE("Engine.SceneViewBuilder.InitializesViewMatrices") {
+    FWorld world;
+    auto   cameraObject = world.CreateGameObject(TEXT("Camera"));
+    REQUIRE(cameraObject.IsValid());
+
+    auto camera = cameraObject.AddComponent<FCameraComponent>();
+    REQUIRE(camera.IsValid());
+    camera.Get().SetNearPlane(0.1f);
+    camera.Get().SetFarPlane(250.0f);
+
+    auto transform        = cameraObject.GetWorldTransform();
+    transform.Translation = FVector3f(3.0f, 4.0f, 5.0f);
+    cameraObject.SetWorldTransform(transform);
+
+    FSceneViewBuildParams params{};
+    params.ViewRect.Width            = 1280U;
+    params.ViewRect.Height           = 720U;
+    params.RenderTargetExtent.Width  = 1280U;
+    params.RenderTargetExtent.Height = 720U;
+    params.FrameIndex                = 42ULL;
+
+    FSceneViewBuilder builder;
+    FRenderScene      scene{};
+    builder.Build(world, params, scene);
+
+    REQUIRE_EQ(scene.Views.Size(), 1U);
+    REQUIRE_CLOSE(scene.Views[0].View.ViewOrigin.X(), 3.0f, 1e-6f);
+    REQUIRE_CLOSE(scene.Views[0].View.ViewOrigin.Y(), 4.0f, 1e-6f);
+    REQUIRE_CLOSE(scene.Views[0].View.ViewOrigin.Z(), 5.0f, 1e-6f);
+    REQUIRE_CLOSE(scene.Views[0].View.Matrices.ViewProj(3, 2), 1.0f, 1e-6f);
 }

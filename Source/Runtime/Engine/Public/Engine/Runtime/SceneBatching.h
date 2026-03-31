@@ -7,9 +7,10 @@
 
 namespace AltinaEngine::Engine {
     struct AE_ENGINE_API FSceneBatchBuildParams {
-        RenderCore::EMaterialPass Pass             = RenderCore::EMaterialPass::BasePass;
-        u32                       LodIndex         = 0U;
-        bool                      bAllowInstancing = true;
+        RenderCore::EMaterialPass Pass                  = RenderCore::EMaterialPass::BasePass;
+        u32                       LodIndex              = 0U;
+        bool                      bAllowInstancing      = true;
+        bool                      bEnableFrustumCulling = true;
     };
 
     /**

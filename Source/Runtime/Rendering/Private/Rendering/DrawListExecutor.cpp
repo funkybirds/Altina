@@ -1,16 +1,28 @@
 #include "Rendering/DrawListExecutor.h"
 
+#include "Container/HashSet.h"
 #include "Geometry/StaticMeshData.h"
 #include "Material/Material.h"
 #include "Material/MaterialPass.h"
 #include "Rhi/Command/RhiCmdContext.h"
 #include "Rhi/RhiBindGroup.h"
+#include "Rhi/RhiInit.h"
 #include "Rhi/RhiPipeline.h"
 #include "Utility/String/StringViewUtility.h"
 #include "Logging/Log.h"
 
 namespace AltinaEngine::Rendering {
     namespace {
+        void BindVertexBufferTracked(Rhi::FRhiCmdContext& ctx, u32 slot,
+            const Rhi::FRhiVertexBufferView& view, u32& outBindCount) {
+            if (view.mBuffer == nullptr) {
+                return;
+            }
+
+            ctx.RHISetVertexBuffer(slot, view);
+            ++outBindCount;
+        }
+
         auto GetSection(const RenderCore::Geometry::FStaticMeshLodData& lod, u32 sectionIndex)
             -> const RenderCore::Geometry::FStaticMeshSection* {
             if (sectionIndex >= lod.mSections.Size()) {
@@ -19,27 +31,19 @@ namespace AltinaEngine::Rendering {
             return &lod.mSections[sectionIndex];
         }
 
-        void BindVertexBuffersLegacy(
-            Rhi::FRhiCmdContext& ctx, const RenderCore::Geometry::FStaticMeshLodData& lod) {
+        void BindVertexBuffersLegacy(Rhi::FRhiCmdContext&   ctx,
+            const RenderCore::Geometry::FStaticMeshLodData& lod, u32& outBindCount) {
             const auto positionView = lod.mPositionBuffer.GetView();
-            if (positionView.mBuffer != nullptr) {
-                ctx.RHISetVertexBuffer(0U, positionView);
-            }
+            BindVertexBufferTracked(ctx, 0U, positionView, outBindCount);
 
             const auto normalView = lod.mTangentBuffer.GetView();
-            if (normalView.mBuffer != nullptr) {
-                ctx.RHISetVertexBuffer(1U, normalView);
-            }
+            BindVertexBufferTracked(ctx, 1U, normalView, outBindCount);
 
             const auto uv0View = lod.mUV0Buffer.GetView();
-            if (uv0View.mBuffer != nullptr) {
-                ctx.RHISetVertexBuffer(2U, uv0View);
-            }
+            BindVertexBufferTracked(ctx, 2U, uv0View, outBindCount);
 
             const auto uv1View = lod.mUV1Buffer.GetView();
-            if (uv1View.mBuffer != nullptr) {
-                ctx.RHISetVertexBuffer(3U, uv1View);
-            }
+            BindVertexBufferTracked(ctx, 3U, uv1View, outBindCount);
         }
 
         auto ResolveVertexStreamView(const RenderCore::Geometry::FStaticMeshLodData& lod,
@@ -70,9 +74,9 @@ namespace AltinaEngine::Rendering {
 
         void BindVertexBuffersResolved(Rhi::FRhiCmdContext& ctx,
             const RenderCore::Geometry::FStaticMeshLodData& lod,
-            const Rhi::FRhiVertexLayoutDesc*                layout) {
+            const Rhi::FRhiVertexLayoutDesc* layout, u32& outBindCount) {
             if (layout == nullptr || layout->mAttributes.IsEmpty()) {
-                BindVertexBuffersLegacy(ctx, lod);
+                BindVertexBuffersLegacy(ctx, lod, outBindCount);
                 return;
             }
 
@@ -84,12 +88,12 @@ namespace AltinaEngine::Rendering {
                     ++missCount;
                     continue;
                 }
-                ctx.RHISetVertexBuffer(attr.mInputSlot, view);
+                BindVertexBufferTracked(ctx, attr.mInputSlot, view, outBindCount);
                 ++boundCount;
             }
 
             if (boundCount == 0U) {
-                BindVertexBuffersLegacy(ctx, lod);
+                BindVertexBuffersLegacy(ctx, lod, outBindCount);
                 LogWarningCat(TEXT("Rendering.DrawList"),
                     "BindVertexBuffersResolved: no streams matched resolved layout, fallback to legacy binding.");
                 return;
@@ -106,50 +110,48 @@ namespace AltinaEngine::Rendering {
         const RenderCore::Render::FDrawList& drawList, const FDrawListBindings& bindings,
         FDrawPipelineResolver pipelineResolver, void* pipelineUserData,
         FDrawBatchBinder batchBinder, void* batchUserData) {
-        static u64 sBasePassExecCount = 0ULL;
-        ++sBasePassExecCount;
-
-        if (drawList.mBatches.IsEmpty()) {
+        if (drawList.IsEmpty()) {
             return;
         }
 
-        u32 batchCount          = 0U;
-        u32 drawCallCount       = 0U;
-        u32 totalInstanceCount  = 0U;
-        u32 maxBatchInstCount   = 0U;
-        u32 skippedNullMesh     = 0U;
-        u32 skippedInvalidLod   = 0U;
-        u32 skippedNullSection  = 0U;
-        u32 skippedNullPipeline = 0U;
-        u32 skippedNullIndex    = 0U;
-        u32 skippedZeroInst     = 0U;
+        const auto rhiStatsBefore = Rhi::RHIGetFrameStats();
+        u32        passId         = 0U;
+        for (const auto& bucket : drawList.mBuckets) {
+            if (!bucket.mBatches.IsEmpty()) {
+                passId = static_cast<u32>(bucket.mPass);
+                break;
+            }
+        }
 
-        for (const auto& batch : drawList.mBatches) {
-            ++batchCount;
-            const auto* mesh = batch.mStatic.mMesh;
-            if (mesh == nullptr) {
-                ++skippedNullMesh;
+        u32                            batchCount            = 0U;
+        u32                            materialBucketCount   = 0U;
+        u32                            drawCallCount         = 0U;
+        u32                            totalInstanceCount    = 0U;
+        u32                            maxBatchInstCount     = 0U;
+        u32                            skippedNullMesh       = 0U;
+        u32                            skippedInvalidLod     = 0U;
+        u32                            skippedNullSection    = 0U;
+        u32                            skippedNullPipeline   = 0U;
+        u32                            skippedNullIndex      = 0U;
+        u32                            skippedZeroInst       = 0U;
+        u32                            vertexBufferBindCount = 0U;
+        Core::Container::THashSet<u64> uniqueGeometryKeys{};
+        uniqueGeometryKeys.Reserve(drawList.GetBatchCount());
+
+        for (const auto& bucket : drawList.mBuckets) {
+            if (bucket.mBatches.IsEmpty()) {
                 continue;
             }
-            if (batch.mStatic.mLodIndex >= mesh->mLods.Size()) {
-                ++skippedInvalidLod;
-                continue;
-            }
+            ++materialBucketCount;
+            batchCount += static_cast<u32>(bucket.mBatches.Size());
 
-            const auto& lod     = mesh->mLods[batch.mStatic.mLodIndex];
-            const auto* section = GetSection(lod, batch.mStatic.mSectionIndex);
-            if (section == nullptr) {
-                ++skippedNullSection;
-                continue;
-            }
-
-            const auto* passDesc =
-                (batch.mMaterial != nullptr) ? batch.mMaterial->FindPassDesc(batch.mPass) : nullptr;
+            const auto* passDesc = (bucket.mMaterial != nullptr)
+                ? bucket.mMaterial->FindPassDesc(bucket.mPass)
+                : nullptr;
             if (pipelineResolver != nullptr) {
-                auto* pipeline = pipelineResolver(batch, passDesc, pipelineUserData);
+                auto* pipeline = pipelineResolver(bucket.mBatches[0], passDesc, pipelineUserData);
                 if (pipeline == nullptr) {
-                    // Never draw with a stale pipeline from a previous pass/batch.
-                    ++skippedNullPipeline;
+                    skippedNullPipeline += static_cast<u32>(bucket.mBatches.Size());
                     continue;
                 }
                 ctx.RHISetGraphicsPipeline(pipeline);
@@ -159,40 +161,61 @@ namespace AltinaEngine::Rendering {
                 ctx.RHISetBindGroup(bindings.PerFrameSetIndex, bindings.PerFrame, nullptr, 0U);
             }
 
-            if (batch.mMaterial != nullptr) {
-                auto group = batch.mMaterial->GetBindGroup(batch.mPass);
+            if (bucket.mMaterial != nullptr) {
+                auto group = bucket.mMaterial->GetBindGroup(bucket.mPass);
                 if (group) {
                     ctx.RHISetBindGroup(bindings.PerMaterialSetIndex, group.Get(), nullptr, 0U);
                 }
             }
 
-            if (batchBinder != nullptr) {
-                batchBinder(ctx, batch, batchUserData);
-            }
+            for (const auto& batch : bucket.mBatches) {
+                const auto* mesh = batch.mStatic.mMesh;
+                if (mesh == nullptr) {
+                    ++skippedNullMesh;
+                    continue;
+                }
+                if (batch.mStatic.mLodIndex >= mesh->mLods.Size()) {
+                    ++skippedInvalidLod;
+                    continue;
+                }
 
-            const auto indexView = lod.mIndexBuffer.GetView();
-            if (indexView.mBuffer == nullptr) {
-                ++skippedNullIndex;
-                continue;
-            }
+                const auto& lod     = mesh->mLods[batch.mStatic.mLodIndex];
+                const auto* section = GetSection(lod, batch.mStatic.mSectionIndex);
+                if (section == nullptr) {
+                    ++skippedNullSection;
+                    continue;
+                }
+                uniqueGeometryKeys.Insert(batch.mBatchKey.mGeometryKey);
 
-            ctx.RHISetPrimitiveTopology(lod.mPrimitiveTopology);
-            BindVertexBuffersResolved(ctx, lod, bindings.ResolvedVertexLayout);
-            ctx.RHISetIndexBuffer(indexView);
+                if (batchBinder != nullptr) {
+                    batchBinder(ctx, batch, batchUserData);
+                }
 
-            const u32 instanceCount = static_cast<u32>(batch.mInstances.Size());
-            if (instanceCount == 0U) {
-                ++skippedZeroInst;
-                continue;
-            }
-            totalInstanceCount += instanceCount;
-            if (instanceCount > maxBatchInstCount) {
-                maxBatchInstCount = instanceCount;
-            }
+                const auto indexView = lod.mIndexBuffer.GetView();
+                if (indexView.mBuffer == nullptr) {
+                    ++skippedNullIndex;
+                    continue;
+                }
 
-            ctx.RHIDrawIndexed(
-                section->IndexCount, instanceCount, section->FirstIndex, section->BaseVertex, 0U);
-            ++drawCallCount;
+                ctx.RHISetPrimitiveTopology(lod.mPrimitiveTopology);
+                BindVertexBuffersResolved(
+                    ctx, lod, bindings.ResolvedVertexLayout, vertexBufferBindCount);
+                ctx.RHISetIndexBuffer(indexView);
+
+                const u32 instanceCount = static_cast<u32>(batch.mInstances.Size());
+                if (instanceCount == 0U) {
+                    ++skippedZeroInst;
+                    continue;
+                }
+                totalInstanceCount += instanceCount;
+                if (instanceCount > maxBatchInstCount) {
+                    maxBatchInstCount = instanceCount;
+                }
+
+                ctx.RHIDrawIndexed(section->IndexCount, instanceCount, section->FirstIndex,
+                    section->BaseVertex, 0U);
+                ++drawCallCount;
+            }
         }
 
         if (drawCallCount == 0U) {
@@ -203,12 +226,14 @@ namespace AltinaEngine::Rendering {
             return;
         }
 
-        if ((sBasePassExecCount % 120ULL) == 0ULL) {
-            LogInfoCat(TEXT("Rendering.DrawList"),
-                "ExecuteBasePass summary: draws={}, batches={}, instances={}, maxBatchInstances={}, skips(nullMesh={}, invalidLod={}, nullSection={}, nullPipeline={}, nullIndex={}, zeroInstance={}).",
-                drawCallCount, batchCount, totalInstanceCount, maxBatchInstCount, skippedNullMesh,
-                skippedInvalidLod, skippedNullSection, skippedNullPipeline, skippedNullIndex,
-                skippedZeroInst);
-        }
+        const auto rhiStatsAfter = Rhi::RHIGetFrameStats();
+        LogInfoCat(TEXT("Rendering.DrawList"),
+            "ExecuteBasePass summary: pass={}, materialBuckets={}, draws={}, batches={}, uniqueGeometry={}, vbBinds={}, rhiVbBinds={}, instances={}, maxBatchInstances={}, skips(nullMesh={}, invalidLod={}, nullSection={}, nullPipeline={}, nullIndex={}, zeroInstance={}).",
+            passId, materialBucketCount, drawCallCount, batchCount,
+            static_cast<u32>(uniqueGeometryKeys.Num()), vertexBufferBindCount,
+            static_cast<u32>(
+                rhiStatsAfter.mSetVertexBufferCalls - rhiStatsBefore.mSetVertexBufferCalls),
+            totalInstanceCount, maxBatchInstCount, skippedNullMesh, skippedInvalidLod,
+            skippedNullSection, skippedNullPipeline, skippedNullIndex, skippedZeroInst);
     }
 } // namespace AltinaEngine::Rendering

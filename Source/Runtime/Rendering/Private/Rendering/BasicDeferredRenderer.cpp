@@ -61,12 +61,26 @@ namespace AltinaEngine::Rendering {
         using Container::THashMap;
         using Container::TVector;
         using RenderCore::EMaterialPass;
+        constexpr auto kFrameTimingCategory = TEXT("FrameTiming");
 
         // 0=PBR, 1=Lambert(debug). Written into the DeferredLighting cbuffer.
-        u32 gDeferredLightingDebugShadingMode = 0U;
+        u32            gDeferredLightingDebugShadingMode = 0U;
         using Deferred::FIblConstants;
         using Deferred::FPerDrawConstants;
         using Deferred::FPerFrameConstants;
+
+        struct FBasePassPipelineStats {
+            u32 mBaseHits             = 0U;
+            u32 mBaseMisses           = 0U;
+            u32 mShadowHits           = 0U;
+            u32 mShadowMisses         = 0U;
+            u32 mMaterialLayoutMisses = 0U;
+            u32 mPipelineLayoutMisses = 0U;
+        };
+
+        thread_local FBasePassPipelineStats gBasePassPipelineStats{};
+
+        void ResetBasePassPipelineStats() noexcept { gBasePassPipelineStats = {}; }
 
         struct FWorldBoundsDebug {
             bool      bValid        = false;
@@ -89,23 +103,23 @@ namespace AltinaEngine::Rendering {
         [[nodiscard]] auto ComputeDrawListWorldBounds(const RenderCore::Render::FDrawList& list)
             -> FWorldBoundsDebug {
             FWorldBoundsDebug out{};
-            out.BatchCount = static_cast<u32>(list.mBatches.Size());
+            out.BatchCount = list.GetBatchCount();
 
             FVector3f minWS(TNumericProperty<f32>::Max);
             FVector3f maxWS(-TNumericProperty<f32>::Max);
 
-            for (const auto& batch : list.mBatches) {
+            list.ForEachBatch([&](const auto& batch) {
                 const auto* mesh = batch.mStatic.mMesh;
                 if (mesh == nullptr) {
-                    continue;
+                    return;
                 }
                 if (batch.mStatic.mLodIndex >= mesh->mLods.Size()) {
-                    continue;
+                    return;
                 }
 
                 const auto& lodBounds = mesh->mLods[batch.mStatic.mLodIndex].mBounds;
                 if (!lodBounds.IsValid()) {
-                    continue;
+                    return;
                 }
 
                 for (const auto& inst : batch.mInstances) {
@@ -123,7 +137,7 @@ namespace AltinaEngine::Rendering {
                     maxWS[2] = Core::Math::Max(maxWS[2], instMaxWS[2]);
                     out.InstanceCount += 1U;
                 }
-            }
+            });
 
             out.bValid = (minWS[0] <= maxWS[0]) && (minWS[1] <= maxWS[1]) && (minWS[2] <= maxWS[2]);
             out.MinWS  = out.bValid ? minWS : FVector3f(0.0f);
@@ -1039,6 +1053,7 @@ namespace AltinaEngine::Rendering {
                 it != resources.MaterialLayouts.end()) {
                 materialLayoutRef = it->second;
             } else {
+                ++gBasePassPipelineStats.mMaterialLayoutMisses;
                 Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
                 layoutDesc.mSetIndex   = IsVulkanBackend() ? 2U : 0U;
                 layoutDesc.mEntries    = layoutEntries;
@@ -1061,6 +1076,7 @@ namespace AltinaEngine::Rendering {
                 it != resources.BasePipelineLayouts.end()) {
                 pipelineLayout = it->second;
             } else {
+                ++gBasePassPipelineStats.mPipelineLayoutMisses;
                 Rhi::FRhiPipelineLayoutDesc layoutDesc{};
                 if (resources.PerFrameLayout) {
                     layoutDesc.mBindGroupLayouts.PushBack(resources.PerFrameLayout.Get());
@@ -1084,6 +1100,11 @@ namespace AltinaEngine::Rendering {
                 batch.mBatchKey.mPipelineKey ^ (materialLayoutHash * 0x9e3779b97f4a7c15ULL);
             if (const auto it = data->PipelineCache->FindIt(key);
                 it != data->PipelineCache->end()) {
+                if (data->PipelineCache == &resources.ShadowPipelines) {
+                    ++gBasePassPipelineStats.mShadowHits;
+                } else {
+                    ++gBasePassPipelineStats.mBaseHits;
+                }
                 return it->second.Get();
             }
 
@@ -1111,6 +1132,11 @@ namespace AltinaEngine::Rendering {
                 return nullptr;
             }
 
+            if (data->PipelineCache == &resources.ShadowPipelines) {
+                ++gBasePassPipelineStats.mShadowMisses;
+            } else {
+                ++gBasePassPipelineStats.mBaseMisses;
+            }
             (*data->PipelineCache)[key] = pipeline;
             return pipeline.Get();
         }
@@ -1469,6 +1495,7 @@ namespace AltinaEngine::Rendering {
         }
     }
     void FBasicDeferredRenderer::Render(RenderCore::FFrameGraph& graph) {
+        ResetBasePassPipelineStats();
         // LogInfo(TEXT("Deferred Render Enter {}"), 1);
         const auto* view         = mViewContext.View;
         auto*       outputTarget = mViewContext.OutputTarget;
@@ -1728,8 +1755,8 @@ namespace AltinaEngine::Rendering {
                 data.Depth    = builder.Write(data.Depth, Rhi::ERhiResourceState::DepthWrite);
 
                 if (drawList != nullptr) {
-                    for (const auto& batch : drawList->mBatches) {
-                        registerMaterialTextureReads(builder, batch.mMaterial, batch.mPass);
+                    for (const auto& bucket : drawList->mBuckets) {
+                        registerMaterialTextureReads(builder, bucket.mMaterial, bucket.mPass);
                     }
                 }
 
@@ -2173,6 +2200,14 @@ namespace AltinaEngine::Rendering {
 
             BuildPostProcess(graph, *view, pp, io, buildCtx);
         }
+
+        LogInfoCat(kFrameTimingCategory,
+            TEXT(
+                "Deferred.Pipelines baseHits={} baseMisses={} shadowHits={} shadowMisses={} materialLayoutMisses={} pipelineLayoutMisses={}"),
+            gBasePassPipelineStats.mBaseHits, gBasePassPipelineStats.mBaseMisses,
+            gBasePassPipelineStats.mShadowHits, gBasePassPipelineStats.mShadowMisses,
+            gBasePassPipelineStats.mMaterialLayoutMisses,
+            gBasePassPipelineStats.mPipelineLayoutMisses);
     }
 
     void FBasicDeferredRenderer::FinalizeRendering() {}

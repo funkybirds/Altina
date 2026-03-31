@@ -12,6 +12,7 @@
 #include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiCommandPool.h"
 #include "Rhi/RhiFence.h"
+#include "Rhi/RhiInit.h"
 #include "Rhi/RhiPipeline.h"
 #include "Rhi/RhiPipelineLayout.h"
 #include "Rhi/RhiQueue.h"
@@ -1364,6 +1365,7 @@ namespace AltinaEngine::Rhi {
         const UINT stride = static_cast<UINT>(view.mStrideBytes);
         const UINT offset = static_cast<UINT>(view.mOffsetBytes);
         context->IASetVertexBuffers(static_cast<UINT>(slot), 1, &buffer, &stride, &offset);
+        RHIRecordSetVertexBufferCall();
 #else
         (void)slot;
         (void)view;
@@ -3190,6 +3192,7 @@ namespace AltinaEngine::Rhi {
             return;
         }
 
+        RHIResetFrameStats(frameIndex);
         mState->mFrameIndex = frameIndex;
         mState->mUploadManager.BeginFrame(frameIndex);
         mState->mStagingManager.Reset();

@@ -11,10 +11,12 @@
 #include "Utility/Assert.h"
 #include "Utility/String/CodeConvert.h"
 
+#include <chrono>
 #include <cstring>
 
 namespace AltinaEngine::RenderCore {
     namespace {
+        constexpr auto kFrameTimingCategory = TEXT("FrameTiming");
         using AltinaEngine::u32;
         using AltinaEngine::u64;
         using AltinaEngine::usize;
@@ -121,7 +123,14 @@ namespace AltinaEngine::RenderCore {
             state.mHasCommands = false;
         }
 
-        void SubmitQueue(FQueueState& state) { SubmitQueue(state, nullptr); }
+        void               SubmitQueue(FQueueState& state) { SubmitQueue(state, nullptr); }
+
+        [[nodiscard]] auto ElapsedMilliseconds(
+            const std::chrono::steady_clock::time_point& startTime) noexcept -> double {
+            using namespace std::chrono;
+            return duration_cast<duration<double, std::milli>>(steady_clock::now() - startTime)
+                .count();
+        }
     } // namespace
 
     FFrameGraphExecutor::FFrameGraphExecutor(Rhi::FRhiDevice& device) : mDevice(&device) {}
@@ -350,6 +359,7 @@ namespace AltinaEngine::RenderCore {
         FFrameGraphPassResources resources(graph);
 
         for (u32 passIndex = 0U; passIndex < static_cast<u32>(graph.mPasses.Size()); ++passIndex) {
+            const auto passStart  = std::chrono::steady_clock::now();
             auto&      pass       = graph.mPasses[passIndex];
             const auto queue      = passQueues[passIndex];
             auto&      queueState = queues[GetQueueIndex(queue)];
@@ -444,9 +454,17 @@ namespace AltinaEngine::RenderCore {
                     signals.PushBack(signal);
                 }
                 SubmitQueue(queueState, &signals);
+                LogInfoCat(kFrameTimingCategory,
+                    TEXT("FrameGraph.Pass index={} name={} queue={} ms={:.3f}"), passIndex,
+                    (pass.mDesc.mName != nullptr) ? pass.mDesc.mName : "<unnamed>",
+                    static_cast<u32>(queue), ElapsedMilliseconds(passStart));
                 continue;
             }
             queueState.mHasCommands = true;
+            LogInfoCat(kFrameTimingCategory,
+                TEXT("FrameGraph.Pass index={} name={} queue={} ms={:.3f}"), passIndex,
+                (pass.mDesc.mName != nullptr) ? pass.mDesc.mName : "<unnamed>",
+                static_cast<u32>(queue), ElapsedMilliseconds(passStart));
         }
 
         // Apply external-output final transitions (for example backbuffer RenderTarget->Present).

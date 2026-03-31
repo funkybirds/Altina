@@ -10,6 +10,7 @@ namespace AltinaEngine::Rhi {
         TShared<FRhiDevice> gRhiDevice;
         FRhiInitDesc        gRhiInitDesc;
         bool                gHasRhiInitDesc = false;
+        FRhiFrameStats      gRhiFrameStats;
     } // namespace
 
     auto RHIInit(FRhiContext& context, const FRhiInitDesc& initDesc,
@@ -56,9 +57,21 @@ namespace AltinaEngine::Rhi {
         return (device != nullptr) ? device->CreateSampler(desc) : FRhiSamplerRef{};
     }
 
+    void RHIResetFrameStats(u64 frameIndex) noexcept {
+        gRhiFrameStats             = {};
+        gRhiFrameStats.mFrameIndex = frameIndex;
+    }
+
+    void RHIRecordSetVertexBufferCall(u64 count) noexcept {
+        gRhiFrameStats.mSetVertexBufferCalls += count;
+    }
+
+    auto RHIGetFrameStats() noexcept -> FRhiFrameStats { return gRhiFrameStats; }
+
     void RHIExit(FRhiContext& context) noexcept {
         gRhiDevice.Reset();
         gHasRhiInitDesc = false;
+        gRhiFrameStats  = {};
         context.Shutdown();
     }
 } // namespace AltinaEngine::Rhi

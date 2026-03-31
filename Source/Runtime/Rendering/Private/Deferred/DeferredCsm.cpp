@@ -247,9 +247,9 @@ namespace AltinaEngine::Rendering::Deferred {
                     data.Shadow = builder.Write(outShadowMap, Rhi::ERhiResourceState::DepthWrite);
 
                     if (inputs.ShadowDrawList != nullptr) {
-                        for (const auto& batch : inputs.ShadowDrawList->mBatches) {
-                            RegisterMaterialTextureReads(graph, builder, batch.mMaterial,
-                                batch.mPass, importedExternalTextures);
+                        for (const auto& bucket : inputs.ShadowDrawList->mBuckets) {
+                            RegisterMaterialTextureReads(graph, builder, bucket.mMaterial,
+                                bucket.mPass, importedExternalTextures);
                         }
                     }
 

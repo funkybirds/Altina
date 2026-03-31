@@ -75,10 +75,65 @@ namespace AltinaEngine::RenderCore::Render {
         TVector<FDrawInstanceData> mInstances; // Same Mesh+Material+Section can be instanced.
     };
 
-    struct FDrawList {
-        TVector<FDrawBatch> mBatches;
+    struct FDrawMaterialBucketKey {
+        u64                   mPassKey     = 0ULL;
+        u64                   mPipelineKey = 0ULL;
+        u64                   mMaterialKey = 0ULL;
 
-        void                Clear() noexcept { mBatches.Clear(); }
-        [[nodiscard]] auto  IsEmpty() const noexcept -> bool { return mBatches.IsEmpty(); }
+        friend constexpr auto operator==(const FDrawMaterialBucketKey& lhs,
+            const FDrawMaterialBucketKey& rhs) noexcept -> bool = default;
+    };
+
+    struct FDrawMaterialBucket {
+        FDrawMaterialBucketKey mBucketKey;
+        EMaterialPass          mPass     = EMaterialPass::BasePass;
+        const FMaterial*       mMaterial = nullptr;
+        TVector<FDrawBatch> mBatches; // Same material bucket, but potentially different geometry.
+    };
+
+    struct FDrawList {
+        TVector<FDrawMaterialBucket> mBuckets;
+
+        void                         Clear() noexcept { mBuckets.Clear(); }
+        [[nodiscard]] auto           IsEmpty() const noexcept -> bool {
+            for (const auto& bucket : mBuckets) {
+                if (!bucket.mBatches.IsEmpty()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        [[nodiscard]] auto GetBucketCount() const noexcept -> u32 {
+            u32 count = 0U;
+            for (const auto& bucket : mBuckets) {
+                if (!bucket.mBatches.IsEmpty()) {
+                    ++count;
+                }
+            }
+            return count;
+        }
+        [[nodiscard]] auto GetBatchCount() const noexcept -> u32 {
+            u32 count = 0U;
+            for (const auto& bucket : mBuckets) {
+                count += static_cast<u32>(bucket.mBatches.Size());
+            }
+            return count;
+        }
+
+        template <typename TFn> void ForEachBatch(TFn&& fn) {
+            for (auto& bucket : mBuckets) {
+                for (auto& batch : bucket.mBatches) {
+                    fn(batch);
+                }
+            }
+        }
+
+        template <typename TFn> void ForEachBatch(TFn&& fn) const {
+            for (const auto& bucket : mBuckets) {
+                for (const auto& batch : bucket.mBatches) {
+                    fn(batch);
+                }
+            }
+        }
     };
 } // namespace AltinaEngine::RenderCore::Render

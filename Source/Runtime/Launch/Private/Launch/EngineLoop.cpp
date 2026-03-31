@@ -40,6 +40,7 @@
 #include "Utility/Assert.h"
 
 #include <cstdint>
+#include <chrono>
 #include <cstring>
 #include <string>
 
@@ -86,6 +87,15 @@ using AltinaEngine::Core::Utility::DebugAssert;
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
     namespace {
+        constexpr auto     kFrameTimingCategory = TEXT("FrameTiming");
+
+        [[nodiscard]] auto ElapsedMilliseconds(
+            const std::chrono::steady_clock::time_point& startTime) noexcept -> f64 {
+            using namespace std::chrono;
+            return duration_cast<duration<f64, std::milli>>(steady_clock::now() - startTime)
+                .count();
+        }
+
         void EnsureEngineReflectionRegistered() {
             static bool sRegistered = false;
             if (!sRegistered) {
@@ -595,6 +605,7 @@ namespace AltinaEngine::Launch {
             const TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
             Rendering::ERendererType rendererType, const Asset::FAssetRegistry* assetRegistry,
             Asset::FAssetManager* assetManager, Rhi::FRhiTexture* primaryViewOutputOverride) {
+            const auto renderRequestStart = std::chrono::steady_clock::now();
             DebugAssert(defaultViewport != nullptr, TEXT("Launch.EngineLoop"),
                 "SendSceneRenderingRequest: default viewport is null.");
             if (scene.Views.IsEmpty()) {
@@ -632,6 +643,7 @@ namespace AltinaEngine::Launch {
             Rhi::FRhiTexture* atmosphereSingleMieScatteringLut = nullptr;
             bool              bHasSkyCube                      = false;
             bool              bHasAtmosphereSky                = false;
+            f64               atmosphereSetupMs                = 0.0;
             if (scene.bHasSkyCube && scene.SkyCubeAsset.IsValid()) {
                 bHasSkyCube = true;
                 if (!GameScene::FSkyCubeComponent::AssetToSkyCubeConverter) {
@@ -818,6 +830,7 @@ namespace AltinaEngine::Launch {
             }
 
             if (scene.bHasPbrSky) {
+                const auto atmosphereStart = std::chrono::steady_clock::now();
                 Rendering::Atmosphere::FAtmosphereSkyDesc atmosphereDesc{};
                 atmosphereDesc.mRayleighScattering    = scene.PbrSky.RayleighScattering;
                 atmosphereDesc.mRayleighScaleHeightKm = scene.PbrSky.RayleighScaleHeightKm;
@@ -846,6 +859,7 @@ namespace AltinaEngine::Launch {
                 const auto* atmosphereResources =
                     Rendering::Atmosphere::FAtmosphereSystem::Get().EnsureSkyResources(
                         atmosphereDesc, sunDirection);
+                atmosphereSetupMs = ElapsedMilliseconds(atmosphereStart);
                 if (atmosphereResources != nullptr && atmosphereResources->IsValid()) {
                     atmosphereParamsBuffer     = atmosphereResources->mParamsBuffer.Get();
                     atmosphereTransmittanceLut = atmosphereResources->mTransmittanceLut.Get();
@@ -871,11 +885,15 @@ namespace AltinaEngine::Launch {
                 ? static_cast<Rendering::IRenderer*>(&deferredRenderer)
                 : static_cast<Rendering::IRenderer*>(&forwardRenderer);
 
+            const auto            prepareStart = std::chrono::steady_clock::now();
             renderer->PrepareForRendering(device);
+            const f64   prepareMs = ElapsedMilliseconds(prepareStart);
 
-            const usize viewCount = scene.Views.Size();
+            const usize viewCount     = scene.Views.Size();
+            f64         renderViewsMs = 0.0;
             for (usize i = 0; i < viewCount; ++i) {
-                auto& view = scene.Views[i];
+                const auto viewStart = std::chrono::steady_clock::now();
+                auto&      view      = scene.Views[i];
                 if (!view.View.IsValid()) {
                     DebugAssert(false, TEXT("Launch.EngineLoop"),
                         "SendSceneRenderingRequest: scene view {} is invalid.",
@@ -937,16 +955,36 @@ namespace AltinaEngine::Launch {
                 viewContext.bHasSkyIbl                       = bHasSkyIbl;
                 renderer->SetViewContext(viewContext);
 
+                const auto              renderBuildStart = std::chrono::steady_clock::now();
                 RenderCore::FFrameGraph graph(device);
                 renderer->Render(graph);
+                const f64  renderBuildMs = ElapsedMilliseconds(renderBuildStart);
+
+                const auto graphCompileStart = std::chrono::steady_clock::now();
                 graph.Compile();
+                const f64  graphCompileMs = ElapsedMilliseconds(graphCompileStart);
+
+                const auto graphExecuteStart = std::chrono::steady_clock::now();
                 ExecuteFrameGraph(device, graph);
+                const f64 graphExecuteMs = ElapsedMilliseconds(graphExecuteStart);
+                const f64 viewMs         = ElapsedMilliseconds(viewStart);
+                renderViewsMs += viewMs;
+
+                LogInfoCat(kFrameTimingCategory,
+                    TEXT(
+                        "RenderThread.View index={} buildMs={:.3f} compileMs={:.3f} executeMs={:.3f} totalMs={:.3f}"),
+                    static_cast<u32>(i), renderBuildMs, graphCompileMs, graphExecuteMs, viewMs);
 
                 Rendering::TemporalAA::FinalizeViewForFrame(
                     viewKey, view.View, bEnableJitter, sampleCount);
             }
 
             renderer->FinalizeRendering();
+            LogInfoCat(kFrameTimingCategory,
+                TEXT(
+                    "RenderThread.Scene frameViews={} atmosphereMs={:.3f} prepareMs={:.3f} viewsMs={:.3f} totalSceneMs={:.3f}"),
+                static_cast<u32>(viewCount), atmosphereSetupMs, prepareMs, renderViewsMs,
+                ElapsedMilliseconds(renderRequestStart));
         }
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
@@ -1360,15 +1398,16 @@ namespace AltinaEngine::Launch {
     }
 
     void FEngineLoop::Draw(const FRenderTick& tick) {
-        u32  windowWidth         = 0U;
-        u32  windowHeight        = 0U;
-        u32  renderWidth         = 0U;
-        u32  renderHeight        = 0U;
-        u32  windowLogicalWidth  = 0U;
-        u32  windowLogicalHeight = 0U;
-        u32  windowDpi           = 0U;
-        f32  windowDpiScale      = 1.0f;
-        bool shouldResize        = false;
+        const auto gameThreadFrameStart = std::chrono::steady_clock::now();
+        u32        windowWidth          = 0U;
+        u32        windowHeight         = 0U;
+        u32        renderWidth          = 0U;
+        u32        renderHeight         = 0U;
+        u32        windowLogicalWidth   = 0U;
+        u32        windowLogicalHeight  = 0U;
+        u32        windowDpi            = 0U;
+        f32        windowDpiScale       = 1.0f;
+        bool       shouldResize         = false;
 
         if (mApplication) {
             auto* window = mApplication->GetMainWindow();
@@ -1487,19 +1526,19 @@ namespace AltinaEngine::Launch {
                             mMaterialCache, shadowDrawLists[i]);
                     }
                     for (auto& drawList : drawLists) {
-                        for (const auto& batch : drawList.mBatches) {
-                            if (batch.mMaterial != nullptr) {
+                        for (const auto& bucket : drawList.mBuckets) {
+                            if (bucket.mMaterial != nullptr) {
                                 auto* material =
-                                    const_cast<RenderCore::FMaterial*>(batch.mMaterial);
+                                    const_cast<RenderCore::FMaterial*>(bucket.mMaterial);
                                 mMaterialCache.PrepareMaterialForRendering(*material);
                             }
                         }
                     }
                     for (auto& drawList : shadowDrawLists) {
-                        for (const auto& batch : drawList.mBatches) {
-                            if (batch.mMaterial != nullptr) {
+                        for (const auto& bucket : drawList.mBuckets) {
+                            if (bucket.mMaterial != nullptr) {
                                 auto* material =
-                                    const_cast<RenderCore::FMaterial*>(batch.mMaterial);
+                                    const_cast<RenderCore::FMaterial*>(bucket.mMaterial);
                                 mMaterialCache.PrepareMaterialForRendering(*material);
                             }
                         }
@@ -1514,7 +1553,7 @@ namespace AltinaEngine::Launch {
 
         u32 totalBatches = 0U;
         for (const auto& drawList : drawLists) {
-            totalBatches += static_cast<u32>(drawList.mBatches.Size());
+            totalBatches += drawList.GetBatchCount();
         }
 
         if (mDebugGui && mInputSystem) {
@@ -1543,6 +1582,7 @@ namespace AltinaEngine::Launch {
                 primaryViewImageId = tick.PrimaryViewImageId, renderScene = Move(renderScene),
                 drawLists = Move(drawLists), shadowDrawLists = Move(shadowDrawLists), rendererType,
                 assetRegistry, assetManager]() mutable -> void {
+                const auto renderThreadFrameStart = std::chrono::steady_clock::now();
                 Assert(static_cast<bool>(device), TEXT("Launch.EngineLoop"),
                      "RenderFrame: RHI device is null at frame {}.", static_cast<u64>(frameIndex));
                 if (!device)
@@ -1554,11 +1594,14 @@ namespace AltinaEngine::Launch {
                 DebugAssert(static_cast<bool>(viewport), TEXT("Launch.EngineLoop"),
                      "RenderFrame: viewport is null at frame {}.", static_cast<u64>(frameIndex));
                 if (viewport && windowWidth > 0U && windowHeight > 0U) {
+                    const auto resizeStart = std::chrono::steady_clock::now();
                     if (shouldResize) {
                         viewport->Resize(windowWidth, windowHeight);
                     }
+                    const f64         resizeMs = ElapsedMilliseconds(resizeStart);
 
                     Rhi::FRhiTexture* primaryViewOutputOverride = nullptr;
+                    const auto        renderSceneStart          = std::chrono::steady_clock::now();
                     if (bRedirectPrimaryViewToOffscreen && renderWidth > 0U && renderHeight > 0U) {
                         Rhi::ERhiFormat targetFormat = Rhi::ERhiFormat::B8G8R8A8Unorm;
                         if (auto* backBuffer = viewport->GetBackBuffer(); backBuffer != nullptr) {
@@ -1608,16 +1651,23 @@ namespace AltinaEngine::Launch {
                              shadowDrawLists, rendererType, assetRegistry, assetManager,
                              primaryViewOutputOverride);
                     }
+                    const f64  renderSceneMs = ElapsedMilliseconds(renderSceneStart);
 
+                    const auto callbackStart = std::chrono::steady_clock::now();
                     if (callback) {
                         callback(*device, *viewport, windowWidth, windowHeight);
                     }
+                    const f64  callbackMs = ElapsedMilliseconds(callbackStart);
 
+                    const auto debugGuiStart = std::chrono::steady_clock::now();
                     if (debugGui) {
                         debugGui->RenderRenderThread(*device, *viewport);
                     }
+                    const f64  debugGuiMs = ElapsedMilliseconds(debugGuiStart);
 
-                    const auto queue = device->GetQueue(Rhi::ERhiQueueType::Graphics);
+                    f64        presentMs    = 0.0;
+                    const auto presentStart = std::chrono::steady_clock::now();
+                    const auto queue        = device->GetQueue(Rhi::ERhiQueueType::Graphics);
                     DebugAssert(static_cast<bool>(queue), TEXT("Launch.EngineLoop"),
                          "RenderFrame: graphics queue is null at frame {}.",
                          static_cast<u64>(frameIndex));
@@ -1627,6 +1677,18 @@ namespace AltinaEngine::Launch {
                         presentInfo.mSyncInterval = 1U;
                         queue->Present(presentInfo);
                     }
+                    presentMs = ElapsedMilliseconds(presentStart);
+
+                    LogInfoCat(kFrameTimingCategory,
+                         TEXT(
+                            "RenderThread.Stage frame={} resizeMs={:.3f} sceneMs={:.3f} callbackMs={:.3f} debugGuiMs={:.3f} presentMs={:.3f}"),
+                         static_cast<u64>(frameIndex), resizeMs, renderSceneMs, callbackMs,
+                         debugGuiMs, presentMs);
+
+                    const auto rhiFrameStats = Rhi::RHIGetFrameStats();
+                    LogInfoCat(kFrameTimingCategory,
+                         TEXT("RenderThread.RHI frame={} setVertexBufferCalls={}"),
+                         static_cast<u64>(frameIndex), rhiFrameStats.mSetVertexBufferCalls);
                 } else {
                     DebugAssert(false, TEXT("Launch.EngineLoop"),
                          "RenderFrame: skipped because viewport/extent is invalid (viewport={}, width={}, height={}, frame={}).",
@@ -1636,8 +1698,17 @@ namespace AltinaEngine::Launch {
 
                 device->EndFrame();
 
-                // LogInfo(TEXT("RenderThread Frame {}"), frameIndex);
+                LogInfoCat(kFrameTimingCategory,
+                     TEXT("RenderThread frame={} dtMs={:.3f} window={}x{} render={}x{}"),
+                     static_cast<u64>(frameIndex), ElapsedMilliseconds(renderThreadFrameStart),
+                     static_cast<u32>(windowWidth), static_cast<u32>(windowHeight),
+                     static_cast<u32>(renderWidth), static_cast<u32>(renderHeight));
             });
+        LogInfoCat(kFrameTimingCategory,
+            TEXT("GameThread frame={} dtMs={:.3f} views={} batches={}"),
+            static_cast<u64>(frameIndex), ElapsedMilliseconds(gameThreadFrameStart),
+            static_cast<u32>(renderScene.Views.Size()), totalBatches);
+
         if (handle.IsValid()) {
             mPendingRenderFrames.Push(handle);
             EnforceRenderLag(GetRenderThreadLagFrames());

@@ -4,12 +4,24 @@
 #include "RhiVulkan/RhiVulkanResources.h"
 #include "RhiVulkanInternal.h"
 
+#include "Logging/Log.h"
 #include "Rhi/RhiInit.h"
 #include "Threading/Mutex.h"
+
+#include <chrono>
 
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
     namespace {
+        constexpr auto     kFrameTimingCategory = TEXT("FrameTiming");
+
+        [[nodiscard]] auto ElapsedMilliseconds(
+            const std::chrono::steady_clock::time_point& startTime) noexcept -> double {
+            using namespace std::chrono;
+            return duration_cast<duration<double, std::milli>>(steady_clock::now() - startTime)
+                .count();
+        }
+
         [[nodiscard]] auto ToVkStageFlags(ERhiShaderStageFlags visibility) noexcept
             -> VkShaderStageFlags {
             VkShaderStageFlags out = 0;
@@ -773,11 +785,16 @@ namespace AltinaEngine::Rhi {
         info.subpass             = 0;
         info.pNext               = renderingInfo;
 
-        VkPipeline pipeline = VK_NULL_HANDLE;
+        const auto pipelineCreateStart = std::chrono::steady_clock::now();
+        VkPipeline pipeline            = VK_NULL_HANDLE;
         if (vkCreateGraphicsPipelines(mState->mDevice, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline)
             != VK_SUCCESS) {
             return VK_NULL_HANDLE;
         }
+        LogInfoCat(kFrameTimingCategory,
+            TEXT("Vulkan.PipelineCreate name={} dynamicRendering={} attachmentHash={} ms={:.3f}"),
+            GetGraphicsDesc().mDebugName.ToView(), usingDynamicRendering ? 1U : 0U, attachmentHash,
+            ElapsedMilliseconds(pipelineCreateStart));
 
         mState->mPipelines.PushBack(FState::FEntry{ key, pipeline });
         return pipeline;

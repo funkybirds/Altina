@@ -17,12 +17,24 @@
 #include "RhiVulkanInternal.h"
 #include "RhiVulkanDebugUtils.h"
 
+#include <chrono>
+
 using AltinaEngine::Move;
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
     using Container::TVector;
 
     namespace {
+        constexpr auto     kFrameTimingCategory          = TEXT("FrameTiming");
+        constexpr u32      kTrackedVertexBufferSlotCount = 16U;
+
+        [[nodiscard]] auto ElapsedMilliseconds(
+            const std::chrono::steady_clock::time_point& startTime) noexcept -> double {
+            using namespace std::chrono;
+            return duration_cast<duration<double, std::milli>>(steady_clock::now() - startTime)
+                .count();
+        }
+
         [[nodiscard]] auto ToVkIndexType(ERhiIndexType type) noexcept -> VkIndexType {
             return (type == ERhiIndexType::Uint16) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
         }
@@ -263,6 +275,7 @@ namespace AltinaEngine::Rhi {
             subpass.pColorAttachments       = colorRefs.IsEmpty() ? nullptr : colorRefs.Data();
             subpass.pDepthStencilAttachment = (depthView != VK_NULL_HANDLE) ? &depthRef : nullptr;
 
+            const auto             renderPassBuildStart = std::chrono::steady_clock::now();
             VkRenderPassCreateInfo rpInfo{};
             rpInfo.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
             rpInfo.attachmentCount = static_cast<u32>(attachmentDescs.Size());
@@ -288,6 +301,11 @@ namespace AltinaEngine::Rhi {
                 outRenderPass = VK_NULL_HANDLE;
                 return false;
             }
+
+            LogInfoCat(kFrameTimingCategory,
+                TEXT("Vulkan.LegacyRenderPass attachments={} extent={}x{} ms={:.3f}"),
+                static_cast<u32>(attachments.Size()), static_cast<u32>(outExtent.width),
+                static_cast<u32>(outExtent.height), ElapsedMilliseconds(renderPassBuildStart));
 
             return true;
         }
@@ -460,6 +478,8 @@ namespace AltinaEngine::Rhi {
         VkFormat                           mDepthFormat = VK_FORMAT_UNDEFINED;
         FRhiVulkanDevice*                  mOwner       = nullptr;
         FVulkanDescriptorAllocator         mDescriptorAllocator;
+        VkBuffer                           mBoundVertexBuffers[kTrackedVertexBufferSlotCount] = {};
+        VkDeviceSize mBoundVertexBufferOffsets[kTrackedVertexBufferSlotCount]                 = {};
     };
 
     FRhiVulkanCommandContext::FRhiVulkanCommandContext(
@@ -604,6 +624,10 @@ namespace AltinaEngine::Rhi {
         mState->mHasIssuedDrawInRenderPass = false;
         mState->mTopology                  = ERhiPrimitiveTopology::TriangleList;
         mState->mAttachmentHash            = 0ULL;
+        for (u32 slot = 0U; slot < kTrackedVertexBufferSlotCount; ++slot) {
+            mState->mBoundVertexBuffers[slot]       = VK_NULL_HANDLE;
+            mState->mBoundVertexBufferOffsets[slot] = ~0ULL;
+        }
         if (mActiveSection) {
             mActiveSection->mState              = ERhiCommandSectionState::Active;
             mActiveSection->mExecution.mState   = ERhiCommandSectionState::Active;
@@ -780,7 +804,18 @@ namespace AltinaEngine::Rhi {
             auto* vkBuffer = static_cast<FRhiVulkanBuffer*>(view.mBuffer);
             buffer         = vkBuffer ? vkBuffer->GetNativeBuffer() : VK_NULL_HANDLE;
         }
+
+        if (slot < kTrackedVertexBufferSlotCount && mState->mBoundVertexBuffers[slot] == buffer
+            && mState->mBoundVertexBufferOffsets[slot] == offset) {
+            return;
+        }
+
         vkCmdBindVertexBuffers(mState->mCmd, slot, 1, &buffer, &offset);
+        RHIRecordSetVertexBufferCall();
+        if (slot < kTrackedVertexBufferSlotCount) {
+            mState->mBoundVertexBuffers[slot]       = buffer;
+            mState->mBoundVertexBufferOffsets[slot] = offset;
+        }
     }
 
     void FRhiVulkanCommandContext::RHISetIndexBuffer(const FRhiIndexBufferView& view) {

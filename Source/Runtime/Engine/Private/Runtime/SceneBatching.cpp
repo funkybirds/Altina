@@ -105,6 +105,15 @@ namespace AltinaEngine::Engine {
             hash     = HashCombine(hash, static_cast<u64>(section.BaseVertex));
             return hash;
         }
+
+        auto BuildMaterialBucketKey(const FDrawKey& key)
+            -> RenderCore::Render::FDrawMaterialBucketKey {
+            RenderCore::Render::FDrawMaterialBucketKey bucketKey{};
+            bucketKey.mPassKey     = key.mPassKey;
+            bucketKey.mPipelineKey = key.mPipelineKey;
+            bucketKey.mMaterialKey = key.mMaterialKey;
+            return bucketKey;
+        }
     } // namespace
 
     void FSceneBatchBuilder::Build(const FRenderScene& scene, const FSceneView& view,
@@ -189,19 +198,30 @@ namespace AltinaEngine::Engine {
         Core::Algorithm::Sort(
             items, [](const FDrawItem& lhs, const FDrawItem& rhs) { return lhs.mKey < rhs.mKey; });
 
-        outDrawList.mBatches.Reserve(items.Size());
+        outDrawList.mBuckets.Reserve(items.Size());
         for (const auto& item : items) {
-            if (outDrawList.mBatches.IsEmpty() || !params.bAllowInstancing
-                || !(item.mKey == outDrawList.mBatches.Back().mBatchKey)) {
+            const auto bucketKey = BuildMaterialBucketKey(item.mKey);
+            if (outDrawList.mBuckets.IsEmpty()
+                || !(bucketKey == outDrawList.mBuckets.Back().mBucketKey)) {
+                RenderCore::Render::FDrawMaterialBucket bucket{};
+                bucket.mBucketKey = bucketKey;
+                bucket.mPass      = item.mPass;
+                bucket.mMaterial  = item.mMaterial;
+                outDrawList.mBuckets.PushBack(Move(bucket));
+            }
+
+            auto& bucket = outDrawList.mBuckets.Back();
+            if (bucket.mBatches.IsEmpty() || !params.bAllowInstancing
+                || !(item.mKey == bucket.mBatches.Back().mBatchKey)) {
                 RenderCore::Render::FDrawBatch batch{};
                 batch.mBatchKey = item.mKey;
                 batch.mPass     = item.mPass;
                 batch.mMaterial = item.mMaterial;
                 batch.mStatic   = item.mStatic;
                 batch.mInstances.PushBack(item.mInstance);
-                outDrawList.mBatches.PushBack(Move(batch));
+                bucket.mBatches.PushBack(Move(batch));
             } else {
-                outDrawList.mBatches.Back().mInstances.PushBack(item.mInstance);
+                bucket.mBatches.Back().mInstances.PushBack(item.mInstance);
             }
         }
     }

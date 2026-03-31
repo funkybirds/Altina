@@ -910,6 +910,7 @@ namespace AltinaEngine::Rhi {
         if (!mState) {
             return;
         }
+        RHIResetFrameStats(frameIndex);
         mState->mUploadManager.BeginFrame(frameIndex);
         mState->mStagingManager.Reset();
     }

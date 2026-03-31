@@ -16,17 +16,20 @@
 #include "Asset/MeshLoader.h"
 #include "Asset/LevelAsset.h"
 #include "Asset/LevelLoader.h"
+#include "Asset/TextureDecode.h"
 #include "Asset/Texture2DAsset.h"
 #include "Asset/Texture2DLoader.h"
 #include "TestHarness.h"
 
 namespace {
     namespace Container = AltinaEngine::Core::Container;
+    using AltinaEngine::Move;
     using AltinaEngine::u16;
     using AltinaEngine::u32;
     using AltinaEngine::u64;
     using AltinaEngine::u8;
     using AltinaEngine::usize;
+    using AltinaEngine::Asset::DecodeTexture2DToRgba8;
     using AltinaEngine::Asset::FAssetBundleReader;
     using AltinaEngine::Asset::FAssetDesc;
     using AltinaEngine::Asset::FAssetHandle;
@@ -288,6 +291,74 @@ TEST_CASE("Asset.Texture2D.BlockCompressed.Load") {
     REQUIRE(std::memcmp(texture->GetPixels().Data(),
                 cooked.Data() + sizeof(header) + sizeof(blobDesc), payloadSize)
         == 0);
+}
+
+TEST_CASE("Asset.Texture2D.BlockCompressed.DecodeToRgba8") {
+    {
+        FTexture2DDesc desc{};
+        desc.Width    = 4U;
+        desc.Height   = 4U;
+        desc.MipCount = 1U;
+        desc.Format   = AltinaEngine::Asset::kTextureFormatBC1;
+        desc.SRGB     = false;
+
+        TVector<u8> pixels{};
+        pixels.PushBack(0x00U);
+        pixels.PushBack(0xF8U);
+        pixels.PushBack(0x00U);
+        pixels.PushBack(0x00U);
+        pixels.PushBack(0x00U);
+        pixels.PushBack(0x00U);
+        pixels.PushBack(0x00U);
+        pixels.PushBack(0x00U);
+
+        FTexture2DAsset texture(desc, AltinaEngine::Move(pixels));
+        FTexture2DDesc  decodedDesc{};
+        TVector<u8>     decodedPixels{};
+        REQUIRE(DecodeTexture2DToRgba8(texture, decodedDesc, decodedPixels));
+        REQUIRE_EQ(decodedDesc.Format, AltinaEngine::Asset::kTextureFormatRGBA8);
+        REQUIRE_EQ(decodedPixels.Size(), static_cast<usize>(4U * 4U * 4U));
+        for (usize pixelIndex = 0U; pixelIndex < 16U; ++pixelIndex) {
+            REQUIRE_EQ(decodedPixels[pixelIndex * 4U + 0U], 255U);
+            REQUIRE_EQ(decodedPixels[pixelIndex * 4U + 1U], 0U);
+            REQUIRE_EQ(decodedPixels[pixelIndex * 4U + 2U], 0U);
+            REQUIRE_EQ(decodedPixels[pixelIndex * 4U + 3U], 255U);
+        }
+    }
+
+    {
+        FTexture2DDesc desc{};
+        desc.Width    = 4U;
+        desc.Height   = 4U;
+        desc.MipCount = 1U;
+        desc.Format   = AltinaEngine::Asset::kTextureFormatBC5;
+        desc.SRGB     = false;
+
+        TVector<u8> pixels{};
+        pixels.PushBack(128U);
+        pixels.PushBack(128U);
+        for (u32 i = 0U; i < 6U; ++i) {
+            pixels.PushBack(0U);
+        }
+        pixels.PushBack(128U);
+        pixels.PushBack(128U);
+        for (u32 i = 0U; i < 6U; ++i) {
+            pixels.PushBack(0U);
+        }
+
+        FTexture2DAsset texture(desc, AltinaEngine::Move(pixels));
+        FTexture2DDesc  decodedDesc{};
+        TVector<u8>     decodedPixels{};
+        REQUIRE(DecodeTexture2DToRgba8(texture, decodedDesc, decodedPixels));
+        REQUIRE_EQ(decodedDesc.Format, AltinaEngine::Asset::kTextureFormatRGBA8);
+        REQUIRE_EQ(decodedPixels.Size(), static_cast<usize>(4U * 4U * 4U));
+        for (usize pixelIndex = 0U; pixelIndex < 16U; ++pixelIndex) {
+            REQUIRE_EQ(decodedPixels[pixelIndex * 4U + 0U], 128U);
+            REQUIRE_EQ(decodedPixels[pixelIndex * 4U + 1U], 128U);
+            REQUIRE(decodedPixels[pixelIndex * 4U + 2U] >= 254U);
+            REQUIRE_EQ(decodedPixels[pixelIndex * 4U + 3U], 255U);
+        }
+    }
 }
 
 TEST_CASE("Asset.MaterialTemplate.Json.Load") {

@@ -6,6 +6,7 @@
 #include "Logging/Log.h"
 #include "Material/Material.h"
 #include "Asset/AssetBinary.h"
+#include "Asset/TextureDecode.h"
 #include "Asset/Texture2DAsset.h"
 #include "Rhi/RhiInit.h"
 #include "Platform/Generic/GenericPlatformDecl.h"
@@ -567,6 +568,8 @@ namespace AltinaEngine::Rendering {
                 case Asset::kTextureFormatRGBA8:
                     return srgb ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
                                 : Rhi::ERhiFormat::R8G8B8A8Unorm;
+                case Asset::kTextureFormatRGBA16F:
+                    return Rhi::ERhiFormat::R16G16B16A16Float;
                 case Asset::kTextureFormatR8:
                 case Asset::kTextureFormatRGB8:
                 default:
@@ -593,12 +596,26 @@ namespace AltinaEngine::Rendering {
                 return {};
             }
 
-            const auto&          assetDesc = asset.GetDesc();
+            const auto&                  assetDesc    = asset.GetDesc();
+            Asset::FTexture2DDesc        uploadDesc   = assetDesc;
+            const auto*                  uploadPixels = &asset.GetPixels();
+            Core::Container::TVector<u8> decodedPixels{};
+            if (assetDesc.Format != Asset::kTextureFormatRGBA8
+                && assetDesc.Format != Asset::kTextureFormatRGBA16F) {
+                if (!Asset::DecodeTexture2DToRgba8(asset, uploadDesc, decodedPixels)) {
+                    LogErrorCat(TEXT("Rendering.Material"),
+                        "Failed to decode Texture2D asset for material upload (format={}, width={}, height={}, mips={}).",
+                        assetDesc.Format, assetDesc.Width, assetDesc.Height, assetDesc.MipCount);
+                    return {};
+                }
+                uploadPixels = &decodedPixels;
+            }
+
             Rhi::FRhiTextureDesc texDesc{};
-            texDesc.mWidth     = assetDesc.Width;
-            texDesc.mHeight    = assetDesc.Height;
-            texDesc.mMipLevels = (assetDesc.MipCount > 0U) ? assetDesc.MipCount : 1U;
-            texDesc.mFormat    = ToRhiFormat(assetDesc);
+            texDesc.mWidth     = uploadDesc.Width;
+            texDesc.mHeight    = uploadDesc.Height;
+            texDesc.mMipLevels = (uploadDesc.MipCount > 0U) ? uploadDesc.MipCount : 1U;
+            texDesc.mFormat    = ToRhiFormat(uploadDesc);
             texDesc.mBindFlags = Rhi::ERhiTextureBindFlags::ShaderResource;
 
             auto texture = Rhi::RHICreateTexture(texDesc);
@@ -606,15 +623,17 @@ namespace AltinaEngine::Rendering {
                 return {};
             }
 
-            const auto& pixels = asset.GetPixels();
+            const auto& pixels = *uploadPixels;
             if (!pixels.IsEmpty()) {
-                const u32 bytesPerPixel = Asset::GetTextureBytesPerPixel(assetDesc.Format);
-                u32       width         = assetDesc.Width;
-                u32       height        = assetDesc.Height;
+                const u32 bytesPerPixel = Asset::GetTextureBytesPerPixel(uploadDesc.Format);
+                u32       width         = uploadDesc.Width;
+                u32       height        = uploadDesc.Height;
                 usize     offset        = 0U;
                 for (u32 mip = 0U; mip < texDesc.mMipLevels; ++mip) {
-                    const usize rowPitch   = static_cast<usize>(width) * bytesPerPixel;
-                    const usize slicePitch = rowPitch * static_cast<usize>(height);
+                    const usize rowPitch = static_cast<usize>(
+                        Asset::GetTextureMipRowPitch(uploadDesc.Format, width, bytesPerPixel));
+                    const usize slicePitch = static_cast<usize>(Asset::GetTextureMipSlicePitch(
+                        uploadDesc.Format, width, height, bytesPerPixel));
                     if (rowPitch == 0U || slicePitch == 0U) {
                         break;
                     }

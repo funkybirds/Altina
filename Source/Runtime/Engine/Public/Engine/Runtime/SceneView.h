@@ -95,8 +95,9 @@ namespace AltinaEngine::Engine {
         GameScene::FGameObjectId                     OwnerId{};
         GameScene::FComponentId                      MeshComponentId{};
         GameScene::FComponentId                      MaterialComponentId{};
-        const RenderCore::Geometry::FStaticMeshData* Mesh      = nullptr;
-        const GameScene::FMeshMaterialComponent*     Materials = nullptr;
+        u64                                          MeshGeometryKey = 0ULL;
+        const RenderCore::Geometry::FStaticMeshData* Mesh            = nullptr;
+        const GameScene::FMeshMaterialComponent*     Materials       = nullptr;
         Core::Math::FMatrix4x4f                      WorldMatrix{};
         Core::Math::FMatrix4x4f                      PrevWorldMatrix{};
     };

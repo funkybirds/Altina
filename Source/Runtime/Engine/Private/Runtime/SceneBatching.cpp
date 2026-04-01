@@ -94,9 +94,9 @@ namespace AltinaEngine::Engine {
             return hash;
         }
 
-        auto BuildGeometryKey(const RenderCore::Geometry::FStaticMeshData* mesh, u32 lodIndex,
-            Rhi::ERhiPrimitiveTopology topology) noexcept -> u64 {
-            u64 hash = HashPointer(mesh);
+        auto BuildGeometryKey(const RenderCore::Geometry::FStaticMeshData* mesh, u64 geometryKey,
+            u32 lodIndex, Rhi::ERhiPrimitiveTopology topology) noexcept -> u64 {
+            u64 hash = (geometryKey != 0ULL) ? geometryKey : HashPointer(mesh);
             hash     = HashCombine(hash, static_cast<u64>(lodIndex));
             hash     = HashCombine(hash, static_cast<u64>(topology));
             return hash;
@@ -376,8 +376,8 @@ namespace AltinaEngine::Engine {
                 item.mKey.mPipelineKey = BuildPipelineKey(
                     material != nullptr ? material->FindPassDesc(params.Pass) : nullptr);
                 item.mKey.mMaterialKey = HashPointer(material);
-                item.mKey.mGeometryKey =
-                    BuildGeometryKey(entry.Mesh, params.LodIndex, lod.mPrimitiveTopology);
+                item.mKey.mGeometryKey = BuildGeometryKey(
+                    entry.Mesh, entry.MeshGeometryKey, params.LodIndex, lod.mPrimitiveTopology);
                 item.mKey.mSectionKey = BuildSectionKey(section);
 
                 items.PushBack(Move(item));

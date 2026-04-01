@@ -30,6 +30,7 @@
 #include "Rhi/RhiViewport.h"
 #include "Engine/Runtime/EngineRuntime.h"
 #include "Engine/Runtime/MaterialCache.h"
+#include "Engine/Runtime/StaticMeshCache.h"
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Engine/GameScene/SkyCubeComponent.h"
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
@@ -124,44 +125,27 @@ namespace AltinaEngine::Launch {
             };
         }
 
-        static void BindStaticMeshConverter(
-            Asset::FAssetRegistry& /*registry*/, Asset::FAssetManager& manager) {
+        static void BindStaticMeshConverter(Asset::FAssetRegistry& /*registry*/,
+            Asset::FAssetManager& manager, Engine::FStaticMeshCache& staticMeshCache) {
             GameScene::FStaticMeshFilterComponent::AssetToStaticMeshConverter =
-                [&manager](
-                    const Asset::FAssetHandle& handle) -> RenderCore::Geometry::FStaticMeshData {
-                if (!handle.IsValid()) {
-                    return {};
-                }
+                [&manager, &staticMeshCache](const Asset::FAssetHandle& handle)
+                -> Container::TShared<Engine::FStaticMeshCacheEntry> {
+                return staticMeshCache.ResolveMesh(handle,
+                    [&manager](const Asset::FAssetHandle&      assetHandle,
+                        RenderCore::Geometry::FStaticMeshData& outMesh) -> bool {
+                        const auto asset = manager.Load(assetHandle);
+                        if (!asset) {
+                            return false;
+                        }
 
-                const auto asset = manager.Load(handle);
-                if (!asset) {
-                    return {};
-                }
+                        const auto* meshAsset =
+                            AltinaEngine::CheckedCast<const Asset::FMeshAsset*>(asset.Get());
+                        if (meshAsset == nullptr) {
+                            return false;
+                        }
 
-                const auto* meshAsset =
-                    AltinaEngine::CheckedCast<const Asset::FMeshAsset*>(asset.Get());
-                if (meshAsset == nullptr) {
-                    return {};
-                }
-
-                RenderCore::Geometry::FStaticMeshData mesh{};
-                if (!Rendering::ConvertMeshAssetToStaticMesh(*meshAsset, mesh)) {
-                    return {};
-                }
-                for (auto& lod : mesh.mLods) {
-                    lod.mPositionBuffer.InitResource();
-                    lod.mIndexBuffer.InitResource();
-                    lod.mTangentBuffer.InitResource();
-                    lod.mUV0Buffer.InitResource();
-                    lod.mUV1Buffer.InitResource();
-
-                    lod.mPositionBuffer.WaitForInit();
-                    lod.mIndexBuffer.WaitForInit();
-                    lod.mTangentBuffer.WaitForInit();
-                    lod.mUV0Buffer.WaitForInit();
-                    lod.mUV1Buffer.WaitForInit();
-                }
-                return mesh;
+                        return Rendering::ConvertMeshAssetToStaticMesh(*meshAsset, outMesh);
+                    });
             };
         }
 
@@ -314,6 +298,7 @@ namespace AltinaEngine::Launch {
         Asset::FTexture2DLoader              mTexture2DLoader;
         Asset::FCubeMapLoader                mCubeMapLoader;
         Engine::FMaterialCache               mMaterialCache;
+        Engine::FStaticMeshCache             mStaticMeshCache;
         TOwner<RenderCore::FRenderingThread> mRenderingThread;
         TOwner<DebugGui::IDebugGuiSystem, TPolymorphicDeleter<DebugGui::IDebugGuiSystem>> mDebugGui;
         FEditorOffscreenCache          mEditorOffscreenCache{};

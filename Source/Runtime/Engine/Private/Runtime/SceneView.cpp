@@ -131,6 +131,7 @@ namespace AltinaEngine::Engine {
             entry.OwnerId             = owner;
             entry.MeshComponentId     = meshId;
             entry.MaterialComponentId = id;
+            entry.MeshGeometryKey     = meshComponent.GetStaticMeshGeometryKey();
             entry.Mesh                = &meshData;
             entry.Materials           = &materialComponent;
             const auto worldTransform = world.Object(owner).GetWorldTransform();

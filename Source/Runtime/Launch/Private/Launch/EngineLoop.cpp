@@ -1225,7 +1225,7 @@ namespace AltinaEngine::Launch {
             mAssetManager.RegisterLoader(&mCubeMapLoader);
             GameScene::FScriptComponent::SetAssetManager(&mAssetManager);
             BindMeshMaterialConverter(mAssetRegistry, mAssetManager);
-            BindStaticMeshConverter(mAssetRegistry, mAssetManager);
+            BindStaticMeshConverter(mAssetRegistry, mAssetManager, mStaticMeshCache);
             BindSkyCubeConverter(mAssetManager);
             mAssetReady = true;
         }
@@ -1851,7 +1851,18 @@ namespace AltinaEngine::Launch {
             mDebugGui.Reset();
         }
 
+        if (mMainViewport) {
+            mMainViewport->SetDeleteQueue(nullptr);
+            mMainViewport.Reset();
+        }
+
+        // Release world-owned render resources (meshes/material instances/components) before
+        // tearing down the RHI device.
+        mEngineRuntime.GetWorldManager().Clear();
+        mRenderCallback = {};
+
         if (mAssetReady) {
+            mStaticMeshCache.Clear();
             mMaterialCache.Clear();
             mAssetManager.ClearCache();
             mAssetManager.UnregisterLoader(&mTexture2DLoader);
@@ -1868,16 +1879,6 @@ namespace AltinaEngine::Launch {
             GameScene::FStaticMeshFilterComponent::AssetToStaticMeshConverter = {};
             mAssetReady                                                       = false;
         }
-
-        if (mMainViewport) {
-            mMainViewport->SetDeleteQueue(nullptr);
-            mMainViewport.Reset();
-        }
-
-        // Release world-owned render resources (meshes/material instances/components) before
-        // tearing down the RHI device.
-        mEngineRuntime.GetWorldManager().Clear();
-        mRenderCallback = {};
 
         if (mRenderingThread) {
             mRenderingThread->Stop();

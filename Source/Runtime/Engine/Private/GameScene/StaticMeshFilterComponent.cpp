@@ -1,7 +1,14 @@
 #include "Engine/GameScene/StaticMeshFilterComponent.h"
 
+#include <cstdint>
+
 namespace AltinaEngine::GameScene {
     namespace {
+        [[nodiscard]] auto BuildProceduralGeometryKey(
+            const Geometry::FStaticMeshData& mesh) noexcept -> u64 {
+            return static_cast<u64>(reinterpret_cast<uintptr_t>(&mesh));
+        }
+
         void ReleaseStaticMeshGpuResources(Geometry::FStaticMeshData& mesh) noexcept {
             for (auto& lod : mesh.mLods) {
                 lod.ReleaseGpuResources();
@@ -14,13 +21,24 @@ namespace AltinaEngine::GameScene {
 
     auto FStaticMeshFilterComponent::GetStaticMesh() noexcept -> Geometry::FStaticMeshData& {
         ResolveStaticMesh();
-        return mStaticMesh;
+        return const_cast<Geometry::FStaticMeshData&>(GetResolvedStaticMesh());
     }
 
     auto FStaticMeshFilterComponent::GetStaticMesh() const noexcept
         -> const Geometry::FStaticMeshData& {
         ResolveStaticMesh();
-        return mStaticMesh;
+        return GetResolvedStaticMesh();
+    }
+
+    auto FStaticMeshFilterComponent::GetStaticMeshGeometryKey() const noexcept -> u64 {
+        ResolveStaticMesh();
+        if (mProceduralOverride) {
+            return BuildProceduralGeometryKey(mStaticMesh);
+        }
+        if (mStaticMeshEntry) {
+            return mStaticMeshEntry->mGeometryKey;
+        }
+        return 0ULL;
     }
 
     void FStaticMeshFilterComponent::SetStaticMeshAsset(Asset::FAssetHandle handle) noexcept {
@@ -29,7 +47,8 @@ namespace AltinaEngine::GameScene {
         mProceduralOverride = false;
         mMeshResolved       = false;
         mStaticMesh         = {};
-        mResolvedAsset      = {};
+        mStaticMeshEntry.Reset();
+        mResolvedAsset = {};
     }
 
     void FStaticMeshFilterComponent::SetStaticMeshData(
@@ -40,6 +59,7 @@ namespace AltinaEngine::GameScene {
         mResolvedAsset      = {};
         mMeshResolved       = true;
         mStaticMesh         = Move(InMesh);
+        mStaticMeshEntry.Reset();
 
         // Mirror the mesh-asset conversion path: ensure GPU buffers exist so the procedural mesh is
         // drawable immediately.
@@ -65,6 +85,7 @@ namespace AltinaEngine::GameScene {
         mResolvedAsset      = {};
         mMeshResolved       = false;
         mStaticMesh         = {};
+        mStaticMeshEntry.Reset();
     }
 
     void FStaticMeshFilterComponent::ResolveStaticMesh() const noexcept {
@@ -88,11 +109,20 @@ namespace AltinaEngine::GameScene {
         mMeshResolved = true;
         ReleaseStaticMeshGpuResources(mStaticMesh);
         mStaticMesh = {};
+        mStaticMeshEntry.Reset();
 
         if (!mMeshAsset.IsValid()) {
             return;
         }
 
-        mStaticMesh = AssetToStaticMeshConverter(mMeshAsset);
+        mStaticMeshEntry = AssetToStaticMeshConverter(mMeshAsset);
+    }
+
+    auto FStaticMeshFilterComponent::GetResolvedStaticMesh() const noexcept
+        -> const Geometry::FStaticMeshData& {
+        if (mProceduralOverride || !mStaticMeshEntry) {
+            return mStaticMesh;
+        }
+        return mStaticMeshEntry->mMesh;
     }
 } // namespace AltinaEngine::GameScene

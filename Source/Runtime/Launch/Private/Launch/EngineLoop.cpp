@@ -36,6 +36,7 @@
 #include "Rhi/RhiQueue.h"
 #include "Rhi/RhiStructs.h"
 #include "Rhi/Command/RhiCmdContextAdapter.h"
+#include "Shadow/CascadedShadowMapping.h"
 #include "Reflection/Reflection.h"
 #include "Utility/Assert.h"
 
@@ -79,6 +80,7 @@
 using AltinaEngine::Move;
 using AltinaEngine::Core::Container::MakeUnique;
 using AltinaEngine::Core::Container::MakeUniqueAs;
+using AltinaEngine::Core::Container::TArray;
 using AltinaEngine::Core::Container::TVector;
 using AltinaEngine::Core::Logging::LogWarningCat;
 using AltinaEngine::Core::Utility::Assert;
@@ -87,6 +89,9 @@ using AltinaEngine::Core::Utility::DebugAssert;
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
     namespace {
+        using FShadowCascadeDrawListArray =
+            TArray<RenderCore::Render::FDrawList, RenderCore::Shadow::kMaxCascades>;
+
         constexpr auto     kFrameTimingCategory = TEXT("FrameTiming");
 
         [[nodiscard]] auto ElapsedMilliseconds(
@@ -155,6 +160,44 @@ namespace AltinaEngine::Launch {
                 out = 1U;
             }
             return out;
+        }
+
+        [[nodiscard]] auto EstimateShadowCascadeCoverage(
+            const RenderCore::View::FViewData& view, f32 cascadeFarDepth) noexcept -> f32 {
+            if (cascadeFarDepth <= 0.0f) {
+                return 0.0f;
+            }
+
+            if (view.Camera.mProjectionType
+                == RenderCore::View::ECameraProjectionType::Orthographic) {
+                return Core::Math::Max(view.Camera.mOrthoWidth, view.Camera.mOrthoHeight);
+            }
+
+            const f32 viewWidth =
+                static_cast<f32>(view.ViewRect.Width > 0U ? view.ViewRect.Width : 1U);
+            const f32 viewHeight =
+                static_cast<f32>(view.ViewRect.Height > 0U ? view.ViewRect.Height : 1U);
+            const f32 aspect = viewWidth / viewHeight;
+            const f32 halfHeight =
+                Core::Math::Tan(view.Camera.mVerticalFovRadians * 0.5f) * cascadeFarDepth;
+            const f32 halfWidth = halfHeight * aspect;
+            return 2.0f * Core::Math::Max(halfWidth, halfHeight);
+        }
+
+        [[nodiscard]] auto EstimateShadowMinCasterRadius(const RenderCore::View::FViewData& view,
+            f32 cascadeFarDepth, u32 shadowMapSize) noexcept -> f32 {
+            if (shadowMapSize == 0U) {
+                return 0.0f;
+            }
+
+            constexpr f32 kMinCasterTexelFactor = 1.5f;
+            const f32     coverage = EstimateShadowCascadeCoverage(view, cascadeFarDepth);
+            if (coverage <= 0.0f) {
+                return 0.0f;
+            }
+
+            const f32 texelWorldSize = coverage / static_cast<f32>(shadowMapSize);
+            return texelWorldSize * kMinCasterTexelFactor;
         }
 
 #if defined(AE_ENABLE_SCRIPTING_CORECLR) && AE_ENABLE_SCRIPTING_CORECLR
@@ -602,7 +645,7 @@ namespace AltinaEngine::Launch {
 
         void SendSceneRenderingRequest(Rhi::FRhiDevice& device, Rhi::FRhiViewport* defaultViewport,
             Engine::FRenderScene& scene, const TVector<RenderCore::Render::FDrawList>& drawLists,
-            const TVector<RenderCore::Render::FDrawList>& shadowDrawLists,
+            const TVector<FShadowCascadeDrawListArray>& shadowDrawLists,
             Rendering::ERendererType rendererType, const Asset::FAssetRegistry* assetRegistry,
             Asset::FAssetManager* assetManager, Rhi::FRhiTexture* primaryViewOutputOverride) {
             const auto renderRequestStart = std::chrono::steady_clock::now();
@@ -931,8 +974,13 @@ namespace AltinaEngine::Launch {
                 viewContext.ViewKey  = viewKey;
                 viewContext.View     = &view.View;
                 viewContext.DrawList = (i < drawLists.Size()) ? &drawLists[i] : nullptr;
-                viewContext.ShadowDrawList =
-                    (i < shadowDrawLists.Size()) ? &shadowDrawLists[i] : nullptr;
+                if (i < shadowDrawLists.Size()) {
+                    for (u32 cascadeIndex = 0U; cascadeIndex < RenderCore::Shadow::kMaxCascades;
+                        ++cascadeIndex) {
+                        viewContext.ShadowDrawLists[cascadeIndex] =
+                            &shadowDrawLists[i][cascadeIndex];
+                    }
+                }
                 viewContext.OutputTarget = outputTarget;
                 const auto* swapchainBackBuffer =
                     (defaultViewport != nullptr) ? defaultViewport->GetBackBuffer() : nullptr;
@@ -1486,7 +1534,7 @@ namespace AltinaEngine::Launch {
 
         Engine::FRenderScene                   renderScene;
         TVector<RenderCore::Render::FDrawList> drawLists;
-        TVector<RenderCore::Render::FDrawList> shadowDrawLists;
+        TVector<FShadowCascadeDrawListArray>   shadowDrawLists;
 
         if (renderWidth > 0U && renderHeight > 0U) {
             if (auto* world = mEngineRuntime.GetWorldManager().GetActiveWorld()) {
@@ -1513,15 +1561,66 @@ namespace AltinaEngine::Launch {
                     drawLists.Resize(renderScene.Views.Size());
                     shadowDrawLists.Resize(renderScene.Views.Size());
                     for (usize i = 0; i < renderScene.Views.Size(); ++i) {
+                        batchParams.mDebugName.Assign(TEXT("BasePass.View"));
+                        batchParams.mDebugName.AppendNumber(static_cast<u32>(i));
                         batchBuilder.Build(renderScene, renderScene.Views[i], batchParams,
                             mMaterialCache, drawLists[i]);
 
                         // Shadow pass draw list (Directional CSM).
                         Engine::FSceneBatchBuildParams shadowParams = batchParams;
-                        shadowParams.Pass                  = RenderCore::EMaterialPass::ShadowPass;
-                        shadowParams.bEnableFrustumCulling = false;
-                        batchBuilder.Build(renderScene, renderScene.Views[i], shadowParams,
-                            mMaterialCache, shadowDrawLists[i]);
+                        shadowParams.Pass = RenderCore::EMaterialPass::ShadowPass;
+
+                        RenderCore::Shadow::FCSMSettings shadowSettings{};
+                        shadowSettings.mCascadeCount  = RenderCore::Shadow::kMaxCascades;
+                        shadowSettings.mSplitLambda   = 0.65f;
+                        shadowSettings.mMaxDistance   = 250.0f;
+                        shadowSettings.mShadowMapSize = 2048U;
+                        shadowSettings.mReceiverBias  = 0.0015f;
+
+                        RenderCore::Shadow::FCSMData shadowCsm{};
+                        u32                          shadowMapSize = shadowSettings.mShadowMapSize;
+                        if (renderScene.Lights.mHasMainDirectionalLight
+                            && renderScene.Lights.mMainDirectionalLight.mCastShadows) {
+                            const auto& directionalLight = renderScene.Lights.mMainDirectionalLight;
+                            shadowSettings.mCascadeCount = directionalLight.mShadowCascadeCount;
+                            shadowSettings.mSplitLambda  = directionalLight.mShadowSplitLambda;
+                            shadowSettings.mMaxDistance  = directionalLight.mShadowMaxDistance;
+                            shadowSettings.mShadowMapSize = directionalLight.mShadowMapSize;
+                            shadowSettings.mReceiverBias  = directionalLight.mShadowReceiverBias;
+                            shadowMapSize                 = directionalLight.mShadowMapSize;
+                            RenderCore::Shadow::BuildDirectionalCSM(renderScene.Views[i].View,
+                                directionalLight, shadowSettings, shadowCsm);
+                        }
+
+                        const u32 cascadeCount = shadowCsm.mCascadeCount;
+                        for (u32 cascadeIndex = 0U; cascadeIndex < RenderCore::Shadow::kMaxCascades;
+                            ++cascadeIndex) {
+                            if (cascadeIndex >= cascadeCount) {
+                                continue;
+                            }
+
+                            shadowParams.bEnableFrustumCulling = true;
+                            shadowParams.bUseCustomCullMatrix  = true;
+                            shadowParams.mCullViewProj =
+                                shadowCsm.mCascades[cascadeIndex].mLightViewProj;
+                            shadowParams.bEnableShadowDistanceCulling = true;
+                            shadowParams.mShadowCullMaxViewDepth =
+                                shadowCsm.mCascades[cascadeIndex].mSplitVs[1];
+                            shadowParams.mShadowCullViewDepthPadding =
+                                (shadowCsm.mCascades[cascadeIndex].mSplitVs[1]
+                                    - shadowCsm.mCascades[cascadeIndex].mSplitVs[0])
+                                * 0.5f;
+                            shadowParams.bEnableShadowSmallCasterCulling = true;
+                            shadowParams.mShadowMinCasterRadiusWs =
+                                EstimateShadowMinCasterRadius(renderScene.Views[i].View,
+                                    shadowCsm.mCascades[cascadeIndex].mSplitVs[1], shadowMapSize);
+                            shadowParams.mDebugName.Assign(TEXT("ShadowPass.View"));
+                            shadowParams.mDebugName.AppendNumber(static_cast<u32>(i));
+                            shadowParams.mDebugName.Append(TEXT(".Cascade"));
+                            shadowParams.mDebugName.AppendNumber(cascadeIndex);
+                            batchBuilder.Build(renderScene, renderScene.Views[i], shadowParams,
+                                mMaterialCache, shadowDrawLists[i][cascadeIndex]);
+                        }
                     }
                     for (auto& drawList : drawLists) {
                         for (const auto& bucket : drawList.mBuckets) {
@@ -1532,12 +1631,14 @@ namespace AltinaEngine::Launch {
                             }
                         }
                     }
-                    for (auto& drawList : shadowDrawLists) {
-                        for (const auto& bucket : drawList.mBuckets) {
-                            if (bucket.mMaterial != nullptr) {
-                                auto* material =
-                                    const_cast<RenderCore::FMaterial*>(bucket.mMaterial);
-                                mMaterialCache.PrepareMaterialForRendering(*material);
+                    for (auto& shadowViewDrawLists : shadowDrawLists) {
+                        for (auto& drawList : shadowViewDrawLists) {
+                            for (const auto& bucket : drawList.mBuckets) {
+                                if (bucket.mMaterial != nullptr) {
+                                    auto* material =
+                                        const_cast<RenderCore::FMaterial*>(bucket.mMaterial);
+                                    mMaterialCache.PrepareMaterialForRendering(*material);
+                                }
                             }
                         }
                     }

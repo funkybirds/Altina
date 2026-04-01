@@ -110,8 +110,7 @@ namespace AltinaEngine::Rendering::Deferred {
 
         if (inputs.View != nullptr && inputs.Lights != nullptr
             && inputs.Lights->mHasMainDirectionalLight
-            && inputs.Lights->mMainDirectionalLight.mCastShadows
-            && inputs.ShadowDrawList != nullptr) {
+            && inputs.Lights->mMainDirectionalLight.mCastShadows) {
             RenderCore::Shadow::BuildDirectionalCSM(
                 *inputs.View, inputs.Lights->mMainDirectionalLight, result.Settings, result.Data);
         }
@@ -246,8 +245,10 @@ namespace AltinaEngine::Rendering::Deferred {
                 [&](RenderCore::FFrameGraphPassBuilder& builder, FShadowPassData& data) {
                     data.Shadow = builder.Write(outShadowMap, Rhi::ERhiResourceState::DepthWrite);
 
-                    if (inputs.ShadowDrawList != nullptr) {
-                        for (const auto& bucket : inputs.ShadowDrawList->mBuckets) {
+                    const auto* shadowDrawList =
+                        (cascade < 4U) ? inputs.ShadowDrawLists[cascade] : nullptr;
+                    if (shadowDrawList != nullptr) {
+                        for (const auto& bucket : shadowDrawList->mBuckets) {
                             RegisterMaterialTextureReads(graph, builder, bucket.mMaterial,
                                 bucket.mPass, importedExternalTextures);
                         }

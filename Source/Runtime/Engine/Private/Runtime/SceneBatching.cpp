@@ -7,6 +7,7 @@
 #include "Types/Conversion.h"
 #include "Algorithm/Sort.h"
 #include "Container/HashUtility.h"
+#include "Logging/Log.h"
 #include "Math/LinAlg/RenderingMath.h"
 
 using AltinaEngine::Move;
@@ -181,6 +182,22 @@ namespace AltinaEngine::Engine {
             return distance < 0.0f;
         }
 
+        [[nodiscard]] auto TryBuildWorldBounds(const RenderCore::Geometry::FStaticMeshData* mesh,
+            u32 lodIndex, const FMatrix4x4f& worldMatrix, FVector3f& outMinWS,
+            FVector3f& outMaxWS) noexcept -> bool {
+            if (mesh == nullptr || lodIndex >= mesh->mLods.Size()) {
+                return false;
+            }
+
+            const auto& lodBounds = mesh->mLods[lodIndex].mBounds;
+            if (!lodBounds.IsValid()) {
+                return false;
+            }
+
+            return Core::Math::LinAlg::TransformAabbToWorld(
+                worldMatrix, lodBounds.Max, lodBounds.Min, outMinWS, outMaxWS);
+        }
+
         [[nodiscard]] auto BuildFrustumCullContext(const FSceneView& view,
             const FSceneBatchBuildParams& params) noexcept -> FFrustumCullContext {
             FFrustumCullContext context{};
@@ -188,27 +205,16 @@ namespace AltinaEngine::Engine {
                 return context;
             }
 
-            ExtractFrustumPlanes(view.View.Matrices.ViewProj, context.mPlanes);
+            const FMatrix4x4f& cullViewProj =
+                params.bUseCustomCullMatrix ? params.mCullViewProj : view.View.Matrices.ViewProj;
+            ExtractFrustumPlanes(cullViewProj, context.mPlanes);
             context.mEnabled = true;
             return context;
         }
 
-        [[nodiscard]] auto IsVisibleInFrustum(const RenderCore::Geometry::FStaticMeshData* mesh,
-            u32 lodIndex, const FMatrix4x4f& worldMatrix,
+        [[nodiscard]] auto IsVisibleInFrustum(const FVector3f& minWS, const FVector3f& maxWS,
             const FFrustumCullContext& context) noexcept -> bool {
-            if (mesh == nullptr || !context.mEnabled || lodIndex >= mesh->mLods.Size()) {
-                return true;
-            }
-
-            const auto& lodBounds = mesh->mLods[lodIndex].mBounds;
-            if (!lodBounds.IsValid()) {
-                return true;
-            }
-
-            FVector3f minWS(0.0f);
-            FVector3f maxWS(0.0f);
-            if (!Core::Math::LinAlg::TransformAabbToWorld(
-                    worldMatrix, lodBounds.Max, lodBounds.Min, minWS, maxWS)) {
+            if (!context.mEnabled) {
                 return true;
             }
 
@@ -219,16 +225,69 @@ namespace AltinaEngine::Engine {
             }
             return true;
         }
+
+        [[nodiscard]] auto IsBeyondShadowCullDistance(const FSceneView& view,
+            const FVector3f& minWS, const FVector3f& maxWS,
+            const FSceneBatchBuildParams& params) noexcept -> bool {
+            if (!params.bEnableShadowDistanceCulling || params.mShadowCullMaxViewDepth <= 0.0f) {
+                return false;
+            }
+
+            FVector3f minVS(0.0f);
+            FVector3f maxVS(0.0f);
+            if (!Core::Math::LinAlg::TransformAabbToWorld(
+                    view.View.Matrices.View, maxWS, minWS, minVS, maxVS)) {
+                return false;
+            }
+
+            const f32 maxAllowedDepth = params.mShadowCullMaxViewDepth
+                + Core::Math::Max(params.mShadowCullViewDepthPadding, 0.0f);
+            return minVS[2] > maxAllowedDepth;
+        }
+
+        [[nodiscard]] auto ComputeWorldBoundsRadius(
+            const FVector3f& minWS, const FVector3f& maxWS) noexcept -> f32 {
+            const FVector3f extents((maxWS[0] - minWS[0]) * 0.5f, (maxWS[1] - minWS[1]) * 0.5f,
+                (maxWS[2] - minWS[2]) * 0.5f);
+            return Core::Math::Sqrt(
+                extents[0] * extents[0] + extents[1] * extents[1] + extents[2] * extents[2]);
+        }
+
+        [[nodiscard]] auto IsSmallShadowCaster(const FVector3f& minWS, const FVector3f& maxWS,
+            const FSceneBatchBuildParams& params) noexcept -> bool {
+            if (!params.bEnableShadowSmallCasterCulling
+                || params.mShadowMinCasterRadiusWs <= 0.0f) {
+                return false;
+            }
+
+            return ComputeWorldBoundsRadius(minWS, maxWS) < params.mShadowMinCasterRadiusWs;
+        }
     } // namespace
 
     void FSceneBatchBuilder::Build(const FRenderScene& scene, const FSceneView& view,
         const FSceneBatchBuildParams& params, FMaterialCache& materialCache,
         RenderCore::Render::FDrawList& outDrawList) const {
         outDrawList.Clear();
+        const TChar* debugName =
+            params.mDebugName.IsEmptyString() ? TEXT("Unnamed") : params.mDebugName.CStr();
 
+        const u32 totalStaticMeshes = static_cast<u32>(scene.StaticMeshes.Size());
         if (scene.StaticMeshes.IsEmpty()) {
+            LogInfoCat(TEXT("Engine.SceneBatching"),
+                "Build summary: name={}, pass={}, frustumEnabled={}, shadowDistanceEnabled={}, smallCasterEnabled={}, staticMeshes=0, frustumCandidates=0, frustumCulled=0, shadowDistanceCandidates=0, shadowDistanceCulled=0, smallCasterCandidates=0, smallCasterCulled=0, visibleMeshes=0, buckets=0, batches=0, instances=0.",
+                debugName, static_cast<u32>(params.Pass), params.bEnableFrustumCulling ? 1U : 0U,
+                params.bEnableShadowDistanceCulling ? 1U : 0U,
+                params.bEnableShadowSmallCasterCulling ? 1U : 0U);
             return;
         }
+
+        u32        visibleMeshCount          = 0U;
+        u32        frustumCandidateCount     = 0U;
+        u32        frustumCulledCount        = 0U;
+        u32        shadowDistanceCandidates  = 0U;
+        u32        shadowDistanceCulledCount = 0U;
+        u32        smallCasterCandidates     = 0U;
+        u32        smallCasterCulledCount    = 0U;
 
         const auto frustumContext = BuildFrustumCullContext(view, params);
 
@@ -254,11 +313,34 @@ namespace AltinaEngine::Engine {
             if (params.LodIndex >= entry.Mesh->mLods.Size()) {
                 continue;
             }
-            if (params.bEnableFrustumCulling
-                && !IsVisibleInFrustum(
-                    entry.Mesh, params.LodIndex, entry.WorldMatrix, frustumContext)) {
-                continue;
+
+            FVector3f  minWS(0.0f);
+            FVector3f  maxWS(0.0f);
+            const bool bHasWorldBounds =
+                TryBuildWorldBounds(entry.Mesh, params.LodIndex, entry.WorldMatrix, minWS, maxWS);
+
+            if (params.bEnableFrustumCulling) {
+                ++frustumCandidateCount;
+                if (bHasWorldBounds && !IsVisibleInFrustum(minWS, maxWS, frustumContext)) {
+                    ++frustumCulledCount;
+                    continue;
+                }
             }
+            if (params.bEnableShadowDistanceCulling) {
+                ++shadowDistanceCandidates;
+                if (bHasWorldBounds && IsBeyondShadowCullDistance(view, minWS, maxWS, params)) {
+                    ++shadowDistanceCulledCount;
+                    continue;
+                }
+            }
+            if (params.bEnableShadowSmallCasterCulling) {
+                ++smallCasterCandidates;
+                if (bHasWorldBounds && IsSmallShadowCaster(minWS, maxWS, params)) {
+                    ++smallCasterCulledCount;
+                    continue;
+                }
+            }
+            ++visibleMeshCount;
 
             const auto& lod = entry.Mesh->mLods[params.LodIndex];
             if (lod.mSections.IsEmpty()) {
@@ -303,6 +385,14 @@ namespace AltinaEngine::Engine {
         }
 
         if (items.IsEmpty()) {
+            LogInfoCat(TEXT("Engine.SceneBatching"),
+                "Build summary: name={}, pass={}, frustumEnabled={}, shadowDistanceEnabled={}, smallCasterEnabled={}, staticMeshes={}, frustumCandidates={}, frustumCulled={}, shadowDistanceCandidates={}, shadowDistanceCulled={}, smallCasterCandidates={}, smallCasterCulled={}, visibleMeshes={}, buckets=0, batches=0, instances=0.",
+                debugName, static_cast<u32>(params.Pass), params.bEnableFrustumCulling ? 1U : 0U,
+                params.bEnableShadowDistanceCulling ? 1U : 0U,
+                params.bEnableShadowSmallCasterCulling ? 1U : 0U, totalStaticMeshes,
+                frustumCandidateCount, frustumCulledCount, shadowDistanceCandidates,
+                shadowDistanceCulledCount, smallCasterCandidates, smallCasterCulledCount,
+                visibleMeshCount);
             return;
         }
 
@@ -335,5 +425,20 @@ namespace AltinaEngine::Engine {
                 bucket.mBatches.Back().mInstances.PushBack(item.mInstance);
             }
         }
+
+        u32 totalInstanceCount = 0U;
+        outDrawList.ForEachBatch([&totalInstanceCount](const auto& batch) {
+            totalInstanceCount += static_cast<u32>(batch.mInstances.Size());
+        });
+
+        LogInfoCat(TEXT("Engine.SceneBatching"),
+            "Build summary: name={}, pass={}, frustumEnabled={}, shadowDistanceEnabled={}, smallCasterEnabled={}, staticMeshes={}, frustumCandidates={}, frustumCulled={}, shadowDistanceCandidates={}, shadowDistanceCulled={}, smallCasterCandidates={}, smallCasterCulled={}, visibleMeshes={}, buckets={}, batches={}, instances={}.",
+            debugName, static_cast<u32>(params.Pass), params.bEnableFrustumCulling ? 1U : 0U,
+            params.bEnableShadowDistanceCulling ? 1U : 0U,
+            params.bEnableShadowSmallCasterCulling ? 1U : 0U, totalStaticMeshes,
+            frustumCandidateCount, frustumCulledCount, shadowDistanceCandidates,
+            shadowDistanceCulledCount, smallCasterCandidates, smallCasterCulledCount,
+            visibleMeshCount, outDrawList.GetBucketCount(), outDrawList.GetBatchCount(),
+            totalInstanceCount);
     }
 } // namespace AltinaEngine::Engine

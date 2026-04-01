@@ -31,7 +31,7 @@ namespace AltinaEngine::Rendering {
         const RenderCore::Lighting::FLightSceneData* Lights = nullptr;
 
         // Optional shadow caster list (e.g., directional CSM).
-        const RenderCore::Render::FDrawList*         ShadowDrawList = nullptr;
+        const RenderCore::Render::FDrawList*         ShadowDrawLists[4] = {};
 
         // Optional sky cubemap (for skybox rendering).
         Rhi::FRhiTexture*                            SkyCubeTexture                   = nullptr;

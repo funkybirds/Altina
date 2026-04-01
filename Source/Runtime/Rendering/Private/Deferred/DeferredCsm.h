@@ -13,9 +13,8 @@
 
 namespace AltinaEngine::Rendering::Deferred {
     struct FCsmBuildInputs {
-        const RenderCore::View::FViewData*           View           = nullptr;
-        const RenderCore::Lighting::FLightSceneData* Lights         = nullptr;
-        const RenderCore::Render::FDrawList*         ShadowDrawList = nullptr;
+        const RenderCore::View::FViewData*           View   = nullptr;
+        const RenderCore::Lighting::FLightSceneData* Lights = nullptr;
     };
 
     struct FCsmBuildResult {
@@ -31,10 +30,10 @@ namespace AltinaEngine::Rendering::Deferred {
         const Core::Math::FMatrix4x4f& lightViewProj, u32 shadowMapSize, void* userData);
 
     struct FCsmShadowPassInputs {
-        RenderCore::FFrameGraph*             Graph          = nullptr;
-        const RenderCore::View::FViewData*   View           = nullptr;
-        const RenderCore::Render::FDrawList* ShadowDrawList = nullptr;
-        const FCsmBuildResult*               Csm            = nullptr;
+        RenderCore::FFrameGraph*             Graph              = nullptr;
+        const RenderCore::View::FViewData*   View               = nullptr;
+        const RenderCore::Render::FDrawList* ShadowDrawLists[4] = {};
+        const FCsmBuildResult*               Csm                = nullptr;
 
         Rhi::FRhiTextureRef*                 PersistentShadowMap       = nullptr;
         u32*                                 PersistentShadowMapSize   = nullptr;

@@ -92,12 +92,14 @@ namespace {
         return entry;
     }
 
-    auto MakeView() -> FSceneView {
+    auto MakeView(const AltinaEngine::Core::Math::FVector3f& translation =
+                      AltinaEngine::Core::Math::FVector3f(0.0f)) -> FSceneView {
         FSceneView view{};
-        view.View.ViewRect           = FViewRect{ 0, 0, 1280U, 720U };
-        view.View.RenderTargetExtent = FRenderTargetExtent2D{ 1280U, 720U };
-        view.View.Camera.mNearPlane  = 0.1f;
-        view.View.Camera.mFarPlane   = 100.0f;
+        view.View.ViewRect                      = FViewRect{ 0, 0, 1280U, 720U };
+        view.View.RenderTargetExtent            = FRenderTargetExtent2D{ 1280U, 720U };
+        view.View.Camera.mNearPlane             = 0.1f;
+        view.View.Camera.mFarPlane              = 100.0f;
+        view.View.Camera.mTransform.Translation = translation;
         view.View.BeginFrame();
         return view;
     }
@@ -267,7 +269,10 @@ TEST_CASE("GameScene.SceneBatching.FrustumCullsMeshesOutsideDepthRange") {
             return FMaterial{};
         });
 
-    FStaticMeshData        mesh           = MakeStaticMesh();
+    FStaticMeshData mesh      = MakeStaticMesh();
+    mesh.mLods[0].mBounds.Min = AltinaEngine::Core::Math::FVector3f(-0.01f, -0.01f, -0.01f);
+    mesh.mLods[0].mBounds.Max = AltinaEngine::Core::Math::FVector3f(0.01f, 0.01f, 0.01f);
+    mesh.mBounds              = mesh.mLods[0].mBounds;
     const FAssetHandle     materialHandle = MakeMaterialHandle(6U);
     FMeshMaterialComponent materials      = MakeMaterialComponent(materialHandle);
 
@@ -325,4 +330,117 @@ TEST_CASE("GameScene.SceneBatching.FrustumCullsMeshesBehindCamera") {
     REQUIRE_EQ(drawList.GetBucketCount(), 1U);
     REQUIRE_EQ(drawList.GetBatchCount(), 1U);
     REQUIRE_EQ(drawList.mBuckets[0].mBatches[0].mInstances.Size(), 1U);
+}
+
+TEST_CASE("GameScene.SceneBatching.CustomCullMatrixOverridesViewFrustum") {
+    FMaterialConverterGuard converterGuard(
+        [](const FAssetHandle&, const AltinaEngine::Asset::FMeshMaterialParameterBlock&) {
+            return FMaterial{};
+        });
+
+    FStaticMeshData        mesh           = MakeStaticMesh();
+    const FAssetHandle     materialHandle = MakeMaterialHandle(8U);
+    FMeshMaterialComponent materials      = MakeMaterialComponent(materialHandle);
+
+    FRenderScene           scene{};
+    scene.StaticMeshes.PushBack(
+        MakeSceneEntry(mesh, materials, AltinaEngine::Core::Math::FVector3f(0.0f, 0.0f, 5.0f)));
+    scene.StaticMeshes.PushBack(
+        MakeSceneEntry(mesh, materials, AltinaEngine::Core::Math::FVector3f(10.0f, 0.0f, 5.0f)));
+
+    FMaterialCache         materialCache{};
+    FSceneBatchBuilder     builder{};
+    FSceneBatchBuildParams params{};
+    params.Pass                  = EMaterialPass::BasePass;
+    params.bAllowInstancing      = true;
+    params.bEnableFrustumCulling = true;
+    params.bUseCustomCullMatrix  = true;
+
+    const FSceneView defaultView = MakeView();
+    const FSceneView cullView    = MakeView(AltinaEngine::Core::Math::FVector3f(10.0f, 0.0f, 0.0f));
+    params.mCullViewProj         = cullView.View.Matrices.ViewProj;
+
+    AltinaEngine::RenderCore::Render::FDrawList drawList{};
+    builder.Build(scene, defaultView, params, materialCache, drawList);
+
+    REQUIRE_EQ(drawList.GetBucketCount(), 1U);
+    REQUIRE_EQ(drawList.GetBatchCount(), 1U);
+    REQUIRE_EQ(drawList.mBuckets[0].mBatches[0].mInstances.Size(), 1U);
+    REQUIRE_EQ(drawList.mBuckets[0].mBatches[0].mInstances[0].mWorld(0, 3), 10.0f);
+}
+
+TEST_CASE("GameScene.SceneBatching.ShadowDistanceCullsFarCasters") {
+    FMaterialConverterGuard converterGuard(
+        [](const FAssetHandle&, const AltinaEngine::Asset::FMeshMaterialParameterBlock&) {
+            return FMaterial{};
+        });
+
+    FStaticMeshData        mesh           = MakeStaticMesh();
+    const FAssetHandle     materialHandle = MakeMaterialHandle(9U);
+    FMeshMaterialComponent materials      = MakeMaterialComponent(materialHandle);
+
+    FRenderScene           scene{};
+    scene.StaticMeshes.PushBack(
+        MakeSceneEntry(mesh, materials, AltinaEngine::Core::Math::FVector3f(0.0f, 0.0f, 5.0f)));
+    scene.StaticMeshes.PushBack(
+        MakeSceneEntry(mesh, materials, AltinaEngine::Core::Math::FVector3f(0.0f, 0.0f, 25.0f)));
+
+    FMaterialCache         materialCache{};
+    FSceneBatchBuilder     builder{};
+    FSceneBatchBuildParams params{};
+    params.Pass                         = EMaterialPass::ShadowPass;
+    params.bAllowInstancing             = true;
+    params.bEnableFrustumCulling        = false;
+    params.bEnableShadowDistanceCulling = true;
+    params.mShadowCullMaxViewDepth      = 10.0f;
+    params.mShadowCullViewDepthPadding  = 0.0f;
+
+    AltinaEngine::RenderCore::Render::FDrawList drawList{};
+    const FSceneView                            view = MakeView();
+    builder.Build(scene, view, params, materialCache, drawList);
+
+    REQUIRE_EQ(drawList.GetBucketCount(), 1U);
+    REQUIRE_EQ(drawList.GetBatchCount(), 1U);
+    REQUIRE_EQ(drawList.mBuckets[0].mBatches[0].mInstances.Size(), 1U);
+    REQUIRE_EQ(drawList.mBuckets[0].mBatches[0].mInstances[0].mWorld(2, 3), 5.0f);
+}
+
+TEST_CASE("GameScene.SceneBatching.SmallCasterCullsTinyShadowCasters") {
+    FMaterialConverterGuard converterGuard(
+        [](const FAssetHandle&, const AltinaEngine::Asset::FMeshMaterialParameterBlock&) {
+            return FMaterial{};
+        });
+
+    FStaticMeshData largeMesh      = MakeStaticMesh();
+    FStaticMeshData smallMesh      = MakeStaticMesh();
+    smallMesh.mLods[0].mBounds.Min = AltinaEngine::Core::Math::FVector3f(-0.01f, -0.01f, -0.01f);
+    smallMesh.mLods[0].mBounds.Max = AltinaEngine::Core::Math::FVector3f(0.01f, 0.01f, 0.01f);
+    smallMesh.mBounds              = smallMesh.mLods[0].mBounds;
+
+    const FAssetHandle     materialHandle = MakeMaterialHandle(10U);
+    FMeshMaterialComponent materials      = MakeMaterialComponent(materialHandle);
+
+    FRenderScene           scene{};
+    scene.StaticMeshes.PushBack(MakeSceneEntry(
+        largeMesh, materials, AltinaEngine::Core::Math::FVector3f(0.0f, 0.0f, 5.0f)));
+    scene.StaticMeshes.PushBack(MakeSceneEntry(
+        smallMesh, materials, AltinaEngine::Core::Math::FVector3f(1.0f, 0.0f, 5.0f)));
+
+    FMaterialCache         materialCache{};
+    FSceneBatchBuilder     builder{};
+    FSceneBatchBuildParams params{};
+    params.Pass                            = EMaterialPass::ShadowPass;
+    params.bAllowInstancing                = true;
+    params.bEnableFrustumCulling           = false;
+    params.bEnableShadowSmallCasterCulling = true;
+    params.mShadowMinCasterRadiusWs        = 0.1f;
+
+    AltinaEngine::RenderCore::Render::FDrawList drawList{};
+    const FSceneView                            view = MakeView();
+    builder.Build(scene, view, params, materialCache, drawList);
+
+    REQUIRE_EQ(drawList.GetBucketCount(), 1U);
+    REQUIRE_EQ(drawList.GetBatchCount(), 1U);
+    REQUIRE_EQ(drawList.mBuckets[0].mBatches[0].mInstances.Size(), 1U);
+    REQUIRE_EQ(drawList.mBuckets[0].mBatches[0].mInstances[0].mWorld(0, 3), 0.0f);
 }

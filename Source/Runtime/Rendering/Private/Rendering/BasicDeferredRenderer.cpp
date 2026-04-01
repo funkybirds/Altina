@@ -1250,7 +1250,7 @@ namespace AltinaEngine::Rendering {
         }
 
         struct FShadowCascadeExecuteContext {
-            const RenderCore::Render::FDrawList* ShadowDrawList = nullptr;
+            const RenderCore::Render::FDrawList* ShadowDrawLists[4] = {};
             FDrawListBindings                    DrawBindings{};
             FBasePassPipelineData                ShadowPipelineData{};
             FBasePassBindingData                 BindingData{};
@@ -1646,20 +1646,25 @@ namespace AltinaEngine::Rendering {
                     }
                 }
 
-                if (mViewContext.ShadowDrawList != nullptr) {
-                    const auto bounds = ComputeDrawListWorldBounds(*mViewContext.ShadowDrawList);
+                for (u32 cascadeIndex = 0U; cascadeIndex < RenderCore::Shadow::kMaxCascades;
+                    ++cascadeIndex) {
+                    if (mViewContext.ShadowDrawLists[cascadeIndex] == nullptr) {
+                        continue;
+                    }
+                    const auto bounds =
+                        ComputeDrawListWorldBounds(*mViewContext.ShadowDrawLists[cascadeIndex]);
                     if (bounds.bValid) {
                         LogInfo(
                             TEXT(
-                                "Scene WorldBounds(ShadowPass): instances={} batches={} min=({}, {}, {}) max=({}, {}, {})"),
-                            bounds.InstanceCount, bounds.BatchCount, bounds.MinWS[0],
+                                "Scene WorldBounds(ShadowPass.Cascade{}): instances={} batches={} min=({}, {}, {}) max=({}, {}, {})"),
+                            cascadeIndex, bounds.InstanceCount, bounds.BatchCount, bounds.MinWS[0],
                             bounds.MinWS[1], bounds.MinWS[2], bounds.MaxWS[0], bounds.MaxWS[1],
                             bounds.MaxWS[2]);
                     } else {
                         LogInfo(
                             TEXT(
-                                "Scene WorldBounds(ShadowPass): <invalid> instances={} batches={}"),
-                            bounds.InstanceCount, bounds.BatchCount);
+                                "Scene WorldBounds(ShadowPass.Cascade{}): <invalid> instances={} batches={}"),
+                            cascadeIndex, bounds.InstanceCount, bounds.BatchCount);
                     }
                 }
 
@@ -1695,10 +1700,9 @@ namespace AltinaEngine::Rendering {
         basePassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
         basePassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
 
-        auto&       resources      = GetSharedResources();
-        auto*       device         = Rhi::RHIGetDevice();
-        const auto* lights         = mViewContext.Lights;
-        const auto* shadowDrawList = mViewContext.ShadowDrawList;
+        auto&       resources = GetSharedResources();
+        auto*       device    = Rhi::RHIGetDevice();
+        const auto* lights    = mViewContext.Lights;
         Assert(device != nullptr, TEXT("BasicDeferredRenderer"),
             "Render failed: RHI device is null while preparing instance buffer.");
         if (device == nullptr) {
@@ -1707,11 +1711,15 @@ namespace AltinaEngine::Rendering {
         Deferred::FCsmBuildInputs csmInputs{};
         csmInputs.View                      = view;
         csmInputs.Lights                    = lights;
-        csmInputs.ShadowDrawList            = shadowDrawList;
         const Deferred::FCsmBuildResult csm = Deferred::BuildCsm(csmInputs);
 
-        const u32                       requiredPerDrawInstances = CountDrawListInstances(drawList)
-            + CountDrawListInstances(shadowDrawList) * csm.Data.mCascadeCount;
+        u32                             requiredPerDrawInstances = CountDrawListInstances(drawList);
+        for (u32 cascadeIndex = 0U; cascadeIndex < csm.Data.mCascadeCount
+            && cascadeIndex < RenderCore::Shadow::kMaxCascades;
+            ++cascadeIndex) {
+            requiredPerDrawInstances +=
+                CountDrawListInstances(mViewContext.ShadowDrawLists[cascadeIndex]);
+        }
         if (requiredPerDrawInstances > mPerDrawCapacity) {
             u32 grownCapacity = (mPerDrawCapacity > 0U) ? mPerDrawCapacity : 1U;
             while (grownCapacity < requiredPerDrawInstances) {
@@ -1922,7 +1930,6 @@ namespace AltinaEngine::Rendering {
             static thread_local TDeque<FShadowCascadeExecuteContext> sShadowContexts;
             sShadowContexts.PushBack(FShadowCascadeExecuteContext{});
             auto& executeCtx                              = sShadowContexts.Back();
-            executeCtx.ShadowDrawList                     = shadowDrawList;
             executeCtx.DrawBindings                       = drawBindings;
             executeCtx.ShadowPipelineData                 = pipelineData;
             executeCtx.ShadowPipelineData.DefaultPassDesc = &resources.DefaultShadowPassDesc;
@@ -1930,6 +1937,7 @@ namespace AltinaEngine::Rendering {
             executeCtx.FallbackPerFrameBuffer             = mPerFrameBuffer.Get();
             executeCtx.FallbackPerFrameGroup              = mPerFrameGroup.Get();
             for (u32 i = 0U; i < 4U; ++i) {
+                executeCtx.ShadowDrawLists[i]        = mViewContext.ShadowDrawLists[i];
                 executeCtx.CascadePerFrameBuffers[i] = mShadowPerFrameBuffers[i].Get();
                 executeCtx.CascadePerFrameGroups[i]  = mShadowPerFrameGroups[i].Get();
             }
@@ -1937,12 +1945,14 @@ namespace AltinaEngine::Rendering {
             Deferred::FCsmShadowPassInputs shadowInputs{};
             shadowInputs.Graph                     = &graph;
             shadowInputs.View                      = view;
-            shadowInputs.ShadowDrawList            = shadowDrawList;
             shadowInputs.Csm                       = &csm;
             shadowInputs.PersistentShadowMap       = &resources.ShadowMapCSM;
             shadowInputs.PersistentShadowMapSize   = &resources.ShadowMapCSMSize;
             shadowInputs.PersistentShadowMapLayers = &resources.ShadowMapCSMLayers;
-            shadowInputs.ExecuteCascadeFn          = [](Rhi::FRhiCmdContext& ctx, u32 cascadeIndex,
+            for (u32 i = 0U; i < 4U; ++i) {
+                shadowInputs.ShadowDrawLists[i] = mViewContext.ShadowDrawLists[i];
+            }
+            shadowInputs.ExecuteCascadeFn = [](Rhi::FRhiCmdContext& ctx, u32 cascadeIndex,
                                                 const FMatrix4x4f& lightViewProj, u32 shadowMapSize,
                                                 void* userData) -> void {
                 auto* executeData = static_cast<FShadowCascadeExecuteContext*>(userData);
@@ -1951,17 +1961,17 @@ namespace AltinaEngine::Rendering {
                 }
 
                 Rhi::FRhiBuffer*    perFrameBuffer = (cascadeIndex < 4U)
-                                ? executeData->CascadePerFrameBuffers[cascadeIndex]
-                                : executeData->FallbackPerFrameBuffer;
+                       ? executeData->CascadePerFrameBuffers[cascadeIndex]
+                       : executeData->FallbackPerFrameBuffer;
                 Rhi::FRhiBindGroup* perFrameGroup  = (cascadeIndex < 4U)
-                              ? executeData->CascadePerFrameGroups[cascadeIndex]
-                              : executeData->FallbackPerFrameGroup;
+                     ? executeData->CascadePerFrameGroups[cascadeIndex]
+                     : executeData->FallbackPerFrameGroup;
                 if (reinterpret_cast<usize>(perFrameBuffer) == static_cast<usize>(~0ULL)
                     || reinterpret_cast<usize>(perFrameGroup) == static_cast<usize>(~0ULL)) {
                     DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                                 "Shadow cascade execute has poisoned pointers (cascade={}, perFrameBuffer={}, perFrameGroup={}).",
-                                 cascadeIndex, reinterpret_cast<usize>(perFrameBuffer),
-                                 reinterpret_cast<usize>(perFrameGroup));
+                        "Shadow cascade execute has poisoned pointers (cascade={}, perFrameBuffer={}, perFrameGroup={}).",
+                        cascadeIndex, reinterpret_cast<usize>(perFrameBuffer),
+                        reinterpret_cast<usize>(perFrameGroup));
                     return;
                 }
 
@@ -1988,12 +1998,14 @@ namespace AltinaEngine::Rendering {
                 scissor.mHeight = shadowMapSize;
                 ctx.RHISetScissor(scissor);
 
-                if (executeData->ShadowDrawList != nullptr) {
+                const auto* shadowDrawList =
+                    (cascadeIndex < 4U) ? executeData->ShadowDrawLists[cascadeIndex] : nullptr;
+                if (shadowDrawList != nullptr) {
                     auto bindings     = executeData->DrawBindings;
                     bindings.PerFrame = perFrameGroup;
-                    FDrawListExecutor::ExecuteBasePass(ctx, *executeData->ShadowDrawList, bindings,
-                                 ResolveShadowPassPipeline, &executeData->ShadowPipelineData, BindPerDraw,
-                                 &executeData->BindingData);
+                    FDrawListExecutor::ExecuteBasePass(ctx, *shadowDrawList, bindings,
+                        ResolveShadowPassPipeline, &executeData->ShadowPipelineData, BindPerDraw,
+                        &executeData->BindingData);
                 }
             };
             shadowInputs.ExecuteCascadeUserData = &executeCtx;

@@ -89,6 +89,34 @@ using AltinaEngine::Core::Utility::DebugAssert;
 namespace AltinaEngine::Launch {
     namespace Container = Core::Container;
     namespace {
+        auto ToRhiTextureFormatImpl(u32 assetFormat, bool srgb) noexcept -> Rhi::ERhiFormat {
+            switch (assetFormat) {
+                case Asset::kTextureFormatRGBA8:
+                    return srgb ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
+                                : Rhi::ERhiFormat::R8G8B8A8Unorm;
+                case Asset::kTextureFormatRGBA16F:
+                    return Rhi::ERhiFormat::R16G16B16A16Float;
+                case Asset::kTextureFormatBC1:
+                    return srgb ? Rhi::ERhiFormat::BC1UnormSrgb : Rhi::ERhiFormat::BC1Unorm;
+                case Asset::kTextureFormatBC2:
+                    return srgb ? Rhi::ERhiFormat::BC2UnormSrgb : Rhi::ERhiFormat::BC2Unorm;
+                case Asset::kTextureFormatBC3:
+                    return srgb ? Rhi::ERhiFormat::BC3UnormSrgb : Rhi::ERhiFormat::BC3Unorm;
+                case Asset::kTextureFormatBC4:
+                    return Rhi::ERhiFormat::BC4Unorm;
+                case Asset::kTextureFormatBC5:
+                    return Rhi::ERhiFormat::BC5Unorm;
+                default:
+                    return Rhi::ERhiFormat::Unknown;
+            }
+        }
+    } // namespace
+
+    auto FEngineLoop::ToRhiTextureFormat(u32 assetFormat, bool srgb) noexcept -> Rhi::ERhiFormat {
+        return ToRhiTextureFormatImpl(assetFormat, srgb);
+    }
+
+    namespace {
         using FShadowCascadeDrawListArray =
             TArray<RenderCore::Render::FDrawList, RenderCore::Shadow::kMaxCascades>;
 
@@ -117,7 +145,6 @@ namespace AltinaEngine::Launch {
             }
             return Application::EWindowDpiPolicy::LogicalFixed;
         }
-
         void ResolveLogicalWindowSize(const Core::Utility::EngineConfig::FConfigCollection& config,
             u32& outWidth, u32& outHeight) {
             u32 logicalWidth  = config.GetUint32(TEXT("Window/LogicalWidth"));
@@ -793,70 +820,61 @@ namespace AltinaEngine::Launch {
                                     const auto& assetDesc = texAsset->GetDesc();
                                     const u32   bytesPerPixel =
                                         Asset::GetTextureBytesPerPixel(assetDesc.Format);
-                                    if (bytesPerPixel > 0U && assetDesc.Width > 0U
-                                        && assetDesc.Height > 0U) {
-                                        Rhi::ERhiFormat format = Rhi::ERhiFormat::Unknown;
-                                        switch (assetDesc.Format) {
-                                            case Asset::kTextureFormatRGBA8:
-                                                format = assetDesc.SRGB
-                                                    ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
-                                                    : Rhi::ERhiFormat::R8G8B8A8Unorm;
-                                                break;
-                                            case Asset::kTextureFormatRGBA16F:
-                                                format = Rhi::ERhiFormat::R16G16B16A16Float;
-                                                break;
-                                            case Asset::kTextureFormatR8:
-                                            case Asset::kTextureFormatRGB8:
-                                            default:
-                                                format = assetDesc.SRGB
-                                                    ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
-                                                    : Rhi::ERhiFormat::R8G8B8A8Unorm;
-                                                break;
-                                        }
+                                    if ((bytesPerPixel > 0U
+                                            || Asset::IsTextureBlockCompressed(assetDesc.Format))
+                                        && assetDesc.Width > 0U && assetDesc.Height > 0U) {
+                                        const Rhi::ERhiFormat format = ToRhiTextureFormatImpl(
+                                            assetDesc.Format, assetDesc.SRGB);
+                                        if (format != Rhi::ERhiFormat::Unknown) {
+                                            Rhi::FRhiTextureDesc texDesc{};
+                                            texDesc.mDebugName.Assign(TEXT("IBL.BrdfLut"));
+                                            texDesc.mDimension = Rhi::ERhiTextureDimension::Tex2D;
+                                            texDesc.mWidth     = assetDesc.Width;
+                                            texDesc.mHeight    = assetDesc.Height;
+                                            texDesc.mMipLevels =
+                                                (assetDesc.MipCount > 0U) ? assetDesc.MipCount : 1U;
+                                            texDesc.mFormat = format;
+                                            texDesc.mBindFlags =
+                                                Rhi::ERhiTextureBindFlags::ShaderResource;
 
-                                        Rhi::FRhiTextureDesc texDesc{};
-                                        texDesc.mDebugName.Assign(TEXT("IBL.BrdfLut"));
-                                        texDesc.mDimension = Rhi::ERhiTextureDimension::Tex2D;
-                                        texDesc.mWidth     = assetDesc.Width;
-                                        texDesc.mHeight    = assetDesc.Height;
-                                        texDesc.mMipLevels =
-                                            (assetDesc.MipCount > 0U) ? assetDesc.MipCount : 1U;
-                                        texDesc.mFormat = format;
-                                        texDesc.mBindFlags =
-                                            Rhi::ERhiTextureBindFlags::ShaderResource;
-
-                                        sBrdfLutTexture = Rhi::RHICreateTexture(texDesc);
-                                        if (sBrdfLutTexture) {
-                                            const auto& pixels = texAsset->GetPixels();
-                                            if (!pixels.IsEmpty()) {
-                                                u32   width  = assetDesc.Width;
-                                                u32   height = assetDesc.Height;
-                                                usize offset = 0U;
-                                                for (u32 mip = 0U; mip < texDesc.mMipLevels;
-                                                    ++mip) {
-                                                    const usize rowPitch =
-                                                        static_cast<usize>(width) * bytesPerPixel;
-                                                    const usize slicePitch =
-                                                        rowPitch * static_cast<usize>(height);
-                                                    if (rowPitch == 0U || slicePitch == 0U) {
-                                                        break;
+                                            sBrdfLutTexture = Rhi::RHICreateTexture(texDesc);
+                                            if (sBrdfLutTexture) {
+                                                const auto& pixels = texAsset->GetPixels();
+                                                if (!pixels.IsEmpty()) {
+                                                    u32   width  = assetDesc.Width;
+                                                    u32   height = assetDesc.Height;
+                                                    usize offset = 0U;
+                                                    for (u32 mip = 0U; mip < texDesc.mMipLevels;
+                                                        ++mip) {
+                                                        const usize rowPitch = static_cast<usize>(
+                                                            Asset::GetTextureMipRowPitch(
+                                                                assetDesc.Format, width,
+                                                                bytesPerPixel));
+                                                        const usize slicePitch = static_cast<usize>(
+                                                            Asset::GetTextureMipSlicePitch(
+                                                                assetDesc.Format, width, height,
+                                                                bytesPerPixel));
+                                                        if (rowPitch == 0U || slicePitch == 0U) {
+                                                            break;
+                                                        }
+                                                        if (offset + slicePitch > pixels.Size()) {
+                                                            break;
+                                                        }
+                                                        Rhi::FRhiTextureSubresource subresource{};
+                                                        subresource.mMipLevel = mip;
+                                                        rhiDevice->UpdateTextureSubresource(
+                                                            sBrdfLutTexture.Get(), subresource,
+                                                            pixels.Data() + offset,
+                                                            static_cast<u32>(rowPitch),
+                                                            static_cast<u32>(slicePitch));
+                                                        offset += slicePitch;
+                                                        width = (width > 1U) ? (width >> 1U) : 1U;
+                                                        height =
+                                                            (height > 1U) ? (height >> 1U) : 1U;
                                                     }
-                                                    if (offset + slicePitch > pixels.Size()) {
-                                                        break;
-                                                    }
-                                                    Rhi::FRhiTextureSubresource subresource{};
-                                                    subresource.mMipLevel = mip;
-                                                    rhiDevice->UpdateTextureSubresource(
-                                                        sBrdfLutTexture.Get(), subresource,
-                                                        pixels.Data() + offset,
-                                                        static_cast<u32>(rowPitch),
-                                                        static_cast<u32>(slicePitch));
-                                                    offset += slicePitch;
-                                                    width  = (width > 1U) ? (width >> 1U) : 1U;
-                                                    height = (height > 1U) ? (height >> 1U) : 1U;
                                                 }
+                                                sHasBrdfLutTexture = true;
                                             }
-                                            sHasBrdfLutTexture = true;
                                         }
                                     }
                                 }

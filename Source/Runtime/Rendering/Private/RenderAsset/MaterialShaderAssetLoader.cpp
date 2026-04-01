@@ -570,11 +570,18 @@ namespace AltinaEngine::Rendering {
                                 : Rhi::ERhiFormat::R8G8B8A8Unorm;
                 case Asset::kTextureFormatRGBA16F:
                     return Rhi::ERhiFormat::R16G16B16A16Float;
-                case Asset::kTextureFormatR8:
-                case Asset::kTextureFormatRGB8:
+                case Asset::kTextureFormatBC1:
+                    return srgb ? Rhi::ERhiFormat::BC1UnormSrgb : Rhi::ERhiFormat::BC1Unorm;
+                case Asset::kTextureFormatBC2:
+                    return srgb ? Rhi::ERhiFormat::BC2UnormSrgb : Rhi::ERhiFormat::BC2Unorm;
+                case Asset::kTextureFormatBC3:
+                    return srgb ? Rhi::ERhiFormat::BC3UnormSrgb : Rhi::ERhiFormat::BC3Unorm;
+                case Asset::kTextureFormatBC4:
+                    return Rhi::ERhiFormat::BC4Unorm;
+                case Asset::kTextureFormatBC5:
+                    return Rhi::ERhiFormat::BC5Unorm;
                 default:
-                    return srgb ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
-                                : Rhi::ERhiFormat::R8G8B8A8Unorm;
+                    return Rhi::ERhiFormat::Unknown;
             }
         }
 
@@ -600,8 +607,7 @@ namespace AltinaEngine::Rendering {
             Asset::FTexture2DDesc        uploadDesc   = assetDesc;
             const auto*                  uploadPixels = &asset.GetPixels();
             Core::Container::TVector<u8> decodedPixels{};
-            if (assetDesc.Format != Asset::kTextureFormatRGBA8
-                && assetDesc.Format != Asset::kTextureFormatRGBA16F) {
+            if (ToRhiFormat(assetDesc) == Rhi::ERhiFormat::Unknown) {
                 if (!Asset::DecodeTexture2DToRgba8(asset, uploadDesc, decodedPixels)) {
                     LogErrorCat(TEXT("Rendering.Material"),
                         "Failed to decode Texture2D asset for material upload (format={}, width={}, height={}, mips={}).",
@@ -617,6 +623,9 @@ namespace AltinaEngine::Rendering {
             texDesc.mMipLevels = (uploadDesc.MipCount > 0U) ? uploadDesc.MipCount : 1U;
             texDesc.mFormat    = ToRhiFormat(uploadDesc);
             texDesc.mBindFlags = Rhi::ERhiTextureBindFlags::ShaderResource;
+            if (texDesc.mFormat == Rhi::ERhiFormat::Unknown) {
+                return {};
+            }
 
             auto texture = Rhi::RHICreateTexture(texDesc);
             if (!texture) {

@@ -129,6 +129,7 @@ float4 PSMain() : SV_Target0 {
 TEST_CASE("RhiD3D11.DeviceCreation") {
 #if AE_PLATFORM_WIN
     using AltinaEngine::Rhi::ERhiBufferBindFlags;
+    using AltinaEngine::Rhi::ERhiFormat;
     using AltinaEngine::Rhi::FRhiBufferDesc;
     using AltinaEngine::Rhi::FRhiD3D11Context;
     using AltinaEngine::Rhi::FRhiInitDesc;
@@ -182,6 +183,21 @@ TEST_CASE("RhiD3D11.DeviceCreation") {
 
     const auto shader = device->CreateShader(shaderDesc);
     REQUIRE(shader);
+
+    constexpr ERhiFormat kBcFormats[] = { ERhiFormat::BC1Unorm, ERhiFormat::BC1UnormSrgb,
+        ERhiFormat::BC2Unorm, ERhiFormat::BC2UnormSrgb, ERhiFormat::BC3Unorm,
+        ERhiFormat::BC3UnormSrgb, ERhiFormat::BC4Unorm, ERhiFormat::BC5Unorm,
+        ERhiFormat::BC6HUfloat, ERhiFormat::BC6HSfloat, ERhiFormat::BC7Unorm,
+        ERhiFormat::BC7UnormSrgb };
+    for (const ERhiFormat format : kBcFormats) {
+        FRhiTextureDesc bcDesc{};
+        bcDesc.mWidth     = 4U;
+        bcDesc.mHeight    = 4U;
+        bcDesc.mMipLevels = 1U;
+        bcDesc.mFormat    = format;
+        bcDesc.mBindFlags = AltinaEngine::Rhi::ERhiTextureBindFlags::ShaderResource;
+        REQUIRE(device->CreateTexture(bcDesc));
+    }
 #else
     // Non-Windows platforms do not support D3D11.
 #endif

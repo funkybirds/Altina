@@ -595,6 +595,30 @@ namespace AltinaEngine::Rhi {
                     return DXGI_FORMAT_B8G8R8A8_UNORM;
                 case ERhiFormat::B8G8R8A8UnormSrgb:
                     return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+                case ERhiFormat::BC1Unorm:
+                    return DXGI_FORMAT_BC1_UNORM;
+                case ERhiFormat::BC1UnormSrgb:
+                    return DXGI_FORMAT_BC1_UNORM_SRGB;
+                case ERhiFormat::BC2Unorm:
+                    return DXGI_FORMAT_BC2_UNORM;
+                case ERhiFormat::BC2UnormSrgb:
+                    return DXGI_FORMAT_BC2_UNORM_SRGB;
+                case ERhiFormat::BC3Unorm:
+                    return DXGI_FORMAT_BC3_UNORM;
+                case ERhiFormat::BC3UnormSrgb:
+                    return DXGI_FORMAT_BC3_UNORM_SRGB;
+                case ERhiFormat::BC4Unorm:
+                    return DXGI_FORMAT_BC4_UNORM;
+                case ERhiFormat::BC5Unorm:
+                    return DXGI_FORMAT_BC5_UNORM;
+                case ERhiFormat::BC6HUfloat:
+                    return DXGI_FORMAT_BC6H_UF16;
+                case ERhiFormat::BC6HSfloat:
+                    return DXGI_FORMAT_BC6H_SF16;
+                case ERhiFormat::BC7Unorm:
+                    return DXGI_FORMAT_BC7_UNORM;
+                case ERhiFormat::BC7UnormSrgb:
+                    return DXGI_FORMAT_BC7_UNORM_SRGB;
                 case ERhiFormat::R16G16B16A16Float:
                     return DXGI_FORMAT_R16G16B16A16_FLOAT;
                 case ERhiFormat::R32G32Float:

@@ -11,6 +11,30 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
                 return VK_FORMAT_B8G8R8A8_UNORM;
             case ERhiFormat::B8G8R8A8UnormSrgb:
                 return VK_FORMAT_B8G8R8A8_SRGB;
+            case ERhiFormat::BC1Unorm:
+                return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+            case ERhiFormat::BC1UnormSrgb:
+                return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
+            case ERhiFormat::BC2Unorm:
+                return VK_FORMAT_BC2_UNORM_BLOCK;
+            case ERhiFormat::BC2UnormSrgb:
+                return VK_FORMAT_BC2_SRGB_BLOCK;
+            case ERhiFormat::BC3Unorm:
+                return VK_FORMAT_BC3_UNORM_BLOCK;
+            case ERhiFormat::BC3UnormSrgb:
+                return VK_FORMAT_BC3_SRGB_BLOCK;
+            case ERhiFormat::BC4Unorm:
+                return VK_FORMAT_BC4_UNORM_BLOCK;
+            case ERhiFormat::BC5Unorm:
+                return VK_FORMAT_BC5_UNORM_BLOCK;
+            case ERhiFormat::BC6HUfloat:
+                return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+            case ERhiFormat::BC6HSfloat:
+                return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+            case ERhiFormat::BC7Unorm:
+                return VK_FORMAT_BC7_UNORM_BLOCK;
+            case ERhiFormat::BC7UnormSrgb:
+                return VK_FORMAT_BC7_SRGB_BLOCK;
             case ERhiFormat::R16G16B16A16Float:
                 return VK_FORMAT_R16G16B16A16_SFLOAT;
             case ERhiFormat::R32G32Float:

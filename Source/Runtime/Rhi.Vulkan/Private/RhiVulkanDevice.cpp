@@ -86,6 +86,47 @@ namespace AltinaEngine::Rhi {
             }
         }
 
+        [[nodiscard]] auto IsBlockCompressedFormat(ERhiFormat fmt) noexcept -> bool {
+            switch (fmt) {
+                case ERhiFormat::BC1Unorm:
+                case ERhiFormat::BC1UnormSrgb:
+                case ERhiFormat::BC2Unorm:
+                case ERhiFormat::BC2UnormSrgb:
+                case ERhiFormat::BC3Unorm:
+                case ERhiFormat::BC3UnormSrgb:
+                case ERhiFormat::BC4Unorm:
+                case ERhiFormat::BC5Unorm:
+                case ERhiFormat::BC6HUfloat:
+                case ERhiFormat::BC6HSfloat:
+                case ERhiFormat::BC7Unorm:
+                case ERhiFormat::BC7UnormSrgb:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        [[nodiscard]] auto GetFormatBlockBytes(ERhiFormat fmt) noexcept -> u32 {
+            switch (fmt) {
+                case ERhiFormat::BC1Unorm:
+                case ERhiFormat::BC1UnormSrgb:
+                case ERhiFormat::BC4Unorm:
+                    return 8U;
+                case ERhiFormat::BC2Unorm:
+                case ERhiFormat::BC2UnormSrgb:
+                case ERhiFormat::BC3Unorm:
+                case ERhiFormat::BC3UnormSrgb:
+                case ERhiFormat::BC5Unorm:
+                case ERhiFormat::BC6HUfloat:
+                case ERhiFormat::BC6HSfloat:
+                case ERhiFormat::BC7Unorm:
+                case ERhiFormat::BC7UnormSrgb:
+                    return 16U;
+                default:
+                    return 0U;
+            }
+        }
+
         [[nodiscard]] constexpr auto ToQueueIndex(ERhiQueueType type) noexcept -> u32 {
             return static_cast<u32>(type);
         }
@@ -504,7 +545,6 @@ namespace AltinaEngine::Rhi {
         if (!mState || texture == nullptr || data == nullptr || rowPitchBytes == 0U) {
             return;
         }
-        (void)slicePitchBytes;
 
         const FRhiTextureDesc& desc = texture->GetDesc();
         if (subresource.mMipLevel >= desc.mMipLevels) {
@@ -530,18 +570,40 @@ namespace AltinaEngine::Rhi {
             }
         }
 
-        const u32 bpp = GetFormatBytesPerPixel(desc.mFormat);
-        if (bpp == 0U) {
-            return;
-        }
-        if ((rowPitchBytes % bpp) != 0U) {
-            return;
-        }
-        if ((rowPitchBytes / bpp) < mipWidth) {
+        const bool isBlockCompressed = IsBlockCompressedFormat(desc.mFormat);
+        const u32  bytesPerPixel     = GetFormatBytesPerPixel(desc.mFormat);
+        const u32  blockBytes        = GetFormatBlockBytes(desc.mFormat);
+        if ((!isBlockCompressed && bytesPerPixel == 0U)
+            || (isBlockCompressed && blockBytes == 0U)) {
             return;
         }
 
-        const u64 uploadSizeBytes = static_cast<u64>(rowPitchBytes) * static_cast<u64>(mipHeight);
+        const u32 requiredRows = isBlockCompressed ? ((mipHeight + 3U) / 4U) : mipHeight;
+        const u32 tightRowPitchBytes =
+            isBlockCompressed ? ((mipWidth + 3U) / 4U) * blockBytes : mipWidth * bytesPerPixel;
+        if (requiredRows == 0U || tightRowPitchBytes == 0U || rowPitchBytes < tightRowPitchBytes) {
+            return;
+        }
+
+        u32 uploadSlicePitchBytes = slicePitchBytes;
+        if (uploadSlicePitchBytes == 0U) {
+            uploadSlicePitchBytes = rowPitchBytes * requiredRows;
+        }
+        if (isBlockCompressed) {
+            if ((rowPitchBytes % blockBytes) != 0U) {
+                return;
+            }
+        } else if ((rowPitchBytes % bytesPerPixel) != 0U) {
+            return;
+        }
+        if ((uploadSlicePitchBytes % rowPitchBytes) != 0U) {
+            return;
+        }
+        if (uploadSlicePitchBytes < rowPitchBytes * requiredRows) {
+            return;
+        }
+
+        const u64 uploadSizeBytes = static_cast<u64>(uploadSlicePitchBytes);
         if (uploadSizeBytes == 0ULL) {
             return;
         }
@@ -663,12 +725,21 @@ namespace AltinaEngine::Rhi {
                 VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &toDst);
 
             VkBufferImageCopy copy{};
-            copy.bufferOffset                = srcOffset;
-            const u32 rowLengthTexels        = static_cast<u32>(rowPitchBytes / bpp);
-            copy.bufferRowLength             = (rowLengthTexels == mipWidth) ? 0U : rowLengthTexels;
-            copy.bufferImageHeight           = 0U;
-            copy.imageSubresource.aspectMask = range.aspectMask;
-            copy.imageSubresource.mipLevel   = subresource.mMipLevel;
+            copy.bufferOffset = srcOffset;
+            if (isBlockCompressed) {
+                const u32 rowBlocks  = rowPitchBytes / blockBytes;
+                const u32 sliceRows  = uploadSlicePitchBytes / rowPitchBytes;
+                copy.bufferRowLength = (rowPitchBytes == tightRowPitchBytes) ? 0U : rowBlocks * 4U;
+                copy.bufferImageHeight = (sliceRows == requiredRows) ? 0U : sliceRows * 4U;
+            } else {
+                const u32 rowLengthTexels = rowPitchBytes / bytesPerPixel;
+                copy.bufferRowLength      = (rowLengthTexels == mipWidth) ? 0U : rowLengthTexels;
+                copy.bufferImageHeight    = (uploadSlicePitchBytes == rowPitchBytes * mipHeight)
+                       ? 0U
+                       : (uploadSlicePitchBytes / rowPitchBytes);
+            }
+            copy.imageSubresource.aspectMask     = range.aspectMask;
+            copy.imageSubresource.mipLevel       = subresource.mMipLevel;
             copy.imageSubresource.baseArrayLayer = range.baseArrayLayer;
             copy.imageSubresource.layerCount     = 1;
             copy.imageOffset                     = { 0, 0,
@@ -805,10 +876,19 @@ namespace AltinaEngine::Rhi {
             0, 0, nullptr, 0, nullptr, 1, &toDst);
 
         VkBufferImageCopy copy{};
-        copy.bufferOffset                    = srcOffset;
-        const u32 rowLengthTexels            = static_cast<u32>(rowPitchBytes / bpp);
-        copy.bufferRowLength                 = (rowLengthTexels == mipWidth) ? 0U : rowLengthTexels;
-        copy.bufferImageHeight               = 0U;
+        copy.bufferOffset = srcOffset;
+        if (isBlockCompressed) {
+            const u32 rowBlocks    = rowPitchBytes / blockBytes;
+            const u32 sliceRows    = uploadSlicePitchBytes / rowPitchBytes;
+            copy.bufferRowLength   = (rowPitchBytes == tightRowPitchBytes) ? 0U : rowBlocks * 4U;
+            copy.bufferImageHeight = (sliceRows == requiredRows) ? 0U : sliceRows * 4U;
+        } else {
+            const u32 rowLengthTexels = rowPitchBytes / bytesPerPixel;
+            copy.bufferRowLength      = (rowLengthTexels == mipWidth) ? 0U : rowLengthTexels;
+            copy.bufferImageHeight    = (uploadSlicePitchBytes == rowPitchBytes * mipHeight)
+                   ? 0U
+                   : (uploadSlicePitchBytes / rowPitchBytes);
+        }
         copy.imageSubresource.aspectMask     = range.aspectMask;
         copy.imageSubresource.mipLevel       = subresource.mMipLevel;
         copy.imageSubresource.baseArrayLayer = range.baseArrayLayer;

@@ -104,6 +104,9 @@ namespace AltinaEngine::Launch {
         auto               LoadDemoAssetRegistry() -> bool;
 
     private:
+        [[nodiscard]] static auto ToRhiTextureFormat(u32 assetFormat, bool srgb) noexcept
+            -> Rhi::ERhiFormat;
+
         struct FEditorOffscreenCache {
             Rhi::FRhiTextureRef Texture;
             u32                 Width  = 0U;
@@ -190,26 +193,14 @@ namespace AltinaEngine::Launch {
 
                 const auto& assetDesc     = cubeAsset->GetDesc();
                 const u32   bytesPerPixel = Asset::GetTextureBytesPerPixel(assetDesc.Format);
-                if (bytesPerPixel == 0U || assetDesc.Size == 0U || assetDesc.MipCount == 0U) {
+                if ((bytesPerPixel == 0U && !Asset::IsTextureBlockCompressed(assetDesc.Format))
+                    || assetDesc.Size == 0U || assetDesc.MipCount == 0U) {
                     return out;
                 }
 
-                Rhi::ERhiFormat format = Rhi::ERhiFormat::Unknown;
-                switch (assetDesc.Format) {
-                    case Asset::kTextureFormatRGBA8:
-                        format = assetDesc.SRGB ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
-                                                : Rhi::ERhiFormat::R8G8B8A8Unorm;
-                        break;
-                    case Asset::kTextureFormatRGBA16F:
-                        format = Rhi::ERhiFormat::R16G16B16A16Float;
-                        break;
-                    case Asset::kTextureFormatR8:
-                    case Asset::kTextureFormatRGB8:
-                    default:
-                        // Cook pipeline should output supported formats; fall back to RGBA8.
-                        format = assetDesc.SRGB ? Rhi::ERhiFormat::R8G8B8A8UnormSrgb
-                                                : Rhi::ERhiFormat::R8G8B8A8Unorm;
-                        break;
+                const Rhi::ERhiFormat format = ToRhiTextureFormat(assetDesc.Format, assetDesc.SRGB);
+                if (format == Rhi::ERhiFormat::Unknown) {
+                    return out;
                 }
 
                 Rhi::FRhiTextureDesc texDesc{};
@@ -233,8 +224,10 @@ namespace AltinaEngine::Launch {
                     u32   size   = assetDesc.Size;
                     usize offset = 0U;
                     for (u32 mip = 0U; mip < assetDesc.MipCount; ++mip) {
-                        const u32 rowPitch   = size * bytesPerPixel;
-                        const u32 slicePitch = rowPitch * size;
+                        const u32 rowPitch =
+                            Asset::GetTextureMipRowPitch(assetDesc.Format, size, bytesPerPixel);
+                        const u32 slicePitch = Asset::GetTextureMipSlicePitch(
+                            assetDesc.Format, size, size, bytesPerPixel);
                         if (rowPitch == 0U || slicePitch == 0U) {
                             break;
                         }

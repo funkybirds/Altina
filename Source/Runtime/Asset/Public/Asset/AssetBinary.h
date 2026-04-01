@@ -191,16 +191,19 @@ namespace AltinaEngine::Asset {
         }
     }
 
-    constexpr u32                kTextureFormatUnknown = 0;
-    constexpr u32                kTextureFormatR8      = 1;
-    constexpr u32                kTextureFormatRGB8    = 2;
-    constexpr u32                kTextureFormatRGBA8   = 3;
-    constexpr u32                kTextureFormatRGBA16F = 4;
-    constexpr u32                kTextureFormatBC1     = 5;
-    constexpr u32                kTextureFormatBC2     = 6;
-    constexpr u32                kTextureFormatBC3     = 7;
-    constexpr u32                kTextureFormatBC4     = 8;
-    constexpr u32                kTextureFormatBC5     = 9;
+    constexpr u32                kTextureFormatUnknown  = 0;
+    constexpr u32                kTextureFormatR8       = 1;
+    constexpr u32                kTextureFormatRGB8     = 2;
+    constexpr u32                kTextureFormatRGBA8    = 3;
+    constexpr u32                kTextureFormatRGBA16F  = 4;
+    constexpr u32                kTextureFormatBC1      = 5;
+    constexpr u32                kTextureFormatBC2      = 6;
+    constexpr u32                kTextureFormatBC3      = 7;
+    constexpr u32                kTextureFormatBC4      = 8;
+    constexpr u32                kTextureFormatBC5      = 9;
+    constexpr u32                kTextureFormatBC6HUF16 = 10;
+    constexpr u32                kTextureFormatBC6HSF16 = 11;
+    constexpr u32                kTextureFormatBC7      = 12;
 
     [[nodiscard]] constexpr auto GetTextureBytesPerPixel(u32 format) noexcept -> u32 {
         switch (format) {
@@ -224,6 +227,9 @@ namespace AltinaEngine::Asset {
             case kTextureFormatBC3:
             case kTextureFormatBC4:
             case kTextureFormatBC5:
+            case kTextureFormatBC6HUF16:
+            case kTextureFormatBC6HSF16:
+            case kTextureFormatBC7:
                 return true;
             default:
                 return false;
@@ -238,6 +244,9 @@ namespace AltinaEngine::Asset {
             case kTextureFormatBC2:
             case kTextureFormatBC3:
             case kTextureFormatBC5:
+            case kTextureFormatBC6HUF16:
+            case kTextureFormatBC6HSF16:
+            case kTextureFormatBC7:
                 return 16;
             default:
                 return 0;

@@ -106,6 +106,12 @@ namespace AltinaEngine::Launch {
                     return Rhi::ERhiFormat::BC4Unorm;
                 case Asset::kTextureFormatBC5:
                     return Rhi::ERhiFormat::BC5Unorm;
+                case Asset::kTextureFormatBC6HUF16:
+                    return Rhi::ERhiFormat::BC6HUfloat;
+                case Asset::kTextureFormatBC6HSF16:
+                    return Rhi::ERhiFormat::BC6HSfloat;
+                case Asset::kTextureFormatBC7:
+                    return srgb ? Rhi::ERhiFormat::BC7UnormSrgb : Rhi::ERhiFormat::BC7Unorm;
                 default:
                     return Rhi::ERhiFormat::Unknown;
             }

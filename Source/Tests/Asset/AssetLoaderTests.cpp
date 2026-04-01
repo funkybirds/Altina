@@ -293,6 +293,55 @@ TEST_CASE("Asset.Texture2D.BlockCompressed.Load") {
         == 0);
 }
 
+TEST_CASE("Asset.Texture2D.BlockCompressedExtended.Load") {
+    constexpr u32 kFormats[] = { AltinaEngine::Asset::kTextureFormatBC6HUF16,
+        AltinaEngine::Asset::kTextureFormatBC6HSF16, AltinaEngine::Asset::kTextureFormatBC7 };
+
+    for (const u32 format : kFormats) {
+        AltinaEngine::Asset::FTexture2DBlobDesc blobDesc{};
+        blobDesc.mWidth    = 4U;
+        blobDesc.mHeight   = 4U;
+        blobDesc.mFormat   = format;
+        blobDesc.mMipCount = 1U;
+        blobDesc.mRowPitch =
+            AltinaEngine::Asset::GetTextureMipRowPitch(blobDesc.mFormat, blobDesc.mWidth, 0U);
+
+        const u32 payloadSize =
+            AltinaEngine::Asset::GetTextureMipSlicePitch(blobDesc.mFormat, 4U, 4U, 0U);
+
+        AltinaEngine::Asset::FAssetBlobHeader header{};
+        header.mType     = static_cast<u8>(AltinaEngine::Asset::EAssetType::Texture2D);
+        header.mDescSize = static_cast<u32>(sizeof(blobDesc));
+        header.mDataSize = payloadSize;
+
+        TVector<u8> cooked{};
+        cooked.Resize(sizeof(header) + sizeof(blobDesc) + payloadSize);
+        std::memcpy(cooked.Data(), &header, sizeof(header));
+        std::memcpy(cooked.Data() + sizeof(header), &blobDesc, sizeof(blobDesc));
+        for (u32 index = 0U; index < payloadSize; ++index) {
+            cooked[sizeof(header) + sizeof(blobDesc) + index] = static_cast<u8>(index * 9U + 7U);
+        }
+
+        FTestAssetStream stream(cooked);
+        FTexture2DLoader loader{};
+
+        FAssetDesc       desc{};
+        desc.mTexture.Width    = blobDesc.mWidth;
+        desc.mTexture.Height   = blobDesc.mHeight;
+        desc.mTexture.MipCount = blobDesc.mMipCount;
+        desc.mTexture.Format   = blobDesc.mFormat;
+        desc.mTexture.SRGB     = false;
+
+        auto asset = loader.Load(desc, stream);
+        REQUIRE(asset);
+
+        auto* texture = static_cast<FTexture2DAsset*>(asset.Get());
+        REQUIRE(texture != nullptr);
+        REQUIRE_EQ(texture->GetDesc().Format, format);
+        REQUIRE_EQ(texture->GetPixels().Size(), static_cast<usize>(payloadSize));
+    }
+}
+
 TEST_CASE("Asset.Texture2D.BlockCompressed.DecodeToRgba8") {
     {
         FTexture2DDesc desc{};

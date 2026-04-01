@@ -33,6 +33,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
         constexpr u32 kDxgiBc4Unorm     = 80U;
         constexpr u32 kDxgiBc5Typeless  = 82U;
         constexpr u32 kDxgiBc5Unorm     = 83U;
+        constexpr u32 kDxgiBc6HTypeless = 94U;
+        constexpr u32 kDxgiBc6HUf16     = 95U;
+        constexpr u32 kDxgiBc6HSf16     = 96U;
+        constexpr u32 kDxgiBc7Typeless  = 97U;
+        constexpr u32 kDxgiBc7Unorm     = 98U;
+        constexpr u32 kDxgiBc7UnormSrgb = 99U;
 
         struct FDdsPixelFormat {
             u32 mSize        = 0U;
@@ -167,6 +173,21 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 case kDxgiBc5Typeless:
                 case kDxgiBc5Unorm:
                     outFormat = Asset::kTextureFormatBC5;
+                    return true;
+                case kDxgiBc6HTypeless:
+                case kDxgiBc6HUf16:
+                    outFormat = Asset::kTextureFormatBC6HUF16;
+                    return true;
+                case kDxgiBc6HSf16:
+                    outFormat = Asset::kTextureFormatBC6HSF16;
+                    return true;
+                case kDxgiBc7Typeless:
+                case kDxgiBc7Unorm:
+                    outFormat = Asset::kTextureFormatBC7;
+                    return true;
+                case kDxgiBc7UnormSrgb:
+                    outFormat = Asset::kTextureFormatBC7;
+                    outSrgb   = true;
                     return true;
                 default:
                     outFormat = Asset::kTextureFormatUnknown;
@@ -313,6 +334,55 @@ namespace AltinaEngine::Tools::AssetPipeline {
             }
             return bytes;
         }
+
+        auto BuildSelfTestDx10Dds(u32 dxgiFormat, u32 width, u32 height, u32 mipCount)
+            -> std::vector<u8> {
+            FDdsHeader header{};
+            header.mSize                = sizeof(FDdsHeader);
+            header.mFlags               = 0x00021007U;
+            header.mHeight              = height;
+            header.mWidth               = width;
+            header.mMipMapCount         = mipCount;
+            header.mPixelFormat.mSize   = sizeof(FDdsPixelFormat);
+            header.mPixelFormat.mFlags  = kDdsPixelFormatFourCc;
+            header.mPixelFormat.mFourCc = MakeFourCc('D', 'X', '1', '0');
+            header.mCaps                = 0x00401008U;
+
+            FDdsHeaderDx10 headerDx10{};
+            headerDx10.mDxgiFormat        = dxgiFormat;
+            headerDx10.mResourceDimension = kD3d10ResourceTex2D;
+            headerDx10.mArraySize         = 1U;
+
+            Asset::FTexture2DBlobDesc blobDesc{};
+            blobDesc.mWidth    = width;
+            blobDesc.mHeight   = height;
+            blobDesc.mMipCount = mipCount;
+            bool sampleSrgb    = false;
+            if (!ResolveDx10Format(dxgiFormat, blobDesc.mFormat, sampleSrgb)) {
+                return {};
+            }
+            blobDesc.mRowPitch =
+                Asset::GetTextureMipRowPitch(blobDesc.mFormat, blobDesc.mWidth, 0U);
+            header.mPitchOrLinearSize = blobDesc.mRowPitch;
+
+            usize payloadSize = 0U;
+            if (!ComputePixelPayloadSize(blobDesc, payloadSize)) {
+                return {};
+            }
+
+            std::vector<u8> bytes(
+                sizeof(u32) + sizeof(FDdsHeader) + sizeof(FDdsHeaderDx10) + payloadSize, 0U);
+            const u32 magic = kDdsMagic;
+            std::memcpy(bytes.data(), &magic, sizeof(magic));
+            std::memcpy(bytes.data() + sizeof(magic), &header, sizeof(header));
+            std::memcpy(
+                bytes.data() + sizeof(magic) + sizeof(header), &headerDx10, sizeof(headerDx10));
+            for (usize index = 0U; index < payloadSize; ++index) {
+                bytes[sizeof(u32) + sizeof(FDdsHeader) + sizeof(FDdsHeaderDx10) + index] =
+                    static_cast<u8>(index * 13U + 5U);
+            }
+            return bytes;
+        }
     } // namespace
 
     auto CookDirectDrawSurfaceTexture2D(const std::vector<u8>& sourceBytes, bool srgb,
@@ -350,6 +420,42 @@ namespace AltinaEngine::Tools::AssetPipeline {
             || descA.MipCount != descB.MipCount || descA.Format != descB.Format
             || descA.SRGB != descB.SRGB || cookedA != cookedB) {
             outError = "DDS self test: output is not deterministic.";
+            return false;
+        }
+
+        const auto bc7Bytes = BuildSelfTestDx10Dds(kDxgiBc7UnormSrgb, 4U, 4U, 1U);
+        if (bc7Bytes.empty()) {
+            outError = "DDS self test: failed to build BC7 sample.";
+            return false;
+        }
+
+        std::vector<u8>       cookedBc7;
+        Asset::FTexture2DDesc descBc7{};
+        if (!CookDirectDrawSurfaceTexture2D(bc7Bytes, false, cookedBc7, descBc7)) {
+            outError = "DDS self test: BC7 cook failed.";
+            return false;
+        }
+        if (descBc7.Width != 4U || descBc7.Height != 4U || descBc7.MipCount != 1U
+            || descBc7.Format != Asset::kTextureFormatBC7 || !descBc7.SRGB) {
+            outError = "DDS self test: unexpected BC7 output texture desc.";
+            return false;
+        }
+
+        const auto bc6hBytes = BuildSelfTestDx10Dds(kDxgiBc6HUf16, 4U, 4U, 1U);
+        if (bc6hBytes.empty()) {
+            outError = "DDS self test: failed to build BC6H sample.";
+            return false;
+        }
+
+        std::vector<u8>       cookedBc6h;
+        Asset::FTexture2DDesc descBc6h{};
+        if (!CookDirectDrawSurfaceTexture2D(bc6hBytes, false, cookedBc6h, descBc6h)) {
+            outError = "DDS self test: BC6H cook failed.";
+            return false;
+        }
+        if (descBc6h.Width != 4U || descBc6h.Height != 4U || descBc6h.MipCount != 1U
+            || descBc6h.Format != Asset::kTextureFormatBC6HUF16 || descBc6h.SRGB) {
+            outError = "DDS self test: unexpected BC6H output texture desc.";
             return false;
         }
 

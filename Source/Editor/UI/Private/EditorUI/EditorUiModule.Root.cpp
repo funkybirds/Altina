@@ -18,11 +18,12 @@ namespace AltinaEngine::Editor::UI {
         constexpr f32      kMenuBarHeight       = 84.0f;
         constexpr f32      kWorkspacePad        = 18.0f;
         constexpr f32      kSplitterSize        = 10.0f;
-        constexpr f32      kTabBarHeight        = 48.0f;
+        constexpr f32      kTabBarHeight        = 40.0f;
+        constexpr f32      kSectionHeadHeight   = 16.0f;
         constexpr f32      kLegacyMenuBarHeight = 24.0f;
         constexpr f32      kLegacyWorkspacePad  = 4.0f;
         constexpr f32      kLegacyTabBarHeight  = 22.0f;
-        constexpr f32      kPanelPadding        = 14.0f;
+        constexpr f32      kPanelPadding        = 10.0f;
         constexpr f32      kMinPanelWidth       = 140.0f;
         constexpr f32      kMinCenterWidth      = 260.0f;
         constexpr f32      kMinTopHeight        = 180.0f;
@@ -68,7 +69,7 @@ namespace AltinaEngine::Editor::UI {
             const auto noteSize = gui.MeasureText(note, DebugGui::EDebugGuiFontRole::Small);
             gui.DrawTextStyled(rect.Min, labelColor, label, DebugGui::EDebugGuiFontRole::Section);
             if (!note.IsEmpty()) {
-                gui.DrawTextStyled(FVector2f(rect.Max.X() - noteSize.X(), rect.Min.Y() + 2.0f),
+                gui.DrawTextStyled(FVector2f(rect.Max.X() - noteSize.X(), rect.Min.Y() + 1.0f),
                     sectionTheme.mSecondaryText, note, DebugGui::EDebugGuiFontRole::Small);
             }
             const auto labelSize = gui.MeasureText(label, DebugGui::EDebugGuiFontRole::Section);
@@ -598,7 +599,7 @@ namespace AltinaEngine::Editor::UI {
             }
 
             const FRect sectionRect = MakeRect(contentRect.Min.X(), contentRect.Min.Y(),
-                contentRect.Max.X(), contentRect.Min.Y() + ScalePx(18.0f));
+                contentRect.Max.X(), contentRect.Min.Y() + ScalePx(kSectionHeadHeight));
             DrawSectionHead(gui, theme, sectionRect, TEXT("Output"), TEXT("Recent logs"), false);
             const f32 entryGap  = ScalePx(8.0f);
             const f32 entryPadX = ScalePx(14.0f);

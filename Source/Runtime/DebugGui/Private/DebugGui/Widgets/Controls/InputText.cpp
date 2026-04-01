@@ -117,9 +117,12 @@ namespace AltinaEngine::DebugGui::Private {
             DrawRoundedRect(
                 r, active ? mTheme->mInputActiveBorder : mTheme->mInputBorder, rounding, 1.0f);
         }
+        PushClipRect(FRect{ FVector2f(r.Min.X() + 1.0f, r.Min.Y() + 1.0f),
+            FVector2f(r.Max.X() - 1.0f, r.Max.Y() - 1.0f) });
         DrawTextStyled(
             FVector2f(r.Min.X() + mTheme->mInputTextOffsetX, r.Min.Y() + mTheme->mInputTextOffsetY),
             mTheme->mInputText, value.ToView(), EDebugGuiFontRole::Body);
+        PopClipRect();
 
         AdvanceItem(FVector2f(w, h));
         return changed;

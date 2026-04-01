@@ -202,7 +202,7 @@ namespace AltinaEngine::Editor::UI {
 
         struct FDockState {
             f32 LeftRatio    = 0.2f;
-            f32 RightRatio   = 0.24f;
+            f32 RightRatio   = 0.28f;
             f32 BottomRatio  = 0.28f;
             i32 ActiveLeft   = 0;
             i32 ActiveCenter = 0;

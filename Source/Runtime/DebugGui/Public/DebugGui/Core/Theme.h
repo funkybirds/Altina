@@ -49,7 +49,7 @@ namespace AltinaEngine::DebugGui {
         FColor32 mDivider          = MakeColor32(255, 153, 64, 20);
         FColor32 mIcon             = MakeColor32(208, 213, 220, 224);
         FColor32 mIconActive       = MakeColor32(255, 255, 255, 255);
-        f32      mHeight           = 48.0f;
+        f32      mHeight           = 40.0f;
         f32      mTextPadX         = 16.0f;
         f32      mTextPadY         = 11.0f;
         f32      mIconSize         = 14.0f;
@@ -111,7 +111,7 @@ namespace AltinaEngine::DebugGui {
         FDebugGuiSectionStyle mSections{};
         f32                   mWorkspacePadding    = 18.0f;
         f32                   mSplitterSize        = 10.0f;
-        f32                   mPanelPadding        = 14.0f;
+        f32                   mPanelPadding        = 10.0f;
         f32                   mMinPanelWidth       = 140.0f;
         f32                   mMinCenterWidth      = 260.0f;
         f32                   mMinTopHeight        = 180.0f;
@@ -192,7 +192,7 @@ namespace AltinaEngine::DebugGui {
         f32                  mTitleTextOffsetY  = 4.0f;
 
         f32                  mSeparatorPaddingY = 4.0f;
-        f32                  mItemSpacingY      = 4.0f;
+        f32                  mItemSpacingY      = 3.0f;
 
         f32                  mButtonPaddingX = 10.0f;
         f32                  mButtonPaddingY = 6.0f;
@@ -226,7 +226,7 @@ namespace AltinaEngine::DebugGui {
         f32                  mCollapseButtonOffsetY  = 3.0f;
         f32                  mCollapseIconHalfWidth  = 4.0f;
         f32                  mCollapseIconHalfHeight = 3.0f;
-        f32                  mTreeRowHeight          = 22.0f;
+        f32                  mTreeRowHeight          = 20.0f;
         f32                  mTreeIndent             = 18.0f;
         f32                  mTreeArrowSize          = 6.0f;
         f32                  mTreeTextPadX           = 8.0f;

@@ -23,6 +23,11 @@ namespace AltinaEngine::Editor::UI {
 
         constexpr f32      kGlyphW                     = 8.0f;
         constexpr u64      kAssetRefreshIntervalFrames = 60ULL;
+        constexpr f32      kSectionHeadHeight          = 16.0f;
+        constexpr f32      kInspectorOuterPad          = 4.0f;
+        constexpr f32      kInspectorSectionGap        = 8.0f;
+        constexpr f32      kInspectorHeaderGap         = 4.0f;
+        constexpr f32      kPropertyValueHeight        = 18.0f;
 
         [[nodiscard]] auto MakeRect(f32 x0, f32 y0, f32 x1, f32 y1) -> FRect {
             return { FVector2f(x0, y0), FVector2f(x1, y1) };
@@ -90,7 +95,7 @@ namespace AltinaEngine::Editor::UI {
             gui.DrawTextStyled(rect.Min, labelColor, label, DebugGui::EDebugGuiFontRole::Section);
             if (!note.IsEmpty()) {
                 const auto noteSize = gui.MeasureText(note, DebugGui::EDebugGuiFontRole::Small);
-                gui.DrawTextStyled(FVector2f(rect.Max.X() - noteSize.X(), rect.Min.Y() + 2.0f),
+                gui.DrawTextStyled(FVector2f(rect.Max.X() - noteSize.X(), rect.Min.Y() + 1.0f),
                     sectionTheme.mSecondaryText, note, DebugGui::EDebugGuiFontRole::Small);
             }
             const auto labelSize = gui.MeasureText(label, DebugGui::EDebugGuiFontRole::Section);
@@ -367,23 +372,21 @@ namespace AltinaEngine::Editor::UI {
         const auto                     ScalePx = [uiScale](f32 value) { return value * uiScale; };
         const DebugGui::FDebugGuiTheme theme =
             (mDebugGuiSystem != nullptr) ? mDebugGuiSystem->GetTheme() : DebugGui::FDebugGuiTheme{};
-        const auto  colText      = theme.mEditor.mPanelContentText;
-        const auto  colMutedText = theme.mEditor.mPanelContentMutedText;
+        const auto colText      = theme.mEditor.mPanelContentText;
+        const auto colMutedText = theme.mEditor.mPanelContentMutedText;
 
-        const FRect sectionRect = MakeRect(contentRect.Min.X(), contentRect.Min.Y(),
-            contentRect.Max.X(), contentRect.Min.Y() + ScalePx(20.0f));
         if (mHierarchySnapshot.mGameObjects.IsEmpty()) {
-            DrawSectionHead(gui, theme, sectionRect, TEXT("World"), TEXT("No active world"), false);
+            gui.DrawTextStyled(
+                FVector2f(contentRect.Min.X() + ScalePx(6.0f), contentRect.Min.Y() + ScalePx(4.0f)),
+                colText, TEXT("No active world"), DebugGui::EDebugGuiFontRole::Section);
+            gui.DrawTextStyled(FVector2f(contentRect.Min.X() + ScalePx(6.0f),
+                                   contentRect.Min.Y() + ScalePx(24.0f)),
+                colMutedText, TEXT("Load or create a world to inspect objects."),
+                DebugGui::EDebugGuiFontRole::Small);
             return;
         }
 
-        Core::Container::FString worldCountLabel;
-        worldCountLabel.AppendNumber(static_cast<i32>(mHierarchySnapshot.mGameObjects.Size()));
-        worldCountLabel.Append(TEXT(" live objects"));
-        DrawSectionHead(gui, theme, sectionRect, TEXT("World"), worldCountLabel.ToView(), false);
-
-        const FRect treeRect = MakeRect(contentRect.Min.X(), sectionRect.Max.Y() + ScalePx(2.0f),
-            contentRect.Max.X(), contentRect.Max.Y());
+        const FRect treeRect = contentRect;
         const f32   rowHeight =
             ((theme.mTreeRowHeight > 0.0f) ? theme.mTreeRowHeight : 18.0f) * uiScale;
         const f32 rowStep =
@@ -432,7 +435,7 @@ namespace AltinaEngine::Editor::UI {
         }
 
         const f32 viewHeight =
-            Core::Math::Max(0.0f, treeRect.Max.Y() - treeRect.Min.Y() - ScalePx(4.0f));
+            Core::Math::Max(0.0f, treeRect.Max.Y() - treeRect.Min.Y() - ScalePx(2.0f));
         const f32 totalHeight = static_cast<f32>(visibleRowCount) * rowStep;
         const f32 maxScrollY  = Core::Math::Max(0.0f, totalHeight - viewHeight);
         mHierarchyScrollY     = Clamp(mHierarchyScrollY, 0.0f, maxScrollY);
@@ -484,7 +487,7 @@ namespace AltinaEngine::Editor::UI {
 
         gui.PushClipRect(treeContentRect);
         gui.SetCursorPos(FVector2f(treeContentRect.Min.X() + ScalePx(2.0f),
-            treeContentRect.Min.Y() + ScalePx(4.0f) - mHierarchyScrollY));
+            treeContentRect.Min.Y() + ScalePx(2.0f) - mHierarchyScrollY));
 
         TVector<i32> indexStack;
         TVector<u32> depthStack;
@@ -591,19 +594,19 @@ namespace AltinaEngine::Editor::UI {
         const FRect panelRect  = contentRect;
         const bool  isReadOnly = (mPlayState == EEditorUiPlayState::Running);
 
-        const f32   outerPad             = ScalePx(8.0f);
-        const f32   sectionGap           = ScalePx(10.0f);
+        const f32   outerPad             = ScalePx(kInspectorOuterPad);
+        const f32   sectionGap           = ScalePx(kInspectorSectionGap);
+        const f32   headerGap            = ScalePx(kInspectorHeaderGap);
         const f32   rowHeight            = ScalePx(20.0f);
         const f32   rowGap               = ScalePx(2.0f);
         const f32   buttonHeight         = ScalePx(22.0f);
-        const f32   propertyHeight       = ScalePx(20.0f);
+        const f32   propertyHeight       = ScalePx(kPropertyValueHeight);
         const f32   collapseHeaderHeight = ScalePx(26.0f);
         const f32   collapseGap          = ScalePx(5.0f);
-        const f32   labelColumnWidth     = ScalePx(132.0f);
+        const f32   labelColumnWidth     = ScalePx(152.0f);
         const f32   renameButtonWidth    = ScalePx(82.0f);
         const f32   rowTextPadX          = ScalePx(8.0f);
         const f32   rowLabelTextY        = ScalePx(3.0f);
-        const f32   rowValueTextY        = ScalePx(2.0f);
         const f32   scrollBarWidth =
             ((theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 8.0f) * uiScale;
         const f32 scrollBarPad =
@@ -651,12 +654,12 @@ namespace AltinaEngine::Editor::UI {
             return total;
         };
 
-        const f32 basicHeaderHeight      = ScalePx(20.0f);
-        const f32 componentsHeaderHeight = ScalePx(20.0f);
+        const f32 basicHeaderHeight      = ScalePx(kSectionHeadHeight);
+        const f32 componentsHeaderHeight = ScalePx(kSectionHeadHeight);
         const f32 basicContentHeight =
-            rowHeight * 2.0f + buttonHeight * 3.0f + rowGap * 4.0f + ScalePx(14.0f);
+            headerGap + rowHeight * 2.0f + buttonHeight * 3.0f + rowGap * 4.0f;
         const f32 totalHeight = basicHeaderHeight + basicContentHeight + sectionGap
-            + componentsHeaderHeight + ScalePx(10.0f) + calcComponentsHeight();
+            + componentsHeaderHeight + headerGap + calcComponentsHeight();
 
         const f32 viewHeight =
             Core::Math::Max(0.0f, panelRect.Max.Y() - panelRect.Min.Y() - outerPad);
@@ -725,15 +728,24 @@ namespace AltinaEngine::Editor::UI {
         const auto drawValueRow = [&](const FRect& rect, FStringView label, FStringView value) {
             const FRect valueRect =
                 MakeRect(rect.Min.X() + labelColumnWidth, rect.Min.Y(), rect.Max.X(), rect.Max.Y());
-            gui.DrawTextStyled(FVector2f(rect.Min.X() + rowTextPadX, rect.Min.Y() + rowLabelTextY),
+            const auto labelTextSize = gui.MeasureText(label, DebugGui::EDebugGuiFontRole::Small);
+            const auto valueTextSize = gui.MeasureText(value, DebugGui::EDebugGuiFontRole::Small);
+            gui.DrawTextStyled(
+                FVector2f(rect.Min.X() + rowTextPadX,
+                    rect.Min.Y() + (rect.Max.Y() - rect.Min.Y() - labelTextSize.Y()) * 0.5f),
                 colMutedText, label, DebugGui::EDebugGuiFontRole::Small);
             gui.DrawRoundedRectFilled(
                 valueRect, colValueFieldBg, theme.mEditor.mPanelSurface.mCornerRadius);
             gui.DrawRoundedRect(
                 valueRect, colValueFieldBorder, theme.mEditor.mPanelSurface.mCornerRadius, 1.0f);
-            gui.DrawTextStyled(FVector2f(valueRect.Min.X() + theme.mInputTextOffsetX,
-                                   valueRect.Min.Y() + rowValueTextY),
-                colValueFieldText, value, DebugGui::EDebugGuiFontRole::Body);
+            gui.PushClipRect(MakeRect(valueRect.Min.X() + 1.0f, valueRect.Min.Y() + 1.0f,
+                valueRect.Max.X() - 1.0f, valueRect.Max.Y() - 1.0f));
+            gui.DrawTextStyled(
+                FVector2f(valueRect.Min.X() + theme.mInputTextOffsetX,
+                    valueRect.Min.Y()
+                        + (valueRect.Max.Y() - valueRect.Min.Y() - valueTextSize.Y()) * 0.5f),
+                colValueFieldText, value, DebugGui::EDebugGuiFontRole::Small);
+            gui.PopClipRect();
         };
 
         gui.PushClipRect(contentClipRect);
@@ -743,7 +755,7 @@ namespace AltinaEngine::Editor::UI {
             MakeRect(contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + basicHeaderHeight);
         DrawSectionHead(gui, theme, basicHeaderRect, TEXT("Basic"),
             object->bIsPrefabRoot ? TEXT("Prefab") : TEXT("GameObject"), true);
-        y = basicHeaderRect.Max.Y() + ScalePx(8.0f);
+        y = basicHeaderRect.Max.Y() + headerGap;
 
         const f32 contentWidth = contentClipRect.Max.X() - contentClipRect.Min.X();
         const f32 inputWidth = contentWidth - labelColumnWidth - renameButtonWidth - ScalePx(8.0f);
@@ -761,9 +773,16 @@ namespace AltinaEngine::Editor::UI {
             nameInputRect, colValueFieldBg, theme.mEditor.mPanelSurface.mCornerRadius);
         gui.DrawRoundedRect(
             nameInputRect, colValueFieldBorder, theme.mEditor.mPanelSurface.mCornerRadius, 1.0f);
-        gui.DrawTextStyled(FVector2f(nameInputRect.Min.X() + theme.mInputTextOffsetX,
-                               nameInputRect.Min.Y() + rowValueTextY),
-            colValueFieldText, mInspectorNameInput.ToView(), DebugGui::EDebugGuiFontRole::Body);
+        const auto nameTextSize =
+            gui.MeasureText(mInspectorNameInput.ToView(), DebugGui::EDebugGuiFontRole::Small);
+        gui.PushClipRect(MakeRect(nameInputRect.Min.X() + 1.0f, nameInputRect.Min.Y() + 1.0f,
+            nameInputRect.Max.X() - 1.0f, nameInputRect.Max.Y() - 1.0f));
+        gui.DrawTextStyled(
+            FVector2f(nameInputRect.Min.X() + theme.mInputTextOffsetX,
+                nameInputRect.Min.Y()
+                    + (nameInputRect.Max.Y() - nameInputRect.Min.Y() - nameTextSize.Y()) * 0.5f),
+            colValueFieldText, mInspectorNameInput.ToView(), DebugGui::EDebugGuiFontRole::Small);
+        gui.PopClipRect();
         (void)drawCenteredButton(renameRect, TEXT("Rename"), !isReadOnly);
         y += rowHeight + rowGap;
 
@@ -795,7 +814,7 @@ namespace AltinaEngine::Editor::UI {
         componentCountLabel.Append(TEXT(" attached"));
         DrawSectionHead(gui, theme, componentsHeaderRect, TEXT("Components"),
             componentCountLabel.ToView(), true);
-        y = componentsHeaderRect.Max.Y() + ScalePx(8.0f);
+        y = componentsHeaderRect.Max.Y() + headerGap;
 
         if (object->mComponents.IsEmpty()) {
             gui.DrawTextStyled(FVector2f(contentClipRect.Min.X(), y), colMutedText,
@@ -856,10 +875,9 @@ namespace AltinaEngine::Editor::UI {
                 for (const auto& property : component.mProperties) {
                     const FRect propertyRect = MakeRect(
                         contentClipRect.Min.X(), y, contentClipRect.Max.X(), y + propertyHeight);
-                    const auto truncatedValue = TruncateAssetLabel(property.mDisplayValue.ToView(),
-                        contentWidth - labelColumnWidth - ScalePx(18.0f));
                     const FString prettyLabel = PrettifyInspectorLabel(property.mName.ToView());
-                    drawValueRow(propertyRect, prettyLabel.ToView(), truncatedValue.ToView());
+                    drawValueRow(
+                        propertyRect, prettyLabel.ToView(), property.mDisplayValue.ToView());
                     y += propertyHeight + rowGap;
                 }
             }
@@ -948,14 +966,9 @@ namespace AltinaEngine::Editor::UI {
             ScalePx(999.0f));
         gui.DrawRoundedRectFilled(gridRect, colPanelBg, theme.mEditor.mInsetSurface.mCornerRadius);
 
-        const FRect treeSectionRect =
-            MakeRect(treeRect.Min.X() + ScalePx(14.0f), treeRect.Min.Y() + ScalePx(12.0f),
-                treeRect.Max.X() - ScalePx(14.0f), treeRect.Min.Y() + ScalePx(30.0f));
-        const FRect gridSectionRect =
-            MakeRect(gridRect.Min.X() + ScalePx(14.0f), gridRect.Min.Y() + ScalePx(12.0f),
-                gridRect.Max.X() - ScalePx(14.0f), gridRect.Min.Y() + ScalePx(30.0f));
-        DrawSectionHead(
-            gui, theme, treeSectionRect, TEXT("Folders"), TEXT("Project assets"), false);
+        const FRect gridSectionRect = MakeRect(gridRect.Min.X() + ScalePx(14.0f),
+            gridRect.Min.Y() + ScalePx(12.0f), gridRect.Max.X() - ScalePx(14.0f),
+            gridRect.Min.Y() + ScalePx(12.0f + kSectionHeadHeight));
         DrawSectionHead(
             gui, theme, gridSectionRect, TEXT("Browser"), mCurrentAssetPath.ToView(), true);
 
@@ -996,8 +1009,10 @@ namespace AltinaEngine::Editor::UI {
             }
         }
 
-        const f32 treeViewHeight =
-            Core::Math::Max(0.0f, treeRect.Max.Y() - treeSectionRect.Max.Y() - ScalePx(8.0f));
+        const f32 treeTopInset    = ScalePx(8.0f);
+        const f32 treeBottomInset = ScalePx(8.0f);
+        const f32 treeViewHeight  = Core::Math::Max(
+            0.0f, treeRect.Max.Y() - treeRect.Min.Y() - treeTopInset - treeBottomInset);
         const f32 treeTotalHeight     = static_cast<f32>(visibleNodeCount) * treeRowStep;
         const f32 treeMaxScrollY      = Core::Math::Max(0.0f, treeTotalHeight - treeViewHeight);
         mAssetTreeScrollY             = Clamp(mAssetTreeScrollY, 0.0f, treeMaxScrollY);
@@ -1006,14 +1021,14 @@ namespace AltinaEngine::Editor::UI {
                 > (scrollBarWidth + scrollBarPad + ScalePx(24.0f)));
         const FRect treeScrollTrackRect = treeNeedsScrollBar
             ? MakeRect(treeRect.Max.X() - scrollBarWidth - scrollBarPad,
-                  treeSectionRect.Max.Y() + ScalePx(2.0f), treeRect.Max.X() - scrollBarPad,
-                  treeRect.Max.Y() - ScalePx(8.0f))
+                  treeRect.Min.Y() + treeTopInset, treeRect.Max.X() - scrollBarPad,
+                  treeRect.Max.Y() - treeBottomInset)
             : MakeRect(0.0f, 0.0f, 0.0f, 0.0f);
         const FRect treeContentRect     = treeNeedsScrollBar
-                ? MakeRect(treeRect.Min.X() + ScalePx(8.0f), treeSectionRect.Max.Y() + ScalePx(2.0f),
-                      treeScrollTrackRect.Min.X() - scrollBarPad, treeRect.Max.Y() - ScalePx(8.0f))
-                : MakeRect(treeRect.Min.X() + ScalePx(8.0f), treeSectionRect.Max.Y() + ScalePx(2.0f),
-                      treeRect.Max.X() - ScalePx(8.0f), treeRect.Max.Y() - ScalePx(8.0f));
+                ? MakeRect(treeRect.Min.X() + ScalePx(8.0f), treeRect.Min.Y() + treeTopInset,
+                      treeScrollTrackRect.Min.X() - scrollBarPad, treeRect.Max.Y() - treeBottomInset)
+                : MakeRect(treeRect.Min.X() + ScalePx(8.0f), treeRect.Min.Y() + treeTopInset,
+                      treeRect.Max.X() - ScalePx(8.0f), treeRect.Max.Y() - treeBottomInset);
 
         if (!gui.IsMouseDown()) {
             mAssetTreeScrollDragging = false;
@@ -1126,7 +1141,7 @@ namespace AltinaEngine::Editor::UI {
 
         const f32   itemWidth  = ScalePx(84.0f);
         const f32   itemHeight = ScalePx(72.0f);
-        const f32   itemGap    = ScalePx(8.0f);
+        const f32   itemGap    = ScalePx(6.0f);
         const FRect gridContentRect =
             MakeRect(gridRect.Min.X() + ScalePx(14.0f), gridSectionRect.Max.Y() + ScalePx(3.0f),
                 gridRect.Max.X() - ScalePx(14.0f), gridRect.Max.Y() - ScalePx(14.0f));

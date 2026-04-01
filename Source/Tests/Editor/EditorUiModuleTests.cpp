@@ -86,9 +86,9 @@ namespace {
         const auto splitterSize =
             (theme.mEditor.mSplitterSize > 0.0f) ? theme.mEditor.mSplitterSize : ScalePx(10.0f);
         const auto tabBarHeight =
-            (theme.mEditor.mTabs.mHeight > 0.0f) ? theme.mEditor.mTabs.mHeight : ScalePx(48.0f);
+            (theme.mEditor.mTabs.mHeight > 0.0f) ? theme.mEditor.mTabs.mHeight : ScalePx(40.0f);
         const auto panelPadding =
-            (theme.mEditor.mPanelPadding > 0.0f) ? theme.mEditor.mPanelPadding : ScalePx(14.0f);
+            (theme.mEditor.mPanelPadding > 0.0f) ? theme.mEditor.mPanelPadding : ScalePx(10.0f);
         const auto minPanelWidth =
             (theme.mEditor.mMinPanelWidth > 0.0f) ? theme.mEditor.mMinPanelWidth : ScalePx(140.0f);
         const auto minCenterWidth = (theme.mEditor.mMinCenterWidth > 0.0f)
@@ -109,7 +109,7 @@ namespace {
 
         float       leftW  = ClampValue(workspaceW * 0.2f, minPanelWidth,
                    workspaceW - minCenterWidth - minPanelWidth - 2.0f * splitterSize);
-        float       rightW = ClampValue(workspaceW * 0.24f, minPanelWidth,
+        float       rightW = ClampValue(workspaceW * 0.28f, minPanelWidth,
                   workspaceW - minCenterWidth - leftW - 2.0f * splitterSize);
         if (leftW + rightW + minCenterWidth + 2.0f * splitterSize > workspaceW) {
             rightW = workspaceW - leftW - minCenterWidth - 2.0f * splitterSize;
@@ -135,7 +135,7 @@ namespace {
 
         const float panelMinY       = contentMinY;
         const float panelMaxY       = contentMaxY;
-        const float outerPad        = ScalePx(8.0f);
+        const float outerPad        = ScalePx(4.0f);
         const float contentClipMinY = panelMinY + outerPad;
         const float scrollBarWidth =
             ((theme.mScrollBarWidth > 0.0f) ? theme.mScrollBarWidth : 8.0f) * uiScale;
@@ -153,13 +153,14 @@ namespace {
         const float rowHeight              = ScalePx(20.0f);
         const float rowGap                 = ScalePx(2.0f);
         const float buttonHeight           = ScalePx(22.0f);
-        const float sectionGap             = ScalePx(10.0f);
-        const float basicHeaderHeight      = ScalePx(20.0f);
-        const float componentsHeaderHeight = ScalePx(20.0f);
+        const float sectionGap             = ScalePx(8.0f);
+        const float headerGap              = ScalePx(4.0f);
+        const float basicHeaderHeight      = ScalePx(16.0f);
+        const float componentsHeaderHeight = ScalePx(16.0f);
         const float collapseHeaderHeight   = ScalePx(26.0f);
-        const float firstComponentHeaderY  = contentClipMinY + basicHeaderHeight + ScalePx(8.0f)
+        const float firstComponentHeaderY  = contentClipMinY + basicHeaderHeight + headerGap
             + (rowHeight + rowGap) * 2.0f + (buttonHeight + rowGap) * 2.0f + buttonHeight
-            + sectionGap + componentsHeaderHeight + ScalePx(8.0f);
+            + sectionGap + componentsHeaderHeight + headerGap;
         layout.mFirstComponentHeaderX =
             static_cast<AltinaEngine::i32>(contentMinX + ScalePx(48.0f));
         layout.mFirstComponentHeaderY =

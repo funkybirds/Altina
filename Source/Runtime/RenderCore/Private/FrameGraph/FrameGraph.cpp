@@ -12,6 +12,7 @@
 
 namespace AltinaEngine::RenderCore {
     using Core::Utility::DebugAssert;
+    using namespace Core::Logging;
 
     namespace {
         struct FCompiledResourceState {
@@ -420,8 +421,9 @@ namespace AltinaEngine::RenderCore {
             for (const auto& pass : mPasses) {
                 const std::string name =
                     (pass.mDesc.mName != nullptr) ? std::string(pass.mDesc.mName) : "<null>";
-                Core::Logging::LogInfo(TEXT("FG Pass[{}]: {} type={} rtvs={} depth={}"), passIndex,
-                    name.c_str(), static_cast<u32>(pass.mDesc.mType),
+                LogInfoCat(TEXT("RenderCore.FrameGraph"),
+                    TEXT("FG Pass[{}]: {} type={} rtvs={} depth={}"), passIndex, name.c_str(),
+                    static_cast<u32>(pass.mDesc.mType),
                     static_cast<u32>(pass.mCompiledColorAttachments.Size()),
                     pass.mHasCompiledDepth ? 1U : 0U);
                 ++passIndex;

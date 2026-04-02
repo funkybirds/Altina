@@ -370,14 +370,16 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.OutputVSKey.IsValid() || !resources.OutputPSKey.IsValid()) {
-                LogError(TEXT("Deferred output shaders are not configured."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred output shaders are not configured."));
                 return false;
             }
 
             auto outputVs = resources.Registry.FindShader(resources.OutputVSKey);
             auto outputPs = resources.Registry.FindShader(resources.OutputPSKey);
             if (!outputVs || !outputPs) {
-                LogError(TEXT("Deferred output shaders are not registered."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred output shaders are not registered."));
                 return false;
             }
 
@@ -406,19 +408,22 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.LightingVSKey.IsValid() || !resources.LightingPSKey.IsValid()) {
-                LogError(TEXT("Deferred lighting shaders are not configured."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred lighting shaders are not configured."));
                 return false;
             }
 
             auto vs = resources.Registry.FindShader(resources.LightingVSKey);
             auto ps = resources.Registry.FindShader(resources.LightingPSKey);
             if (!vs || !ps) {
-                LogError(TEXT("Deferred lighting shaders are not registered."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred lighting shaders are not registered."));
                 return false;
             }
 
             if (!resources.LightingPipelineLayout) {
-                LogError(TEXT("Deferred lighting pipeline layout is missing."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred lighting pipeline layout is missing."));
                 return false;
             }
 
@@ -447,19 +452,22 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.SsaoVSKey.IsValid() || !resources.SsaoPSKey.IsValid()) {
-                LogError(TEXT("Deferred SSAO shaders are not configured."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred SSAO shaders are not configured."));
                 return false;
             }
 
             auto vs = resources.Registry.FindShader(resources.SsaoVSKey);
             auto ps = resources.Registry.FindShader(resources.SsaoPSKey);
             if (!vs || !ps) {
-                LogError(TEXT("Deferred SSAO shaders are not registered."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred SSAO shaders are not registered."));
                 return false;
             }
 
             if (!resources.SsaoPipelineLayout) {
-                LogError(TEXT("Deferred SSAO pipeline layout is missing."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred SSAO pipeline layout is missing."));
                 return false;
             }
 
@@ -494,12 +502,14 @@ namespace AltinaEngine::Rendering {
             auto vs = resources.Registry.FindShader(resources.SkyBoxVSKey);
             auto ps = resources.Registry.FindShader(resources.SkyBoxPSKey);
             if (!vs || !ps) {
-                LogError(TEXT("Deferred skybox shaders are not registered."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred skybox shaders are not registered."));
                 return false;
             }
 
             if (!resources.SkyBoxPipelineLayout) {
-                LogError(TEXT("Deferred skybox pipeline layout is missing."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred skybox pipeline layout is missing."));
                 return false;
             }
 
@@ -535,12 +545,14 @@ namespace AltinaEngine::Rendering {
             auto vs = resources.Registry.FindShader(resources.AtmosphereSkyVSKey);
             auto ps = resources.Registry.FindShader(resources.AtmosphereSkyPSKey);
             if (!vs || !ps) {
-                LogError(TEXT("Deferred atmosphere sky shaders are not registered."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred atmosphere sky shaders are not registered."));
                 return false;
             }
 
             if (!resources.AtmosphereSkyPipelineLayout) {
-                LogError(TEXT("Deferred atmosphere sky pipeline layout is missing."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("Deferred atmosphere sky pipeline layout is missing."));
                 return false;
             }
 
@@ -1102,10 +1114,12 @@ namespace AltinaEngine::Rendering {
                     return nullptr;
                 }
                 resources.MaterialLayouts[materialLayoutHash] = materialLayoutRef;
-                LogInfo(TEXT("BasePass MaterialLayout entries={} hash={}"),
+                LogInfoCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("BasePass MaterialLayout entries={} hash={}"),
                     static_cast<u32>(layoutEntries.Size()), materialLayoutHash);
                 for (const auto& entry : layoutEntries) {
-                    LogInfo(TEXT("  MaterialLayout binding={} type={} vis={}"), entry.mBinding,
+                    LogInfoCat(TEXT("Rendering.BasicDeferred"),
+                        TEXT("  MaterialLayout binding={} type={} vis={}"), entry.mBinding,
                         static_cast<u32>(entry.mType), static_cast<u32>(entry.mVisibility));
                 }
             }
@@ -1131,7 +1145,8 @@ namespace AltinaEngine::Rendering {
                     return nullptr;
                 }
                 resources.BasePipelineLayouts[materialLayoutHash] = pipelineLayout;
-                LogInfo(TEXT("BasePass PipelineLayout groups={} hash={}"),
+                LogInfoCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("BasePass PipelineLayout groups={} hash={}"),
                     static_cast<u32>(layoutDesc.mBindGroupLayouts.Size()), materialLayoutHash);
             }
 
@@ -1633,14 +1648,14 @@ namespace AltinaEngine::Rendering {
                 if (drawList != nullptr) {
                     const auto bounds = ComputeDrawListWorldBounds(*drawList);
                     if (bounds.bValid) {
-                        LogInfo(
+                        LogInfoCat(TEXT("Rendering.Deferred"),
                             TEXT(
                                 "Scene WorldBounds(BasePass): instances={} batches={} min=({}, {}, {}) max=({}, {}, {})"),
                             bounds.InstanceCount, bounds.BatchCount, bounds.MinWS[0],
                             bounds.MinWS[1], bounds.MinWS[2], bounds.MaxWS[0], bounds.MaxWS[1],
                             bounds.MaxWS[2]);
                     } else {
-                        LogInfo(
+                        LogInfoCat(TEXT("Rendering.Deferred"),
                             TEXT("Scene WorldBounds(BasePass): <invalid> instances={} batches={}"),
                             bounds.InstanceCount, bounds.BatchCount);
                     }
@@ -1654,21 +1669,22 @@ namespace AltinaEngine::Rendering {
                     const auto bounds =
                         ComputeDrawListWorldBounds(*mViewContext.ShadowDrawLists[cascadeIndex]);
                     if (bounds.bValid) {
-                        LogInfo(
+                        LogInfoCat(TEXT("Rendering.BasicDeferred"),
                             TEXT(
                                 "Scene WorldBounds(ShadowPass.Cascade{}): instances={} batches={} min=({}, {}, {}) max=({}, {}, {})"),
                             cascadeIndex, bounds.InstanceCount, bounds.BatchCount, bounds.MinWS[0],
                             bounds.MinWS[1], bounds.MinWS[2], bounds.MaxWS[0], bounds.MaxWS[1],
                             bounds.MaxWS[2]);
                     } else {
-                        LogInfo(
+                        LogInfoCat(TEXT("Rendering.BasicDeferred"),
                             TEXT(
                                 "Scene WorldBounds(ShadowPass.Cascade{}): <invalid> instances={} batches={}"),
                             cascadeIndex, bounds.InstanceCount, bounds.BatchCount);
                     }
                 }
 
-                LogInfo(TEXT("View OriginWS=({}, {}, {}) Near={} Far={} FovY(rad)={} ReverseZ={}"),
+                LogInfoCat(TEXT("Rendering.BasicDeferred"),
+                    TEXT("View OriginWS=({}, {}, {}) Near={} Far={} FovY(rad)={} ReverseZ={}"),
                     view->ViewOrigin[0], view->ViewOrigin[1], view->ViewOrigin[2],
                     view->Camera.mNearPlane, view->Camera.mFarPlane,
                     view->Camera.mVerticalFovRadians, view->bReverseZ ? 1 : 0);

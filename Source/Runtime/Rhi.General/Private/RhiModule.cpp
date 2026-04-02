@@ -2,5 +2,5 @@
 #include <Logging/Log.h>
 
 namespace AltinaEngine::Rhi {
-    void FRhiModule::LogHelloWorld() { LogInfo(TEXT("Hello from Rhi.General!")); }
+    void FRhiModule::LogHelloWorld() {}
 } // namespace AltinaEngine::Rhi

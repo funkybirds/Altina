@@ -77,7 +77,8 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
             static bool sLoggedOnce = false;
             if (!sLoggedOnce) {
                 sLoggedOnce = true;
-                LogWarning(TEXT("PostProcess.TAA skipped: missing ViewKey (no persistent state)."));
+                LogWarningCat(TEXT("Rendering.Postprocess"),
+                    TEXT("PostProcess.TAA skipped: missing ViewKey (no persistent state)."));
             }
             return;
         }
@@ -88,8 +89,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
             static bool sLoggedOnce = false;
             if (!sLoggedOnce) {
                 sLoggedOnce = true;
-                LogWarning(TEXT(
-                    "PostProcess.TAA skipped: shared resources not ready (shader/pipeline creation failed?)"));
+                LogWarningCat(TEXT("Rendering.Postprocess"),
+                    TEXT(
+                        "PostProcess.TAA skipped: shared resources not ready (shader/pipeline creation failed?)"));
             }
             return;
         }

@@ -188,14 +188,14 @@ namespace AltinaEngine::Application {
 
         EnsureWindow();
         if (!mMainWindow) {
-            LogError(TEXT("Failed to create platform window."));
+            LogErrorCat(TEXT("Application"), TEXT("Failed to create platform window."));
             return;
         }
 
         mMainWindow->Show();
         mIsRunning = true;
 
-        LogInfo(TEXT("AltinaEngine application initialized."));
+        LogInfoCat(TEXT("Application"), TEXT("AltinaEngine application initialized."));
     }
 
     void FApplication::Tick(float InDeltaTime) {
@@ -228,12 +228,13 @@ namespace AltinaEngine::Application {
         }
 
         mIsRunning = false;
-        LogInfo(TEXT("AltinaEngine application shutdown."));
+        LogInfoCat(TEXT("Application"), TEXT("AltinaEngine application shutdown."));
     }
 
     void FApplication::SetWindowProperties(const FPlatformWindowProperty& InProperties) {
         if (mIsRunning) {
-            LogWarning(TEXT("Cannot update window properties while the application is running."));
+            LogInfoCat(TEXT("Application"),
+                TEXT("Cannot update window properties while the application is running."));
             return;
         }
 
@@ -278,12 +279,12 @@ namespace AltinaEngine::Application {
 
         FWindowOwner platformWindow = CreatePlatformWindow();
         if (!platformWindow) {
-            LogError(TEXT("CreatePlatformWindow returned null."));
+            LogErrorCat(TEXT("Application"), TEXT("CreatePlatformWindow returned null."));
             return;
         }
 
         if (!platformWindow->Initialize(normalizedProperties)) {
-            LogError(TEXT("Platform window initialization failed."));
+            LogErrorCat(TEXT("Application"), TEXT("Platform window initialization failed."));
             return;
         }
 

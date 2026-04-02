@@ -763,8 +763,9 @@ namespace AltinaEngine::RenderCore {
                     (i < layout.mTextureNameHashes.Size()) ? layout.mTextureNameHashes[i] : 0U;
                 const auto* param =
                     (nameHash != 0U) ? mParameters.FindTextureParam(nameHash) : nullptr;
-                LogInfo(TEXT("Material BindGroup pass={} texIndex={} nameHash=0x{:08X} binding={} ")
-                            TEXT("samplerBinding={} hasParam={} srv={} sampler={}"),
+                LogInfoCat(TEXT("RenderCore.Material"),
+                    TEXT("Material BindGroup pass={} texIndex={} nameHash=0x{:08X} binding={} ")
+                        TEXT("samplerBinding={} hasParam={} srv={} sampler={}"),
                     static_cast<u32>(pass), static_cast<u32>(i), nameHash,
                     layout.mTextureBindings[i],
                     (i < layout.mSamplerBindings.Size()) ? layout.mSamplerBindings[i]

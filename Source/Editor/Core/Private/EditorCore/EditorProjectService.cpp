@@ -151,19 +151,22 @@ namespace AltinaEngine::Editor::Core {
         }
 
         if (projectPath.IsEmptyString() || !AECore::Platform::IsPathExist(projectPath)) {
-            LogWarning(TEXT("Editor project file not found; fallback to default world."));
+            LogWarningCat(TEXT("Editor.Core"),
+                TEXT("Editor project file not found; fallback to default world."));
             return false;
         }
 
         FNativeString jsonText;
         if (!AECore::Platform::ReadFileTextUtf8(projectPath, jsonText)) {
-            LogWarning(TEXT("Failed to read editor project file: {}"), projectPath.ToView());
+            LogWarningCat(TEXT("Editor.Core"), TEXT("Failed to read editor project file: {}"),
+                projectPath.ToView());
             return false;
         }
 
         FJsonDocument document;
         if (!document.Parse(jsonText.ToView())) {
-            LogWarning(TEXT("Failed to parse editor project file: {}"), projectPath.ToView());
+            LogWarningCat(TEXT("Editor.Core"), TEXT("Failed to parse editor project file: {}"),
+                projectPath.ToView());
             return false;
         }
 

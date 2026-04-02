@@ -204,7 +204,8 @@ namespace AltinaEngine::Application {
             static_cast<HINSTANCE>(mInstanceHandle), this));
 
         if (!mWindowHandle) {
-            LogError(TEXT("Failed to create Win32 window (error {})."), GetLastError());
+            LogErrorCat(TEXT("Application.Windows"),
+                TEXT("Failed to create Win32 window (error {})."), GetLastError());
             return false;
         }
 
@@ -228,8 +229,9 @@ namespace AltinaEngine::Application {
             }
         }
 
-        LogInfo(TEXT("Window initialized DPI={} scale={} logical={}x{} physical={}x{} policy={}."),
-            dpi, mProperties.mDpiScaling, mProperties.mWidth, mProperties.mHeight,
+        LogInfoCat(TEXT("Application.Windows"),
+            TEXT("Window initialized DPI={} scale={} logical={}x{} physical={}x{} policy={}."), dpi,
+            mProperties.mDpiScaling, mProperties.mWidth, mProperties.mHeight,
             mProperties.mPhysicalWidth, mProperties.mPhysicalHeight,
             static_cast<u32>(mProperties.mDpiPolicy));
 
@@ -526,7 +528,7 @@ namespace AltinaEngine::Application {
                             SWP_NOZORDER | SWP_NOACTIVATE);
                     }
                     window->UpdateCachedSizeFromClientRect();
-                    LogInfo(
+                    LogInfoCat(TEXT("Application.Windows"),
                         TEXT(
                             "Window DPI changed to {} (scale={}) logical={}x{} physical={}x{} policy={}."),
                         dpiX, dpiScale, window->mProperties.mWidth, window->mProperties.mHeight,
@@ -677,7 +679,8 @@ namespace AltinaEngine::Application {
         if (!RegisterClass(&windowClass)) {
             const DWORD errorCode = GetLastError();
             if (errorCode != ERROR_CLASS_ALREADY_EXISTS) {
-                LogError(TEXT("RegisterClass failed (error {})."), errorCode);
+                LogInfoCat(TEXT("Application.Windows"), TEXT("RegisterClass failed (error {})."),
+                    errorCode);
             }
         }
 

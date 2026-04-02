@@ -174,7 +174,7 @@ namespace AltinaEngine::Rendering::Atmosphere {
             Container::FStringView entry, EShaderStage stage, Rhi::FRhiShaderRef& outShader)
             -> bool {
             if (path.IsEmpty() || !path.Exists()) {
-                LogError(
+                LogErrorCat(TEXT("Rendering.Postprocess"),
                     TEXT("Atmosphere shader source not found: '{}'"), path.GetString().ToView());
                 return false;
             }
@@ -196,7 +196,8 @@ namespace AltinaEngine::Rendering::Atmosphere {
 
             const FShaderCompileResult result = GetShaderCompiler().Compile(request);
             if (!result.mSucceeded) {
-                LogError(TEXT("Atmosphere shader compile failed: path='{}' entry='{}' diag={}"),
+                LogErrorCat(TEXT("Rendering.Atmo"),
+                    TEXT("Atmosphere shader compile failed: path='{}' entry='{}' diag={}"),
                     path.GetString().ToView(), entry, result.mDiagnostics.ToView());
                 return false;
             }
@@ -221,7 +222,8 @@ namespace AltinaEngine::Rendering::Atmosphere {
 
             Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
             if (!BuildBindGroupLayoutFromShaders(shaders, 0U, layoutDesc)) {
-                LogError(TEXT("Atmosphere failed to build bind group layout: {}"), debugName);
+                LogErrorCat(TEXT("Rendering.Atmo"),
+                    TEXT("Atmosphere failed to build bind group layout: {}"), debugName);
                 return false;
             }
             layoutDesc.mDebugName.Assign(debugName);
@@ -642,7 +644,8 @@ namespace AltinaEngine::Rendering::Atmosphere {
                 || singleScatteringShaderPath.IsEmpty() || scatteringDensityShaderPath.IsEmpty()
                 || indirectIrradianceShaderPath.IsEmpty()
                 || multipleScatteringShaderPath.IsEmpty()) {
-                LogError(TEXT("Atmosphere compute shader sources not found."));
+                LogErrorCat(
+                    TEXT("Rendering.Atmo"), TEXT("Atmosphere compute shader sources not found."));
                 return nullptr;
             }
 

@@ -2803,10 +2803,11 @@ namespace AltinaEngine::Rhi {
             ComPtr<ID3D11Multithread> multithread;
             if (SUCCEEDED(mState->mImmediateContext.As(&multithread)) && multithread) {
                 multithread->SetMultithreadProtected(TRUE);
-                LogInfo(TEXT("RHI(D3D11): Multithread protection enabled."));
+                LogInfoCat(TEXT("RHI.D3D11"), TEXT("Multithread protection enabled."));
             }
     #else
-            LogWarning(TEXT("RHI(D3D11): ID3D11Multithread not available; skipping protection."));
+            LogWarningCat(
+                TEXT("RHI.D3D11"), TEXT("ID3D11Multithread not available; skipping protection."));
     #endif
         }
 
@@ -3269,8 +3270,8 @@ namespace AltinaEngine::Rhi {
             const HRESULT reason = mState->mDevice->GetDeviceRemovedReason();
             if (FAILED(reason)) {
                 mState->mDeviceRemovedLogged = true;
-                LogError(
-                    TEXT("RHI(D3D11): Device removed (hr=0x{:08X})."), static_cast<u32>(reason));
+                LogErrorCat(TEXT("RHI.D3D11"), TEXT("Device removed (hr=0x{:08X})."),
+                    static_cast<u32>(reason));
                 std::abort();
                 DumpInfoQueueMessages(mState->mInfoQueue.Get());
             }

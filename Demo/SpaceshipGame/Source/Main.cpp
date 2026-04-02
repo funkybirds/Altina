@@ -185,7 +185,7 @@ namespace {
         mesh.mLods.PushBack(Move(lod));
         mesh.mBounds = lod.mBounds;
 
-        LogInfo(
+        LogInfoCat(TEXT("Demo"),
             TEXT(
                 "[SpaceshipGame] Built orbit billboard line mesh '{}' (segments={}, verts={}, indices={})."),
             debugName, segmentCount, vertexCount, static_cast<u32>(indices.Size()));
@@ -289,12 +289,13 @@ namespace {
             Rendering::rPostProcessBloomIntensity.Set(0.16f);
             Rendering::rPostProcessBloomIterations.Set(6);
             Rendering::rPostProcessBloomKawaseOffset.Set(1.2f);
-            LogInfo(TEXT("[SpaceshipGame] PostProcess: Bloom=ON (press B to toggle)."));
+            LogInfoCat(
+                TEXT("Demo"), TEXT("[SpaceshipGame] PostProcess: Bloom=ON (press B to toggle)."));
 
             // Thin world-space ribbons alias heavily at distance without AA. Enable FXAA so orbit
             // lines don't look "broken" when they become sub-pixel wide.
             Rendering::rPostProcessFxaa.Set(1);
-            LogInfo(TEXT("[SpaceshipGame] PostProcess: FXAA=ON."));
+            LogInfoCat(TEXT("Demo"), TEXT("[SpaceshipGame] PostProcess: FXAA=ON."));
 
             auto&      worldManager = engineLoop.GetWorldManager();
             const auto worldHandle  = worldManager.CreateWorld();
@@ -364,7 +365,8 @@ namespace {
                         }
                     }
                 } else {
-                    LogWarning(TEXT("[SpaceshipGame] Failed to instantiate ship model."));
+                    LogWarningCat(
+                        TEXT("Demo"), TEXT("[SpaceshipGame] Failed to instantiate ship model."));
                 }
             }
 
@@ -397,7 +399,8 @@ namespace {
                         Engine::GameSceneAsset::FModelAssetInstantiator::kLoaderType, *world,
                         assetManager, model);
                 if (!modelResult.Root.IsValid()) {
-                    LogWarning(TEXT("[SpaceshipGame] Failed to instantiate model for '{}'."), name);
+                    LogWarningCat(TEXT("Demo"),
+                        TEXT("[SpaceshipGame] Failed to instantiate model for '{}'."), name);
                     return obj;
                 }
 
@@ -427,8 +430,9 @@ namespace {
                     }
                 }
 
-                LogInfo(TEXT("[SpaceshipGame] Instantiated '{}' model: nodes={}, meshNodes={}."),
-                    name, static_cast<u32>(modelResult.SpawnedNodes.Size()), meshNodeCount);
+                LogInfoCat(TEXT("Demo"),
+                    TEXT("[SpaceshipGame] Instantiated '{}' model: nodes={}, meshNodes={}."), name,
+                    static_cast<u32>(modelResult.SpawnedNodes.Size()), meshNodeCount);
                 return obj;
             };
 
@@ -563,7 +567,7 @@ namespace {
                 if (input->WasKeyPressed(Input::EKey::B)) {
                     const i32 enabled = (Rendering::rPostProcessBloom.Get() != 0) ? 0 : 1;
                     Rendering::rPostProcessBloom.Set(enabled);
-                    LogInfo(TEXT("[SpaceshipGame] PostProcess: Bloom={}."),
+                    LogInfoCat(TEXT("Demo"), TEXT("[SpaceshipGame] PostProcess: Bloom={}."),
                         enabled ? TEXT("ON") : TEXT("OFF"));
                 }
 

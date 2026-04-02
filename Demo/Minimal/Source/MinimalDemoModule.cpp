@@ -31,7 +31,8 @@ namespace {
             const auto levelHandle =
                 engineLoop.GetAssetRegistry().FindByPath(TEXT("demo/minimal/levels/default"));
             if (!levelHandle.IsValid()) {
-                LogError(TEXT("Demo level asset missing: demo/minimal/levels/default."));
+                LogErrorCat(
+                    TEXT("Demo"), TEXT("Demo level asset missing: demo/minimal/levels/default."));
                 return false;
             }
 
@@ -39,20 +40,20 @@ namespace {
             auto  loadedWorld =
                 Engine::GameSceneAsset::LoadWorldFromLevelAsset(levelHandle, assetManager);
             if (!loadedWorld) {
-                LogError(TEXT("Failed to deserialize level asset as world."));
+                LogErrorCat(TEXT("Demo"), TEXT("Failed to deserialize level asset as world."));
                 return false;
             }
 
             const auto worldHandle = worldManager.AddWorld(Move(loadedWorld));
             if (!worldHandle.IsValid()) {
-                LogError(TEXT("Failed to add level world into world manager."));
+                LogErrorCat(TEXT("Demo"), TEXT("Failed to add level world into world manager."));
                 return false;
             }
 
             worldManager.SetActiveWorld(worldHandle);
             auto* world = worldManager.GetWorld(worldHandle);
             if (world == nullptr) {
-                LogError(TEXT("Failed to acquire world from world manager."));
+                LogErrorCat(TEXT("Demo"), TEXT("Failed to acquire world from world manager."));
                 return false;
             }
 
@@ -79,7 +80,7 @@ namespace {
                 break;
             }
             if (!resolvedCamera) {
-                LogError(TEXT("No active camera found in level world."));
+                LogErrorCat(TEXT("Demo"), TEXT("No active camera found in level world."));
                 return false;
             }
 

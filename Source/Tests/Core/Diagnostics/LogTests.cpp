@@ -50,7 +50,7 @@ TEST_CASE("Logger formats text via sink") {
     FLogger::SetDefaultCategory(TEXT("Test"));
     FLogger::SetLogSink(&CaptureSink, &Captured);
 
-    AltinaEngine::LogInfo(TEXT("Value {}"), 42);
+    AltinaEngine::LogInfoCat(TEXT("Default"), TEXT("Value {}"), 42);
 
     REQUIRE_EQ(Captured.size(), 1U);
     REQUIRE_EQ(Captured[0].Level, ELogLevel::Info);
@@ -74,10 +74,10 @@ TEST_CASE("Logger respects minimum log level") {
     FLogger::SetLogLevel(ELogLevel::Warning);
     FLogger::SetDefaultCategory(TEXT("Test"));
 
-    AltinaEngine::LogInfo(TEXT("Skip me"));
+    AltinaEngine::LogInfoCat(TEXT("Default"), TEXT("Skip me"));
     REQUIRE_EQ(Captured.size(), 0U);
 
-    AltinaEngine::LogError(TEXT("Emit {}"), TEXT("!"));
+    AltinaEngine::LogErrorCat(TEXT("Default"), TEXT("Emit {}"), TEXT("!"));
     REQUIRE_EQ(Captured.size(), 1U);
     REQUIRE_EQ(Captured[0].Level, ELogLevel::Error);
 
@@ -92,7 +92,7 @@ TEST_CASE("Logger appends stacktrace for error and fatal") {
     FLogger::SetDefaultCategory(TEXT("Test"));
     FLogger::SetLogSink(&CaptureSink, &Captured);
 
-    AltinaEngine::LogError(TEXT("Boom"));
+    AltinaEngine::LogErrorCat(TEXT("Default"), TEXT("Boom"));
     REQUIRE_EQ(Captured.size(), 1U);
     REQUIRE_EQ(Captured[0].Level, ELogLevel::Error);
     REQUIRE(Captured[0].Message.ToView().Contains(TEXT("StackTrace:")));

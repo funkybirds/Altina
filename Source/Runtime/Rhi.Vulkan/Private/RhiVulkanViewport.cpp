@@ -338,7 +338,7 @@ namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
         HWND hwnd = reinterpret_cast<HWND>(desc.mNativeHandle);
         if (hwnd == nullptr) {
-            LogError(TEXT("RHI(Vulkan): Viewport requires a valid HWND."));
+            LogErrorCat(TEXT("RHI.Vulkan"), TEXT("Viewport requires a valid HWND."));
             return;
         }
 
@@ -349,12 +349,12 @@ namespace AltinaEngine::Rhi {
 
         if (vkCreateWin32SurfaceKHR(instance, &surfaceInfo, nullptr, &mState->mSurface)
             != VK_SUCCESS) {
-            LogError(TEXT("RHI(Vulkan): Failed to create Win32 surface."));
+            LogErrorCat(TEXT("RHI.Vulkan"), TEXT("Failed to create Win32 surface."));
             return;
         }
 
         if (!createSwapchain(desc)) {
-            LogError(TEXT("RHI(Vulkan): Failed to create swapchain."));
+            LogErrorCat(TEXT("RHI.Vulkan"), TEXT("Failed to create swapchain."));
         }
 #else
         (void)desc;

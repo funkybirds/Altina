@@ -20,6 +20,24 @@
     #define AE_COMPILER_GCC 0 // NOLINT
 #endif
 
+// C++ standard detection macros
+#if defined(_MSVC_LANG)
+    #define AE_CPLUSPLUS _MSVC_LANG // NOLINT
+#else
+    #define AE_CPLUSPLUS __cplusplus // NOLINT
+#endif
+
+#define AE_CPP_11_OR_LATER (AE_CPLUSPLUS >= 201103L)                  // NOLINT
+#define AE_CPP_14_OR_LATER (AE_CPLUSPLUS >= 201402L)                  // NOLINT
+#define AE_CPP_17_OR_LATER (AE_CPLUSPLUS >= 201703L)                  // NOLINT
+#define AE_CPP_20_OR_LATER (AE_CPLUSPLUS >= 202002L)                  // NOLINT
+#define AE_CPP_23_OR_LATER (AE_CPLUSPLUS >= 202100L)                  // NOLINT
+#define AE_CPP_26_OR_LATER (AE_CPLUSPLUS >= 202400L) && (!_MSVC_LANG) // NOLINT
+
+#if !AE_CPP_23_OR_LATER
+    #error "AltinaEngine requires C++23 or later."
+#endif
+
 // Platform detection macros (0 or 1)
 #if defined(_WIN32) || defined(_WIN64)
     #define AE_PLATFORM_WIN 1 // NOLINT
@@ -57,4 +75,10 @@
 #else
     #error \
         "Unknown compiler, please define AE_DLLEXPORT, AE_DLLIMPORT, and AE_FORCEINLINE for your compiler"
+#endif
+
+#if AE_CPP_26_OR_LATER
+    #define AE_FUNC_DELETE(reason) delete (msg)
+#else
+    #define AE_FUNC_DELETE(reason) delete
 #endif

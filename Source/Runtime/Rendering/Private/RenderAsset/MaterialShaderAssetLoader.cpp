@@ -451,7 +451,7 @@ namespace AltinaEngine::Rendering {
             const FStringView keyPrefix, RenderCore::FShaderRegistry::FShaderKey& outKey,
             ShaderCompiler::FShaderCompileResult& outResult) -> bool {
             if (path.IsEmpty() || !path.Exists()) {
-                LogError(TEXT("Preset shader source not found."));
+                LogErrorCat(TEXT("Rendering.Material"), TEXT("Preset shader source not found."));
                 return false;
             }
 
@@ -484,13 +484,15 @@ namespace AltinaEngine::Rendering {
 
             outResult = ShaderCompiler::GetShaderCompiler().Compile(request);
             if (!outResult.mSucceeded) {
-                LogError(TEXT("Preset shader compile failed: {}"), outResult.mDiagnostics.ToView());
+                LogErrorCat(TEXT("Rendering.Material"), TEXT("Preset shader compile failed: {}"),
+                    outResult.mDiagnostics.ToView());
                 return false;
             }
 
             auto* device = Rhi::RHIGetDevice();
             if (!device) {
-                LogError(TEXT("RHI device missing for shader creation."));
+                LogErrorCat(
+                    TEXT("Rendering.Material"), TEXT("RHI device missing for shader creation."));
                 return false;
             }
 
@@ -498,7 +500,8 @@ namespace AltinaEngine::Rendering {
             shaderDesc.mDebugName.Assign(entry);
             auto shader = device->CreateShader(shaderDesc);
             if (!shader) {
-                LogError(TEXT("Failed to create preset RHI shader."));
+                LogErrorCat(
+                    TEXT("Rendering.Material"), TEXT("Failed to create preset RHI shader."));
                 return false;
             }
 
@@ -508,7 +511,8 @@ namespace AltinaEngine::Rendering {
             outKey = RenderCore::FShaderRegistry::MakeKey(keyName.ToView(), stage);
 
             if (!Rendering::FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
-                LogError(TEXT("Failed to register preset shader {}."), outKey.mName.ToView());
+                LogErrorCat(TEXT("Rendering.Material"),
+                    TEXT("Failed to register preset shader {}."), outKey.mName.ToView());
                 return false;
             }
 
@@ -709,14 +713,14 @@ namespace AltinaEngine::Rendering {
         ShaderCompiler::FShaderCompileResult&    outResult) -> bool {
         const auto* desc = registry.GetDesc(handle);
         if (desc == nullptr) {
-            LogError(TEXT("Shader asset desc missing."));
+            LogErrorCat(TEXT("Rendering.Material"), TEXT("Shader asset desc missing."));
             return false;
         }
 
         auto  asset       = manager.Load(handle);
         auto* shaderAsset = asset ? static_cast<Asset::FShaderAsset*>(asset.Get()) : nullptr;
         if (shaderAsset == nullptr) {
-            LogError(TEXT("Failed to load shader asset."));
+            LogErrorCat(TEXT("Rendering.Material"), TEXT("Failed to load shader asset."));
             return false;
         }
 
@@ -728,7 +732,7 @@ namespace AltinaEngine::Rendering {
 
         Core::Utility::Filesystem::FPath tempPath;
         if (!WriteTempShaderFile(shaderAsset->GetSource(), handle.mUuid, language, tempPath)) {
-            LogError(TEXT("Failed to write temp shader file."));
+            LogErrorCat(TEXT("Rendering.Material"), TEXT("Failed to write temp shader file."));
             return false;
         }
 
@@ -750,13 +754,15 @@ namespace AltinaEngine::Rendering {
         Core::Platform::RemoveFileIfExists(tempPath.GetString());
 
         if (!outResult.mSucceeded) {
-            LogError(TEXT("Shader compile failed: {}"), outResult.mDiagnostics.ToView());
+            LogErrorCat(TEXT("Rendering.Material"), TEXT("Shader compile failed: {}"),
+                outResult.mDiagnostics.ToView());
             return false;
         }
 
         auto* device = Rhi::RHIGetDevice();
         if (!device) {
-            LogError(TEXT("RHI device missing for shader creation."));
+            LogErrorCat(
+                TEXT("Rendering.Material"), TEXT("RHI device missing for shader creation."));
             return false;
         }
 
@@ -764,14 +770,15 @@ namespace AltinaEngine::Rendering {
         shaderDesc.mDebugName.Assign(entry);
         auto shader = device->CreateShader(shaderDesc);
         if (!shader) {
-            LogError(TEXT("Failed to create RHI shader."));
+            LogErrorCat(TEXT("Rendering.Material"), TEXT("Failed to create RHI shader."));
             return false;
         }
 
         outKey =
             RenderCore::FShaderRegistry::MakeAssetKey(desc->mVirtualPath.ToView(), entry, stage);
         if (!Rendering::FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
-            LogError(TEXT("Failed to register shader for {}."), outKey.mName.ToView());
+            LogErrorCat(TEXT("Rendering.Material"), TEXT("Failed to register shader for {}."),
+                outKey.mName.ToView());
             return false;
         }
         return true;
@@ -800,7 +807,8 @@ namespace AltinaEngine::Rendering {
                 const auto* presetPath =
                     RenderCore::FShaderPresetRegistry::FindPreset(pass.mPreset.ToView());
                 if (presetPath == nullptr) {
-                    LogError(TEXT("Shader preset not found: {}"), pass.mPreset.ToView());
+                    LogErrorCat(TEXT("Rendering.Material"), TEXT("Shader preset not found: {}"),
+                        pass.mPreset.ToView());
                     return {};
                 }
 
@@ -809,7 +817,8 @@ namespace AltinaEngine::Rendering {
                 const auto vsEntry    = SelectPresetEntry(passType, Shader::EShaderStage::Vertex);
                 const auto psEntry    = SelectPresetEntry(passType, Shader::EShaderStage::Pixel);
                 if (vsEntry.IsEmpty() || psEntry.IsEmpty()) {
-                    LogError(TEXT("Shader preset pass not supported: {}"), pass.mPreset.ToView());
+                    LogErrorCat(TEXT("Rendering.Material"),
+                        TEXT("Shader preset pass not supported: {}"), pass.mPreset.ToView());
                     return {};
                 }
 
@@ -922,13 +931,15 @@ namespace AltinaEngine::Rendering {
         auto* materialAsset =
             assetRef ? static_cast<Asset::FMaterialAsset*>(assetRef.Get()) : nullptr;
         if (materialAsset == nullptr) {
-            LogError(TEXT("Failed to load material template asset."));
+            LogErrorCat(
+                TEXT("Rendering.Material"), TEXT("Failed to load material template asset."));
             return material;
         }
 
         auto templ = BuildMaterialTemplateFromAsset(*materialAsset, registry, manager);
         if (!templ) {
-            LogError(TEXT("Failed to build material template from asset."));
+            LogErrorCat(
+                TEXT("Rendering.Material"), TEXT("Failed to build material template from asset."));
             return material;
         }
 

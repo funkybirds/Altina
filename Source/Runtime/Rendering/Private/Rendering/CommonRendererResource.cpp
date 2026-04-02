@@ -214,7 +214,8 @@ namespace AltinaEngine::Rendering {
             const FStringView keyPrefix, RenderCore::FShaderRegistry::FShaderKey& outKey,
             FShaderCompileResult& outResult) -> bool {
             if (path.IsEmpty() || !path.Exists()) {
-                LogError(TEXT("Deferred shader source not found: path='{}' entry='{}' stage={}"),
+                LogErrorCat(TEXT("Rendering.Resource"),
+                    TEXT("Deferred shader source not found: path='{}' entry='{}' stage={}"),
                     path.GetString().ToView(), entry, static_cast<u32>(stage));
                 return false;
             }
@@ -236,7 +237,7 @@ namespace AltinaEngine::Rendering {
 
             outResult = GetShaderCompiler().Compile(request);
             if (!outResult.mSucceeded) {
-                LogError(
+                LogErrorCat(TEXT("Rendering.Resource"),
                     TEXT("Deferred shader compile failed: path='{}' entry='{}' stage={} diag={}"),
                     path.GetString().ToView(), entry, static_cast<u32>(stage),
                     outResult.mDiagnostics.ToView());
@@ -245,7 +246,8 @@ namespace AltinaEngine::Rendering {
 
             auto* device = Rhi::RHIGetDevice();
             if (!device) {
-                LogError(TEXT("RHI device missing for shader creation."));
+                LogErrorCat(
+                    TEXT("Rendering.Resource"), TEXT("RHI device missing for shader creation."));
                 return false;
             }
 
@@ -253,7 +255,7 @@ namespace AltinaEngine::Rendering {
             shaderDesc.mDebugName.Assign(entry);
             auto shader = device->CreateShader(shaderDesc);
             if (!shader) {
-                LogError(
+                LogErrorCat(TEXT("Rendering.Resource"),
                     TEXT("Failed to create deferred RHI shader: path='{}' entry='{}' stage={}"),
                     path.GetString().ToView(), entry, static_cast<u32>(stage));
                 return false;
@@ -265,7 +267,7 @@ namespace AltinaEngine::Rendering {
             outKey = RenderCore::FShaderRegistry::MakeKey(keyName.ToView(), stage);
 
             if (!FBasicDeferredRenderer::RegisterShader(outKey, shader)) {
-                LogError(
+                LogErrorCat(TEXT("Rendering.Resource"),
                     TEXT("Failed to register deferred shader: key='{}'"), outKey.mName.ToView());
                 return false;
             }
@@ -413,7 +415,7 @@ namespace AltinaEngine::Rendering {
 
         const auto shaderPath = FindBuiltinDeferredShaderPath();
         if (shaderPath.IsEmpty() || !shaderPath.Exists()) {
-            LogError(
+            LogErrorCat(TEXT("Rendering.Resource"),
                 TEXT("Builtin deferred shader not found. Expected {}."), kDeferredShaderRelPath);
             return;
         }
@@ -421,7 +423,8 @@ namespace AltinaEngine::Rendering {
         const auto lightingShaderPath = FindBuiltinShaderPath(kDeferredLightingShaderAssetsRelPath,
             kDeferredLightingShaderRelPath, kDeferredLightingShaderSourcePath);
         if (lightingShaderPath.IsEmpty() || !lightingShaderPath.Exists()) {
-            LogError(TEXT("Builtin deferred lighting shader not found. Expected {}."),
+            LogErrorCat(TEXT("Rendering.Resource"),
+                TEXT("Builtin deferred lighting shader not found. Expected {}."),
                 kDeferredLightingShaderRelPath);
             return;
         }
@@ -429,7 +432,8 @@ namespace AltinaEngine::Rendering {
         const auto ssaoShaderPath = FindBuiltinShaderPath(kDeferredSsaoShaderAssetsRelPath,
             kDeferredSsaoShaderRelPath, kDeferredSsaoShaderSourcePath);
         if (ssaoShaderPath.IsEmpty() || !ssaoShaderPath.Exists()) {
-            LogError(TEXT("Builtin deferred SSAO shader not found. Expected {}."),
+            LogErrorCat(TEXT("Rendering.Resource"),
+                TEXT("Builtin deferred SSAO shader not found. Expected {}."),
                 kDeferredSsaoShaderRelPath);
             return;
         }
@@ -437,7 +441,8 @@ namespace AltinaEngine::Rendering {
         const auto skyBoxShaderPath = FindBuiltinShaderPath(kDeferredSkyBoxShaderAssetsRelPath,
             kDeferredSkyBoxShaderRelPath, kDeferredSkyBoxShaderSourcePath);
         if (skyBoxShaderPath.IsEmpty() || !skyBoxShaderPath.Exists()) {
-            LogError(TEXT("Builtin deferred skybox shader not found. Expected {}."),
+            LogErrorCat(TEXT("Rendering.Resource"),
+                TEXT("Builtin deferred skybox shader not found. Expected {}."),
                 kDeferredSkyBoxShaderRelPath);
             return;
         }
@@ -445,7 +450,8 @@ namespace AltinaEngine::Rendering {
         const auto shadowShaderPath = FindBuiltinShaderPath(kShadowDepthShaderAssetsRelPath,
             kShadowDepthShaderRelPath, kShadowDepthShaderSourcePath);
         if (shadowShaderPath.IsEmpty() || !shadowShaderPath.Exists()) {
-            LogError(TEXT("Builtin shadow depth shader not found. Expected {}."),
+            LogErrorCat(TEXT("Rendering.Resource"),
+                TEXT("Builtin shadow depth shader not found. Expected {}."),
                 kShadowDepthShaderRelPath);
             return;
         }
@@ -454,12 +460,13 @@ namespace AltinaEngine::Rendering {
             FindBuiltinShaderPath(kAtmosphereSkyShaderAssetsRelPath, kAtmosphereSkyShaderRelPath,
                 kAtmosphereSkyShaderSourcePath);
         if (atmosphereSkyShaderPath.IsEmpty() || !atmosphereSkyShaderPath.Exists()) {
-            LogError(TEXT("Builtin atmosphere sky shader not found. Expected {}."),
+            LogErrorCat(TEXT("Rendering.Resource"),
+                TEXT("Builtin atmosphere sky shader not found. Expected {}."),
                 kAtmosphereSkyShaderRelPath);
             return;
         }
 
-        LogInfo(
+        LogInfoCat(TEXT("Rendering.Resource"),
             TEXT(
                 "Deferred shader paths: base='{}' lighting='{}' ssao='{}' skybox='{}' atmosphere='{}' shadow='{}'"),
             shaderPath.GetString().ToView(), lightingShaderPath.GetString().ToView(),
@@ -581,10 +588,12 @@ namespace AltinaEngine::Rendering {
                 atmosphereSkyVsKey, atmosphereSkyPsKey);
         } else {
             FBasicDeferredRenderer::SetAtmosphereSkyShaderKeys({}, {});
-            LogWarning(TEXT(
-                "Atmosphere sky shader compile failed; continuing without atmosphere sky pass."));
+            LogWarningCat(TEXT("Rendering.Resources"),
+                TEXT(
+                    "Atmosphere sky shader compile failed; continuing without atmosphere sky pass."));
         }
-        LogInfo(TEXT("Deferred lighting shader keys configured: vs='{}' ps='{}'"),
+        LogInfoCat(TEXT("Rendering.Resource"),
+            TEXT("Deferred lighting shader keys configured: vs='{}' ps='{}'"),
             lightingVsKey.mName.ToView(), lightingPsKey.mName.ToView());
         sInitialized = true;
     }

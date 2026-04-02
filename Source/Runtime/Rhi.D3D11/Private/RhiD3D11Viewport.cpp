@@ -162,7 +162,7 @@ namespace AltinaEngine::Rhi {
         UpdateExtent(mState->mWidth, mState->mHeight);
 
         if (!CreateSwapChain() || !CreateBackBuffer()) {
-            LogError(TEXT("RHI(D3D11): Failed to create viewport swapchain/backbuffer."));
+            LogErrorCat(TEXT("RHI.D3D11"), TEXT("Failed to create viewport swapchain/backbuffer."));
         }
 #else
         (void)device;
@@ -232,14 +232,16 @@ namespace AltinaEngine::Rhi {
         HRESULT           hr = mState->mSwapChain->ResizeBuffers(
             mState->mBufferCount, newWidth, newHeight, format, flags);
         if (FAILED(hr)) {
-            LogError(TEXT("RHI(D3D11): ResizeBuffers failed (hr=0x{:08X})."), static_cast<u32>(hr));
+            LogErrorCat(TEXT("RHI.D3D11"), TEXT("ResizeBuffers failed (hr=0x{:08X})."),
+                static_cast<u32>(hr));
 
             if (hr == DXGI_ERROR_INVALID_CALL) {
                 mState->mSwapChain.Reset();
                 mState->mWidth  = newWidth;
                 mState->mHeight = newHeight;
                 if (!CreateSwapChain()) {
-                    LogError(TEXT("RHI(D3D11): Recreate swapchain failed after ResizeBuffers."));
+                    LogErrorCat(
+                        TEXT("RHI.D3D11"), TEXT("Recreate swapchain failed after ResizeBuffers."));
                     return;
                 }
 
@@ -271,12 +273,12 @@ namespace AltinaEngine::Rhi {
         const u32     flags        = ResolvePresentFlags(syncInterval, info.mFlags);
         const HRESULT hr           = mState->mSwapChain->Present(syncInterval, flags);
         if (FAILED(hr)) {
-            LogError(TEXT("RHI(D3D11): Present failed (hr=0x{:08X}, {})."), static_cast<u32>(hr),
-                DxgiErrorToString(hr));
+            LogErrorCat(TEXT("RHI.D3D11"), TEXT("Present failed (hr=0x{:08X}, {})."),
+                static_cast<u32>(hr), DxgiErrorToString(hr));
             if (mState->mDevice) {
                 const HRESULT reason = mState->mDevice->GetDeviceRemovedReason();
                 if (reason != S_OK) {
-                    LogError(TEXT("RHI(D3D11): Device removed reason=0x{:08X} ({})."),
+                    LogErrorCat(TEXT("RHI.D3D11"), TEXT("Device removed reason=0x{:08X} ({})."),
                         static_cast<u32>(reason), DxgiErrorToString(reason));
                 }
             }
@@ -302,13 +304,13 @@ namespace AltinaEngine::Rhi {
 
         const auto& desc = GetDesc();
         if (desc.mNativeHandle == nullptr) {
-            LogError(TEXT("RHI(D3D11): Viewport creation failed (no native handle)."));
+            LogErrorCat(TEXT("RHI.D3D11"), TEXT("Viewport creation failed (no native handle)."));
             return false;
         }
 
         const DXGI_FORMAT format = ToD3D11Format(mState->mFormat);
         if (format == DXGI_FORMAT_UNKNOWN) {
-            LogError(TEXT("RHI(D3D11): Viewport creation failed (unknown format)."));
+            LogErrorCat(TEXT("RHI.D3D11"), TEXT("Viewport creation failed (unknown format)."));
             return false;
         }
 
@@ -349,7 +351,7 @@ namespace AltinaEngine::Rhi {
         const HRESULT           hr = factory->CreateSwapChainForHwnd(
             mState->mDevice.Get(), hwnd, &swapDesc, nullptr, nullptr, &swapChain);
         if (FAILED(hr) || !swapChain) {
-            LogError(TEXT("RHI(D3D11): CreateSwapChainForHwnd failed (hr=0x{:08X})."),
+            LogErrorCat(TEXT("RHI.D3D11"), TEXT("CreateSwapChainForHwnd failed (hr=0x{:08X})."),
                 static_cast<u32>(hr));
             return false;
         }

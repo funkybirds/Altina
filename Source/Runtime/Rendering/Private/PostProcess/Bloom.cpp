@@ -333,8 +333,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
             static bool sLoggedOnce = false;
             if (!sLoggedOnce) {
                 sLoggedOnce = true;
-                LogWarning(TEXT(
-                    "PostProcess.Bloom skipped: shared resources not ready (shader/pipeline creation failed?)"));
+                LogWarningCat(TEXT("Rendering.Postprocess"),
+                    TEXT(
+                        "PostProcess.Bloom skipped: shared resources not ready (shader/pipeline creation failed?)"));
             }
             return;
         }

@@ -1163,7 +1163,8 @@ namespace AltinaEngine::Launch {
 #endif
 
         if (!mApplication) {
-            LogError(TEXT("FEngineLoop PreInit failed: application allocation failed."));
+            LogErrorCat(
+                TEXT("Launch"), TEXT("FEngineLoop PreInit failed: application allocation failed."));
             return false;
         }
 
@@ -1183,13 +1184,15 @@ namespace AltinaEngine::Launch {
                 ClampInternalRenderScale(config.GetFloat32(TEXT("Render/InternalScale")));
 
             mApplication->SetWindowProperties(props);
-            LogInfo(TEXT("Window config logical={}x{} dpiPolicy={} renderScale={}."), props.mWidth,
+            LogInfoCat(TEXT("Launch"),
+                TEXT("Window config logical={}x{} dpiPolicy={} renderScale={}."), props.mWidth,
                 props.mHeight, static_cast<u32>(props.mDpiPolicy), mRenderInternalScale);
         }
 
         mApplication->Initialize();
         if (!mApplication->IsRunning()) {
-            LogError(TEXT("FEngineLoop PreInit failed: application did not start."));
+            LogErrorCat(
+                TEXT("Launch"), TEXT("FEngineLoop PreInit failed: application did not start."));
             return false;
         }
         if (mInputSystem) {
@@ -1204,7 +1207,8 @@ namespace AltinaEngine::Launch {
 
     auto FEngineLoop::Init() -> bool {
         if (!mApplication) {
-            LogError(TEXT("FEngineLoop Init failed: application is not initialized."));
+            LogErrorCat(
+                TEXT("Launch"), TEXT("FEngineLoop Init failed: application is not initialized."));
             return false;
         }
 
@@ -1231,7 +1235,7 @@ namespace AltinaEngine::Launch {
         }
 
         if (!LoadDemoAssetRegistry()) {
-            LogWarning(TEXT("Demo asset registry not loaded."));
+            LogWarningCat(TEXT("Launch"), TEXT("Demo asset registry not loaded."));
         }
 
 #if AE_PLATFORM_WIN
@@ -1286,10 +1290,10 @@ namespace AltinaEngine::Launch {
                 ? Rhi::ERhiBackend::DirectX11
                 : Rhi::ERhiBackend::Vulkan;
 
-            LogWarning(TEXT("RHI backend '{}' init failed. Fallback to '{}'."),
+            LogWarningCat(TEXT("Launch"), TEXT("RHI backend '{}' init failed. Fallback to '{}'."),
                 backendName(requestedRhi), backendName(fallbackRhi));
             if (!tryInitializeBackend(fallbackRhi)) {
-                LogError(
+                LogErrorCat(TEXT("Launch"),
                     TEXT("FEngineLoop Init failed: RHIInit failed for '{}' and fallback '{}'."),
                     backendName(requestedRhi), backendName(fallbackRhi));
                 return false;
@@ -1311,7 +1315,7 @@ namespace AltinaEngine::Launch {
 
         mRhiDevice = Rhi::RHIInit(*mRhiContext, initDesc, deviceDesc);
         if (!mRhiDevice) {
-            LogError(TEXT("FEngineLoop Init failed: RHIInit failed."));
+            LogErrorCat(TEXT("Launch"), TEXT("FEngineLoop Init failed: RHIInit failed."));
             return false;
         }
 #endif
@@ -1320,7 +1324,7 @@ namespace AltinaEngine::Launch {
 
         auto* window = mApplication->GetMainWindow();
         if (!window) {
-            LogError(TEXT("FEngineLoop Init failed: main window is missing."));
+            LogErrorCat(TEXT("Launch"), TEXT("FEngineLoop Init failed: main window is missing."));
             return false;
         }
 
@@ -1332,7 +1336,7 @@ namespace AltinaEngine::Launch {
         viewportDesc.mNativeHandle = window->GetNativeHandle();
         mMainViewport              = Rhi::RHICreateViewport(viewportDesc);
         if (!mMainViewport) {
-            LogError(TEXT("FEngineLoop Init failed: viewport creation failed."));
+            LogErrorCat(TEXT("Launch"), TEXT("FEngineLoop Init failed: viewport creation failed."));
             return false;
         }
 
@@ -1526,7 +1530,7 @@ namespace AltinaEngine::Launch {
             || (mLastLoggedInternalWidth != renderWidth)
             || (mLastLoggedInternalHeight != renderHeight);
         if (shouldLogWindowMetrics) {
-            LogInfo(
+            LogInfoCat(TEXT("Launch"),
                 TEXT(
                     "Window metrics: DPI={} scale={} logical={}x{} physical={}x{} swapchain={}x{} internal={}x{} renderScale={}."),
                 windowDpi, windowDpiScale, windowLogicalWidth, windowLogicalHeight, windowWidth,
@@ -2030,7 +2034,7 @@ namespace AltinaEngine::Launch {
         Container::FString registryPath;
         const auto&        config            = Core::Utility::EngineConfig::GetGlobalConfig();
         const auto         assetRootOverride = config.GetString(TEXT("GameClient/AssetRoot"));
-        LogInfo(TEXT("LoadDemoAssetRegistry AssetRoot override: {}"),
+        LogInfoCat(TEXT("Launch"), TEXT("LoadDemoAssetRegistry AssetRoot override: {}"),
             assetRootOverride.IsEmptyString() ? TEXT("<empty>") : assetRootOverride.ToView());
         if (!assetRootOverride.IsEmptyString()) {
             if (Core::Platform::IsAbsolutePath(assetRootOverride.ToView())) {
@@ -2054,21 +2058,23 @@ namespace AltinaEngine::Launch {
             registryPath = baseDir;
             registryPath.Append(TEXT("/Assets/Registry/AssetRegistry.json"));
         }
-        LogInfo(TEXT("LoadDemoAssetRegistry path: {}"), registryPath.ToView());
+        LogInfoCat(TEXT("Launch"), TEXT("LoadDemoAssetRegistry path: {}"), registryPath.ToView());
         if (!Core::Platform::IsPathExist(registryPath)) {
-            LogWarning(TEXT("Asset registry not found at {}"), registryPath.ToView());
+            LogWarningCat(
+                TEXT("Launch"), TEXT("Asset registry not found at {}"), registryPath.ToView());
             return false;
         }
 
         if (!mAssetRegistry.LoadFromJsonFile(registryPath)) {
-            LogWarning(TEXT("Failed to load asset registry from {}"), registryPath.ToView());
+            LogWarningCat(TEXT("Launch"), TEXT("Failed to load asset registry from {}"),
+                registryPath.ToView());
             return false;
         }
 
         const auto assetRoot =
             Core::Utility::Filesystem::FPath(registryPath).ParentPath().ParentPath();
         if (!Core::Utility::Filesystem::SetCurrentWorkingDir(assetRoot)) {
-            LogWarning(TEXT("Failed to set asset root as working directory."));
+            LogWarningCat(TEXT("Launch"), TEXT("Failed to set asset root as working directory."));
         }
         return true;
     }

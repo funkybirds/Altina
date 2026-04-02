@@ -79,9 +79,9 @@ namespace AltinaEngine::Core::Logging {
         FLogger::Logf(ELogLevel::Info, Category, Format, Forward<Args>(args)...);
     }
 
-    template <typename... Args> void LogInfo(TFormatString<Args...> Format, Args&&... args) {
-        LogInfoCategory(FLogger::GetDefaultCategory(), Format, Forward<Args>(args)...);
-    }
+    template <typename... Args>
+    void LogInfo(TFormatString<Args...> Format, Args&&... args) = AE_FUNC_DELETE(
+        "Deprecation: Category is Required");
 
     template <typename... Args>
     void LogInfoCat(FStringView Category, TFormatString<Args...> Format, Args&&... args) {
@@ -93,9 +93,9 @@ namespace AltinaEngine::Core::Logging {
         FLogger::Logf(ELogLevel::Warning, Category, Format, Forward<Args>(args)...);
     }
 
-    template <typename... Args> void LogWarning(TFormatString<Args...> Format, Args&&... args) {
-        LogWarningCategory(FLogger::GetDefaultCategory(), Format, Forward<Args>(args)...);
-    }
+    template <typename... Args>
+    void LogWarning(TFormatString<Args...> Format, Args&&... args) = AE_FUNC_DELETE(
+        "Deprecation: Category is Required");
 
     template <typename... Args>
     void LogWarningCat(FStringView Category, TFormatString<Args...> Format, Args&&... args) {
@@ -107,9 +107,9 @@ namespace AltinaEngine::Core::Logging {
         FLogger::Logf(ELogLevel::Error, Category, Format, Forward<Args>(args)...);
     }
 
-    template <typename... Args> void LogError(TFormatString<Args...> Format, Args&&... args) {
-        LogErrorCategory(FLogger::GetDefaultCategory(), Format, Forward<Args>(args)...);
-    }
+    template <typename... Args>
+    void LogError(TFormatString<Args...> Format, Args&&... args) = AE_FUNC_DELETE(
+        "Deprecation: Category is Required");
 
     template <typename... Args>
     void LogErrorCat(FStringView Category, TFormatString<Args...> Format, Args&&... args) {

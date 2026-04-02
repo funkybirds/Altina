@@ -209,7 +209,7 @@ namespace AltinaEngine::Rhi {
         if (!mState) {
             mState = MakeUnique<FRhiD3D11ContextState>();
         }
-        LogInfo(TEXT("RHI(D3D11): Initializing (DebugLayer={}, GPUValidation={})."),
+        LogInfoCat(TEXT("RHI.D3D11"), TEXT("Initializing (DebugLayer={}, GPUValidation={})."),
             desc.mEnableDebugLayer, desc.mEnableGpuValidation);
 
         // GUI demos often have no console; emit a temp file stamp so we can verify the backend
@@ -243,14 +243,14 @@ namespace AltinaEngine::Rhi {
 
         const bool ok = CreateFactory(*mState, desc);
         if (!ok) {
-            LogError(TEXT("RHI(D3D11): Failed to create DXGI factory."));
+            LogErrorCat(TEXT("RHI.D3D11"), TEXT("Failed to create DXGI factory."));
         } else {
-            LogInfo(TEXT("RHI(D3D11): DXGI factory created."));
+            LogInfoCat(TEXT("RHI.D3D11"), TEXT("DXGI factory created."));
         }
         return ok;
 #else
         (void)desc;
-        LogWarning(TEXT("RHI(D3D11): Initialization requested on non-Windows platform."));
+        LogWarningCat(TEXT("RHI.D3D11"), TEXT("Initialization requested on non-Windows platform."));
         return false;
 #endif
     }

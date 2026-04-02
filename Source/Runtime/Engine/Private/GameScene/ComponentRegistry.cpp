@@ -31,7 +31,7 @@ namespace AltinaEngine::GameScene {
                 && it->second.TypeName != entry.TypeName;
             it->second = entry;
             if (hasNameConflict) {
-                LogWarning(
+                LogWarningCat(TEXT("Engine.GameScene"),
                     TEXT("GameScene component registry: replaced type hash {}"), entry.TypeHash);
             }
             return;

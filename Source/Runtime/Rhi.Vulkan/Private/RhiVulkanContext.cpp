@@ -88,9 +88,9 @@ namespace AltinaEngine::Rhi {
                 return VK_FALSE;
             }
             if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-                LogWarning(TEXT("Vulkan: {}"), callbackData->pMessage);
+                LogWarningCat(TEXT("RHI.Vulkan"), TEXT("{}"), callbackData->pMessage);
             } else {
-                LogInfo(TEXT("Vulkan: {}"), callbackData->pMessage);
+                LogInfoCat(TEXT("RHI.Vulkan"), TEXT("{}"), callbackData->pMessage);
             }
             return VK_FALSE;
         }
@@ -209,7 +209,7 @@ namespace AltinaEngine::Rhi {
             mState = MakeUnique<FRhiVulkanContextState>();
         }
 
-        LogInfo(TEXT("RHI(Vulkan): Initializing (DebugLayer={}, GPUValidation={})."),
+        LogInfoCat(TEXT("RHI.Vulkan"), TEXT("Initializing (DebugLayer={}, GPUValidation={})."),
             desc.mEnableDebugLayer, desc.mEnableGpuValidation);
 
         const u32 loaderVersion  = GetVulkanVersion();
@@ -428,7 +428,7 @@ namespace AltinaEngine::Rhi {
 
         VkDevice device = VK_NULL_HANDLE;
         if (vkCreateDevice(physical, &createInfo, nullptr, &device) != VK_SUCCESS) {
-            LogError(TEXT("RHI(Vulkan): Failed to create VkDevice."));
+            LogErrorCat(TEXT("RHI.Vulkan"), TEXT("Failed to create VkDevice."));
             return {};
         }
 

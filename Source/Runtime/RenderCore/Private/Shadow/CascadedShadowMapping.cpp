@@ -115,12 +115,13 @@ namespace AltinaEngine::RenderCore::Shadow {
         static bool     sLoggedOnce = false;
         if (!sLoggedOnce) {
             sLoggedOnce = true;
-            LogInfo(TEXT("CSM Build: cascades={} splitLambda={} maxDist={} shadowMapSize={}"),
+            LogInfoCat(TEXT("RenderCore.CSM"),
+                TEXT("CSM Build: cascades={} splitLambda={} maxDist={} shadowMapSize={}"),
                 cascadeCount, settings.mSplitLambda, settings.mMaxDistance,
                 settings.mShadowMapSize);
-            LogInfo(TEXT("CSM Light: dirWS=({}, {}, {}) castShadows={}"), dirWS[0], dirWS[1],
-                dirWS[2], light.mCastShadows ? 1 : 0);
-            LogInfo(
+            LogInfoCat(TEXT("RenderCore.CSM"), TEXT("CSM Light: dirWS=({}, {}, {}) castShadows={}"),
+                dirWS[0], dirWS[1], dirWS[2], light.mCastShadows ? 1 : 0);
+            LogInfoCat(TEXT("RenderCore.CSM"),
                 TEXT("CSM View: originWS=({}, {}, {}) nearVS={} farVS={} fovY(rad)={} reverseZ={}"),
                 view.ViewOrigin[0], view.ViewOrigin[1], view.ViewOrigin[2], nearVS, farVS,
                 view.Camera.mVerticalFovRadians, view.bReverseZ ? 1 : 0);

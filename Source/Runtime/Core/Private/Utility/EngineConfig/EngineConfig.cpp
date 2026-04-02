@@ -713,10 +713,11 @@ namespace AltinaEngine::Core::Utility::EngineConfig {
         FNativeString jsonText;
         if (LoadDefaultConfigText(jsonText)) {
             if (!gEngineConfig.ParseJsonConfig(jsonText.ToView())) {
-                LogWarning(TEXT("Failed to parse DefaultGame.json."));
+                LogWarningCat(TEXT("EngineConfig"), TEXT("Failed to parse DefaultGame.json."));
             }
         } else {
-            LogWarning(TEXT("DefaultGame.json not found under Assets/Config."));
+            LogWarningCat(
+                TEXT("EngineConfig"), TEXT("DefaultGame.json not found under Assets/Config."));
         }
 
         gEngineConfig.ApplyStartupParamOverrides(startupParameters);

@@ -250,7 +250,8 @@ namespace AltinaEngine::Rendering {
                         fn = it->second.Fn;
                     } else if (!s.MissingLoggedOnce.HasKey(node.EffectId)) {
                         s.MissingLoggedOnce[node.EffectId] = true;
-                        LogWarning(TEXT("PostProcess effect '{}' is not registered. Skipping."),
+                        LogWarningCat(TEXT("Rendering.Postprocess"),
+                            TEXT("PostProcess effect '{}' is not registered. Skipping."),
                             node.EffectId.ToView());
                     }
                 }

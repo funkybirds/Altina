@@ -357,7 +357,8 @@ namespace AltinaEngine::DebugGui::Private {
             desc.mBindFlags   = Rhi::ERhiTextureBindFlags::ShaderResource;
             mFontTexture      = device.CreateTexture(desc);
             if (!mFontTexture) {
-                LogError(TEXT("DebugGui: Failed to create font texture."));
+                LogErrorCat(
+                    TEXT("DebugGUI.Rendering"), TEXT("DebugGui: Failed to create font texture."));
                 return false;
             }
 
@@ -373,7 +374,8 @@ namespace AltinaEngine::DebugGui::Private {
             srv.mFormat  = desc.mFormat;
             mFontSrv     = device.CreateShaderResourceView(srv);
             if (!mFontSrv) {
-                LogError(TEXT("DebugGui: Failed to create font SRV."));
+                LogErrorCat(
+                    TEXT("DebugGUI.Rendering"), TEXT("DebugGui: Failed to create font SRV."));
                 return false;
             }
         }
@@ -390,7 +392,8 @@ namespace AltinaEngine::DebugGui::Private {
             desc.mBindFlags   = Rhi::ERhiTextureBindFlags::ShaderResource;
             mIconTexture      = device.CreateTexture(desc);
             if (!mIconTexture) {
-                LogError(TEXT("DebugGui: Failed to create icon texture."));
+                LogErrorCat(
+                    TEXT("DebugGUI.Rendering"), TEXT("DebugGui: Failed to create icon texture."));
                 return false;
             }
 
@@ -406,7 +409,8 @@ namespace AltinaEngine::DebugGui::Private {
             srv.mFormat  = desc.mFormat;
             mIconSrv     = device.CreateShaderResourceView(srv);
             if (!mIconSrv) {
-                LogError(TEXT("DebugGui: Failed to create icon SRV."));
+                LogErrorCat(
+                    TEXT("DebugGUI.Rendering"), TEXT("DebugGui: Failed to create icon SRV."));
                 return false;
             }
         }
@@ -420,7 +424,8 @@ namespace AltinaEngine::DebugGui::Private {
             s.mAddressW = Rhi::ERhiSamplerAddressMode::Clamp;
             mSampler    = device.CreateSampler(s);
             if (!mSampler) {
-                LogError(TEXT("DebugGui: Failed to create sampler."));
+                LogErrorCat(
+                    TEXT("DebugGUI.Rendering"), TEXT("DebugGui: Failed to create sampler."));
                 return false;
             }
         }
@@ -432,18 +437,20 @@ namespace AltinaEngine::DebugGui::Private {
             shaders.PushBack(mVertexShader.Get());
             shaders.PushBack(mPixelShader.Get());
             if (!RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaders(shaders, 0U, layout)) {
-                LogError(
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
                     TEXT("DebugGui: Failed to build bind-group layout from shader reflection."));
                 return false;
             }
             mLayout = device.CreateBindGroupLayout(layout);
             if (!mLayout) {
-                LogError(TEXT("DebugGui: Failed to create bind group layout."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to create bind group layout."));
                 return false;
             }
             if (!RenderCore::ShaderBinding::BuildBindingLookupTableFromShaders(
                     shaders, layout.mSetIndex, mLayout.Get(), mBindingLookupTable)) {
-                LogError(TEXT("DebugGui: Failed to build binding lookup table."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to build binding lookup table."));
                 return false;
             }
 
@@ -456,7 +463,8 @@ namespace AltinaEngine::DebugGui::Private {
                 || !RenderCore::ShaderBinding::FindBindingByNameHash(mBindingLookupTable,
                     RenderCore::ShaderBinding::HashBindingName(TEXT("gSampler")),
                     Rhi::ERhiBindingType::Sampler, mSamplerBinding)) {
-                LogError(TEXT("DebugGui: Failed to resolve bind-group bindings from reflection."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to resolve bind-group bindings from reflection."));
                 return false;
             }
         }
@@ -467,7 +475,8 @@ namespace AltinaEngine::DebugGui::Private {
             p.mBindGroupLayouts.PushBack(mLayout.Get());
             mPipelineLayout = device.CreatePipelineLayout(p);
             if (!mPipelineLayout) {
-                LogError(TEXT("DebugGui: Failed to create pipeline layout."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to create pipeline layout."));
                 return false;
             }
         }
@@ -491,7 +500,8 @@ namespace AltinaEngine::DebugGui::Private {
                 mConstantsBufferImage = device.CreateBuffer(cb);
             }
             if (!mConstantsBufferSdf || !mConstantsBufferIcon || !mConstantsBufferImage) {
-                LogError(TEXT("DebugGui: Failed to create constants buffers."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to create constants buffers."));
                 return false;
             }
         }
@@ -500,26 +510,28 @@ namespace AltinaEngine::DebugGui::Private {
             if (mConstantsBinding == RenderCore::ShaderBinding::kInvalidBinding
                 || mTextureBinding == RenderCore::ShaderBinding::kInvalidBinding
                 || mSamplerBinding == RenderCore::ShaderBinding::kInvalidBinding) {
-                LogError(TEXT("DebugGui: Invalid bind-group binding lookup state."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Invalid bind-group binding lookup state."));
                 return false;
             }
 
             RenderCore::ShaderBinding::FBindGroupBuilder builder(mLayout.Get());
             if (!builder.AddBuffer(mConstantsBinding, mConstantsBufferSdf.Get(), 0ULL,
                     static_cast<u64>(sizeof(FConstants)))) {
-                LogError(
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
                     TEXT("DebugGui: Failed to add constant-buffer bind-group entry (binding={})."),
                     mConstantsBinding);
                 return false;
             }
             if (!builder.AddTexture(mTextureBinding, mFontTexture.Get())) {
-                LogError(
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
                     TEXT("DebugGui: Failed to add font-texture bind-group entry (binding={})."),
                     mTextureBinding);
                 return false;
             }
             if (!builder.AddSampler(mSamplerBinding, mSampler.Get())) {
-                LogError(TEXT("DebugGui: Failed to add sampler bind-group entry (binding={})."),
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to add sampler bind-group entry (binding={})."),
                     mSamplerBinding);
                 return false;
             }
@@ -527,13 +539,14 @@ namespace AltinaEngine::DebugGui::Private {
             Rhi::FRhiBindGroupDesc bg{};
             bg.mDebugName.Assign(TEXT("DebugGui.Font.BindGroup"));
             if (!builder.Build(bg)) {
-                LogError(
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
                     TEXT("DebugGui: Failed to build bind group desc (layout/entry mismatch)."));
                 return false;
             }
             mFontBindGroup = device.CreateBindGroup(bg);
             if (!mFontBindGroup) {
-                LogError(TEXT("DebugGui: Failed to create font bind group."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to create font bind group."));
                 return false;
             }
         }
@@ -542,22 +555,26 @@ namespace AltinaEngine::DebugGui::Private {
             if (mConstantsBinding == RenderCore::ShaderBinding::kInvalidBinding
                 || mTextureBinding == RenderCore::ShaderBinding::kInvalidBinding
                 || mSamplerBinding == RenderCore::ShaderBinding::kInvalidBinding) {
-                LogError(TEXT("DebugGui: Invalid bind-group binding lookup state."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Invalid bind-group binding lookup state."));
                 return false;
             }
 
             RenderCore::ShaderBinding::FBindGroupBuilder builder(mLayout.Get());
             if (!builder.AddBuffer(mConstantsBinding, mConstantsBufferIcon.Get(), 0ULL,
                     static_cast<u64>(sizeof(FConstants)))) {
-                LogError(TEXT("DebugGui: Failed to add icon constant-buffer entry."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to add icon constant-buffer entry."));
                 return false;
             }
             if (!builder.AddTexture(mTextureBinding, mIconTexture.Get())) {
-                LogError(TEXT("DebugGui: Failed to add icon-texture bind-group entry."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to add icon-texture bind-group entry."));
                 return false;
             }
             if (!builder.AddSampler(mSamplerBinding, mSampler.Get())) {
-                LogError(TEXT("DebugGui: Failed to add sampler bind-group entry (binding={})."),
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to add sampler bind-group entry (binding={})."),
                     mSamplerBinding);
                 return false;
             }
@@ -565,12 +582,14 @@ namespace AltinaEngine::DebugGui::Private {
             Rhi::FRhiBindGroupDesc bg{};
             bg.mDebugName.Assign(TEXT("DebugGui.Icon.BindGroup"));
             if (!builder.Build(bg)) {
-                LogError(TEXT("DebugGui: Failed to build icon bind group desc."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to build icon bind group desc."));
                 return false;
             }
             mIconBindGroup = device.CreateBindGroup(bg);
             if (!mIconBindGroup) {
-                LogError(TEXT("DebugGui: Failed to create icon bind group."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to create icon bind group."));
                 return false;
             }
         }
@@ -620,7 +639,8 @@ namespace AltinaEngine::DebugGui::Private {
 
             mPipeline = device.CreateGraphicsPipeline(gp);
             if (!mPipeline) {
-                LogError(TEXT("DebugGui: Failed to create graphics pipeline."));
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to create graphics pipeline."));
                 return false;
             }
         }
@@ -800,7 +820,8 @@ namespace AltinaEngine::DebugGui::Private {
             mIndexBufferSize = ibBytes;
         }
         if (!mVertexBuffer || !mIndexBuffer) {
-            LogError(TEXT("DebugGui: Failed to allocate geometry buffers."));
+            LogErrorCat(
+                TEXT("DebugGUI.Rendering"), TEXT("DebugGui: Failed to allocate geometry buffers."));
             return false;
         }
 
@@ -852,11 +873,12 @@ namespace AltinaEngine::DebugGui::Private {
 
         const auto shaderPath = FindDebugGuiShaderPath();
         if (shaderPath.IsEmpty() || !shaderPath.Exists()) {
-            LogError(
-                TEXT("DebugGui shader source not found: '{}'"), shaderPath.GetString().ToView());
+            LogErrorCat(TEXT("DebugGUI.Rendering"), TEXT("DebugGui shader source not found: '{}'"),
+                shaderPath.GetString().ToView());
             return false;
         }
-        LogInfo(TEXT("DebugGui shader source: '{}'"), shaderPath.GetString().ToView());
+        LogInfoCat(TEXT("DebugGUI.Rendering"), TEXT("DebugGui shader source: '{}'"),
+            shaderPath.GetString().ToView());
 
         auto CompileStage = [&](FStringView entry, Shader::EShaderStage stage,
                                 Rhi::FRhiShaderRef& out) -> bool {
@@ -879,7 +901,8 @@ namespace AltinaEngine::DebugGui::Private {
 
             FShaderCompileResult result = GetShaderCompiler().Compile(request);
             if (!result.mSucceeded) {
-                LogError(TEXT("DebugGui shader compile failed: entry='{}' stage={} diag={}"), entry,
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui shader compile failed: entry='{}' stage={} diag={}"), entry,
                     static_cast<u32>(stage), result.mDiagnostics.ToView());
                 return false;
             }
@@ -888,7 +911,8 @@ namespace AltinaEngine::DebugGui::Private {
             shaderDesc.mDebugName.Assign(entry);
             out = device.CreateShader(shaderDesc);
             if (!out) {
-                LogError(TEXT("DebugGui: Failed to create RHI shader: '{}'"), entry);
+                LogErrorCat(TEXT("DebugGUI.Rendering"),
+                    TEXT("DebugGui: Failed to create RHI shader: '{}'"), entry);
                 return false;
             }
             return true;

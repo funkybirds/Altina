@@ -13,7 +13,8 @@ namespace AltinaEngine::Engine::GameSceneAsset {
     void FPrefabInstantiatorRegistry::Register(IPrefabInstantiator& instantiator) {
         const auto loaderType = instantiator.GetLoaderType();
         if (loaderType.IsEmpty()) {
-            LogWarning(TEXT("Prefab registry: ignored registration with empty loader type."));
+            LogWarningCat(TEXT("Engine.GameSceneAsset"),
+                TEXT("Prefab registry: ignored registration with empty loader type."));
             return;
         }
 
@@ -21,7 +22,8 @@ namespace AltinaEngine::Engine::GameSceneAsset {
         const bool          existed = mInstantiators.HasKey(key);
         mInstantiators[key]         = &instantiator;
         if (existed) {
-            LogWarning(TEXT("Prefab registry: replaced existing instantiator for loader type."));
+            LogWarningCat(TEXT("Engine.GameSceneAsset"),
+                TEXT("Prefab registry: replaced existing instantiator for loader type."));
         }
     }
 
@@ -44,7 +46,8 @@ namespace AltinaEngine::Engine::GameSceneAsset {
         const Asset::FAssetHandle& assetHandle) const -> FPrefabInstantiateResult {
         auto* instantiator = Find(loaderType);
         if (instantiator == nullptr) {
-            LogWarning(TEXT("Prefab registry: no instantiator found for requested loader type."));
+            LogWarningCat(TEXT("Engine.GameSceneAsset"),
+                TEXT("Prefab registry: no instantiator found for requested loader type."));
             return {};
         }
 

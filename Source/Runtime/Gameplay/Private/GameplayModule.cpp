@@ -10,7 +10,7 @@ namespace AltinaEngine::Core::Reflection {
 }
 
 namespace AltinaEngine::Gameplay {
-    void FGameplayModule::LogHelloWorld() { LogInfo(TEXT("Hello from Gameplay!")); }
+    void FGameplayModule::LogHelloWorld() {}
 
     void FGameplayModule::ValidateReflection() {
         Core::Reflection::RegisterReflection_AltinaEngineGameplay();
@@ -31,7 +31,7 @@ namespace AltinaEngine::Gameplay {
         speedRef        = 2.5f;
 
         const auto& data = obj.As<FGameplayReflectionTest>();
-        LogInfo(
-            TEXT("Gameplay reflection check: mHealth={}, mSpeed={}"), data.mHealth, data.mSpeed);
+        LogInfoCat(TEXT("Gameplay"), TEXT("Gameplay reflection check: mHealth={}, mSpeed={}"),
+            data.mHealth, data.mSpeed);
     }
 } // namespace AltinaEngine::Gameplay

@@ -77,8 +77,9 @@ namespace AltinaEngine::Rendering::TemporalAA::Detail {
         s.HistoryB =
             CreateHistoryTexture(device, TEXT("TemporalAA.HistoryB"), width, height, format);
         if (!s.HistoryA || !s.HistoryB) {
-            LogError(TEXT("TemporalAA: failed to allocate history textures ({}x{}, format={})."),
-                width, height, static_cast<u32>(format));
+            LogErrorCat(TEXT("Rendering.TAA"),
+                TEXT("TemporalAA: failed to allocate history textures ({}x{}, format={})."), width,
+                height, static_cast<u32>(format));
             s.InvalidateHistory();
             return;
         }

@@ -173,7 +173,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
         auto CompileShaderFromFile(const FPath& path, FStringView entry, Shader::EShaderStage stage,
             Rhi::FRhiShaderRef& outShader) -> bool {
             if (path.IsEmpty() || !path.Exists()) {
-                LogError(TEXT("PostProcess shader source not found: path='{}' entry='{}' stage={}"),
+                LogErrorCat(TEXT("Rendering.Postprocess"),
+                    TEXT("PostProcess shader source not found: path='{}' entry='{}' stage={}"),
                     path.GetString().ToView(), entry, static_cast<u32>(stage));
                 return false;
             }
@@ -199,7 +200,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
 
             FShaderCompileResult result = GetShaderCompiler().Compile(request);
             if (!result.mSucceeded) {
-                LogError(
+                LogErrorCat(TEXT("Rendering.Postprocess"),
                     TEXT(
                         "PostProcess shader compile failed: path='{}' entry='{}' stage={} diag={}"),
                     path.GetString().ToView(), entry, static_cast<u32>(stage),
@@ -209,7 +210,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
 
             auto* device = Rhi::RHIGetDevice();
             if (!device) {
-                LogError(TEXT("RHI device missing for PostProcess shader creation."));
+                LogErrorCat(TEXT("Rendering.Postprocess"),
+                    TEXT("RHI device missing for PostProcess shader creation."));
                 return false;
             }
 
@@ -217,8 +219,9 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
             shaderDesc.mDebugName.Assign(entry);
             outShader = device->CreateShader(shaderDesc);
             if (!outShader) {
-                LogError(TEXT("Failed to create PostProcess RHI shader: entry='{}' stage={}"),
-                    entry, static_cast<u32>(stage));
+                LogErrorCat(TEXT("Rendering.Postprocess"),
+                    TEXT("Failed to create PostProcess RHI shader: entry='{}' stage={}"), entry,
+                    static_cast<u32>(stage));
                 return false;
             }
 
@@ -252,7 +255,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                     const auto bloomPath   = shaderDir / TEXT("Bloom.hlsl");
                     const auto taaPath     = shaderDir / TEXT("Taa.hlsl");
 
-                    LogInfo(TEXT("PostProcess shader dir: '{}'"), shaderDir.GetString().ToView());
+                    LogInfoCat(TEXT("Rendering.Postprocess"), TEXT("PostProcess shader dir: '{}'"),
+                        shaderDir.GetString().ToView());
 
                     if (!CompileShaderFromFile(vsPath, TEXT("VSFullScreenTriangle"),
                             Shader::EShaderStage::Vertex, res.FullscreenVS)
@@ -281,7 +285,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                         return false;
                     }
                 } else {
-                    LogError(
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
                         TEXT("PostProcess shaders not found. Expected dir '{}' or '{}' or '{}'"),
                         kPostProcessShaderAssetsRelDir, kPostProcessShaderRelDir,
                         kPostProcessShaderSourceRelDir);
@@ -310,19 +314,21 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaders(
                     shaders, 0U, layoutDesc);
                 if (!built) {
-                    LogError(
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
                         TEXT("Failed to build PostProcess bind group layout from reflection."));
                     return false;
                 }
                 layoutDesc.mDebugName.Assign(TEXT("PostProcess.Layout"));
                 res.Layout = device.CreateBindGroupLayout(layoutDesc);
                 if (!res.Layout) {
-                    LogError(TEXT("Failed to create PostProcess bind group layout."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess bind group layout."));
                     return false;
                 }
                 if (!RenderCore::ShaderBinding::BuildBindingLookupTableFromShaders(
                         shaders, layoutDesc.mSetIndex, res.Layout.Get(), res.LayoutBindings)) {
-                    LogError(TEXT("Failed to build PostProcess layout binding lookup table."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to build PostProcess layout binding lookup table."));
                     return false;
                 }
             }
@@ -336,19 +342,21 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaders(
                     shaders, 0U, layoutDesc);
                 if (!built) {
-                    LogError(
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
                         TEXT("Failed to build PostProcess TAA bind group layout from reflection."));
                     return false;
                 }
                 layoutDesc.mDebugName.Assign(TEXT("PostProcess.TAA.Layout"));
                 res.TaaLayout = device.CreateBindGroupLayout(layoutDesc);
                 if (!res.TaaLayout) {
-                    LogError(TEXT("Failed to create PostProcess TAA bind group layout."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess TAA bind group layout."));
                     return false;
                 }
                 if (!RenderCore::ShaderBinding::BuildBindingLookupTableFromShaders(shaders,
                         layoutDesc.mSetIndex, res.TaaLayout.Get(), res.TaaLayoutBindings)) {
-                    LogError(TEXT("Failed to build PostProcess TAA layout binding lookup table."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to build PostProcess TAA layout binding lookup table."));
                     return false;
                 }
             }
@@ -359,7 +367,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 layoutDesc.mBindGroupLayouts.PushBack(res.Layout.Get());
                 res.PipelineLayout = device.CreatePipelineLayout(layoutDesc);
                 if (!res.PipelineLayout) {
-                    LogError(TEXT("Failed to create PostProcess pipeline layout."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess pipeline layout."));
                     return false;
                 }
             }
@@ -370,7 +379,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 layoutDesc.mBindGroupLayouts.PushBack(res.TaaLayout.Get());
                 res.TaaPipelineLayout = device.CreatePipelineLayout(layoutDesc);
                 if (!res.TaaPipelineLayout) {
-                    LogError(TEXT("Failed to create PostProcess TAA pipeline layout."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess TAA pipeline layout."));
                     return false;
                 }
             }
@@ -380,7 +390,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 samplerDesc.mDebugName.Assign(TEXT("PostProcess.LinearSampler"));
                 res.LinearSampler = Rhi::RHICreateSampler(samplerDesc);
                 if (!res.LinearSampler) {
-                    LogError(TEXT("Failed to create PostProcess sampler."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess sampler."));
                     return false;
                 }
             }
@@ -398,7 +409,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mCpuAccess = Rhi::ERhiCpuAccess::Write;
                 out             = device.CreateBuffer(desc);
                 if (!out) {
-                    LogError(TEXT("Failed to create PostProcess constant buffer."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess constant buffer."));
                     return false;
                 }
                 UpdateConstantBuffer(out.Get(), defaults, sizeBytes);
@@ -444,7 +456,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mDepthState.mDepthWrite  = false;
                 res.BlitPipeline              = device.CreateGraphicsPipeline(desc);
                 if (!res.BlitPipeline) {
-                    LogError(TEXT("Failed to create PostProcess blit pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess blit pipeline."));
                     return false;
                 }
             }
@@ -464,7 +477,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mDepthState.mDepthWrite  = false;
                 res.TonemapPipeline           = device.CreateGraphicsPipeline(desc);
                 if (!res.TonemapPipeline) {
-                    LogError(TEXT("Failed to create PostProcess tonemap pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess tonemap pipeline."));
                     return false;
                 }
             }
@@ -484,7 +498,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mDepthState.mDepthWrite  = false;
                 res.FxaaPipeline              = device.CreateGraphicsPipeline(desc);
                 if (!res.FxaaPipeline) {
-                    LogError(TEXT("Failed to create PostProcess fxaa pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess fxaa pipeline."));
                     return false;
                 }
             }
@@ -504,7 +519,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mDepthState.mDepthWrite  = false;
                 res.BloomPrefilterPipeline    = device.CreateGraphicsPipeline(desc);
                 if (!res.BloomPrefilterPipeline) {
-                    LogError(TEXT("Failed to create PostProcess bloom prefilter pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess bloom prefilter pipeline."));
                     return false;
                 }
             }
@@ -524,7 +540,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mDepthState.mDepthWrite  = false;
                 res.BloomDownsamplePipeline   = device.CreateGraphicsPipeline(desc);
                 if (!res.BloomDownsamplePipeline) {
-                    LogError(TEXT("Failed to create PostProcess bloom downsample pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess bloom downsample pipeline."));
                     return false;
                 }
             }
@@ -544,7 +561,7 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mDepthState.mDepthWrite        = false;
                 res.BloomDownsampleWeightedPipeline = device.CreateGraphicsPipeline(desc);
                 if (!res.BloomDownsampleWeightedPipeline) {
-                    LogError(
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
                         TEXT("Failed to create PostProcess bloom downsample-weighted pipeline."));
                     return false;
                 }
@@ -565,7 +582,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mDepthState.mDepthWrite  = false;
                 res.BloomBlurHPipeline        = device.CreateGraphicsPipeline(desc);
                 if (!res.BloomBlurHPipeline) {
-                    LogError(TEXT("Failed to create PostProcess bloom blur-h pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess bloom blur-h pipeline."));
                     return false;
                 }
             }
@@ -585,7 +603,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mDepthState.mDepthWrite  = false;
                 res.BloomBlurVPipeline        = device.CreateGraphicsPipeline(desc);
                 if (!res.BloomBlurVPipeline) {
-                    LogError(TEXT("Failed to create PostProcess bloom blur-v pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess bloom blur-v pipeline."));
                     return false;
                 }
             }
@@ -612,7 +631,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mBlendState.mAlphaOp     = Rhi::ERhiBlendOp::Add;
                 res.BloomUpsampleAddPipeline  = device.CreateGraphicsPipeline(desc);
                 if (!res.BloomUpsampleAddPipeline) {
-                    LogError(TEXT("Failed to create PostProcess bloom upsample-add pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess bloom upsample-add pipeline."));
                     return false;
                 }
             }
@@ -639,7 +659,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mBlendState.mAlphaOp     = Rhi::ERhiBlendOp::Add;
                 res.BloomApplyAddPipeline     = device.CreateGraphicsPipeline(desc);
                 if (!res.BloomApplyAddPipeline) {
-                    LogError(TEXT("Failed to create PostProcess bloom apply pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess bloom apply pipeline."));
                     return false;
                 }
             }
@@ -659,7 +680,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
                 desc.mDepthState.mDepthWrite  = false;
                 res.TaaPipeline               = device.CreateGraphicsPipeline(desc);
                 if (!res.TaaPipeline) {
-                    LogError(TEXT("Failed to create PostProcess TAA pipeline."));
+                    LogErrorCat(TEXT("Rendering.Postprocess"),
+                        TEXT("Failed to create PostProcess TAA pipeline."));
                     return false;
                 }
             }
@@ -676,7 +698,8 @@ namespace AltinaEngine::Rendering::PostProcess::Detail {
     auto EnsurePostProcessSharedResources() -> bool {
         auto* device = Rhi::RHIGetDevice();
         if (!device) {
-            LogError(TEXT("RHI device missing for PostProcess resources."));
+            LogErrorCat(TEXT("Rendering.Postprocess"),
+                TEXT("RHI device missing for PostProcess resources."));
             return false;
         }
 

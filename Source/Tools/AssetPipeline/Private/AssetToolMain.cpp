@@ -1499,6 +1499,10 @@ namespace AltinaEngine::Tools::AssetPipeline {
                 registryAssets.push_back(registryEntry);
 
                 if (!generatedAssets.empty()) {
+                    std::unordered_set<std::string> generatedUuidSet;
+                    std::unordered_set<std::string> generatedPathSet;
+                    generatedUuidSet.reserve(generatedAssets.size());
+                    generatedPathSet.reserve(generatedAssets.size());
                     for (const auto& generated : generatedAssets) {
                         if (!generated.Handle.IsValid()) {
                             continue;
@@ -1506,6 +1510,18 @@ namespace AltinaEngine::Tools::AssetPipeline {
 
                         const std::string genUuid =
                             ToStdString(generated.Handle.mUuid.ToNativeString());
+                        if (!generatedUuidSet.insert(genUuid).second) {
+                            std::cerr << "Duplicate generated UUID in importer output: " << genUuid
+                                      << "\n";
+                            return 1;
+                        }
+                        if (!generated.VirtualPath.empty()
+                            && !generatedPathSet.insert(generated.VirtualPath).second) {
+                            std::cerr << "Duplicate generated VirtualPath in importer output: "
+                                      << generated.VirtualPath << "\n";
+                            return 1;
+                        }
+
                         const std::string           genCookedRel = "Assets/" + genUuid + ".bin";
                         const std::filesystem::path genCookedPath =
                             paths.CookedRoot / "Assets" / (genUuid + ".bin");

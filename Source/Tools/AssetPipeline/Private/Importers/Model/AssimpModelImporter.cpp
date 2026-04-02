@@ -510,6 +510,13 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return "Mesh_" + std::to_string(index);
         }
 
+        auto BuildUniqueMeshVirtualPath(
+            const std::string& basePath, const aiMesh* mesh, u32 meshIndex) -> std::string {
+            std::string meshName = SanitizeName(GetMeshName(mesh, meshIndex), "mesh");
+            meshName += "_" + std::to_string(meshIndex);
+            return NormalizeVirtualPath(basePath + "/meshes/" + meshName);
+        }
+
         auto ToAssetHandle(const FUuid& uuid, Asset::EAssetType type) -> Asset::FAssetHandle {
             Asset::FAssetHandle handle{};
             handle.mUuid = uuid;
@@ -945,10 +952,8 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             return;
                         }
 
-                        const std::string meshName =
-                            SanitizeName(GetMeshName(mesh, meshIndex), "mesh");
                         const std::string meshVirtual =
-                            NormalizeVirtualPath(basePath + "/meshes/" + meshName);
+                            BuildUniqueMeshVirtualPath(basePath, mesh, meshIndex);
                         const FUuid     meshUuid = MakeDerivedUuid(baseHandle.mUuid, meshVirtual);
 
                         FGeneratedAsset meshAsset{};

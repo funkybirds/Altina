@@ -12,12 +12,14 @@
 #include "CoreMinimal.h"
 #include "RhiVulkanCommon.h"
 #include "Utility/Assert.h"
+#include "Container/Pointer.h"
 
 using AltinaEngine::Forward;
 using AltinaEngine::Move;
 using AltinaEngine::Core::Container::MakeSharedAs;
 using AltinaEngine::Core::Container::TAllocator;
 using AltinaEngine::Core::Container::TAllocatorTraits;
+using AltinaEngine::Core::Container::TNonNullPtr;
 using AltinaEngine::Core::Utility::Assert;
 
 namespace AltinaEngine::Rhi {
@@ -57,10 +59,8 @@ namespace AltinaEngine::Rhi {
             return (available < preferred) ? available : preferred;
         }
 
-        auto HasLayer(const TVector<VkLayerProperties>& layers, const char* name) -> bool {
-            if (name == nullptr) {
-                return false;
-            }
+        auto HasLayer(const TVector<VkLayerProperties>& layers, TNonNullPtr<const char*> name)
+            -> bool {
             for (const auto& layer : layers) {
                 if (Core::Algorithm::RawStringEqualUnsafe(layer.layerName, name)) {
                     return true;
@@ -69,10 +69,8 @@ namespace AltinaEngine::Rhi {
             return false;
         }
 
-        auto HasExtension(const TVector<VkExtensionProperties>& exts, const char* name) -> bool {
-            if (!name) {
-                return false;
-            }
+        auto HasExtension(const TVector<VkExtensionProperties>& exts, TNonNullPtr<const char*> name)
+            -> bool {
             for (const auto& ext : exts) {
                 if (Core::Algorithm::RawStringEqualUnsafe(ext.extensionName, name)) {
                     return true;
@@ -88,9 +86,11 @@ namespace AltinaEngine::Rhi {
                 return VK_FALSE;
             }
             if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-                LogWarningCat(TEXT("RHI.Vulkan"), TEXT("{}"), callbackData->pMessage);
+                LogWarningCat(
+                    TEXT("RHI.Vulkan"), TEXT("Validation Layer: {}"), callbackData->pMessage);
             } else {
-                LogInfoCat(TEXT("RHI.Vulkan"), TEXT("{}"), callbackData->pMessage);
+                LogInfoCat(
+                    TEXT("RHI.Vulkan"), TEXT("Validation Layer: {}"), callbackData->pMessage);
             }
             return VK_FALSE;
         }
@@ -140,6 +140,8 @@ namespace AltinaEngine::Rhi {
                 case VK_PHYSICAL_DEVICE_TYPE_CPU:
                     return ERhiAdapterType::Cpu;
                 default:
+                    Assert(false, TEXT("RHI.Vulkan"), TEXT("Unknown physical device type: {}"),
+                        static_cast<u32>(type));
                     return ERhiAdapterType::Unknown;
             }
         }
@@ -155,6 +157,8 @@ namespace AltinaEngine::Rhi {
                 case static_cast<u32>(ERhiVendorId::Microsoft):
                     return ERhiVendorId::Microsoft;
                 default:
+                    Assert(false, TEXT("RHI.Vulkan"), TEXT("Unknown vendor ID: {}"),
+                        static_cast<u32>(vendor));
                     return ERhiVendorId::Unknown;
             }
         }
@@ -269,7 +273,7 @@ namespace AltinaEngine::Rhi {
         createInfo.ppEnabledExtensionNames = mState->mEnabledExtensions.Data();
 
         if (vkCreateInstance(&createInfo, nullptr, &mState->mInstance) != VK_SUCCESS) {
-            LogErrorCat(TEXT("RHI.Vulkan"), TEXT("RHI(Vulkan): Failed to create VkInstance."));
+            LogErrorCat(TEXT("RHI.Vulkan"), TEXT("Failed to create VkInstance."));
             return false;
         }
 
@@ -277,7 +281,7 @@ namespace AltinaEngine::Rhi {
             mState->mDebugMessenger = CreateDebugMessenger(mState->mInstance);
         }
 
-        LogInfoCat(TEXT("RHI.Vulkan"), TEXT("RHI(Vulkan): Instance created (API={}.{}.{})"),
+        LogInfoCat(TEXT("RHI.Vulkan"), TEXT("Instance created (API={}.{}.{})"),
             VK_VERSION_MAJOR(mState->mInstanceVersion), VK_VERSION_MINOR(mState->mInstanceVersion),
             VK_VERSION_PATCH(mState->mInstanceVersion));
         return true;

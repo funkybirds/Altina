@@ -1813,6 +1813,10 @@ namespace AltinaEngine::Rendering {
             resources.PerDrawLayout ? resources.PerDrawLayout->GetDesc().mSetIndex : 0U;
         drawBindings.PerMaterialSetIndex  = IsVulkanBackend() ? 2U : 0U;
         drawBindings.ResolvedVertexLayout = &resources.BaseVertexLayout;
+        DebugAssert(drawBindings.PerFrame != nullptr, TEXT("BasicDeferredRenderer"),
+            "Per-frame bind group is null for base pass.");
+        DebugAssert(drawBindings.PerDraw != nullptr, TEXT("BasicDeferredRenderer"),
+            "Per-draw bind group is null for base pass.");
 
         FBasePassPipelineData pipelineData{};
         pipelineData.Device          = device;
@@ -2036,6 +2040,9 @@ namespace AltinaEngine::Rendering {
                     constants.ViewProjection = lightViewProj;
                     ctx.RHIUpdateDynamicBufferDiscard(
                         perFrameBuffer, &constants, sizeof(constants), 0ULL);
+                }
+                if (perFrameBuffer == nullptr || perFrameGroup == nullptr) {
+                    return;
                 }
 
                 Rhi::FRhiViewportRect viewport{};

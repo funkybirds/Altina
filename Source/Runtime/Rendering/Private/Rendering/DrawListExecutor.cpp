@@ -158,10 +158,6 @@ namespace AltinaEngine::Rendering {
             if (bindings.PerFrame != nullptr) {
                 ctx.RHISetBindGroup(bindings.PerFrameSetIndex, bindings.PerFrame, nullptr, 0U);
             }
-            if (bindings.PerDraw != nullptr) {
-                ctx.RHISetBindGroup(bindings.PerDrawSetIndex, bindings.PerDraw, nullptr, 0U);
-            }
-
             if (bucket.mMaterial != nullptr) {
                 auto group = bucket.mMaterial->GetBindGroup(bucket.mPass);
                 if (group) {
@@ -208,6 +204,12 @@ namespace AltinaEngine::Rendering {
                 FDrawBatchExecutionParams executionParams{};
                 if (batchBinder != nullptr) {
                     batchBinder(ctx, batch, executionParams, batchUserData);
+                }
+                if (bindings.PerDraw != nullptr) {
+                    // Per-draw buffer content can change for every batch; rebind to avoid backend
+                    // state aliasing/stale SRV reads when updating and drawing from the same
+                    // buffer.
+                    ctx.RHISetBindGroup(bindings.PerDrawSetIndex, bindings.PerDraw, nullptr, 0U);
                 }
 
                 ctx.RHIDrawIndexed(section->IndexCount, instanceCount, section->FirstIndex,

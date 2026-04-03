@@ -27,6 +27,13 @@ namespace AltinaEngine {
     struct TTypeIsAnyOf<T, TTypeSet<TCandidates...>> :
         TBoolConstant<(... || TTypeSameAs<T, TCandidates>::Value)> {};
 
+    template <bool B, typename TTrue, typename TFalse> struct TTypeSelect {
+        using Type = TTrue; // NOLINT
+    };
+    template <typename TTrue, typename TFalse> struct TTypeSelect<false, TTrue, TFalse> {
+        using Type = TFalse; // NOLINT
+    };
+
     template <typename T, typename U>
     concept CSameAs = TTypeSameAs<T, U>::Value;
 
@@ -141,6 +148,13 @@ namespace AltinaEngine {
     [[nodiscard]] constexpr auto ToUnderlying(T value) noexcept -> TUnderlyingType<T> {
         return static_cast<TUnderlyingType<T>>(value);
     }
+    // Basic Types: Pointer
+    template <typename T> struct TIsPointer : TFalseType {};
+
+    template <typename T> struct TIsPointer<T*> : TTrueType {};
+
+    template <typename T>
+    concept CPointer = TIsPointer<T>::Value;
 
     // Basic Types
     namespace Detail::BasicTypes {
@@ -488,5 +502,13 @@ namespace AltinaEngine {
             return static_cast<L&&>(l) == static_cast<R&&>(r);
         }
     };
+
+    // GSL: F.16
+    template <typename T>
+    using TValueOrReferenceReturn = TTypeSelect<sizeof(T) <= 2 * sizeof(void*), T, T&>::Type;
+
+    template <typename T>
+    using TConstValueOrReferenceReturn =
+        TTypeSelect<sizeof(T) <= 2 * sizeof(void*), const T, const T&>::Type;
 
 } // namespace AltinaEngine

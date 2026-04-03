@@ -11,17 +11,11 @@
 
 using AltinaEngine::Forward;
 namespace AltinaEngine::Core::Logging {
-    template <bool B, typename TTrue, typename TFalse> struct TSelect {
-        using Type = TTrue; // NOLINT
-    };
-    template <typename TTrue, typename TFalse> struct TSelect<false, TTrue, TFalse> {
-        using Type = TFalse; // NOLINT
-    };
 
     using Container::FStringView;
 
     template <typename... Args>
-    using TFormatString = TSelect<CSameAs<TChar, wchar_t>, std::wformat_string<Args...>,
+    using TFormatString = TTypeSelect<CSameAs<TChar, wchar_t>, std::wformat_string<Args...>,
         std::format_string<Args...>>::Type;
 
     enum class ELogLevel : u8 {

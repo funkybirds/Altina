@@ -127,6 +127,14 @@ namespace AltinaEngine::Core::Logging {
             }
         }
 
+        auto ResolveCategory(FStringView Category) noexcept -> FStringView {
+            const auto defaultTag = LiteralView(kDefaultCategory);
+            if (Category.IsEmpty() || Category == defaultTag) {
+                return FLogger::GetDefaultCategory();
+            }
+            return Category;
+        }
+
         auto ConsoleStream() noexcept -> std::basic_ostream<TChar>& {
             if constexpr (std::is_same_v<TChar, wchar_t>) {
                 return std::wcout;
@@ -197,16 +205,17 @@ namespace AltinaEngine::Core::Logging {
         if (!ShouldLog(Level)) {
             return;
         }
+        const auto resolvedCategory = ResolveCategory(Category);
 
         if (!ShouldEmitStackTrace(Level)) {
-            DefaultSink(Level, Category, Message, nullptr);
+            DefaultSink(Level, resolvedCategory, Message, nullptr);
             return;
         }
 
         FString composed;
         composed.Append(Message);
         AppendStackTrace(composed);
-        DefaultSink(Level, Category, composed.ToView(), nullptr);
+        DefaultSink(Level, resolvedCategory, composed.ToView(), nullptr);
     }
 
     auto FLogger::ShouldLog(ELogLevel Level) noexcept -> bool {
@@ -238,8 +247,9 @@ namespace AltinaEngine::Core::Logging {
     }
 
     void FLogger::Dispatch(ELogLevel Level, FStringView Category, FStringView Message) {
-        FLogSink sinkCopy     = nullptr;
-        void*    userDataCopy = nullptr;
+        const auto resolvedCategory = ResolveCategory(Category);
+        FLogSink   sinkCopy         = nullptr;
+        void*      userDataCopy     = nullptr;
         {
             Threading::FScopedLock lock(gLogMutex);
             sinkCopy     = gUserSink;
@@ -248,9 +258,9 @@ namespace AltinaEngine::Core::Logging {
 
         if (!ShouldEmitStackTrace(Level)) {
             if (sinkCopy) {
-                sinkCopy(Level, Category, Message, userDataCopy);
+                sinkCopy(Level, resolvedCategory, Message, userDataCopy);
             } else {
-                DefaultSink(Level, Category, Message, nullptr);
+                DefaultSink(Level, resolvedCategory, Message, nullptr);
             }
             return;
         }
@@ -261,9 +271,9 @@ namespace AltinaEngine::Core::Logging {
         const auto view = composed.ToView();
 
         if (sinkCopy) {
-            sinkCopy(Level, Category, view, userDataCopy);
+            sinkCopy(Level, resolvedCategory, view, userDataCopy);
         } else {
-            DefaultSink(Level, Category, view, nullptr);
+            DefaultSink(Level, resolvedCategory, view, nullptr);
         }
     }
 

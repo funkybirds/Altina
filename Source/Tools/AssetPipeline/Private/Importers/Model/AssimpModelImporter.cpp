@@ -50,6 +50,12 @@ namespace AltinaEngine::Tools::AssetPipeline {
             return HashBytes(hash, text.data(), text.size());
         }
 
+        auto HashAssetHandle(u64 hash, const Asset::FAssetHandle& handle) -> u64 {
+            hash          = HashBytes(hash, handle.mUuid.Data(), FUuid::kByteCount);
+            const u8 type = static_cast<u8>(handle.mType);
+            return HashBytes(hash, &type, sizeof(type));
+        }
+
         auto MakeDerivedUuid(const FUuid& base, const std::string& salt) -> FUuid {
             u64 h1 = HashBytes(kFnvOffset, base.Data(), FUuid::kByteCount);
             h1     = HashString(h1, salt);
@@ -614,8 +620,14 @@ namespace AltinaEngine::Tools::AssetPipeline {
         std::unordered_map<u32, u32>      meshIndexToRef;
         std::vector<Asset::FModelMeshRef> meshRefs;
         std::vector<Asset::FAssetHandle>  materialSlots;
+        struct FMeshRefDedupCandidate {
+            u32                 mMeshRefIndex        = 0U;
+            usize               mGeneratedAssetIndex = 0U;
+            Asset::FAssetHandle mMaterialTemplate{};
+        };
+        std::unordered_map<u64, std::vector<FMeshRefDedupCandidate>> meshDedupByCookedAndMaterial;
 
-        std::vector<Asset::FAssetHandle>  materialHandles;
+        std::vector<Asset::FAssetHandle>                             materialHandles;
         materialHandles.resize(scene->mNumMaterials);
         std::unordered_map<std::string, Asset::FAssetHandle> textureByVirtual;
 
@@ -952,31 +964,78 @@ namespace AltinaEngine::Tools::AssetPipeline {
                             return;
                         }
 
-                        const std::string meshVirtual =
-                            BuildUniqueMeshVirtualPath(basePath, mesh, meshIndex);
-                        const FUuid     meshUuid = MakeDerivedUuid(baseHandle.mUuid, meshVirtual);
-
-                        FGeneratedAsset meshAsset{};
-                        meshAsset.Handle      = ToAssetHandle(meshUuid, Asset::EAssetType::Mesh);
-                        meshAsset.Type        = Asset::EAssetType::Mesh;
-                        meshAsset.VirtualPath = meshVirtual;
-                        meshAsset.CookedBytes = Move(meshCooked);
-                        meshAsset.MeshDesc    = meshDesc;
-                        generated.push_back(Move(meshAsset));
-
-                        Asset::FModelMeshRef meshRef{};
-                        meshRef.mMesh = ToAssetHandle(meshUuid, Asset::EAssetType::Mesh);
-                        meshRef.mMaterialSlotOffset = static_cast<u32>(materialSlots.size());
-                        meshRef.mMaterialSlotCount  = 1U;
-                        const u32 materialIndex     = mesh->mMaterialIndex;
+                        const u32           materialIndex = mesh->mMaterialIndex;
+                        Asset::FAssetHandle materialTemplate{};
                         if (materialIndex < materialHandles.size()) {
-                            materialSlots.push_back(materialHandles[materialIndex]);
-                        } else {
-                            materialSlots.push_back({});
+                            materialTemplate = materialHandles[materialIndex];
                         }
 
-                        meshRefs.push_back(meshRef);
-                        meshRefIndex = static_cast<i32>(meshRefs.size() - 1);
+                        // Deduplicate mesh-ref entries by cooked geometry + material template.
+                        // This allows identical imported meshes to share one meshRef and become
+                        // eligible for runtime instancing.
+                        u64 dedupHash = HashBytes(
+                            kFnvOffset, meshCooked.data(), static_cast<size_t>(meshCooked.size()));
+                        dedupHash = HashAssetHandle(dedupHash, materialTemplate);
+
+                        bool reusedMeshRef = false;
+                        if (const auto dedupIt = meshDedupByCookedAndMaterial.find(dedupHash);
+                            dedupIt != meshDedupByCookedAndMaterial.end()) {
+                            for (const auto& candidate : dedupIt->second) {
+                                if (!(candidate.mMaterialTemplate == materialTemplate)) {
+                                    continue;
+                                }
+                                if (candidate.mGeneratedAssetIndex >= generated.size()) {
+                                    continue;
+                                }
+                                const auto& existingAsset =
+                                    generated[candidate.mGeneratedAssetIndex];
+                                if (existingAsset.Type != Asset::EAssetType::Mesh) {
+                                    continue;
+                                }
+                                if (existingAsset.CookedBytes.size() != meshCooked.size()) {
+                                    continue;
+                                }
+                                if (!existingAsset.CookedBytes.empty()
+                                    && std::memcmp(existingAsset.CookedBytes.data(),
+                                           meshCooked.data(), existingAsset.CookedBytes.size())
+                                        != 0) {
+                                    continue;
+                                }
+                                meshRefIndex  = static_cast<i32>(candidate.mMeshRefIndex);
+                                reusedMeshRef = true;
+                                break;
+                            }
+                        }
+
+                        if (!reusedMeshRef) {
+                            const std::string meshVirtual =
+                                BuildUniqueMeshVirtualPath(basePath, mesh, meshIndex);
+                            const FUuid meshUuid = MakeDerivedUuid(baseHandle.mUuid, meshVirtual);
+
+                            FGeneratedAsset meshAsset{};
+                            meshAsset.Handle = ToAssetHandle(meshUuid, Asset::EAssetType::Mesh);
+                            meshAsset.Type   = Asset::EAssetType::Mesh;
+                            meshAsset.VirtualPath          = meshVirtual;
+                            meshAsset.CookedBytes          = Move(meshCooked);
+                            meshAsset.MeshDesc             = meshDesc;
+                            const usize generatedMeshIndex = generated.size();
+                            generated.push_back(Move(meshAsset));
+
+                            Asset::FModelMeshRef meshRef{};
+                            meshRef.mMesh = ToAssetHandle(meshUuid, Asset::EAssetType::Mesh);
+                            meshRef.mMaterialSlotOffset = static_cast<u32>(materialSlots.size());
+                            meshRef.mMaterialSlotCount  = 1U;
+                            materialSlots.push_back(materialTemplate);
+
+                            meshRefs.push_back(meshRef);
+                            meshRefIndex = static_cast<i32>(meshRefs.size() - 1);
+
+                            FMeshRefDedupCandidate candidate{};
+                            candidate.mMeshRefIndex        = static_cast<u32>(meshRefIndex);
+                            candidate.mGeneratedAssetIndex = generatedMeshIndex;
+                            candidate.mMaterialTemplate    = materialTemplate;
+                            meshDedupByCookedAndMaterial[dedupHash].push_back(candidate);
+                        }
                         meshIndexToRef.emplace(meshIndex, static_cast<u32>(meshRefIndex));
                     }
 

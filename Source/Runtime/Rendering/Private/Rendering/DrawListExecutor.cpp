@@ -126,8 +126,6 @@ namespace AltinaEngine::Rendering {
         u32                            batchCount            = 0U;
         u32                            materialBucketCount   = 0U;
         u32                            drawCallCount         = 0U;
-        u32                            totalInstanceCount    = 0U;
-        u32                            maxBatchInstCount     = 0U;
         u32                            skippedNullMesh       = 0U;
         u32                            skippedInvalidLod     = 0U;
         u32                            skippedNullSection    = 0U;
@@ -190,11 +188,6 @@ namespace AltinaEngine::Rendering {
                 }
                 uniqueGeometryKeys.Insert(batch.mBatchKey.mGeometryKey);
 
-                FDrawBatchExecutionParams executionParams{};
-                if (batchBinder != nullptr) {
-                    batchBinder(ctx, batch, executionParams, batchUserData);
-                }
-
                 const auto indexView = lod.mIndexBuffer.GetView();
                 if (indexView.mBuffer == nullptr) {
                     ++skippedNullIndex;
@@ -211,9 +204,10 @@ namespace AltinaEngine::Rendering {
                     ++skippedZeroInst;
                     continue;
                 }
-                totalInstanceCount += instanceCount;
-                if (instanceCount > maxBatchInstCount) {
-                    maxBatchInstCount = instanceCount;
+
+                FDrawBatchExecutionParams executionParams{};
+                if (batchBinder != nullptr) {
+                    batchBinder(ctx, batch, executionParams, batchUserData);
                 }
 
                 ctx.RHIDrawIndexed(section->IndexCount, instanceCount, section->FirstIndex,
@@ -232,12 +226,12 @@ namespace AltinaEngine::Rendering {
 
         const auto rhiStatsAfter = Rhi::RHIGetFrameStats();
         LogInfoCat(TEXT("Rendering.DrawList"),
-            "ExecuteBasePass summary: pass={}, materialBuckets={}, draws={}, batches={}, uniqueGeometry={}, vbBinds={}, rhiVbBinds={}, instances={}, maxBatchInstances={}, skips(nullMesh={}, invalidLod={}, nullSection={}, nullPipeline={}, nullIndex={}, zeroInstance={}).",
+            "ExecuteBasePass summary: pass={}, materialBuckets={}, draws={}, batches={}, uniqueGeometry={}, vbBinds={}, rhiVbBinds={}, skips(nullMesh={}, invalidLod={}, nullSection={}, nullPipeline={}, nullIndex={}, zeroInstance={}).",
             passId, materialBucketCount, drawCallCount, batchCount,
             static_cast<u32>(uniqueGeometryKeys.Num()), vertexBufferBindCount,
             static_cast<u32>(
                 rhiStatsAfter.mSetVertexBufferCalls - rhiStatsBefore.mSetVertexBufferCalls),
-            totalInstanceCount, maxBatchInstCount, skippedNullMesh, skippedInvalidLod,
-            skippedNullSection, skippedNullPipeline, skippedNullIndex, skippedZeroInst);
+            skippedNullMesh, skippedInvalidLod, skippedNullSection, skippedNullPipeline,
+            skippedNullIndex, skippedZeroInst);
     }
 } // namespace AltinaEngine::Rendering

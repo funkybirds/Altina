@@ -120,67 +120,10 @@ namespace AltinaEngine::Engine {
             return bucketKey;
         }
 
-        struct FFrustumPlane {
-            FVector3f mNormal   = FVector3f(0.0f);
-            f32       mDistance = 0.0f;
-        };
-
         struct FFrustumCullContext {
-            FFrustumPlane mPlanes[6]{};
-            bool          mEnabled = false;
+            FMatrix4x4f mViewProj = FMatrix4x4f(0.0f);
+            bool        mEnabled  = false;
         };
-
-        [[nodiscard]] auto NormalizePlane(const FFrustumPlane& plane) noexcept -> FFrustumPlane {
-            const f32 lengthSq = plane.mNormal[0] * plane.mNormal[0]
-                + plane.mNormal[1] * plane.mNormal[1] + plane.mNormal[2] * plane.mNormal[2];
-            if (lengthSq <= 1e-8f) {
-                return plane;
-            }
-
-            const f32     invLength = 1.0f / Core::Math::Sqrt(lengthSq);
-            FFrustumPlane out{};
-            out.mNormal[0] = plane.mNormal[0] * invLength;
-            out.mNormal[1] = plane.mNormal[1] * invLength;
-            out.mNormal[2] = plane.mNormal[2] * invLength;
-            out.mDistance  = plane.mDistance * invLength;
-            return out;
-        }
-
-        void ExtractFrustumPlanes(
-            const FMatrix4x4f& viewProj, FFrustumPlane (&outPlanes)[6]) noexcept {
-            const FVector4f row0(viewProj(0, 0), viewProj(0, 1), viewProj(0, 2), viewProj(0, 3));
-            const FVector4f row1(viewProj(1, 0), viewProj(1, 1), viewProj(1, 2), viewProj(1, 3));
-            const FVector4f row2(viewProj(2, 0), viewProj(2, 1), viewProj(2, 2), viewProj(2, 3));
-            const FVector4f row3(viewProj(3, 0), viewProj(3, 1), viewProj(3, 2), viewProj(3, 3));
-
-            const auto      setPlane = [&outPlanes](u32 index, const FVector4f& coeffs) {
-                FFrustumPlane plane{};
-                plane.mNormal[0] = coeffs[0];
-                plane.mNormal[1] = coeffs[1];
-                plane.mNormal[2] = coeffs[2];
-                plane.mDistance  = coeffs[3];
-                outPlanes[index] = NormalizePlane(plane);
-            };
-
-            setPlane(0U, row3 + row0); // left
-            setPlane(1U, row3 - row0); // right
-            setPlane(2U, row3 + row1); // bottom
-            setPlane(3U, row3 - row1); // top
-            setPlane(4U, row2);        // near (D3D/Vulkan z >= 0)
-            setPlane(5U, row3 - row2); // far
-        }
-
-        [[nodiscard]] auto IsOutsidePlane(const FFrustumPlane& plane, const FVector3f& minWS,
-            const FVector3f& maxWS) noexcept -> bool {
-            FVector3f support(0.0f);
-            support[0] = (plane.mNormal[0] >= 0.0f) ? maxWS[0] : minWS[0];
-            support[1] = (plane.mNormal[1] >= 0.0f) ? maxWS[1] : minWS[1];
-            support[2] = (plane.mNormal[2] >= 0.0f) ? maxWS[2] : minWS[2];
-
-            const f32 distance = plane.mNormal[0] * support[0] + plane.mNormal[1] * support[1]
-                + plane.mNormal[2] * support[2] + plane.mDistance;
-            return distance < 0.0f;
-        }
 
         [[nodiscard]] auto TryBuildWorldBounds(const RenderCore::Geometry::FStaticMeshData* mesh,
             u32 lodIndex, const FMatrix4x4f& worldMatrix, FVector3f& outMinWS,
@@ -207,8 +150,8 @@ namespace AltinaEngine::Engine {
 
             const FMatrix4x4f& cullViewProj =
                 params.bUseCustomCullMatrix ? params.mCullViewProj : view.View.Matrices.ViewProj;
-            ExtractFrustumPlanes(cullViewProj, context.mPlanes);
-            context.mEnabled = true;
+            context.mViewProj = cullViewProj;
+            context.mEnabled  = true;
             return context;
         }
 
@@ -218,10 +161,35 @@ namespace AltinaEngine::Engine {
                 return true;
             }
 
-            for (const auto& plane : context.mPlanes) {
-                if (IsOutsidePlane(plane, minWS, maxWS)) {
-                    return false;
+            const f32 xs[2] = { minWS[0], maxWS[0] };
+            const f32 ys[2] = { minWS[1], maxWS[1] };
+            const f32 zs[2] = { minWS[2], maxWS[2] };
+
+            bool      outLeft   = true;
+            bool      outRight  = true;
+            bool      outBottom = true;
+            bool      outTop    = true;
+            bool      outNear   = true;
+            bool      outFar    = true;
+
+            for (u32 xi = 0U; xi < 2U; ++xi) {
+                for (u32 yi = 0U; yi < 2U; ++yi) {
+                    for (u32 zi = 0U; zi < 2U; ++zi) {
+                        const FVector4f clip = Core::Math::MatMul(
+                            context.mViewProj, FVector4f(xs[xi], ys[yi], zs[zi], 1.0f));
+
+                        outLeft   = outLeft && (clip[0] < -clip[3]);
+                        outRight  = outRight && (clip[0] > clip[3]);
+                        outBottom = outBottom && (clip[1] < -clip[3]);
+                        outTop    = outTop && (clip[1] > clip[3]);
+                        outNear   = outNear && (clip[2] < 0.0f);
+                        outFar    = outFar && (clip[2] > clip[3]);
+                    }
                 }
+            }
+
+            if (outLeft || outRight || outBottom || outTop || outNear || outFar) {
+                return false;
             }
             return true;
         }

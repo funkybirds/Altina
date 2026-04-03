@@ -1223,6 +1223,8 @@ namespace AltinaEngine::Rendering {
             u32              PerDrawStrideBytes     = 0U;
             u32              PerDrawCapacity        = 0U;
             u64              PerDrawBaseOffsetBytes = 0ULL;
+            u32              PerDrawCursorInstances = 0U;
+            bool             bUseInstanceCursor     = false;
         };
 
         void BindPerDraw(Rhi::FRhiCmdContext& ctx, const RenderCore::Render::FDrawBatch& batch,
@@ -1242,9 +1244,23 @@ namespace AltinaEngine::Rendering {
                 data->PerDrawStrideBytes, static_cast<u32>(sizeof(FInstanceDrawData)));
 
             const u32 instanceCount = static_cast<u32>(batch.mInstances.Size());
-            DebugAssert(instanceCount <= data->PerDrawCapacity, TEXT("BasicDeferredRenderer"),
-                "PerDraw instance buffer overflow (instanceCount={}, capacity={}).", instanceCount,
-                data->PerDrawCapacity);
+            u32       firstInstance = 0U;
+            if (data->bUseInstanceCursor) {
+                firstInstance = data->PerDrawCursorInstances;
+                DebugAssert(firstInstance <= data->PerDrawCapacity, TEXT("BasicDeferredRenderer"),
+                    "PerDraw first-instance out of range (firstInstance={}, capacity={}).",
+                    firstInstance, data->PerDrawCapacity);
+                const u32 remainingCapacity = (firstInstance <= data->PerDrawCapacity)
+                    ? (data->PerDrawCapacity - firstInstance)
+                    : 0U;
+                DebugAssert(instanceCount <= remainingCapacity, TEXT("BasicDeferredRenderer"),
+                    "PerDraw instance buffer overflow (firstInstance={}, instanceCount={}, capacity={}).",
+                    firstInstance, instanceCount, data->PerDrawCapacity);
+            } else {
+                DebugAssert(instanceCount <= data->PerDrawCapacity, TEXT("BasicDeferredRenderer"),
+                    "PerDraw instance buffer overflow (instanceCount={}, capacity={}).",
+                    instanceCount, data->PerDrawCapacity);
+            }
 
             static thread_local TVector<FInstanceDrawData> uploadData{};
             uploadData.Clear();
@@ -1256,19 +1272,27 @@ namespace AltinaEngine::Rendering {
                 uploadData.PushBack(Move(gpuData));
             }
 
-            const u64 byteOffset = data->PerDrawBaseOffsetBytes;
+            const u64 byteOffset = data->bUseInstanceCursor
+                ? (data->PerDrawBaseOffsetBytes
+                      + static_cast<u64>(firstInstance)
+                          * static_cast<u64>(sizeof(FInstanceDrawData)))
+                : data->PerDrawBaseOffsetBytes;
             const u64 byteSize =
                 static_cast<u64>(instanceCount) * static_cast<u64>(sizeof(FInstanceDrawData));
             ctx.RHIUpdateDynamicBufferDiscard(
                 data->PerDrawBuffer, uploadData.Data(), byteSize, byteOffset);
-            outParams.mFirstInstance = 0U;
+            outParams.mFirstInstance = data->bUseInstanceCursor ? firstInstance : 0U;
+            if (data->bUseInstanceCursor) {
+                data->PerDrawCursorInstances += instanceCount;
+            }
         }
 
         struct FShadowCascadeExecuteContext {
             const RenderCore::Render::FDrawList* ShadowDrawLists[4] = {};
             FDrawListBindings                    DrawBindings{};
             FBasePassPipelineData                ShadowPipelineData{};
-            FBasePassBindingData                 BindingData{};
+            FBasePassBindingData                 BindingDataPerCascade[4]{};
+            FBasePassBindingData                 FallbackBindingData{};
             Rhi::FRhiBuffer*                     CascadePerFrameBuffers[4] = {};
             Rhi::FRhiBindGroup*                  CascadePerFrameGroups[4]  = {};
             Rhi::FRhiBuffer*                     FallbackPerFrameBuffer    = nullptr;
@@ -1729,13 +1753,24 @@ namespace AltinaEngine::Rendering {
         csmInputs.Lights                    = lights;
         const Deferred::FCsmBuildResult csm = Deferred::BuildCsm(csmInputs);
 
-        u32                             requiredPerDrawInstances = CountDrawListInstances(drawList);
+        u32                             requiredPerDrawInstances = 0U;
+        const u32                       basePassInstanceCount    = CountDrawListInstances(drawList);
+        requiredPerDrawInstances += basePassInstanceCount;
+        TArray<u32, 4U> shadowPassFirstInstance{};
+        u32             accumulatedFirstInstance = basePassInstanceCount;
         for (u32 cascadeIndex = 0U; cascadeIndex < csm.Data.mCascadeCount
             && cascadeIndex < RenderCore::Shadow::kMaxCascades;
             ++cascadeIndex) {
-            requiredPerDrawInstances +=
+            shadowPassFirstInstance[cascadeIndex] = accumulatedFirstInstance;
+            const u32 cascadeInstanceCount =
                 CountDrawListInstances(mViewContext.ShadowDrawLists[cascadeIndex]);
+            requiredPerDrawInstances += cascadeInstanceCount;
+            accumulatedFirstInstance += cascadeInstanceCount;
         }
+        DebugAssert(accumulatedFirstInstance == requiredPerDrawInstances,
+            TEXT("BasicDeferredRenderer"),
+            "PerDraw instance accumulation mismatch (accumulated={}, required={}).",
+            accumulatedFirstInstance, requiredPerDrawInstances);
         if (requiredPerDrawInstances > mPerDrawCapacity) {
             u32 grownCapacity = (mPerDrawCapacity > 0U) ? mPerDrawCapacity : 1U;
             while (grownCapacity < requiredPerDrawInstances) {
@@ -1792,6 +1827,8 @@ namespace AltinaEngine::Rendering {
         bindingData.PerDrawCapacity        = mPerDrawCapacity;
         bindingData.PerDrawBaseOffsetBytes = static_cast<u64>(mPerDrawFrameSlot)
             * static_cast<u64>(mPerDrawCapacity) * static_cast<u64>(mPerDrawStrideBytes);
+        bindingData.PerDrawCursorInstances = 0U;
+        bindingData.bUseInstanceCursor     = IsVulkanBackend();
         if (bindingData.PerDrawBuffer != nullptr) {
             const u64 requiredBytes = bindingData.PerDrawBaseOffsetBytes
                 + static_cast<u64>(bindingData.PerDrawCapacity)
@@ -1949,11 +1986,14 @@ namespace AltinaEngine::Rendering {
             executeCtx.DrawBindings                       = drawBindings;
             executeCtx.ShadowPipelineData                 = pipelineData;
             executeCtx.ShadowPipelineData.DefaultPassDesc = &resources.DefaultShadowPassDesc;
-            executeCtx.BindingData                        = bindingData;
+            executeCtx.FallbackBindingData                = bindingData;
             executeCtx.FallbackPerFrameBuffer             = mPerFrameBuffer.Get();
             executeCtx.FallbackPerFrameGroup              = mPerFrameGroup.Get();
             for (u32 i = 0U; i < 4U; ++i) {
-                executeCtx.ShadowDrawLists[i]        = mViewContext.ShadowDrawLists[i];
+                executeCtx.ShadowDrawLists[i]       = mViewContext.ShadowDrawLists[i];
+                executeCtx.BindingDataPerCascade[i] = bindingData;
+                executeCtx.BindingDataPerCascade[i].PerDrawCursorInstances =
+                    bindingData.bUseInstanceCursor ? shadowPassFirstInstance[i] : 0U;
                 executeCtx.CascadePerFrameBuffers[i] = mShadowPerFrameBuffers[i].Get();
                 executeCtx.CascadePerFrameGroups[i]  = mShadowPerFrameGroups[i].Get();
             }
@@ -2019,9 +2059,12 @@ namespace AltinaEngine::Rendering {
                 if (shadowDrawList != nullptr) {
                     auto bindings     = executeData->DrawBindings;
                     bindings.PerFrame = perFrameGroup;
+                    auto* bindingData = (cascadeIndex < 4U)
+                        ? &executeData->BindingDataPerCascade[cascadeIndex]
+                        : &executeData->FallbackBindingData;
                     FDrawListExecutor::ExecuteBasePass(ctx, *shadowDrawList, bindings,
                         ResolveShadowPassPipeline, &executeData->ShadowPipelineData, BindPerDraw,
-                        &executeData->BindingData);
+                        bindingData);
                 }
             };
             shadowInputs.ExecuteCascadeUserData = &executeCtx;

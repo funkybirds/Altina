@@ -1,5 +1,4 @@
-#ifndef ALTINAENGINE_CORE_PUBLIC_CONTAINER_HASHUTILITY_H
-#define ALTINAENGINE_CORE_PUBLIC_CONTAINER_HASHUTILITY_H
+#pragma once
 
 #include "../Types/Aliases.h"
 #include "../Types/Traits.h"
@@ -51,6 +50,13 @@ namespace AltinaEngine::Core::Container {
         }
     };
 
+    template <CPointer T> struct THashFunc<T> {
+        auto operator()(T value) const noexcept -> usize {
+            return Detail::FoldToUsize(
+                Detail::MixU64(static_cast<u64>(reinterpret_cast<usize>(value))));
+        }
+    };
+
     template <typename T>
         requires CEnum<T>
     struct THashFunc<T> {
@@ -79,4 +85,13 @@ namespace AltinaEngine::Core::Container {
     };
 } // namespace AltinaEngine::Core::Container
 
-#endif // ALTINAENGINE_CORE_PUBLIC_CONTAINER_HASHUTILITY_H
+namespace AltinaEngine {
+    template <typename T>
+    [[nodiscard]] inline auto GetInternalHash(const T& value) noexcept -> usize {
+        return Core::Container::THashFunc<T>{}(value);
+    }
+
+    [[nodiscard]] inline auto InternalHashCombine(u64 seed, u64 value) noexcept -> u64 {
+        return seed ^ (value + 0x9e3779b97f4a7c15ULL + (seed << 6U) + (seed >> 2U));
+    }
+} // namespace AltinaEngine

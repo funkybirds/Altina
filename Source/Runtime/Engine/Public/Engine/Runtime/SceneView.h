@@ -131,3 +131,33 @@ namespace AltinaEngine::Engine {
             FRenderScene& outScene) const;
     };
 } // namespace AltinaEngine::Engine
+
+namespace AltinaEngine::Core::Container {
+    template <> struct THashFunc<Engine::FSceneView> {
+        auto operator()(const Engine::FSceneView& view) const noexcept -> usize {
+            using ETargetType = Engine::FSceneView::ETargetType;
+
+            u64 h = 0ULL;
+            h     = InternalHashCombine(h, static_cast<u64>(view.Target.Type));
+
+            // View target contributes to key.
+            switch (view.Target.Type) {
+                case ETargetType::Viewport:
+                    h = InternalHashCombine(h, GetInternalHash(view.Target.Viewport));
+                    break;
+                case ETargetType::TextureAsset:
+                    h = InternalHashCombine(h, GetInternalHash(view.Target.Texture.mUuid));
+                    h = InternalHashCombine(h, static_cast<u64>(view.Target.Texture.mType));
+                    break;
+                default:
+                    break;
+            }
+
+            // Camera id contributes to key.
+            h = InternalHashCombine(h, static_cast<u64>(view.CameraId.Index));
+            h = InternalHashCombine(h, static_cast<u64>(view.CameraId.Generation));
+            h = InternalHashCombine(h, static_cast<u64>(view.CameraId.Type));
+            return h;
+        }
+    };
+} // namespace AltinaEngine::Core::Container

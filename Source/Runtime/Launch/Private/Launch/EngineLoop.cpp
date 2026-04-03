@@ -40,9 +40,7 @@
 #include "Reflection/Reflection.h"
 #include "Utility/Assert.h"
 
-#include <cstdint>
 #include <chrono>
-#include <cstring>
 #include <string>
 
 #if AE_PLATFORM_WIN
@@ -536,55 +534,6 @@ namespace AltinaEngine::Launch {
             return nullptr;
         }
 
-        constexpr u64      kViewKeyHashSeed = 0x9e3779b97f4a7c15ULL;
-
-        [[nodiscard]] auto HashCombine(u64 seed, u64 value) noexcept -> u64 {
-            return seed ^ (value + kViewKeyHashSeed + (seed << 6U) + (seed >> 2U));
-        }
-
-        [[nodiscard]] auto HashPointer(const void* ptr) noexcept -> u64 {
-            return static_cast<u64>(reinterpret_cast<uintptr_t>(ptr));
-        }
-
-        [[nodiscard]] auto HashUuid(const FUuid& uuid) noexcept -> u64 {
-            // Simple FNV-1a over 16 bytes.
-            constexpr u64 kOffset = 1469598103934665603ULL;
-            constexpr u64 kPrime  = 1099511628211ULL;
-            u64           h       = kOffset;
-            const u8*     p       = uuid.Data();
-            for (usize i = 0; i < FUuid::kByteCount; ++i) {
-                h ^= static_cast<u64>(p[i]);
-                h *= kPrime;
-            }
-            return h;
-        }
-
-        [[nodiscard]] auto ComputeTemporalViewKey(const Engine::FSceneView& view) noexcept -> u64 {
-            using ETargetType = Engine::FSceneView::ETargetType;
-
-            u64 h = 0ULL;
-            h     = HashCombine(h, static_cast<u64>(view.Target.Type));
-
-            // View target contributes to key.
-            switch (view.Target.Type) {
-                case ETargetType::Viewport:
-                    h = HashCombine(h, HashPointer(view.Target.Viewport));
-                    break;
-                case ETargetType::TextureAsset:
-                    h = HashCombine(h, HashUuid(view.Target.Texture.mUuid));
-                    h = HashCombine(h, static_cast<u64>(view.Target.Texture.mType));
-                    break;
-                default:
-                    break;
-            }
-
-            // Camera id contributes to key.
-            h = HashCombine(h, static_cast<u64>(view.CameraId.Index));
-            h = HashCombine(h, static_cast<u64>(view.CameraId.Generation));
-            h = HashCombine(h, static_cast<u64>(view.CameraId.Type));
-            return h;
-        }
-
         void ExecuteFrameGraph(Rhi::FRhiDevice& device, RenderCore::FFrameGraph& graph) {
             RenderCore::FFrameGraphExecutor executor(device);
             executor.Execute(graph);
@@ -980,7 +929,7 @@ namespace AltinaEngine::Launch {
                     continue;
                 }
 
-                const u64  viewKey    = ComputeTemporalViewKey(view);
+                const u64  viewKey    = GetInternalHash(view);
                 const bool bEnableTaa = (rendererType == Rendering::ERendererType::Deferred)
                     && (Rendering::rPostProcessTaa.Get() != 0);
                 const bool bEnableJitter  = bEnableTaa && (Rendering::rTemporalJitter.Get() != 0);
@@ -1694,10 +1643,6 @@ namespace AltinaEngine::Launch {
             mDebugGui->TickGameThread(
                 *mInputSystem.Get(), mLastDeltaTimeSeconds, windowWidth, windowHeight);
         }
-        // LogInfo(TEXT("Scene Batches: {} (Views: {})"), totalBatches,
-        //     static_cast<u32>(renderScene.Views.Size()));
-
-        // LogInfo(TEXT("GameThread Frame {}"), frameIndex);
 
         auto* assetRegistry = &mAssetRegistry;
         auto* assetManager  = &mAssetManager;

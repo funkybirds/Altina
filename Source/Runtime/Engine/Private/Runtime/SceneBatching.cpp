@@ -3,7 +3,6 @@
 #include "Engine/GameScene/MeshMaterialComponent.h"
 #include "Material/Material.h"
 #include "Material/MaterialPass.h"
-#include "Shader/ShaderRegistry.h"
 #include "Types/Conversion.h"
 #include "Algorithm/Sort.h"
 #include "Container/HashUtility.h"
@@ -19,95 +18,11 @@ namespace AltinaEngine::Engine {
         using RenderCore::Render::FDrawItem;
         using RenderCore::Render::FDrawKey;
 
-        constexpr u64 kHashSeed = 0x9e3779b97f4a7c15ULL;
-
-        auto          HashCombine(u64 seed, u64 value) noexcept -> u64 {
-            return seed ^ (value + kHashSeed + (seed << 6U) + (seed >> 2U));
-        }
-
-        auto HashPointer(const void* ptr) noexcept -> u64 {
-            return static_cast<u64>(reinterpret_cast<uintptr_t>(ptr));
-        }
-
-        auto HashFloat(f32 value) noexcept -> u64 {
-            const auto bits = BitCast<u32>(value);
-            return static_cast<u64>(bits);
-        }
-
-        auto HashShaderKey(const RenderCore::FShaderRegistry::FShaderKey& key) noexcept -> u64 {
-            if (!key.IsValid()) {
-                return 0ULL;
-            }
-            auto hash = Core::Container::THashFunc<RenderCore::Container::FString>{}(key.mName);
-            hash      = HashCombine(hash, static_cast<u64>(key.mStage));
-            hash      = HashCombine(hash, static_cast<u64>(key.mPermutation.mHash));
-            return hash;
-        }
-
-        auto HashRasterState(const Rhi::FRhiRasterStateDesc& state) noexcept -> u64 {
-            u64 hash = 0ULL;
-            hash     = HashCombine(hash, static_cast<u64>(state.mFillMode));
-            hash     = HashCombine(hash, static_cast<u64>(state.mCullMode));
-            hash     = HashCombine(hash, static_cast<u64>(state.mFrontFace));
-            hash     = HashCombine(hash, static_cast<u64>(state.mDepthBias));
-            hash     = HashCombine(hash, HashFloat(state.mDepthBiasClamp));
-            hash     = HashCombine(hash, HashFloat(state.mSlopeScaledDepthBias));
-            hash     = HashCombine(hash, static_cast<u64>(state.mDepthClip ? 1U : 0U));
-            hash     = HashCombine(hash, static_cast<u64>(state.mConservativeRaster ? 1U : 0U));
-            return hash;
-        }
-
-        auto HashDepthState(const Rhi::FRhiDepthStateDesc& state) noexcept -> u64 {
-            u64 hash = 0ULL;
-            hash     = HashCombine(hash, static_cast<u64>(state.mDepthEnable ? 1U : 0U));
-            hash     = HashCombine(hash, static_cast<u64>(state.mDepthWrite ? 1U : 0U));
-            hash     = HashCombine(hash, static_cast<u64>(state.mDepthCompare));
-            return hash;
-        }
-
-        auto HashBlendState(const Rhi::FRhiBlendStateDesc& state) noexcept -> u64 {
-            u64 hash = 0ULL;
-            hash     = HashCombine(hash, static_cast<u64>(state.mBlendEnable ? 1U : 0U));
-            hash     = HashCombine(hash, static_cast<u64>(state.mSrcColor));
-            hash     = HashCombine(hash, static_cast<u64>(state.mDstColor));
-            hash     = HashCombine(hash, static_cast<u64>(state.mColorOp));
-            hash     = HashCombine(hash, static_cast<u64>(state.mSrcAlpha));
-            hash     = HashCombine(hash, static_cast<u64>(state.mDstAlpha));
-            hash     = HashCombine(hash, static_cast<u64>(state.mAlphaOp));
-            hash     = HashCombine(hash, static_cast<u64>(state.mColorWriteMask));
-            return hash;
-        }
-
-        auto BuildPipelineKey(const RenderCore::FMaterialPassDesc* passDesc) noexcept -> u64 {
-            if (passDesc == nullptr) {
-                return 0ULL;
-            }
-
-            u64 hash = 0ULL;
-            hash     = HashCombine(hash, HashShaderKey(passDesc->mShaders.mVertex));
-            hash     = HashCombine(hash, HashShaderKey(passDesc->mShaders.mPixel));
-            hash     = HashCombine(hash, HashShaderKey(passDesc->mShaders.mCompute));
-            hash     = HashCombine(hash, static_cast<u64>(passDesc->mShaders.mPermutation.mHash));
-            hash     = HashCombine(hash, HashRasterState(passDesc->mState.mRaster));
-            hash     = HashCombine(hash, HashDepthState(passDesc->mState.mDepth));
-            hash     = HashCombine(hash, HashBlendState(passDesc->mState.mBlend));
-            return hash;
-        }
-
         auto BuildGeometryKey(const RenderCore::Geometry::FStaticMeshData* mesh, u64 geometryKey,
             u32 lodIndex, Rhi::ERhiPrimitiveTopology topology) noexcept -> u64 {
-            u64 hash = (geometryKey != 0ULL) ? geometryKey : HashPointer(mesh);
-            hash     = HashCombine(hash, static_cast<u64>(lodIndex));
-            hash     = HashCombine(hash, static_cast<u64>(topology));
-            return hash;
-        }
-
-        auto BuildSectionKey(const RenderCore::Geometry::FStaticMeshSection& section) noexcept
-            -> u64 {
-            u64 hash = 0ULL;
-            hash     = HashCombine(hash, static_cast<u64>(section.FirstIndex));
-            hash     = HashCombine(hash, static_cast<u64>(section.IndexCount));
-            hash     = HashCombine(hash, static_cast<u64>(section.BaseVertex));
+            u64 hash = (geometryKey != 0ULL) ? geometryKey : GetInternalHash(mesh);
+            hash     = InternalHashCombine(hash, static_cast<u64>(lodIndex));
+            hash     = InternalHashCombine(hash, static_cast<u64>(topology));
             return hash;
         }
 
@@ -271,7 +186,7 @@ namespace AltinaEngine::Engine {
             totalSections += lods[params.LodIndex].mSections.Size();
         }
 
-        Core::Container::TVector<FDrawItem> items;
+        TVector<FDrawItem> items;
         items.Reserve(totalSections);
 
         for (const auto& entry : scene.StaticMeshes) {
@@ -341,12 +256,12 @@ namespace AltinaEngine::Engine {
                 item.mInstance.mObjectId   = entry.OwnerId.IsValid() ? entry.OwnerId.Index : 0U;
 
                 item.mKey.mPassKey     = static_cast<u64>(params.Pass);
-                item.mKey.mPipelineKey = BuildPipelineKey(
+                item.mKey.mPipelineKey = GetInternalHash(
                     material != nullptr ? material->FindPassDesc(params.Pass) : nullptr);
-                item.mKey.mMaterialKey = HashPointer(material);
+                item.mKey.mMaterialKey = GetInternalHash(material);
                 item.mKey.mGeometryKey = BuildGeometryKey(
                     entry.Mesh, entry.MeshGeometryKey, params.LodIndex, lod.mPrimitiveTopology);
-                item.mKey.mSectionKey = BuildSectionKey(section);
+                item.mKey.mSectionKey = GetInternalHash(section);
 
                 items.PushBack(Move(item));
             }

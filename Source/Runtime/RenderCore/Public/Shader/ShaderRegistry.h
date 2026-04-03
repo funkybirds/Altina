@@ -81,3 +81,18 @@ namespace AltinaEngine::RenderCore {
     };
 
 } // namespace AltinaEngine::RenderCore
+
+namespace AltinaEngine::Core::Container {
+    template <> struct THashFunc<RenderCore::FShaderRegistry::FShaderKey> {
+        auto operator()(const RenderCore::FShaderRegistry::FShaderKey& key) const noexcept
+            -> usize {
+            if (!key.IsValid()) {
+                return 0ULL;
+            }
+            auto hash = Core::Container::THashFunc<RenderCore::Container::FString>{}(key.mName);
+            hash      = InternalHashCombine(hash, static_cast<u64>(key.mStage));
+            hash      = InternalHashCombine(hash, static_cast<u64>(key.mPermutation.mHash));
+            return hash;
+        }
+    };
+} // namespace AltinaEngine::Core::Container

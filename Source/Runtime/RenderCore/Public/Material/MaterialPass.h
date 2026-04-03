@@ -93,3 +93,22 @@ namespace AltinaEngine::RenderCore {
     };
 
 } // namespace AltinaEngine::RenderCore
+
+namespace AltinaEngine::Core::Container {
+    template <> struct THashFunc<RenderCore::FMaterialPassDesc> {
+        [[nodiscard]] auto operator()(const RenderCore::FMaterialPassDesc& passDesc) const noexcept
+            -> usize {
+
+            u64 hash = 0ULL;
+            hash     = InternalHashCombine(hash, GetInternalHash(passDesc.mShaders.mVertex));
+            hash     = InternalHashCombine(hash, GetInternalHash(passDesc.mShaders.mPixel));
+            hash     = InternalHashCombine(hash, GetInternalHash(passDesc.mShaders.mCompute));
+            hash =
+                InternalHashCombine(hash, static_cast<u64>(passDesc.mShaders.mPermutation.mHash));
+            hash = InternalHashCombine(hash, GetInternalHash(passDesc.mState.mRaster));
+            hash = InternalHashCombine(hash, GetInternalHash(passDesc.mState.mDepth));
+            hash = InternalHashCombine(hash, GetInternalHash(passDesc.mState.mBlend));
+            return hash;
+        }
+    };
+} // namespace AltinaEngine::Core::Container

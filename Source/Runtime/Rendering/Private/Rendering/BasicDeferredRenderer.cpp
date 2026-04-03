@@ -240,6 +240,7 @@ namespace AltinaEngine::Rendering {
 
         [[nodiscard]] constexpr auto GetPerDrawInstanceCapacity() noexcept -> u32 {
             // Covers base pass + 4 shadow cascades for typical scenes with headroom.
+            // TODO: Refactor
             return 16384U;
         }
 
@@ -361,44 +362,6 @@ namespace AltinaEngine::Rendering {
 
         void EnsureDefaultTemplate(FDeferredSharedResources& resources) {
             UpdateDefaultPassDesc(resources);
-        }
-
-        auto EnsureOutputPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)
-            -> bool {
-            if (resources.OutputPipeline) {
-                return true;
-            }
-
-            if (!resources.OutputVSKey.IsValid() || !resources.OutputPSKey.IsValid()) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred output shaders are not configured."));
-                return false;
-            }
-
-            auto outputVs = resources.Registry.FindShader(resources.OutputVSKey);
-            auto outputPs = resources.Registry.FindShader(resources.OutputPSKey);
-            if (!outputVs || !outputPs) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred output shaders are not registered."));
-                return false;
-            }
-
-            Rhi::FRhiGraphicsPipelineDesc outputDesc{};
-            outputDesc.mDebugName.Assign(TEXT("BasicDeferred.OutputPipeline"));
-            outputDesc.mVertexShader   = outputVs.Get();
-            outputDesc.mPixelShader    = outputPs.Get();
-            outputDesc.mPipelineLayout = resources.OutputPipelineLayout.Get();
-            outputDesc.mVertexLayout   = {};
-            outputDesc.mRasterState    = {};
-            outputDesc.mDepthState     = {};
-            outputDesc.mBlendState     = {};
-            // Full-screen triangle in VSComposite is CW in NDC; avoid culling it.
-            outputDesc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
-            outputDesc.mDepthState.mDepthEnable = false;
-            outputDesc.mDepthState.mDepthWrite  = false;
-            resources.OutputPipeline            = device.CreateGraphicsPipeline(outputDesc);
-
-            return resources.OutputPipeline.Get() != nullptr;
         }
 
         auto EnsureLightingPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)

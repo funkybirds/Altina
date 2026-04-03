@@ -7,6 +7,7 @@
 #include "Container/String.h"
 #include "Container/StringView.h"
 #include "Container/Vector.h"
+#include "Container/HashUtility.h"
 
 namespace AltinaEngine::Rhi {
     namespace Container = Core::Container;
@@ -523,3 +524,46 @@ namespace AltinaEngine::Rhi {
     };
 
 } // namespace AltinaEngine::Rhi
+
+namespace AltinaEngine::Core::Container {
+    template <> struct THashFunc<Rhi::FRhiBlendStateDesc> {
+        [[nodiscard]] auto operator()(const Rhi::FRhiBlendStateDesc& state) const noexcept
+            -> usize {
+            u64 hash = 0ULL;
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mBlendEnable ? 1U : 0U));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mSrcColor));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mDstColor));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mColorOp));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mSrcAlpha));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mDstAlpha));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mAlphaOp));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mColorWriteMask));
+            return hash;
+        }
+    };
+    template <> struct THashFunc<Rhi::FRhiRasterStateDesc> {
+        [[nodiscard]] auto operator()(const Rhi::FRhiRasterStateDesc& state) const noexcept
+            -> usize {
+            u64 hash = 0ULL;
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mFillMode));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mCullMode));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mFrontFace));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mDepthBias));
+            hash     = InternalHashCombine(hash, GetInternalHash(state.mDepthBiasClamp));
+            hash     = InternalHashCombine(hash, GetInternalHash(state.mSlopeScaledDepthBias));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mDepthClip ? 1U : 0U));
+            hash = InternalHashCombine(hash, static_cast<u64>(state.mConservativeRaster ? 1U : 0U));
+            return hash;
+        }
+    };
+    template <> struct THashFunc<Rhi::FRhiDepthStateDesc> {
+        [[nodiscard]] auto operator()(const Rhi::FRhiDepthStateDesc& state) const noexcept
+            -> usize {
+            u64 hash = 0ULL;
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mDepthEnable ? 1U : 0U));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mDepthWrite ? 1U : 0U));
+            hash     = InternalHashCombine(hash, static_cast<u64>(state.mDepthCompare));
+            return hash;
+        }
+    };
+} // namespace AltinaEngine::Core::Container

@@ -206,3 +206,16 @@ namespace AltinaEngine::RenderCore::Geometry {
     };
 
 } // namespace AltinaEngine::RenderCore::Geometry
+
+namespace AltinaEngine::Core::Container {
+    template <> struct THashFunc<RenderCore::Geometry::FStaticMeshSection> {
+        auto operator()(const RenderCore::Geometry::FStaticMeshSection& section) const noexcept
+            -> usize {
+            u64 hash = 0ULL;
+            hash     = InternalHashCombine(hash, static_cast<u64>(section.FirstIndex));
+            hash     = InternalHashCombine(hash, static_cast<u64>(section.IndexCount));
+            hash     = InternalHashCombine(hash, static_cast<u64>(section.BaseVertex));
+            return hash;
+        }
+    };
+} // namespace AltinaEngine::Core::Container

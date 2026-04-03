@@ -6,6 +6,8 @@
 #include "Container/StringView.h"
 #include "Types/Aliases.h"
 
+#include "Container/HashUtility.h"
+
 using AltinaEngine::Core::Container::FNativeString;
 using AltinaEngine::Core::Container::FNativeStringView;
 using AltinaEngine::Core::Container::FString;
@@ -73,3 +75,19 @@ namespace AltinaEngine {
     };
 
 } // namespace AltinaEngine
+
+namespace AltinaEngine::Core::Container {
+    template <> struct THashFunc<FUuid> {
+        auto operator()(const FUuid& uuid) const noexcept -> usize {
+            constexpr u64 kOffset = 1469598103934665603ULL;
+            constexpr u64 kPrime  = 1099511628211ULL;
+            u64           h       = kOffset;
+            const u8*     p       = uuid.Data();
+            for (usize i = 0; i < FUuid::kByteCount; ++i) {
+                h ^= static_cast<u64>(p[i]);
+                h *= kPrime;
+            }
+            return h;
+        }
+    };
+} // namespace AltinaEngine::Core::Container

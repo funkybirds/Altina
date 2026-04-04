@@ -1526,7 +1526,7 @@ namespace AltinaEngine::Rendering {
     }
     void FBasicDeferredRenderer::Render(RenderCore::FFrameGraph& graph) {
         ResetBasePassPipelineStats();
-        // LogInfo(TEXT("Deferred Render Enter {}"), 1);
+
         const auto* view         = mViewContext.View;
         auto*       outputTarget = mViewContext.OutputTarget;
         const auto* drawList     = mViewContext.DrawList;
@@ -1537,19 +1537,14 @@ namespace AltinaEngine::Rendering {
             return;
         }
 
-        if (!view->IsValid()) {
-            Assert(false, TEXT("BasicDeferredRenderer"), "Render skipped: view is invalid.");
-            return;
-        }
+        Assert(view->IsValid(), TEXT("BasicDeferredRenderer"), "Render skipped: view is invalid.");
 
         const u32 width  = view->RenderTargetExtent.Width;
         const u32 height = view->RenderTargetExtent.Height;
-        if (width == 0U || height == 0U) {
-            Assert(false, TEXT("BasicDeferredRenderer"),
-                "Render skipped: render extent is invalid {}x{}.", static_cast<u32>(width),
-                static_cast<u32>(height));
-            return;
-        }
+
+        Assert(width > 0U && height > 0U, TEXT("BasicDeferredRenderer"),
+            "Render skipped: render extent is invalid {}x{}.", static_cast<u32>(width),
+            static_cast<u32>(height));
 
         DebugAssert(mPerDrawStrideBytes == static_cast<u32>(sizeof(FInstanceDrawData)),
             TEXT("BasicDeferredRenderer"),
@@ -1557,125 +1552,15 @@ namespace AltinaEngine::Rendering {
             static_cast<u32>(sizeof(FInstanceDrawData)));
         DebugAssert(mPerDrawCapacity > 0U, TEXT("BasicDeferredRenderer"),
             "PerDraw instance capacity invalid (capacity={}).", mPerDrawCapacity);
+
+        // TODO: Refactor: to `mPerDrawFrameSlot` should be an attribute of `RenderCore` module
         mPerDrawFrameSlot =
             IsVulkanBackend() ? static_cast<u32>(view->FrameIndex % kInstanceFrameRing) : 0U;
-
-        struct FImportedExternalTexture {
-            Rhi::FRhiTexture*                 Texture = nullptr;
-            RenderCore::FFrameGraphTextureRef Ref;
-        };
-        TVector<FImportedExternalTexture> importedExternalTextures;
-
-        auto                              findOrImportExternalTextureRef =
-            [&graph, &importedExternalTextures](
-                Rhi::FRhiTexture* texture) -> RenderCore::FFrameGraphTextureRef {
-            if (texture == nullptr) {
-                return {};
-            }
-            for (const auto& imported : importedExternalTextures) {
-                if (imported.Texture == texture) {
-                    return imported.Ref;
-                }
-            }
-
-            const auto ref = graph.ImportTexture(texture, Rhi::ERhiResourceState::Common);
-            importedExternalTextures.PushBack({ texture, ref });
-            return ref;
-        };
-
-        auto registerExternalTextureRead =
-            [&findOrImportExternalTextureRef](RenderCore::FFrameGraphPassBuilder& builder,
-                Rhi::FRhiTexture*                                                 texture,
-                Rhi::ERhiResourceState state) -> RenderCore::FFrameGraphTextureRef {
-            const auto ref = findOrImportExternalTextureRef(texture);
-            if (!ref.IsValid()) {
-                return {};
-            }
-            return builder.Read(ref, state);
-        };
-
-        auto registerMaterialTextureReads =
-            [&registerExternalTextureRead](RenderCore::FFrameGraphPassBuilder& builder,
-                const RenderCore::FMaterial* material, RenderCore::EMaterialPass pass) -> void {
-            if (material == nullptr) {
-                return;
-            }
-
-            const auto* layout = material->FindLayout(pass);
-            if (layout == nullptr) {
-                return;
-            }
-
-            const auto& parameters = material->GetParameters();
-            for (const auto paramId : layout->mTextureNameHashes) {
-                const auto* textureParam = parameters.FindTextureParam(paramId);
-                if (textureParam == nullptr || !textureParam->mSrv) {
-                    continue;
-                }
-                auto* texture = textureParam->mSrv->GetTexture();
-                if (texture == nullptr) {
-                    continue;
-                }
-                registerExternalTextureRead(
-                    builder, texture, Rhi::ERhiResourceState::ShaderResource);
-            }
-        };
 
         if (mPerFrameBuffer) {
             FPerFrameConstants constants{};
             constants.ViewProjection = view->Matrices.ViewProjJittered;
             UpdateConstantBuffer(mPerFrameBuffer.Get(), &constants, sizeof(constants));
-        }
-
-        {
-            static bool sLoggedBoundsOnce = false;
-            if (!sLoggedBoundsOnce) {
-                sLoggedBoundsOnce = true;
-
-                if (drawList != nullptr) {
-                    const auto bounds = ComputeDrawListWorldBounds(*drawList);
-                    if (bounds.bValid) {
-                        LogInfoCat(TEXT("Rendering.Deferred"),
-                            TEXT(
-                                "Scene WorldBounds(BasePass): instances={} batches={} min=({}, {}, {}) max=({}, {}, {})"),
-                            bounds.InstanceCount, bounds.BatchCount, bounds.MinWS[0],
-                            bounds.MinWS[1], bounds.MinWS[2], bounds.MaxWS[0], bounds.MaxWS[1],
-                            bounds.MaxWS[2]);
-                    } else {
-                        LogInfoCat(TEXT("Rendering.Deferred"),
-                            TEXT("Scene WorldBounds(BasePass): <invalid> instances={} batches={}"),
-                            bounds.InstanceCount, bounds.BatchCount);
-                    }
-                }
-
-                for (u32 cascadeIndex = 0U; cascadeIndex < RenderCore::Shadow::kMaxCascades;
-                    ++cascadeIndex) {
-                    if (mViewContext.ShadowDrawLists[cascadeIndex] == nullptr) {
-                        continue;
-                    }
-                    const auto bounds =
-                        ComputeDrawListWorldBounds(*mViewContext.ShadowDrawLists[cascadeIndex]);
-                    if (bounds.bValid) {
-                        LogInfoCat(TEXT("Rendering.BasicDeferred"),
-                            TEXT(
-                                "Scene WorldBounds(ShadowPass.Cascade{}): instances={} batches={} min=({}, {}, {}) max=({}, {}, {})"),
-                            cascadeIndex, bounds.InstanceCount, bounds.BatchCount, bounds.MinWS[0],
-                            bounds.MinWS[1], bounds.MinWS[2], bounds.MaxWS[0], bounds.MaxWS[1],
-                            bounds.MaxWS[2]);
-                    } else {
-                        LogInfoCat(TEXT("Rendering.BasicDeferred"),
-                            TEXT(
-                                "Scene WorldBounds(ShadowPass.Cascade{}): <invalid> instances={} batches={}"),
-                            cascadeIndex, bounds.InstanceCount, bounds.BatchCount);
-                    }
-                }
-
-                LogInfoCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("View OriginWS=({}, {}, {}) Near={} Far={} FovY(rad)={} ReverseZ={}"),
-                    view->ViewOrigin[0], view->ViewOrigin[1], view->ViewOrigin[2],
-                    view->Camera.mNearPlane, view->Camera.mFarPlane,
-                    view->Camera.mVerticalFovRadians, view->bReverseZ ? 1 : 0);
-            }
         }
 
         constexpr Rhi::FRhiClearColor     kAlbedoClear{ 0.12f, 0.12f, 0.12f, 1.0f };
@@ -1854,7 +1739,30 @@ namespace AltinaEngine::Rendering {
 
                 if (drawList != nullptr) {
                     for (const auto& bucket : drawList->mBuckets) {
-                        registerMaterialTextureReads(builder, bucket.mMaterial, bucket.mPass);
+                        const auto* material = bucket.mMaterial;
+                        if (material == nullptr) {
+                            continue;
+                        }
+                        const auto* layout = material->FindLayout(bucket.mPass);
+                        if (layout == nullptr) {
+                            continue;
+                        }
+                        const auto& parameters = material->GetParameters();
+                        for (const auto paramId : layout->mTextureNameHashes) {
+                            const auto* textureParam = parameters.FindTextureParam(paramId);
+                            if (textureParam == nullptr || !textureParam->mSrv) {
+                                continue;
+                            }
+                            const auto& textureRef = textureParam->mSrv->GetTextureRef();
+                            if (!textureRef) {
+                                continue;
+                            }
+                            const auto importedRef =
+                                graph.ImportTexture(textureRef, Rhi::ERhiResourceState::Common);
+                            if (importedRef.IsValid()) {
+                                builder.Read(importedRef, Rhi::ERhiResourceState::ShaderResource);
+                            }
+                        }
                     }
                 }
 
@@ -1944,6 +1852,9 @@ namespace AltinaEngine::Rendering {
                 }
             });
         RenderCore::FFrameGraphTextureRef shadowMap;
+
+        // TODO: Refactor: realtime shadow rendering should be disentangled from a specific
+        // renderer. For the logic is shared for forwarded and deferred renderers.
         {
             // FrameGraph executes after this function scope; keep one stable context per Render()
             // call in the current frame to avoid dangling/overwritten user-data pointers.
@@ -2108,6 +2019,8 @@ namespace AltinaEngine::Rendering {
 
         RenderCore::FFrameGraphTextureRef ssaoTexture;
 
+        // TODO: Refactor: pipeline input preparations (for SSAO, lighting, ...) can be placed in
+        // a separate function to avoid bloating the main Render() function.
         {
             auto& shared = GetSharedResources();
             if (device != nullptr && EnsureSsaoPipeline(*device, shared) && shared.SsaoLayout
@@ -2138,7 +2051,11 @@ namespace AltinaEngine::Rendering {
             }
         }
 
-        auto outputTexture = graph.ImportTexture(outputTarget, mViewContext.OutputFinalState);
+        const bool bBackbufferOutput =
+            (mViewContext.OutputFinalState == Rhi::ERhiResourceState::Present);
+        auto                              outputTexture = bBackbufferOutput
+                                         ? graph.ImportTextureLegacy(outputTarget, mViewContext.OutputFinalState)
+                                         : graph.ImportTexture(Rhi::FRhiTextureRef(outputTarget), mViewContext.OutputFinalState);
         RenderCore::FFrameGraphTextureRef sceneColorHDR;
 
         if (device != nullptr) {
@@ -2168,8 +2085,8 @@ namespace AltinaEngine::Rendering {
                 lightingInputs.SkyIrradiance              = mViewContext.SkyIrradianceCube;
                 lightingInputs.SkySpecular                = mViewContext.SkySpecularCube;
                 lightingInputs.BrdfLut                    = mViewContext.BrdfLutTexture;
-                lightingInputs.IblBlackCube               = shared.IblBlackCube.Get();
-                lightingInputs.IblBlack2D                 = shared.IblBlack2D.Get();
+                lightingInputs.IblBlackCube               = shared.IblBlackCube;
+                lightingInputs.IblBlack2D                 = shared.IblBlack2D;
                 lightingInputs.RuntimeSettings.bEnableIbl = false;
                 lightingInputs.RuntimeSettings.IblDiffuseIntensity =
                     rIblDiffuseIntensity.GetRenderValue();
@@ -2185,10 +2102,9 @@ namespace AltinaEngine::Rendering {
             }
 
             if (mViewContext.bHasAtmosphereSky && (mViewContext.AtmosphereParamsBuffer != nullptr)
-                && (mViewContext.AtmosphereTransmittanceLut != nullptr)
-                && (mViewContext.AtmosphereScatteringLut != nullptr)
-                && (mViewContext.AtmosphereSingleMieScatteringLut != nullptr)
-                && sceneColorHDR.IsValid() && sceneDepth.IsValid() && shared.AtmosphereSkyLayout
+                && mViewContext.AtmosphereTransmittanceLut && mViewContext.AtmosphereScatteringLut
+                && mViewContext.AtmosphereSingleMieScatteringLut && sceneColorHDR.IsValid()
+                && sceneDepth.IsValid() && shared.AtmosphereSkyLayout
                 && EnsureAtmosphereSkyPipeline(*device, shared) && shared.AtmosphereSkyPipeline
                 && shared.OutputSampler) {
                 Deferred::FDeferredAtmosphereSkyPassInputs atmosphereInputs{};
@@ -2207,7 +2123,7 @@ namespace AltinaEngine::Rendering {
                 atmosphereInputs.SceneDepth    = sceneDepth;
                 atmosphereInputs.SceneColorHDR = sceneColorHDR;
                 Deferred::AddDeferredAtmosphereSkyPass(atmosphereInputs);
-            } else if (mViewContext.bHasSkyCube && (mViewContext.SkyCubeTexture != nullptr)
+            } else if (mViewContext.bHasSkyCube && mViewContext.SkyCubeTexture
                 && sceneColorHDR.IsValid() && sceneDepth.IsValid() && shared.SkyBoxLayout
                 && EnsureSkyBoxPipeline(*device, shared) && shared.SkyBoxPipeline
                 && shared.OutputSampler) {
@@ -2225,6 +2141,9 @@ namespace AltinaEngine::Rendering {
                 Deferred::AddDeferredSkyBoxPass(skyboxInputs);
             }
         }
+
+        // TODO: Refactor: pipeline input preparations for postproc can be placed in a separate
+        // function to avoid bloating the main Render() function.
 
         // Post-process chain (stack + registry) -> Present.
         {

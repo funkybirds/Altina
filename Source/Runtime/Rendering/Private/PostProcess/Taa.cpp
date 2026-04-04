@@ -134,9 +134,9 @@ namespace AltinaEngine::Rendering::PostProcess::Builtin {
         }
 
         const auto historyReadImported =
-            graph.ImportTexture(historyRead.Get(), Rhi::ERhiResourceState::ShaderResource);
+            graph.ImportTexture(historyRead, Rhi::ERhiResourceState::ShaderResource);
         const auto historyWriteImported =
-            graph.ImportTexture(historyWrite.Get(), Rhi::ERhiResourceState::RenderTarget);
+            graph.ImportTexture(historyWrite, Rhi::ERhiResourceState::RenderTarget);
 
         // Params.
         const f32                         alpha  = GetParamF32(node.Params, TEXT("Alpha"), 0.9f);

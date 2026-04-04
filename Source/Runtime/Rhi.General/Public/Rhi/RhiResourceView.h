@@ -46,6 +46,9 @@ namespace AltinaEngine::Rhi {
         [[nodiscard]] auto GetDesc() const noexcept -> const FRhiShaderResourceViewDesc& {
             return mDesc;
         }
+        [[nodiscard]] auto GetTextureRef() const noexcept -> const FRhiTextureRef& {
+            return mTexture;
+        }
         [[nodiscard]] auto GetTexture() const noexcept -> FRhiTexture* { return mTexture.Get(); }
         [[nodiscard]] auto GetBuffer() const noexcept -> FRhiBuffer* { return mBuffer.Get(); }
         [[nodiscard]] auto GetDebugName() const noexcept -> FStringView {

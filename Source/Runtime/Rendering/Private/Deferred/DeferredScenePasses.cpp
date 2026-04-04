@@ -81,8 +81,8 @@ namespace AltinaEngine::Rendering::Deferred {
         graph.AddPass<FLightingPassData>(
             lightingPassDesc,
             [&](RenderCore::FFrameGraphPassBuilder& builder, FLightingPassData& data) {
-                auto registerExternalTextureRead = [&](Rhi::FRhiTexture* texture) -> void {
-                    if (texture == nullptr) {
+                auto registerExternalTextureRead = [&](const Rhi::FRhiTextureRef& texture) -> void {
+                    if (!texture) {
                         return;
                     }
                     const auto ref = graph.ImportTexture(texture, Rhi::ERhiResourceState::Common);
@@ -212,9 +212,9 @@ namespace AltinaEngine::Rendering::Deferred {
                         iblBuffer, &iblConstants, sizeof(iblConstants), 0ULL);
                 }
 
-                auto*     irrTex  = settings.bEnableIbl ? skyIrradiance : iblBlackCube;
-                auto*     specTex = settings.bEnableIbl ? skySpecular : iblBlackCube;
-                auto*     lutTex  = settings.bEnableIbl ? brdfLut : iblBlack2D;
+                auto*     irrTex  = settings.bEnableIbl ? skyIrradiance.Get() : iblBlackCube.Get();
+                auto*     specTex = settings.bEnableIbl ? skySpecular.Get() : iblBlackCube.Get();
+                auto*     lutTex  = settings.bEnableIbl ? brdfLut.Get() : iblBlack2D.Get();
 
                 const u32 lightingPerFrameBinding = RequireBinding(*bindings, kNameDeferredView,
                     Rhi::ERhiBindingType::ConstantBuffer, TEXT("Lighting"));
@@ -331,7 +331,7 @@ namespace AltinaEngine::Rendering::Deferred {
                 builder.Read(inputs.SceneDepth, Rhi::ERhiResourceState::ShaderResource);
                 data.Depth =
                     builder.Read(inputs.SceneDepth, Rhi::ERhiResourceState::ShaderResource);
-                if (inputs.SkyCube != nullptr) {
+                if (inputs.SkyCube) {
                     const auto skyCubeRef =
                         graph.ImportTexture(inputs.SkyCube, Rhi::ERhiResourceState::Common);
                     if (skyCubeRef.IsValid()) {
@@ -385,7 +385,7 @@ namespace AltinaEngine::Rendering::Deferred {
                     TEXT("BasicDeferredRenderer"), "SkyBox bind group: add per-frame failed.");
                 DebugAssert(builder.AddTexture(skyDepthBinding, depthTex),
                     TEXT("BasicDeferredRenderer"), "SkyBox bind group: add depth failed.");
-                DebugAssert(builder.AddTexture(skyCubeBinding, skyCube),
+                DebugAssert(builder.AddTexture(skyCubeBinding, skyCube.Get()),
                     TEXT("BasicDeferredRenderer"), "SkyBox bind group: add skycube failed.");
                 DebugAssert(builder.AddSampler(skySamplerBinding, sampler),
                     TEXT("BasicDeferredRenderer"), "SkyBox bind group: add sampler failed.");
@@ -529,13 +529,14 @@ namespace AltinaEngine::Rendering::Deferred {
                     TEXT("BasicDeferredRenderer"), "AtmosphereSky bind group: add params failed.");
                 DebugAssert(builder.AddTexture(depthBinding, depthTex),
                     TEXT("BasicDeferredRenderer"), "AtmosphereSky bind group: add depth failed.");
-                DebugAssert(builder.AddTexture(transmittanceBinding, transmittanceLut),
+                DebugAssert(builder.AddTexture(transmittanceBinding, transmittanceLut.Get()),
                     TEXT("BasicDeferredRenderer"),
                     "AtmosphereSky bind group: add transmittance failed.");
-                DebugAssert(builder.AddTexture(scatteringBinding, scatteringLut),
+                DebugAssert(builder.AddTexture(scatteringBinding, scatteringLut.Get()),
                     TEXT("BasicDeferredRenderer"),
                     "AtmosphereSky bind group: add scattering failed.");
-                DebugAssert(builder.AddTexture(singleMieScatteringBinding, singleMieScatteringLut),
+                DebugAssert(
+                    builder.AddTexture(singleMieScatteringBinding, singleMieScatteringLut.Get()),
                     TEXT("BasicDeferredRenderer"),
                     "AtmosphereSky bind group: add single mie scattering failed.");
                 DebugAssert(builder.AddSampler(samplerBinding, sampler),

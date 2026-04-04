@@ -490,10 +490,35 @@ namespace AltinaEngine::RenderCore {
     }
 
     FFrameGraphTextureRef FFrameGraph::ImportTexture(
-        Rhi::FRhiTexture* external, Rhi::ERhiResourceState state) {
+        const Rhi::FRhiTextureRef& external, Rhi::ERhiResourceState state) {
+        if (!external) {
+            return {};
+        }
+
+        const auto* externalPtr = external.Get();
+        for (u32 i = 0U; i < static_cast<u32>(mTextures.Size()); ++i) {
+            auto& entry = mTextures[i];
+            if (!entry.mIsExternal || entry.mExternalTexture.Get() != externalPtr) {
+                continue;
+            }
+
+            DebugAssert(entry.mDesc.mInitialState == state, TEXT("RenderCore.FrameGraph"),
+                "ImportTexture state mismatch for external texture ptr={}: existing={}, requested={}.",
+                static_cast<const void*>(externalPtr), static_cast<u32>(entry.mDesc.mInitialState),
+                static_cast<u32>(state));
+
+            if (state == Rhi::ERhiResourceState::Present) {
+                // Imported presentable textures are always tracked as external outputs.
+                entry.mIsExternalOutput = true;
+                entry.mFinalState       = Rhi::ERhiResourceState::Present;
+            }
+
+            return FFrameGraphTextureRef{ i + 1U };
+        }
+
         FRdgTextureEntry entry;
         entry.mIsExternal         = true;
-        entry.mExternal           = external;
+        entry.mExternalTexture    = external;
         entry.mDesc.mInitialState = state;
         if (state == Rhi::ERhiResourceState::Present) {
             // Treat imported presentable textures (swapchain backbuffer) as implicit external
@@ -504,6 +529,14 @@ namespace AltinaEngine::RenderCore {
         mTextures.PushBack(entry);
         mCompiled = false;
         return FFrameGraphTextureRef{ static_cast<u32>(mTextures.Size()) };
+    }
+
+    FFrameGraphTextureRef FFrameGraph::ImportTextureLegacy(
+        Rhi::FRhiTexture* external, Rhi::ERhiResourceState state) {
+        DebugAssert(state == Rhi::ERhiResourceState::Present, TEXT("RenderCore.FrameGraph"),
+            "ImportTextureLegacy is reserved for swapchain backbuffer imports (state={}).",
+            static_cast<u32>(state));
+        return ImportTexture(Rhi::FRhiTextureRef(external), state);
     }
 
     FFrameGraphBufferRef FFrameGraph::ImportBuffer(
@@ -752,7 +785,7 @@ namespace AltinaEngine::RenderCore {
             return nullptr;
         }
         const auto& entry = mTextures[index];
-        return entry.mIsExternal ? entry.mExternal : entry.mTexture.Get();
+        return entry.mIsExternal ? entry.mExternalTexture.Get() : entry.mTexture.Get();
     }
 
     auto FFrameGraph::ResolveBuffer(FFrameGraphBufferRef ref) const -> Rhi::FRhiBuffer* {

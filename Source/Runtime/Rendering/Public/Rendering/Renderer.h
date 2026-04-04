@@ -4,6 +4,7 @@
 
 #include "FrameGraph/FrameGraph.h"
 #include "Rhi/RhiBuffer.h"
+#include "Rhi/RhiRefs.h"
 #include "Rhi/RhiTexture.h"
 
 namespace AltinaEngine::RenderCore::View {
@@ -34,21 +35,21 @@ namespace AltinaEngine::Rendering {
         const RenderCore::Render::FDrawList*         ShadowDrawLists[4] = {};
 
         // Optional sky cubemap (for skybox rendering).
-        Rhi::FRhiTexture*                            SkyCubeTexture                   = nullptr;
-        bool                                         bHasSkyCube                      = false;
-        Rhi::FRhiBuffer*                             AtmosphereParamsBuffer           = nullptr;
-        Rhi::FRhiTexture*                            AtmosphereTransmittanceLut       = nullptr;
-        Rhi::FRhiTexture*                            AtmosphereIrradianceLut          = nullptr;
-        Rhi::FRhiTexture*                            AtmosphereScatteringLut          = nullptr;
-        Rhi::FRhiTexture*                            AtmosphereSingleMieScatteringLut = nullptr;
-        bool                                         bHasAtmosphereSky                = false;
+        Rhi::FRhiTextureRef                          SkyCubeTexture;
+        bool                                         bHasSkyCube            = false;
+        Rhi::FRhiBuffer*                             AtmosphereParamsBuffer = nullptr;
+        Rhi::FRhiTextureRef                          AtmosphereTransmittanceLut;
+        Rhi::FRhiTextureRef                          AtmosphereIrradianceLut;
+        Rhi::FRhiTextureRef                          AtmosphereScatteringLut;
+        Rhi::FRhiTextureRef                          AtmosphereSingleMieScatteringLut;
+        bool                                         bHasAtmosphereSky = false;
 
         // Optional environment IBL (diffuse irradiance + specular prefilter + BRDF LUT).
         // These are GPU resources (not asset handles) and are expected to be persistent across
         // frames, typically cached by the engine loop.
-        Rhi::FRhiTexture*                            SkyIrradianceCube = nullptr; // TextureCube
-        Rhi::FRhiTexture*                            SkySpecularCube   = nullptr; // TextureCube
-        Rhi::FRhiTexture*                            BrdfLutTexture    = nullptr; // Texture2D
+        Rhi::FRhiTextureRef                          SkyIrradianceCube; // TextureCube
+        Rhi::FRhiTextureRef                          SkySpecularCube;   // TextureCube
+        Rhi::FRhiTextureRef                          BrdfLutTexture;    // Texture2D
         float                                        SkySpecularMaxLod = 0.0f;
         bool                                         bHasSkyIbl        = false;
     };

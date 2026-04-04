@@ -646,29 +646,29 @@ namespace AltinaEngine::Launch {
                 static_cast<u32>(shadowDrawLists.Size()), static_cast<u32>(scene.Views.Size()));
 
             // Cache skybox/IBL GPU resources on the render thread to avoid re-uploading.
-            auto&             cache                = GetSceneRenderCaches();
-            auto&             sSkyCubeAsset        = cache.SkyCubeAsset;
-            auto&             sSkyCubeRhi          = cache.SkyCubeRhi;
-            bool&             sHasSkyCubeRhi       = cache.HasSkyCubeRhi;
-            auto&             sSkyIrradianceAsset  = cache.SkyIrradianceAsset;
-            auto&             sSkyIrradianceRhi    = cache.SkyIrradianceRhi;
-            bool&             sHasSkyIrradianceRhi = cache.HasSkyIrradianceRhi;
-            auto&             sSkySpecularAsset    = cache.SkySpecularAsset;
-            auto&             sSkySpecularRhi      = cache.SkySpecularRhi;
-            bool&             sHasSkySpecularRhi   = cache.HasSkySpecularRhi;
-            auto&             sBrdfLutAsset        = cache.BrdfLutAsset;
-            auto&             sBrdfLutTexture      = cache.BrdfLutTexture;
-            bool&             sHasBrdfLutTexture   = cache.HasBrdfLutTexture;
+            auto&               cache                = GetSceneRenderCaches();
+            auto&               sSkyCubeAsset        = cache.SkyCubeAsset;
+            auto&               sSkyCubeRhi          = cache.SkyCubeRhi;
+            bool&               sHasSkyCubeRhi       = cache.HasSkyCubeRhi;
+            auto&               sSkyIrradianceAsset  = cache.SkyIrradianceAsset;
+            auto&               sSkyIrradianceRhi    = cache.SkyIrradianceRhi;
+            bool&               sHasSkyIrradianceRhi = cache.HasSkyIrradianceRhi;
+            auto&               sSkySpecularAsset    = cache.SkySpecularAsset;
+            auto&               sSkySpecularRhi      = cache.SkySpecularRhi;
+            bool&               sHasSkySpecularRhi   = cache.HasSkySpecularRhi;
+            auto&               sBrdfLutAsset        = cache.BrdfLutAsset;
+            auto&               sBrdfLutTexture      = cache.BrdfLutTexture;
+            bool&               sHasBrdfLutTexture   = cache.HasBrdfLutTexture;
 
-            Rhi::FRhiTexture* skyCubeTexture                   = nullptr;
-            Rhi::FRhiBuffer*  atmosphereParamsBuffer           = nullptr;
-            Rhi::FRhiTexture* atmosphereTransmittanceLut       = nullptr;
-            Rhi::FRhiTexture* atmosphereIrradianceLut          = nullptr;
-            Rhi::FRhiTexture* atmosphereScatteringLut          = nullptr;
-            Rhi::FRhiTexture* atmosphereSingleMieScatteringLut = nullptr;
-            bool              bHasSkyCube                      = false;
-            bool              bHasAtmosphereSky                = false;
-            f64               atmosphereSetupMs                = 0.0;
+            Rhi::FRhiTextureRef skyCubeTexture;
+            Rhi::FRhiBuffer*    atmosphereParamsBuffer = nullptr;
+            Rhi::FRhiTextureRef atmosphereTransmittanceLut;
+            Rhi::FRhiTextureRef atmosphereIrradianceLut;
+            Rhi::FRhiTextureRef atmosphereScatteringLut;
+            Rhi::FRhiTextureRef atmosphereSingleMieScatteringLut;
+            bool                bHasSkyCube       = false;
+            bool                bHasAtmosphereSky = false;
+            f64                 atmosphereSetupMs = 0.0;
             if (scene.bHasSkyCube && scene.SkyCubeAsset.IsValid()) {
                 bHasSkyCube = true;
                 if (!GameScene::FSkyCubeComponent::AssetToSkyCubeConverter) {
@@ -689,18 +689,18 @@ namespace AltinaEngine::Launch {
                     sBrdfLutTexture.Reset();
                 }
                 if (sHasSkyCubeRhi) {
-                    skyCubeTexture = sSkyCubeRhi.Texture.Get();
+                    skyCubeTexture = sSkyCubeRhi.Texture;
                 } else {
                     bHasSkyCube = false;
                 }
             }
 
             // Optional environment IBL (diffuse irradiance + specular prefilter + BRDF LUT).
-            Rhi::FRhiTexture* skyIrradiance  = nullptr;
-            Rhi::FRhiTexture* skySpecular    = nullptr;
-            Rhi::FRhiTexture* brdfLut        = nullptr;
-            float             specularMaxLod = 0.0f;
-            bool              bHasSkyIbl     = false;
+            Rhi::FRhiTextureRef skyIrradiance;
+            Rhi::FRhiTextureRef skySpecular;
+            Rhi::FRhiTextureRef brdfLut;
+            float               specularMaxLod = 0.0f;
+            bool                bHasSkyIbl     = false;
 
             if (bHasSkyCube && assetRegistry != nullptr && assetManager != nullptr) {
                 const auto* baseDesc = assetRegistry->GetDesc(scene.SkyCubeAsset);
@@ -731,7 +731,7 @@ namespace AltinaEngine::Launch {
                             sHasSkyIrradianceRhi = sSkyIrradianceRhi.IsValid();
                         }
                         if (sHasSkyIrradianceRhi) {
-                            skyIrradiance = sSkyIrradianceRhi.Texture.Get();
+                            skyIrradiance = sSkyIrradianceRhi.Texture;
                         }
                     }
 
@@ -744,7 +744,7 @@ namespace AltinaEngine::Launch {
                             sHasSkySpecularRhi = sSkySpecularRhi.IsValid();
                         }
                         if (sHasSkySpecularRhi) {
-                            skySpecular = sSkySpecularRhi.Texture.Get();
+                            skySpecular = sSkySpecularRhi.Texture;
                         }
 
                         const auto* specDesc = assetRegistry->GetDesc(specularHandle);
@@ -836,12 +836,11 @@ namespace AltinaEngine::Launch {
                             }
                         }
                         if (sHasBrdfLutTexture) {
-                            brdfLut = sBrdfLutTexture.Get();
+                            brdfLut = sBrdfLutTexture;
                         }
                     }
 
-                    bHasSkyIbl = (skyIrradiance != nullptr) && (skySpecular != nullptr)
-                        && (brdfLut != nullptr);
+                    bHasSkyIbl = skyIrradiance && skySpecular && brdfLut;
                 }
             }
 
@@ -877,19 +876,17 @@ namespace AltinaEngine::Launch {
                         atmosphereDesc, sunDirection);
                 atmosphereSetupMs = ElapsedMilliseconds(atmosphereStart);
                 if (atmosphereResources != nullptr && atmosphereResources->IsValid()) {
-                    atmosphereParamsBuffer     = atmosphereResources->mParamsBuffer.Get();
-                    atmosphereTransmittanceLut = atmosphereResources->mTransmittanceLut.Get();
-                    atmosphereIrradianceLut    = atmosphereResources->mIrradianceLut.Get();
-                    atmosphereScatteringLut    = atmosphereResources->mScatteringLut.Get();
-                    atmosphereSingleMieScatteringLut =
-                        atmosphereResources->mSingleMieScatteringLut.Get();
-                    bHasAtmosphereSky = (atmosphereParamsBuffer != nullptr)
-                        && (atmosphereTransmittanceLut != nullptr)
-                        && (atmosphereScatteringLut != nullptr)
-                        && (atmosphereSingleMieScatteringLut != nullptr);
-                    skyIrradiance  = nullptr;
-                    skySpecular    = nullptr;
-                    brdfLut        = nullptr;
+                    atmosphereParamsBuffer           = atmosphereResources->mParamsBuffer.Get();
+                    atmosphereTransmittanceLut       = atmosphereResources->mTransmittanceLut;
+                    atmosphereIrradianceLut          = atmosphereResources->mIrradianceLut;
+                    atmosphereScatteringLut          = atmosphereResources->mScatteringLut;
+                    atmosphereSingleMieScatteringLut = atmosphereResources->mSingleMieScatteringLut;
+                    bHasAtmosphereSky                = (atmosphereParamsBuffer != nullptr)
+                        && atmosphereTransmittanceLut && atmosphereScatteringLut
+                        && atmosphereSingleMieScatteringLut;
+                    skyIrradiance.Reset();
+                    skySpecular.Reset();
+                    brdfLut.Reset();
                     specularMaxLod = 0.0f;
                     bHasSkyIbl     = false;
                 }

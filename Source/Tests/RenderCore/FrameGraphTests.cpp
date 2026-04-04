@@ -481,7 +481,7 @@ TEST_CASE("FrameGraphExecutor.CrossQueueTransition_SubmitOrder") {
     texDesc.mFormat  = ERhiFormat::R8G8B8A8Unorm;
     auto externalTex = device.CreateTexture(texDesc);
     REQUIRE(externalTex);
-    const auto texRef = graph.ImportTexture(externalTex.Get(), ERhiResourceState::Common);
+    const auto texRef = graph.ImportTexture(externalTex, ERhiResourceState::Common);
 
     struct FPassData {
         FFrameGraphTextureRef mTex;
@@ -748,7 +748,7 @@ TEST_CASE("FrameGraph.ImportedTextureRoundTrip") {
     graph.BeginFrame(2);
 
     bool samePointer = false;
-    auto imported = graph.ImportTexture(externalTexture.Get(), ERhiResourceState::ShaderResource);
+    auto imported    = graph.ImportTexture(externalTexture, ERhiResourceState::ShaderResource);
 
     FFrameGraphPassDesc passDesc;
     passDesc.mName  = "FrameGraph.ImportedTextureRoundTrip";
@@ -791,7 +791,7 @@ TEST_CASE("FrameGraph.ImportedTextureWriteAsRenderTarget") {
     FFrameGraph graph(*device);
     graph.BeginFrame(3);
 
-    auto imported = graph.ImportTexture(externalTexture.Get(), ERhiResourceState::Common);
+    auto imported = graph.ImportTexture(externalTexture, ERhiResourceState::Common);
 
     struct FPassData {
         FFrameGraphTextureRef Out;
@@ -847,6 +847,32 @@ TEST_CASE("FrameGraph.ImportedTextureWriteAsRenderTarget") {
     REQUIRE(executed);
     REQUIRE(sameTexture);
     REQUIRE(hasValidRtv);
+}
+
+TEST_CASE("FrameGraph.ImportTexture_DeduplicatesWithinFrame") {
+    FRhiMockContext context;
+    auto            device = CreateMockDevice(context);
+
+    FRhiTextureDesc texDesc{};
+    texDesc.mDebugName.Assign(TEXT("ImportedTextureDedup"));
+    texDesc.mWidth     = 4U;
+    texDesc.mHeight    = 4U;
+    texDesc.mFormat    = ERhiFormat::R8G8B8A8Unorm;
+    texDesc.mBindFlags = ERhiTextureBindFlags::ShaderResource;
+
+    auto externalTexture = device->CreateTexture(texDesc);
+    REQUIRE(externalTexture);
+
+    FFrameGraph graph(*device);
+    graph.BeginFrame(11);
+
+    const auto firstImport  = graph.ImportTexture(externalTexture, ERhiResourceState::Common);
+    const auto secondImport = graph.ImportTexture(externalTexture, ERhiResourceState::Common);
+    REQUIRE(firstImport.IsValid());
+    REQUIRE(secondImport.IsValid());
+    REQUIRE(firstImport.mId == secondImport.mId);
+
+    graph.EndFrame();
 }
 
 TEST_CASE("FrameGraph.AutoTransitionsBeforePass") {

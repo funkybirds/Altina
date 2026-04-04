@@ -1,6 +1,5 @@
 #include "Deferred/DeferredCsm.h"
 
-#include "Container/Vector.h"
 #include "FrameGraph/FrameGraph.h"
 #include "Material/Material.h"
 #include "Rhi/RhiDebugMarker.h"
@@ -13,15 +12,9 @@ namespace AltinaEngine::Rendering::Deferred {
     namespace {
         using Core::Utility::Assert;
 
-        struct FImportedExternalTexture {
-            Rhi::FRhiTexture*                 Texture = nullptr;
-            RenderCore::FFrameGraphTextureRef Ref;
-        };
-
         auto RegisterMaterialTextureReads(RenderCore::FFrameGraph& graph,
             RenderCore::FFrameGraphPassBuilder& builder, const RenderCore::FMaterial* material,
-            RenderCore::EMaterialPass                           pass,
-            Core::Container::TVector<FImportedExternalTexture>& importedExternalTextures) -> void {
+            RenderCore::EMaterialPass pass) -> void {
             if (material == nullptr) {
                 return;
             }
@@ -31,35 +24,18 @@ namespace AltinaEngine::Rendering::Deferred {
                 return;
             }
 
-            auto findOrImportExternalTextureRef =
-                [&graph, &importedExternalTextures](
-                    Rhi::FRhiTexture* texture) -> RenderCore::FFrameGraphTextureRef {
-                if (texture == nullptr) {
-                    return {};
-                }
-                for (const auto& imported : importedExternalTextures) {
-                    if (imported.Texture == texture) {
-                        return imported.Ref;
-                    }
-                }
-
-                const auto ref = graph.ImportTexture(texture, Rhi::ERhiResourceState::Common);
-                importedExternalTextures.PushBack({ texture, ref });
-                return ref;
-            };
-
             const auto& parameters = material->GetParameters();
             for (const auto paramId : layout->mTextureNameHashes) {
                 const auto* textureParam = parameters.FindTextureParam(paramId);
                 if (textureParam == nullptr || !textureParam->mSrv) {
                     continue;
                 }
-                auto* texture = textureParam->mSrv->GetTexture();
-                if (texture == nullptr) {
+                const auto& textureRef = textureParam->mSrv->GetTextureRef();
+                if (!textureRef) {
                     continue;
                 }
 
-                const auto ref = findOrImportExternalTextureRef(texture);
+                const auto ref = graph.ImportTexture(textureRef, Rhi::ERhiResourceState::Common);
                 if (ref.IsValid()) {
                     builder.Read(ref, Rhi::ERhiResourceState::ShaderResource);
                 }
@@ -206,15 +182,13 @@ namespace AltinaEngine::Rendering::Deferred {
 
         auto& graph = *inputs.Graph;
         outShadowMap =
-            graph.ImportTexture(inputs.PersistentShadowMap->Get(), Rhi::ERhiResourceState::Common);
+            graph.ImportTexture(*inputs.PersistentShadowMap, Rhi::ERhiResourceState::Common);
         Assert(outShadowMap.IsValid(), TEXT("BasicDeferredRenderer"),
             "Render failed: ImportTexture(ShadowMap.CSM) returned invalid ref.");
 
         RenderCore::FFrameGraphPassDesc shadowPassDesc{};
         shadowPassDesc.mType  = RenderCore::EFrameGraphPassType::Raster;
         shadowPassDesc.mQueue = RenderCore::EFrameGraphQueue::Graphics;
-
-        Core::Container::TVector<FImportedExternalTexture> importedExternalTextures;
 
         for (u32 cascade = 0U; cascade < csmData.mCascadeCount; ++cascade) {
             struct FShadowPassData {
@@ -249,8 +223,8 @@ namespace AltinaEngine::Rendering::Deferred {
                         (cascade < 4U) ? inputs.ShadowDrawLists[cascade] : nullptr;
                     if (shadowDrawList != nullptr) {
                         for (const auto& bucket : shadowDrawList->mBuckets) {
-                            RegisterMaterialTextureReads(graph, builder, bucket.mMaterial,
-                                bucket.mPass, importedExternalTextures);
+                            RegisterMaterialTextureReads(
+                                graph, builder, bucket.mMaterial, bucket.mPass);
                         }
                     }
 

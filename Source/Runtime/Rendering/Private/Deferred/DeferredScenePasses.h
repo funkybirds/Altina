@@ -9,6 +9,7 @@
 #include "Rhi/RhiBindGroupLayout.h"
 #include "Rhi/RhiBuffer.h"
 #include "Rhi/RhiPipeline.h"
+#include "Rhi/RhiRefs.h"
 #include "Rhi/RhiSampler.h"
 #include "Rhi/RhiTexture.h"
 
@@ -44,11 +45,11 @@ namespace AltinaEngine::Rendering::Deferred {
         u32                                                   Width  = 0U;
         u32                                                   Height = 0U;
 
-        Rhi::FRhiTexture*                                     SkyIrradiance = nullptr;
-        Rhi::FRhiTexture*                                     SkySpecular   = nullptr;
-        Rhi::FRhiTexture*                                     BrdfLut       = nullptr;
-        Rhi::FRhiTexture*                                     IblBlackCube  = nullptr;
-        Rhi::FRhiTexture*                                     IblBlack2D    = nullptr;
+        Rhi::FRhiTextureRef                                   SkyIrradiance;
+        Rhi::FRhiTextureRef                                   SkySpecular;
+        Rhi::FRhiTextureRef                                   BrdfLut;
+        Rhi::FRhiTextureRef                                   IblBlackCube;
+        Rhi::FRhiTextureRef                                   IblBlack2D;
         FLightingPassRuntimeSettings                          RuntimeSettings{};
     };
 
@@ -60,7 +61,7 @@ namespace AltinaEngine::Rendering::Deferred {
         Rhi::FRhiSampler*                                     Sampler        = nullptr;
         const RenderCore::ShaderBinding::FBindingLookupTable* Bindings       = nullptr;
         Rhi::FRhiBuffer*                                      PerFrameBuffer = nullptr;
-        Rhi::FRhiTexture*                                     SkyCube        = nullptr;
+        Rhi::FRhiTextureRef                                   SkyCube;
         RenderCore::FFrameGraphTextureRef                     SceneDepth;
         RenderCore::FFrameGraphTextureRef                     SceneColorHDR;
     };
@@ -74,9 +75,9 @@ namespace AltinaEngine::Rendering::Deferred {
         const RenderCore::ShaderBinding::FBindingLookupTable* Bindings               = nullptr;
         Rhi::FRhiBuffer*                                      PerFrameBuffer         = nullptr;
         Rhi::FRhiBuffer*                                      AtmosphereParamsBuffer = nullptr;
-        Rhi::FRhiTexture*                                     TransmittanceLut       = nullptr;
-        Rhi::FRhiTexture*                                     ScatteringLut          = nullptr;
-        Rhi::FRhiTexture*                                     SingleMieScatteringLut = nullptr;
+        Rhi::FRhiTextureRef                                   TransmittanceLut;
+        Rhi::FRhiTextureRef                                   ScatteringLut;
+        Rhi::FRhiTextureRef                                   SingleMieScatteringLut;
         RenderCore::FFrameGraphTextureRef                     SceneDepth;
         RenderCore::FFrameGraphTextureRef                     SceneColorHDR;
     };

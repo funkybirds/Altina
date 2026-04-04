@@ -875,6 +875,31 @@ TEST_CASE("FrameGraph.ImportTexture_DeduplicatesWithinFrame") {
     graph.EndFrame();
 }
 
+TEST_CASE("FrameGraph.ImportBuffer_DeduplicatesWithinFrame") {
+    FRhiMockContext context;
+    auto            device = CreateMockDevice(context);
+
+    FRhiBufferDesc  bufferDesc{};
+    bufferDesc.mDebugName.Assign(TEXT("ImportedBufferDedup"));
+    bufferDesc.mSizeBytes = 256U;
+    bufferDesc.mBindFlags =
+        ERhiBufferBindFlags::ShaderResource | ERhiBufferBindFlags::UnorderedAccess;
+
+    auto externalBuffer = device->CreateBuffer(bufferDesc);
+    REQUIRE(externalBuffer);
+
+    FFrameGraph graph(*device);
+    graph.BeginFrame(12);
+
+    const auto firstImport  = graph.ImportBuffer(externalBuffer, ERhiResourceState::ShaderResource);
+    const auto secondImport = graph.ImportBuffer(externalBuffer, ERhiResourceState::ShaderResource);
+    REQUIRE(firstImport.IsValid());
+    REQUIRE(secondImport.IsValid());
+    REQUIRE(firstImport.mId == secondImport.mId);
+
+    graph.EndFrame();
+}
+
 TEST_CASE("FrameGraph.AutoTransitionsBeforePass") {
     FRhiMockContext context;
     auto            device = CreateMockDevice(context);

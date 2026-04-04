@@ -256,7 +256,10 @@ namespace AltinaEngine::RenderCore {
             const Rhi::FRhiTextureRef& external, Rhi::ERhiResourceState state);
         FFrameGraphTextureRef ImportTextureLegacy(
             Rhi::FRhiTexture* external, Rhi::ERhiResourceState state);
-        FFrameGraphBufferRef ImportBuffer(Rhi::FRhiBuffer* external, Rhi::ERhiResourceState state);
+        FFrameGraphBufferRef ImportBuffer(
+            const Rhi::FRhiBufferRef& external, Rhi::ERhiResourceState state);
+        FFrameGraphBufferRef ImportBufferLegacy(
+            Rhi::FRhiBuffer* external, Rhi::ERhiResourceState state);
 
     private:
         friend class FFrameGraphPassResources;
@@ -289,7 +292,7 @@ namespace AltinaEngine::RenderCore {
         struct FRdgBufferEntry {
             FFrameGraphBufferDesc  mDesc;
             Rhi::FRhiBufferRef     mBuffer;
-            Rhi::FRhiBuffer*       mExternal         = nullptr;
+            Rhi::FRhiBufferRef     mExternalBuffer;
             bool                   mIsExternal       = false;
             bool                   mIsExternalOutput = false;
             Rhi::ERhiResourceState mFinalState       = Rhi::ERhiResourceState::Unknown;

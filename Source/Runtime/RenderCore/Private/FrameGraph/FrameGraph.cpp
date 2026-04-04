@@ -540,14 +540,38 @@ namespace AltinaEngine::RenderCore {
     }
 
     FFrameGraphBufferRef FFrameGraph::ImportBuffer(
-        Rhi::FRhiBuffer* external, Rhi::ERhiResourceState state) {
+        const Rhi::FRhiBufferRef& external, Rhi::ERhiResourceState state) {
+        if (!external) {
+            return {};
+        }
+
+        const auto* externalPtr = external.Get();
+        for (u32 i = 0U; i < static_cast<u32>(mBuffers.Size()); ++i) {
+            auto& entry = mBuffers[i];
+            if (!entry.mIsExternal || entry.mExternalBuffer.Get() != externalPtr) {
+                continue;
+            }
+
+            DebugAssert(entry.mDesc.mInitialState == state, TEXT("RenderCore.FrameGraph"),
+                "ImportBuffer state mismatch for external buffer ptr={}: existing={}, requested={}.",
+                static_cast<const void*>(externalPtr), static_cast<u32>(entry.mDesc.mInitialState),
+                static_cast<u32>(state));
+
+            return FFrameGraphBufferRef{ i + 1U };
+        }
+
         FRdgBufferEntry entry;
         entry.mIsExternal         = true;
-        entry.mExternal           = external;
+        entry.mExternalBuffer     = external;
         entry.mDesc.mInitialState = state;
         mBuffers.PushBack(entry);
         mCompiled = false;
         return FFrameGraphBufferRef{ static_cast<u32>(mBuffers.Size()) };
+    }
+
+    FFrameGraphBufferRef FFrameGraph::ImportBufferLegacy(
+        Rhi::FRhiBuffer* external, Rhi::ERhiResourceState state) {
+        return ImportBuffer(Rhi::FRhiBufferRef(external), state);
     }
 
     auto FFrameGraph::AllocatePass(const FFrameGraphPassDesc& desc) -> u32 {
@@ -797,7 +821,7 @@ namespace AltinaEngine::RenderCore {
             return nullptr;
         }
         const auto& entry = mBuffers[index];
-        return entry.mIsExternal ? entry.mExternal : entry.mBuffer.Get();
+        return entry.mIsExternal ? entry.mExternalBuffer.Get() : entry.mBuffer.Get();
     }
 
     auto FFrameGraph::ResolveSRV(FFrameGraphSRVRef ref) const -> Rhi::FRhiShaderResourceView* {

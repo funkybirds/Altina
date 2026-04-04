@@ -897,8 +897,12 @@ namespace AltinaEngine::Launch {
             Rendering::IRenderer* renderer = (rendererType == Rendering::ERendererType::Deferred)
                 ? static_cast<Rendering::IRenderer*>(&deferredRenderer)
                 : static_cast<Rendering::IRenderer*>(&forwardRenderer);
+            if (rendererType == Rendering::ERendererType::Deferred) {
+                Rendering::FRendererBuilder rendererBuilder{};
+                rendererBuilder.ApplyToRenderer(deferredRenderer);
+            }
 
-            const auto            prepareStart = std::chrono::steady_clock::now();
+            const auto prepareStart = std::chrono::steady_clock::now();
             renderer->PrepareForRendering(device);
             const f64   prepareMs = ElapsedMilliseconds(prepareStart);
 

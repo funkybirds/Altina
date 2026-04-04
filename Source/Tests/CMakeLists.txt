@@ -74,6 +74,19 @@ ae_add_test_target(AltinaEngineTestsRenderCore
         AltinaEngine::Rhi::Mock
 )
 
+file(GLOB_RECURSE AE_TEST_RENDERING_SOURCES
+    CONFIGURE_DEPENDS
+    ${AE_TESTS_ROOT}/Rendering/*.cpp
+)
+
+if(AE_TEST_RENDERING_SOURCES)
+    ae_add_test_target(AltinaEngineTestsRendering
+        FOLDER "Rendering"
+        SOURCES ${AE_TEST_RENDERING_SOURCES}
+        LIBS AltinaEngine::Rendering
+    )
+endif()
+
 file(GLOB_RECURSE AE_TEST_GEOMETRY_PROCESSING_SOURCES
     CONFIGURE_DEPENDS
     ${AE_TESTS_ROOT}/GeometryProcessing/*.cpp

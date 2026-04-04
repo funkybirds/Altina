@@ -1250,6 +1250,270 @@ namespace AltinaEngine::Rendering {
             }
         }
 
+        [[nodiscard]] auto BuildDeferredSsaoPassInputs(RenderCore::FFrameGraph& graph,
+            Rhi::FRhiDevice* device, FDeferredSharedResources& resources,
+            const RenderCore::View::FViewRect& viewRect,
+            const FPerFrameConstants& perFrameConstants, Rhi::FRhiBuffer* perFrameBuffer,
+            Rhi::FRhiBuffer* ssaoConstantsBuffer, RenderCore::FFrameGraphTextureRef gbufferB,
+            RenderCore::FFrameGraphTextureRef sceneDepth, u32 width, u32 height,
+            Deferred::FDeferredSsaoPassInputs& outInputs) -> bool {
+            if (device == nullptr || !EnsureSsaoPipeline(*device, resources)
+                || !resources.SsaoLayout || !resources.SsaoPipeline || !resources.OutputSampler) {
+                return false;
+            }
+
+            outInputs.Graph               = &graph;
+            outInputs.ViewRect            = &viewRect;
+            outInputs.PerFrameConstants   = &perFrameConstants;
+            outInputs.Pipeline            = resources.SsaoPipeline.Get();
+            outInputs.Layout              = resources.SsaoLayout.Get();
+            outInputs.Sampler             = resources.OutputSampler.Get();
+            outInputs.Bindings            = &resources.SsaoBindings;
+            outInputs.PerFrameBuffer      = perFrameBuffer;
+            outInputs.SsaoConstantsBuffer = ssaoConstantsBuffer;
+            outInputs.GBufferB            = gbufferB;
+            outInputs.SceneDepth          = sceneDepth;
+            outInputs.Width               = width;
+            outInputs.Height              = height;
+
+            outInputs.RuntimeSettings.Enable = (rSsaoEnable.GetRenderValue() != 0) ? 1U : 0U;
+            outInputs.RuntimeSettings.SampleCount =
+                static_cast<u32>(Core::Math::Max(0, rSsaoSampleCount.GetRenderValue()));
+            outInputs.RuntimeSettings.RadiusVS  = rSsaoRadiusVS.GetRenderValue();
+            outInputs.RuntimeSettings.BiasNdc   = rSsaoBiasNdc.GetRenderValue();
+            outInputs.RuntimeSettings.Power     = rSsaoPower.GetRenderValue();
+            outInputs.RuntimeSettings.Intensity = rSsaoIntensity.GetRenderValue();
+            return true;
+        }
+
+        [[nodiscard]] auto BuildDeferredLightingPassInputs(RenderCore::FFrameGraph& graph,
+            Rhi::FRhiDevice* device, FDeferredSharedResources& resources,
+            const RenderCore::View::FViewRect& viewRect,
+            const FPerFrameConstants& perFrameConstants, const FRenderViewContext& viewContext,
+            Rhi::FRhiBuffer* perFrameBuffer, Rhi::FRhiBuffer* iblConstantsBuffer,
+            RenderCore::FFrameGraphTextureRef gbufferA, RenderCore::FFrameGraphTextureRef gbufferB,
+            RenderCore::FFrameGraphTextureRef gbufferC,
+            RenderCore::FFrameGraphTextureRef sceneDepth,
+            RenderCore::FFrameGraphTextureRef ssaoTexture,
+            RenderCore::FFrameGraphTextureRef shadowMap, u32 width, u32 height,
+            Deferred::FDeferredLightingPassInputs& outInputs) -> bool {
+            if (device == nullptr || !EnsureLightingPipeline(*device, resources)
+                || !resources.LightingLayout || !resources.LightingPipeline
+                || !resources.OutputSampler) {
+                return false;
+            }
+
+            outInputs.Graph              = &graph;
+            outInputs.ViewRect           = &viewRect;
+            outInputs.PerFrameConstants  = &perFrameConstants;
+            outInputs.Pipeline           = resources.LightingPipeline.Get();
+            outInputs.Layout             = resources.LightingLayout.Get();
+            outInputs.Sampler            = resources.OutputSampler.Get();
+            outInputs.Bindings           = &resources.LightingBindings;
+            outInputs.PerFrameBuffer     = perFrameBuffer;
+            outInputs.IblConstantsBuffer = iblConstantsBuffer;
+            outInputs.GBufferA           = gbufferA;
+            outInputs.GBufferB           = gbufferB;
+            outInputs.GBufferC           = gbufferC;
+            outInputs.SceneDepth         = sceneDepth;
+            outInputs.SsaoTexture        = ssaoTexture;
+            outInputs.ShadowMap          = shadowMap;
+            outInputs.Width              = width;
+            outInputs.Height             = height;
+            outInputs.SkyIrradiance      = viewContext.SkyIrradianceCube;
+            outInputs.SkySpecular        = viewContext.SkySpecularCube;
+            outInputs.BrdfLut            = viewContext.BrdfLutTexture;
+            outInputs.IblBlackCube       = resources.IblBlackCube;
+            outInputs.IblBlack2D         = resources.IblBlack2D;
+
+            // Keep IBL disabled by default; runtime tuning can be enabled later.
+            outInputs.RuntimeSettings.bEnableIbl           = false;
+            outInputs.RuntimeSettings.IblDiffuseIntensity  = rIblDiffuseIntensity.GetRenderValue();
+            outInputs.RuntimeSettings.IblSpecularIntensity = rIblSpecularIntensity.GetRenderValue();
+            outInputs.RuntimeSettings.IblSaturation        = rIblSaturation.GetRenderValue();
+            outInputs.RuntimeSettings.SpecularMaxLod       = viewContext.SkySpecularMaxLod;
+            return true;
+        }
+
+        [[nodiscard]] auto BuildDeferredAtmosphereSkyPassInputs(RenderCore::FFrameGraph& graph,
+            Rhi::FRhiDevice* device, FDeferredSharedResources& resources,
+            const RenderCore::View::FViewRect& viewRect, const FRenderViewContext& viewContext,
+            Rhi::FRhiBuffer* perFrameBuffer, RenderCore::FFrameGraphTextureRef sceneDepth,
+            RenderCore::FFrameGraphTextureRef           sceneColorHDR,
+            Deferred::FDeferredAtmosphereSkyPassInputs& outInputs) -> bool {
+            if (!viewContext.bHasAtmosphereSky || (viewContext.AtmosphereParamsBuffer == nullptr)
+                || !viewContext.AtmosphereTransmittanceLut || !viewContext.AtmosphereScatteringLut
+                || !viewContext.AtmosphereSingleMieScatteringLut || !sceneColorHDR.IsValid()
+                || !sceneDepth.IsValid() || device == nullptr || !resources.AtmosphereSkyLayout
+                || !EnsureAtmosphereSkyPipeline(*device, resources)
+                || !resources.AtmosphereSkyPipeline || !resources.OutputSampler) {
+                return false;
+            }
+
+            outInputs.Graph                  = &graph;
+            outInputs.ViewRect               = &viewRect;
+            outInputs.Pipeline               = resources.AtmosphereSkyPipeline.Get();
+            outInputs.Layout                 = resources.AtmosphereSkyLayout.Get();
+            outInputs.Sampler                = resources.OutputSampler.Get();
+            outInputs.Bindings               = &resources.AtmosphereSkyBindings;
+            outInputs.PerFrameBuffer         = perFrameBuffer;
+            outInputs.AtmosphereParamsBuffer = viewContext.AtmosphereParamsBuffer;
+            outInputs.TransmittanceLut       = viewContext.AtmosphereTransmittanceLut;
+            outInputs.ScatteringLut          = viewContext.AtmosphereScatteringLut;
+            outInputs.SingleMieScatteringLut = viewContext.AtmosphereSingleMieScatteringLut;
+            outInputs.SceneDepth             = sceneDepth;
+            outInputs.SceneColorHDR          = sceneColorHDR;
+            return true;
+        }
+
+        [[nodiscard]] auto BuildDeferredSkyBoxPassInputs(RenderCore::FFrameGraph& graph,
+            Rhi::FRhiDevice* device, FDeferredSharedResources& resources,
+            const RenderCore::View::FViewRect& viewRect, const FRenderViewContext& viewContext,
+            Rhi::FRhiBuffer* perFrameBuffer, RenderCore::FFrameGraphTextureRef sceneDepth,
+            RenderCore::FFrameGraphTextureRef    sceneColorHDR,
+            Deferred::FDeferredSkyBoxPassInputs& outInputs) -> bool {
+            if (!viewContext.bHasSkyCube || !viewContext.SkyCubeTexture || !sceneColorHDR.IsValid()
+                || !sceneDepth.IsValid() || device == nullptr || !resources.SkyBoxLayout
+                || !EnsureSkyBoxPipeline(*device, resources) || !resources.SkyBoxPipeline
+                || !resources.OutputSampler) {
+                return false;
+            }
+
+            outInputs.Graph          = &graph;
+            outInputs.ViewRect       = &viewRect;
+            outInputs.Pipeline       = resources.SkyBoxPipeline.Get();
+            outInputs.Layout         = resources.SkyBoxLayout.Get();
+            outInputs.Sampler        = resources.OutputSampler.Get();
+            outInputs.Bindings       = &resources.SkyBoxBindings;
+            outInputs.PerFrameBuffer = perFrameBuffer;
+            outInputs.SkyCube        = viewContext.SkyCubeTexture;
+            outInputs.SceneDepth     = sceneDepth;
+            outInputs.SceneColorHDR  = sceneColorHDR;
+            return true;
+        }
+
+        [[nodiscard]] auto BuildDefaultPostProcessStack() -> FPostProcessStack {
+            FPostProcessStack stack{};
+            stack.bEnable = (rPostProcessEnable.GetRenderValue() != 0);
+
+            const bool bEnableTaa = (rPostProcessTaa.GetRenderValue() != 0);
+            if (bEnableTaa) {
+                FPostProcessNode node{};
+                node.EffectId.Assign(TEXT("TAA"));
+                node.bEnabled = true;
+                node.Params[FString(TEXT("Alpha"))] =
+                    FPostProcessParamValue(rPostProcessTaaAlpha.GetRenderValue());
+                node.Params[FString(TEXT("ClampK"))] =
+                    FPostProcessParamValue(rPostProcessTaaClampK.GetRenderValue());
+                stack.Stack.PushBack(Move(node));
+            }
+
+            if (rPostProcessBloom.GetRenderValue() != 0) {
+                FPostProcessNode node{};
+                node.EffectId.Assign(TEXT("Bloom"));
+                node.bEnabled = true;
+                node.Params[FString(TEXT("Threshold"))] =
+                    FPostProcessParamValue(rPostProcessBloomThreshold.GetRenderValue());
+                node.Params[FString(TEXT("Knee"))] =
+                    FPostProcessParamValue(rPostProcessBloomKnee.GetRenderValue());
+                node.Params[FString(TEXT("Intensity"))] =
+                    FPostProcessParamValue(rPostProcessBloomIntensity.GetRenderValue());
+                node.Params[FString(TEXT("KawaseOffset"))] =
+                    FPostProcessParamValue(rPostProcessBloomKawaseOffset.GetRenderValue());
+                node.Params[FString(TEXT("Iterations"))] =
+                    FPostProcessParamValue(rPostProcessBloomIterations.GetRenderValue());
+                node.Params[FString(TEXT("FirstDownsampleLumaWeight"))] = FPostProcessParamValue(
+                    rPostProcessBloomFirstDownsampleLumaWeight.GetRenderValue());
+                stack.Stack.PushBack(Move(node));
+            }
+
+            if (rPostProcessTonemap.GetRenderValue() != 0) {
+                FPostProcessNode node{};
+                node.EffectId.Assign(TEXT("Tonemap"));
+                node.bEnabled                          = true;
+                node.Params[FString(TEXT("Exposure"))] = FPostProcessParamValue(1.0f);
+                node.Params[FString(TEXT("Gamma"))]    = FPostProcessParamValue(2.2f);
+                stack.Stack.PushBack(Move(node));
+            }
+
+            if (!bEnableTaa && rPostProcessFxaa.GetRenderValue() != 0) {
+                FPostProcessNode node{};
+                node.EffectId.Assign(TEXT("Fxaa"));
+                node.bEnabled = true;
+                node.Params[FString(TEXT("EdgeThreshold"))] =
+                    FPostProcessParamValue(rPostProcessFxaaEdgeThreshold.GetRenderValue());
+                node.Params[FString(TEXT("EdgeThresholdMin"))] =
+                    FPostProcessParamValue(rPostProcessFxaaEdgeThresholdMin.GetRenderValue());
+                node.Params[FString(TEXT("Subpix"))] =
+                    FPostProcessParamValue(rPostProcessFxaaSubpix.GetRenderValue());
+                stack.Stack.PushBack(Move(node));
+            }
+
+            return stack;
+        }
+
+        void BuildDeferredPerFrameConstants(const RenderCore::View::FViewData& view,
+            const RenderCore::Lighting::FLightSceneData*                       lights,
+            const Deferred::FCsmBuildResult& csm, FPerFrameConstants& outPerFrameConstants) {
+            outPerFrameConstants.ViewProjection = view.Matrices.ViewProjJittered;
+            outPerFrameConstants.View           = view.Matrices.View;
+            outPerFrameConstants.Proj           = view.Matrices.ProjJittered;
+            outPerFrameConstants.ViewProj       = view.Matrices.ViewProjJittered;
+            outPerFrameConstants.InvViewProj    = view.Matrices.InvViewProjJittered;
+
+            outPerFrameConstants.ViewOriginWS[0]  = view.ViewOrigin[0];
+            outPerFrameConstants.ViewOriginWS[1]  = view.ViewOrigin[1];
+            outPerFrameConstants.ViewOriginWS[2]  = view.ViewOrigin[2];
+            outPerFrameConstants.bReverseZ        = view.bReverseZ ? 1U : 0U;
+            outPerFrameConstants.DebugShadingMode = gDeferredLightingDebugShadingMode;
+
+            const f32 w = static_cast<f32>(view.RenderTargetExtent.Width);
+            const f32 h = static_cast<f32>(view.RenderTargetExtent.Height);
+            outPerFrameConstants.RenderTargetSize[0]    = w;
+            outPerFrameConstants.RenderTargetSize[1]    = h;
+            outPerFrameConstants.InvRenderTargetSize[0] = (w > 0.0f) ? (1.0f / w) : 0.0f;
+            outPerFrameConstants.InvRenderTargetSize[1] = (h > 0.0f) ? (1.0f / h) : 0.0f;
+
+            RenderCore::Lighting::FDirectionalLight dir{};
+            if (lights != nullptr && lights->mHasMainDirectionalLight) {
+                dir = lights->mMainDirectionalLight;
+            } else {
+                dir.mDirectionWS = FVector3f(0.4f, 0.6f, 0.7f);
+                dir.mColor       = FVector3f(1.0f, 1.0f, 1.0f);
+                dir.mIntensity   = 2.0f;
+                dir.mCastShadows = false;
+            }
+
+            outPerFrameConstants.DirLightDirectionWS[0] = dir.mDirectionWS[0];
+            outPerFrameConstants.DirLightDirectionWS[1] = dir.mDirectionWS[1];
+            outPerFrameConstants.DirLightDirectionWS[2] = dir.mDirectionWS[2];
+            outPerFrameConstants.DirLightColor[0]       = dir.mColor[0];
+            outPerFrameConstants.DirLightColor[1]       = dir.mColor[1];
+            outPerFrameConstants.DirLightColor[2]       = dir.mColor[2];
+            outPerFrameConstants.DirLightIntensity      = dir.mIntensity;
+
+            outPerFrameConstants.PointLightCount = 0U;
+            if (lights != nullptr && !lights->mPointLights.IsEmpty()) {
+                const u32 count = static_cast<u32>(lights->mPointLights.Size());
+                const u32 clamped =
+                    (count > Deferred::kMaxPointLights) ? Deferred::kMaxPointLights : count;
+                outPerFrameConstants.PointLightCount = clamped;
+                for (u32 i = 0U; i < clamped; ++i) {
+                    const auto& src                                   = lights->mPointLights[i];
+                    outPerFrameConstants.PointLights[i].PositionWS[0] = src.mPositionWS[0];
+                    outPerFrameConstants.PointLights[i].PositionWS[1] = src.mPositionWS[1];
+                    outPerFrameConstants.PointLights[i].PositionWS[2] = src.mPositionWS[2];
+                    outPerFrameConstants.PointLights[i].Range         = src.mRange;
+                    outPerFrameConstants.PointLights[i].Color[0]      = src.mColor[0];
+                    outPerFrameConstants.PointLights[i].Color[1]      = src.mColor[1];
+                    outPerFrameConstants.PointLights[i].Color[2]      = src.mColor[2];
+                    outPerFrameConstants.PointLights[i].Intensity     = src.mIntensity;
+                }
+            }
+
+            Deferred::FillPerFrameCsmConstants(csm, outPerFrameConstants);
+        }
+
         struct FShadowCascadeExecuteContext {
             const RenderCore::Render::FDrawList* ShadowDrawLists[4] = {};
             FDrawListBindings                    DrawBindings{};
@@ -1396,6 +1660,66 @@ namespace AltinaEngine::Rendering {
         gDeferredLightingDebugShadingMode = bEnabled ? 1U : 0U;
     }
 
+    void FBasicDeferredRenderer::SetViewContext(const FRenderViewContext& context) {
+        FBaseRenderer::SetViewContext(context);
+        mGraphOutputs = {};
+    }
+
+    void FBasicDeferredRenderer::RegisterBuiltinPasses() {
+        FRendererPassRegistration gbufferPass{};
+        gbufferPass.mPassId.Assign(TEXT("Deferred.GBufferBase"));
+        gbufferPass.mPassSet = ERendererPassSet::DeferredBase;
+        gbufferPass.mExecute = [this](RenderCore::FFrameGraph& graph) {
+            RegisterDeferredGBufferBasePass(graph);
+        };
+        RegisterPassToSet(gbufferPass);
+
+        FRendererPassRegistration shadowPass{};
+        shadowPass.mPassId.Assign(TEXT("Deferred.CsmShadow"));
+        shadowPass.mPassSet = ERendererPassSet::Shadow;
+        shadowPass.mExecute = [this](RenderCore::FFrameGraph& graph) {
+            RegisterDeferredShadowPass(graph);
+        };
+        RegisterPassToSet(shadowPass);
+
+        FRendererPassRegistration ssaoPass{};
+        ssaoPass.mPassId.Assign(TEXT("Deferred.Ssao"));
+        ssaoPass.mPassSet     = ERendererPassSet::DeferredBase;
+        ssaoPass.mAnchorOrder = ERendererPassAnchorOrder::After;
+        ssaoPass.mAnchorPassId.Assign(TEXT("Deferred.GBufferBase"));
+        ssaoPass.mExecute = [this](RenderCore::FFrameGraph& graph) {
+            RegisterDeferredSsaoPass(graph);
+        };
+        RegisterPassToSet(ssaoPass);
+
+        FRendererPassRegistration lightingPass{};
+        lightingPass.mPassId.Assign(TEXT("Deferred.Lighting"));
+        lightingPass.mPassSet     = ERendererPassSet::DeferredBase;
+        lightingPass.mAnchorOrder = ERendererPassAnchorOrder::After;
+        lightingPass.mAnchorPassId.Assign(TEXT("Deferred.Ssao"));
+        lightingPass.mExecute = [this](RenderCore::FFrameGraph& graph) {
+            RegisterDeferredLightingPass(graph);
+        };
+        RegisterPassToSet(lightingPass);
+
+        FRendererPassRegistration skyPass{};
+        skyPass.mPassId.Assign(TEXT("Deferred.Sky"));
+        skyPass.mPassSet     = ERendererPassSet::DeferredBase;
+        skyPass.mAnchorOrder = ERendererPassAnchorOrder::After;
+        skyPass.mAnchorPassId.Assign(TEXT("Deferred.Lighting"));
+        skyPass.mExecute = [this](
+                               RenderCore::FFrameGraph& graph) { RegisterDeferredSkyPass(graph); };
+        RegisterPassToSet(skyPass);
+
+        FRendererPassRegistration postProcessPass{};
+        postProcessPass.mPassId.Assign(TEXT("Deferred.PostProcess"));
+        postProcessPass.mPassSet = ERendererPassSet::PostProcess;
+        postProcessPass.mExecute = [this](RenderCore::FFrameGraph& graph) {
+            RegisterDeferredPostProcessPass(graph);
+        };
+        RegisterPassToSet(postProcessPass);
+    }
+
     void FBasicDeferredRenderer::PrepareForRendering(Rhi::FRhiDevice& device) {
         auto& resources = GetSharedResources();
         EnsureDefaultTemplate(resources);
@@ -1524,7 +1848,7 @@ namespace AltinaEngine::Rendering {
                 mPerDrawCapacity, mPerDrawGroups);
         }
     }
-    void FBasicDeferredRenderer::Render(RenderCore::FFrameGraph& graph) {
+    void FBasicDeferredRenderer::RegisterDeferredGBufferBasePass(RenderCore::FFrameGraph& graph) {
         ResetBasePassPipelineStats();
 
         const auto* view         = mViewContext.View;
@@ -1563,14 +1887,9 @@ namespace AltinaEngine::Rendering {
             UpdateConstantBuffer(mPerFrameBuffer.Get(), &constants, sizeof(constants));
         }
 
-        constexpr Rhi::FRhiClearColor     kAlbedoClear{ 0.12f, 0.12f, 0.12f, 1.0f };
-        constexpr Rhi::FRhiClearColor     kNormalClear{ 0.5f, 0.5f, 1.0f, 1.0f };
-        constexpr Rhi::FRhiClearColor     kEmissiveClear{ 0.0f, 0.0f, 0.0f, 1.0f };
-
-        RenderCore::FFrameGraphTextureRef gbufferA;
-        RenderCore::FFrameGraphTextureRef gbufferB;
-        RenderCore::FFrameGraphTextureRef gbufferC;
-        RenderCore::FFrameGraphTextureRef sceneDepth;
+        constexpr Rhi::FRhiClearColor kAlbedoClear{ 0.12f, 0.12f, 0.12f, 1.0f };
+        constexpr Rhi::FRhiClearColor kNormalClear{ 0.5f, 0.5f, 1.0f, 1.0f };
+        constexpr Rhi::FRhiClearColor kEmissiveClear{ 0.0f, 0.0f, 0.0f, 1.0f };
 
         struct FBasePassData {
             RenderCore::FFrameGraphTextureRef GBufferA;
@@ -1593,9 +1912,7 @@ namespace AltinaEngine::Rendering {
         const auto* lights    = mViewContext.Lights;
         Assert(device != nullptr, TEXT("BasicDeferredRenderer"),
             "Render failed: RHI device is null while preparing instance buffer.");
-        if (device == nullptr) {
-            return;
-        }
+
         Deferred::FCsmBuildInputs csmInputs{};
         csmInputs.View                      = view;
         csmInputs.Lights                    = lights;
@@ -1604,12 +1921,10 @@ namespace AltinaEngine::Rendering {
         u32                             requiredPerDrawInstances = 0U;
         const u32                       basePassInstanceCount    = CountDrawListInstances(drawList);
         requiredPerDrawInstances += basePassInstanceCount;
-        TArray<u32, 4U> shadowPassFirstInstance{};
-        u32             accumulatedFirstInstance = basePassInstanceCount;
+        u32 accumulatedFirstInstance = basePassInstanceCount;
         for (u32 cascadeIndex = 0U; cascadeIndex < csm.Data.mCascadeCount
             && cascadeIndex < RenderCore::Shadow::kMaxCascades;
             ++cascadeIndex) {
-            shadowPassFirstInstance[cascadeIndex] = accumulatedFirstInstance;
             const u32 cascadeInstanceCount =
                 CountDrawListInstances(mViewContext.ShadowDrawLists[cascadeIndex]);
             requiredPerDrawInstances += cascadeInstanceCount;
@@ -1821,10 +2136,10 @@ namespace AltinaEngine::Rendering {
 
                 builder.SetRenderTargets(rtvs, 3U, &depthBinding);
 
-                gbufferA   = data.GBufferA;
-                gbufferB   = data.GBufferB;
-                gbufferC   = data.GBufferC;
-                sceneDepth = data.Depth;
+                mGraphOutputs.mGBufferA   = data.GBufferA;
+                mGraphOutputs.mGBufferB   = data.GBufferB;
+                mGraphOutputs.mGBufferC   = data.GBufferC;
+                mGraphOutputs.mSceneDepth = data.Depth;
             },
             [drawList, drawBindings, pipelineData, bindingData, viewRect](Rhi::FRhiCmdContext& ctx,
                 const RenderCore::FFrameGraphPassResources&, const FBasePassData&) -> void {
@@ -1851,7 +2166,104 @@ namespace AltinaEngine::Rendering {
                         BindPerDraw, const_cast<FBasePassBindingData*>(&bindingData));
                 }
             });
-        RenderCore::FFrameGraphTextureRef shadowMap;
+    }
+
+    void FBasicDeferredRenderer::RegisterDeferredShadowPass(RenderCore::FFrameGraph& graph) {
+        const auto* view         = mViewContext.View;
+        auto*       outputTarget = mViewContext.OutputTarget;
+        const auto* drawList     = mViewContext.DrawList;
+        if (view == nullptr || outputTarget == nullptr) {
+            Assert(false, TEXT("BasicDeferredRenderer"),
+                "Render skipped: view/output target is null (view={}, outputTarget={}).",
+                static_cast<int>(view ? 1 : 0), static_cast<int>(outputTarget ? 1 : 0));
+            return;
+        }
+
+        Assert(view->IsValid(), TEXT("BasicDeferredRenderer"), "Render skipped: view is invalid.");
+        const u32 width  = view->RenderTargetExtent.Width;
+        const u32 height = view->RenderTargetExtent.Height;
+        Assert(width > 0U && height > 0U, TEXT("BasicDeferredRenderer"),
+            "Render skipped: render extent is invalid {}x{}.", static_cast<u32>(width),
+            static_cast<u32>(height));
+
+        auto&       resources = GetSharedResources();
+        auto*       device    = Rhi::RHIGetDevice();
+        const auto* lights    = mViewContext.Lights;
+        Assert(device != nullptr, TEXT("BasicDeferredRenderer"),
+            "Render failed: RHI device is null while preparing shadow pass.");
+
+        Deferred::FCsmBuildInputs csmInputs{};
+        csmInputs.View                      = view;
+        csmInputs.Lights                    = lights;
+        const Deferred::FCsmBuildResult csm = Deferred::BuildCsm(csmInputs);
+
+        const u32                       basePassInstanceCount    = CountDrawListInstances(drawList);
+        u32                             requiredPerDrawInstances = basePassInstanceCount;
+        TArray<u32, 4U>                 shadowPassFirstInstance{};
+        u32                             accumulatedFirstInstance = basePassInstanceCount;
+        for (u32 cascadeIndex = 0U; cascadeIndex < csm.Data.mCascadeCount
+            && cascadeIndex < RenderCore::Shadow::kMaxCascades;
+            ++cascadeIndex) {
+            shadowPassFirstInstance[cascadeIndex] = accumulatedFirstInstance;
+            const u32 cascadeInstanceCount =
+                CountDrawListInstances(mViewContext.ShadowDrawLists[cascadeIndex]);
+            requiredPerDrawInstances += cascadeInstanceCount;
+            accumulatedFirstInstance += cascadeInstanceCount;
+        }
+        if (requiredPerDrawInstances > mPerDrawCapacity) {
+            u32 grownCapacity = (mPerDrawCapacity > 0U) ? mPerDrawCapacity : 1U;
+            while (grownCapacity < requiredPerDrawInstances) {
+                grownCapacity *= 2U;
+            }
+
+            mPerDrawCapacity = grownCapacity;
+            for (auto& group : mPerDrawGroups) {
+                group.Reset();
+            }
+            mPerDrawBuffer.Reset();
+
+            Rhi::FRhiBufferDesc desc{};
+            desc.mDebugName.Assign(TEXT("Deferred.PerDraw"));
+            desc.mSizeBytes = static_cast<u64>(mPerDrawStrideBytes)
+                * static_cast<u64>(mPerDrawCapacity)
+                * static_cast<u64>(IsVulkanBackend() ? kInstanceFrameRing : 1U);
+            desc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
+                                                : Rhi::ERhiResourceUsage::Default;
+            desc.mBindFlags = Rhi::ERhiBufferBindFlags::ShaderResource;
+            desc.mCpuAccess =
+                IsVulkanBackend() ? Rhi::ERhiCpuAccess::Write : Rhi::ERhiCpuAccess::None;
+            mPerDrawBuffer = device->CreateBuffer(desc);
+            if (mPerDrawBuffer && resources.PerDrawLayout) {
+                RebuildPerDrawBindGroups(*device, resources, mPerDrawBuffer.Get(),
+                    mPerDrawStrideBytes, mPerDrawCapacity, mPerDrawGroups);
+            }
+        }
+
+        FDrawListBindings drawBindings{};
+        drawBindings.PerDraw  = mPerDrawGroups[mPerDrawFrameSlot].Get();
+        drawBindings.PerFrame = mPerFrameGroup.Get();
+        drawBindings.PerFrameSetIndex =
+            resources.PerFrameLayout ? resources.PerFrameLayout->GetDesc().mSetIndex : 0U;
+        drawBindings.PerDrawSetIndex =
+            resources.PerDrawLayout ? resources.PerDrawLayout->GetDesc().mSetIndex : 0U;
+        drawBindings.PerMaterialSetIndex  = IsVulkanBackend() ? 2U : 0U;
+        drawBindings.ResolvedVertexLayout = &resources.BaseVertexLayout;
+
+        FBasePassPipelineData pipelineData{};
+        pipelineData.Device          = device;
+        pipelineData.Registry        = &resources.Registry;
+        pipelineData.PipelineCache   = &resources.BasePipelines;
+        pipelineData.DefaultPassDesc = &resources.DefaultPassDesc;
+        pipelineData.VertexLayout    = resources.BaseVertexLayout;
+
+        FBasePassBindingData bindingData{};
+        bindingData.PerDrawBuffer          = mPerDrawBuffer.Get();
+        bindingData.PerDrawStrideBytes     = mPerDrawStrideBytes;
+        bindingData.PerDrawCapacity        = mPerDrawCapacity;
+        bindingData.PerDrawBaseOffsetBytes = static_cast<u64>(mPerDrawFrameSlot)
+            * static_cast<u64>(mPerDrawCapacity) * static_cast<u64>(mPerDrawStrideBytes);
+        bindingData.PerDrawCursorInstances = 0U;
+        bindingData.bUseInstanceCursor     = IsVulkanBackend();
 
         // TODO: Refactor: realtime shadow rendering should be disentangled from a specific
         // renderer. For the logic is shared for forwarded and deferred renderers.
@@ -1950,265 +2362,150 @@ namespace AltinaEngine::Rendering {
             };
             shadowInputs.ExecuteCascadeUserData = &executeCtx;
 
-            Deferred::AddCsmShadowPasses(shadowInputs, shadowMap);
+            Deferred::AddCsmShadowPasses(shadowInputs, mGraphOutputs.mShadowMap);
+        }
+    }
+
+    void FBasicDeferredRenderer::RegisterDeferredSsaoPass(RenderCore::FFrameGraph& graph) {
+        const auto* view         = mViewContext.View;
+        auto*       outputTarget = mViewContext.OutputTarget;
+        if (view == nullptr || outputTarget == nullptr) {
+            Assert(false, TEXT("BasicDeferredRenderer"),
+                "Render skipped: view/output target is null (view={}, outputTarget={}).",
+                static_cast<int>(view ? 1 : 0), static_cast<int>(outputTarget ? 1 : 0));
+            return;
+        }
+        if (!mGraphOutputs.mGBufferB.IsValid() || !mGraphOutputs.mSceneDepth.IsValid()) {
+            return;
         }
 
-        // Fill shared per-frame constants once (used by SSAO and deferred lighting).
-        FPerFrameConstants perFrameConstants{};
-        {
-            perFrameConstants.ViewProjection = view->Matrices.ViewProjJittered;
-            perFrameConstants.View           = view->Matrices.View;
-            perFrameConstants.Proj           = view->Matrices.ProjJittered;
-            perFrameConstants.ViewProj       = view->Matrices.ViewProjJittered;
-            perFrameConstants.InvViewProj    = view->Matrices.InvViewProjJittered;
+        auto*       device    = Rhi::RHIGetDevice();
+        auto&       resources = GetSharedResources();
+        const auto* lights    = mViewContext.Lights;
+        if (device == nullptr) {
+            return;
+        }
 
-            perFrameConstants.ViewOriginWS[0]  = view->ViewOrigin[0];
-            perFrameConstants.ViewOriginWS[1]  = view->ViewOrigin[1];
-            perFrameConstants.ViewOriginWS[2]  = view->ViewOrigin[2];
-            perFrameConstants.bReverseZ        = view->bReverseZ ? 1U : 0U;
-            perFrameConstants.DebugShadingMode = gDeferredLightingDebugShadingMode;
+        Deferred::FCsmBuildInputs csmInputs{};
+        csmInputs.View                      = view;
+        csmInputs.Lights                    = lights;
+        const Deferred::FCsmBuildResult csm = Deferred::BuildCsm(csmInputs);
 
-            const f32 w = static_cast<f32>(view->RenderTargetExtent.Width);
-            const f32 h = static_cast<f32>(view->RenderTargetExtent.Height);
-            perFrameConstants.RenderTargetSize[0]    = w;
-            perFrameConstants.RenderTargetSize[1]    = h;
-            perFrameConstants.InvRenderTargetSize[0] = (w > 0.0f) ? (1.0f / w) : 0.0f;
-            perFrameConstants.InvRenderTargetSize[1] = (h > 0.0f) ? (1.0f / h) : 0.0f;
+        FPerFrameConstants              perFrameConstants{};
+        BuildDeferredPerFrameConstants(*view, lights, csm, perFrameConstants);
 
-            // Lighting inputs.
-            RenderCore::Lighting::FDirectionalLight dir{};
-            if (lights != nullptr && lights->mHasMainDirectionalLight) {
-                dir = lights->mMainDirectionalLight;
+        Deferred::FDeferredSsaoPassInputs ssaoInputs{};
+        const auto                        viewRect = view->ViewRect;
+        const u32                         width    = view->RenderTargetExtent.Width;
+        const u32                         height   = view->RenderTargetExtent.Height;
+        if (BuildDeferredSsaoPassInputs(graph, device, resources, viewRect, perFrameConstants,
+                mPerFrameBuffer.Get(), mSsaoConstantsBuffer.Get(), mGraphOutputs.mGBufferB,
+                mGraphOutputs.mSceneDepth, width, height, ssaoInputs)) {
+            Deferred::AddDeferredSsaoPass(ssaoInputs, mGraphOutputs.mSsaoTexture);
+        }
+    }
+
+    void FBasicDeferredRenderer::RegisterDeferredLightingPass(RenderCore::FFrameGraph& graph) {
+        const auto* view         = mViewContext.View;
+        auto*       outputTarget = mViewContext.OutputTarget;
+        if (view == nullptr || outputTarget == nullptr) {
+            Assert(false, TEXT("BasicDeferredRenderer"),
+                "Render skipped: view/output target is null (view={}, outputTarget={}).",
+                static_cast<int>(view ? 1 : 0), static_cast<int>(outputTarget ? 1 : 0));
+            return;
+        }
+        if (!mGraphOutputs.mGBufferA.IsValid() || !mGraphOutputs.mGBufferB.IsValid()
+            || !mGraphOutputs.mGBufferC.IsValid() || !mGraphOutputs.mSceneDepth.IsValid()) {
+            return;
+        }
+
+        auto*       device    = Rhi::RHIGetDevice();
+        auto&       resources = GetSharedResources();
+        const auto* lights    = mViewContext.Lights;
+        if (device == nullptr) {
+            return;
+        }
+
+        Deferred::FCsmBuildInputs csmInputs{};
+        csmInputs.View                      = view;
+        csmInputs.Lights                    = lights;
+        const Deferred::FCsmBuildResult csm = Deferred::BuildCsm(csmInputs);
+
+        FPerFrameConstants              perFrameConstants{};
+        BuildDeferredPerFrameConstants(*view, lights, csm, perFrameConstants);
+        const auto viewRect = view->ViewRect;
+        const u32  width    = view->RenderTargetExtent.Width;
+        const u32  height   = view->RenderTargetExtent.Height;
+
+        EnsureLayouts(*device, resources);
+        Deferred::FDeferredLightingPassInputs lightingInputs{};
+        if (BuildDeferredLightingPassInputs(graph, device, resources, viewRect, perFrameConstants,
+                mViewContext, mPerFrameBuffer.Get(), mIblConstantsBuffer.Get(),
+                mGraphOutputs.mGBufferA, mGraphOutputs.mGBufferB, mGraphOutputs.mGBufferC,
+                mGraphOutputs.mSceneDepth, mGraphOutputs.mSsaoTexture, mGraphOutputs.mShadowMap,
+                width, height, lightingInputs)) {
+            Deferred::AddDeferredLightingPass(lightingInputs, mGraphOutputs.mSceneColorHdr);
+        } else {
+            DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                "DeferredLighting skipped: shared pipeline/layout/sampler missing.");
+        }
+    }
+
+    void FBasicDeferredRenderer::RegisterDeferredSkyPass(RenderCore::FFrameGraph& graph) {
+        const auto* view         = mViewContext.View;
+        auto*       outputTarget = mViewContext.OutputTarget;
+        if (view == nullptr || outputTarget == nullptr) {
+            Assert(false, TEXT("BasicDeferredRenderer"),
+                "Render skipped: view/output target is null (view={}, outputTarget={}).",
+                static_cast<int>(view ? 1 : 0), static_cast<int>(outputTarget ? 1 : 0));
+            return;
+        }
+
+        auto* device = Rhi::RHIGetDevice();
+        if (device != nullptr) {
+            auto& resources = GetSharedResources();
+            EnsureLayouts(*device, resources);
+            const auto                                 viewRect = view->ViewRect;
+
+            Deferred::FDeferredAtmosphereSkyPassInputs atmosphereInputs{};
+            if (BuildDeferredAtmosphereSkyPassInputs(graph, device, resources, viewRect,
+                    mViewContext, mPerFrameBuffer.Get(), mGraphOutputs.mSceneDepth,
+                    mGraphOutputs.mSceneColorHdr, atmosphereInputs)) {
+                Deferred::AddDeferredAtmosphereSkyPass(atmosphereInputs);
             } else {
-                dir.mDirectionWS = FVector3f(0.4f, 0.6f, 0.7f);
-                dir.mColor       = FVector3f(1.0f, 1.0f, 1.0f);
-                dir.mIntensity   = 2.0f;
-                dir.mCastShadows = false;
-            }
-
-            perFrameConstants.DirLightDirectionWS[0] = dir.mDirectionWS[0];
-            perFrameConstants.DirLightDirectionWS[1] = dir.mDirectionWS[1];
-            perFrameConstants.DirLightDirectionWS[2] = dir.mDirectionWS[2];
-            perFrameConstants.DirLightColor[0]       = dir.mColor[0];
-            perFrameConstants.DirLightColor[1]       = dir.mColor[1];
-            perFrameConstants.DirLightColor[2]       = dir.mColor[2];
-            perFrameConstants.DirLightIntensity      = dir.mIntensity;
-
-            // Point lights.
-            perFrameConstants.PointLightCount = 0U;
-            if (lights != nullptr && !lights->mPointLights.IsEmpty()) {
-                const u32 count = static_cast<u32>(lights->mPointLights.Size());
-                const u32 clamped =
-                    (count > Deferred::kMaxPointLights) ? Deferred::kMaxPointLights : count;
-                perFrameConstants.PointLightCount = clamped;
-                for (u32 i = 0U; i < clamped; ++i) {
-                    const auto& src                                = lights->mPointLights[i];
-                    perFrameConstants.PointLights[i].PositionWS[0] = src.mPositionWS[0];
-                    perFrameConstants.PointLights[i].PositionWS[1] = src.mPositionWS[1];
-                    perFrameConstants.PointLights[i].PositionWS[2] = src.mPositionWS[2];
-                    perFrameConstants.PointLights[i].Range         = src.mRange;
-                    perFrameConstants.PointLights[i].Color[0]      = src.mColor[0];
-                    perFrameConstants.PointLights[i].Color[1]      = src.mColor[1];
-                    perFrameConstants.PointLights[i].Color[2]      = src.mColor[2];
-                    perFrameConstants.PointLights[i].Intensity     = src.mIntensity;
+                Deferred::FDeferredSkyBoxPassInputs skyboxInputs{};
+                if (BuildDeferredSkyBoxPassInputs(graph, device, resources, viewRect, mViewContext,
+                        mPerFrameBuffer.Get(), mGraphOutputs.mSceneDepth,
+                        mGraphOutputs.mSceneColorHdr, skyboxInputs)) {
+                    Deferred::AddDeferredSkyBoxPass(skyboxInputs);
                 }
             }
-
-            Deferred::FillPerFrameCsmConstants(csm, perFrameConstants);
         }
+    }
 
-        RenderCore::FFrameGraphTextureRef ssaoTexture;
-
-        // TODO: Refactor: pipeline input preparations (for SSAO, lighting, ...) can be placed in
-        // a separate function to avoid bloating the main Render() function.
-        {
-            auto& shared = GetSharedResources();
-            if (device != nullptr && EnsureSsaoPipeline(*device, shared) && shared.SsaoLayout
-                && shared.SsaoPipeline && shared.OutputSampler) {
-                Deferred::FDeferredSsaoPassInputs ssaoInputs{};
-                ssaoInputs.Graph                  = &graph;
-                ssaoInputs.ViewRect               = &viewRect;
-                ssaoInputs.PerFrameConstants      = &perFrameConstants;
-                ssaoInputs.Pipeline               = shared.SsaoPipeline.Get();
-                ssaoInputs.Layout                 = shared.SsaoLayout.Get();
-                ssaoInputs.Sampler                = shared.OutputSampler.Get();
-                ssaoInputs.Bindings               = &shared.SsaoBindings;
-                ssaoInputs.PerFrameBuffer         = mPerFrameBuffer.Get();
-                ssaoInputs.SsaoConstantsBuffer    = mSsaoConstantsBuffer.Get();
-                ssaoInputs.GBufferB               = gbufferB;
-                ssaoInputs.SceneDepth             = sceneDepth;
-                ssaoInputs.Width                  = width;
-                ssaoInputs.Height                 = height;
-                ssaoInputs.RuntimeSettings.Enable = (rSsaoEnable.GetRenderValue() != 0) ? 1U : 0U;
-                ssaoInputs.RuntimeSettings.SampleCount =
-                    static_cast<u32>(Core::Math::Max(0, rSsaoSampleCount.GetRenderValue()));
-                ssaoInputs.RuntimeSettings.RadiusVS  = rSsaoRadiusVS.GetRenderValue();
-                ssaoInputs.RuntimeSettings.BiasNdc   = rSsaoBiasNdc.GetRenderValue();
-                ssaoInputs.RuntimeSettings.Power     = rSsaoPower.GetRenderValue();
-                ssaoInputs.RuntimeSettings.Intensity = rSsaoIntensity.GetRenderValue();
-
-                Deferred::AddDeferredSsaoPass(ssaoInputs, ssaoTexture);
-            }
+    void FBasicDeferredRenderer::RegisterDeferredPostProcessPass(RenderCore::FFrameGraph& graph) {
+        const auto* view         = mViewContext.View;
+        auto*       outputTarget = mViewContext.OutputTarget;
+        if (view == nullptr || outputTarget == nullptr) {
+            Assert(false, TEXT("BasicDeferredRenderer"),
+                "Render skipped: view/output target is null (view={}, outputTarget={}).",
+                static_cast<int>(view ? 1 : 0), static_cast<int>(outputTarget ? 1 : 0));
+            return;
         }
 
         const bool bBackbufferOutput =
             (mViewContext.OutputFinalState == Rhi::ERhiResourceState::Present);
-        auto                              outputTexture = bBackbufferOutput
-                                         ? graph.ImportTextureLegacy(outputTarget, mViewContext.OutputFinalState)
-                                         : graph.ImportTexture(Rhi::FRhiTextureRef(outputTarget), mViewContext.OutputFinalState);
-        RenderCore::FFrameGraphTextureRef sceneColorHDR;
-
-        if (device != nullptr) {
-            auto& shared = GetSharedResources();
-            EnsureLayouts(*device, shared);
-
-            if (EnsureLightingPipeline(*device, shared) && shared.LightingLayout
-                && shared.LightingPipeline && shared.OutputSampler) {
-                Deferred::FDeferredLightingPassInputs lightingInputs{};
-                lightingInputs.Graph                      = &graph;
-                lightingInputs.ViewRect                   = &viewRect;
-                lightingInputs.PerFrameConstants          = &perFrameConstants;
-                lightingInputs.Pipeline                   = shared.LightingPipeline.Get();
-                lightingInputs.Layout                     = shared.LightingLayout.Get();
-                lightingInputs.Sampler                    = shared.OutputSampler.Get();
-                lightingInputs.Bindings                   = &shared.LightingBindings;
-                lightingInputs.PerFrameBuffer             = mPerFrameBuffer.Get();
-                lightingInputs.IblConstantsBuffer         = mIblConstantsBuffer.Get();
-                lightingInputs.GBufferA                   = gbufferA;
-                lightingInputs.GBufferB                   = gbufferB;
-                lightingInputs.GBufferC                   = gbufferC;
-                lightingInputs.SceneDepth                 = sceneDepth;
-                lightingInputs.SsaoTexture                = ssaoTexture;
-                lightingInputs.ShadowMap                  = shadowMap;
-                lightingInputs.Width                      = width;
-                lightingInputs.Height                     = height;
-                lightingInputs.SkyIrradiance              = mViewContext.SkyIrradianceCube;
-                lightingInputs.SkySpecular                = mViewContext.SkySpecularCube;
-                lightingInputs.BrdfLut                    = mViewContext.BrdfLutTexture;
-                lightingInputs.IblBlackCube               = shared.IblBlackCube;
-                lightingInputs.IblBlack2D                 = shared.IblBlack2D;
-                lightingInputs.RuntimeSettings.bEnableIbl = false;
-                lightingInputs.RuntimeSettings.IblDiffuseIntensity =
-                    rIblDiffuseIntensity.GetRenderValue();
-                lightingInputs.RuntimeSettings.IblSpecularIntensity =
-                    rIblSpecularIntensity.GetRenderValue();
-                lightingInputs.RuntimeSettings.IblSaturation  = rIblSaturation.GetRenderValue();
-                lightingInputs.RuntimeSettings.SpecularMaxLod = mViewContext.SkySpecularMaxLod;
-
-                Deferred::AddDeferredLightingPass(lightingInputs, sceneColorHDR);
-            } else {
-                DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                    "DeferredLighting skipped: shared pipeline/layout/sampler missing.");
-            }
-
-            if (mViewContext.bHasAtmosphereSky && (mViewContext.AtmosphereParamsBuffer != nullptr)
-                && mViewContext.AtmosphereTransmittanceLut && mViewContext.AtmosphereScatteringLut
-                && mViewContext.AtmosphereSingleMieScatteringLut && sceneColorHDR.IsValid()
-                && sceneDepth.IsValid() && shared.AtmosphereSkyLayout
-                && EnsureAtmosphereSkyPipeline(*device, shared) && shared.AtmosphereSkyPipeline
-                && shared.OutputSampler) {
-                Deferred::FDeferredAtmosphereSkyPassInputs atmosphereInputs{};
-                atmosphereInputs.Graph                  = &graph;
-                atmosphereInputs.ViewRect               = &viewRect;
-                atmosphereInputs.Pipeline               = shared.AtmosphereSkyPipeline.Get();
-                atmosphereInputs.Layout                 = shared.AtmosphereSkyLayout.Get();
-                atmosphereInputs.Sampler                = shared.OutputSampler.Get();
-                atmosphereInputs.Bindings               = &shared.AtmosphereSkyBindings;
-                atmosphereInputs.PerFrameBuffer         = mPerFrameBuffer.Get();
-                atmosphereInputs.AtmosphereParamsBuffer = mViewContext.AtmosphereParamsBuffer;
-                atmosphereInputs.TransmittanceLut       = mViewContext.AtmosphereTransmittanceLut;
-                atmosphereInputs.ScatteringLut          = mViewContext.AtmosphereScatteringLut;
-                atmosphereInputs.SingleMieScatteringLut =
-                    mViewContext.AtmosphereSingleMieScatteringLut;
-                atmosphereInputs.SceneDepth    = sceneDepth;
-                atmosphereInputs.SceneColorHDR = sceneColorHDR;
-                Deferred::AddDeferredAtmosphereSkyPass(atmosphereInputs);
-            } else if (mViewContext.bHasSkyCube && mViewContext.SkyCubeTexture
-                && sceneColorHDR.IsValid() && sceneDepth.IsValid() && shared.SkyBoxLayout
-                && EnsureSkyBoxPipeline(*device, shared) && shared.SkyBoxPipeline
-                && shared.OutputSampler) {
-                Deferred::FDeferredSkyBoxPassInputs skyboxInputs{};
-                skyboxInputs.Graph          = &graph;
-                skyboxInputs.ViewRect       = &viewRect;
-                skyboxInputs.Pipeline       = shared.SkyBoxPipeline.Get();
-                skyboxInputs.Layout         = shared.SkyBoxLayout.Get();
-                skyboxInputs.Sampler        = shared.OutputSampler.Get();
-                skyboxInputs.Bindings       = &shared.SkyBoxBindings;
-                skyboxInputs.PerFrameBuffer = mPerFrameBuffer.Get();
-                skyboxInputs.SkyCube        = mViewContext.SkyCubeTexture;
-                skyboxInputs.SceneDepth     = sceneDepth;
-                skyboxInputs.SceneColorHDR  = sceneColorHDR;
-                Deferred::AddDeferredSkyBoxPass(skyboxInputs);
-            }
-        }
-
-        // TODO: Refactor: pipeline input preparations for postproc can be placed in a separate
-        // function to avoid bloating the main Render() function.
+        auto outputTexture = bBackbufferOutput
+            ? graph.ImportTextureLegacy(outputTarget, mViewContext.OutputFinalState)
+            : graph.ImportTexture(Rhi::FRhiTextureRef(outputTarget), mViewContext.OutputFinalState);
 
         // Post-process chain (stack + registry) -> Present.
         {
-            FPostProcessStack pp{};
-            pp.bEnable = (rPostProcessEnable.GetRenderValue() != 0);
+            FPostProcessStack pp = BuildDefaultPostProcessStack();
 
-            const bool bEnableTaa = (rPostProcessTaa.GetRenderValue() != 0);
-            if (bEnableTaa) {
-                FPostProcessNode node{};
-                node.EffectId.Assign(TEXT("TAA"));
-                node.bEnabled = true;
-                node.Params[FString(TEXT("Alpha"))] =
-                    FPostProcessParamValue(rPostProcessTaaAlpha.GetRenderValue());
-                node.Params[FString(TEXT("ClampK"))] =
-                    FPostProcessParamValue(rPostProcessTaaClampK.GetRenderValue());
-                pp.Stack.PushBack(Move(node));
-            }
-
-            if (rPostProcessBloom.GetRenderValue() != 0) {
-                FPostProcessNode node{};
-                node.EffectId.Assign(TEXT("Bloom"));
-                node.bEnabled = true;
-                // Defaults can be tuned via CVars; can be overridden later via stack params.
-                node.Params[FString(TEXT("Threshold"))] =
-                    FPostProcessParamValue(rPostProcessBloomThreshold.GetRenderValue());
-                node.Params[FString(TEXT("Knee"))] =
-                    FPostProcessParamValue(rPostProcessBloomKnee.GetRenderValue());
-                node.Params[FString(TEXT("Intensity"))] =
-                    FPostProcessParamValue(rPostProcessBloomIntensity.GetRenderValue());
-                node.Params[FString(TEXT("KawaseOffset"))] =
-                    FPostProcessParamValue(rPostProcessBloomKawaseOffset.GetRenderValue());
-                node.Params[FString(TEXT("Iterations"))] =
-                    FPostProcessParamValue(rPostProcessBloomIterations.GetRenderValue());
-                node.Params[FString(TEXT("FirstDownsampleLumaWeight"))] = FPostProcessParamValue(
-                    rPostProcessBloomFirstDownsampleLumaWeight.GetRenderValue());
-                pp.Stack.PushBack(Move(node));
-            }
-
-            if (rPostProcessTonemap.GetRenderValue() != 0) {
-                FPostProcessNode node{};
-                node.EffectId.Assign(TEXT("Tonemap"));
-                node.bEnabled = true;
-                // Defaults; user can override via stack params later.
-                node.Params[FString(TEXT("Exposure"))] = FPostProcessParamValue(1.0f);
-                node.Params[FString(TEXT("Gamma"))]    = FPostProcessParamValue(2.2f);
-                pp.Stack.PushBack(Move(node));
-            }
-
-            if (!bEnableTaa && rPostProcessFxaa.GetRenderValue() != 0) {
-                FPostProcessNode node{};
-                node.EffectId.Assign(TEXT("Fxaa"));
-                node.bEnabled = true;
-                // Defaults can be tuned via CVars; can be overridden later via stack params.
-                node.Params[FString(TEXT("EdgeThreshold"))] =
-                    FPostProcessParamValue(rPostProcessFxaaEdgeThreshold.GetRenderValue());
-                node.Params[FString(TEXT("EdgeThresholdMin"))] =
-                    FPostProcessParamValue(rPostProcessFxaaEdgeThresholdMin.GetRenderValue());
-                node.Params[FString(TEXT("Subpix"))] =
-                    FPostProcessParamValue(rPostProcessFxaaSubpix.GetRenderValue());
-                pp.Stack.PushBack(Move(node));
-            }
-
-            FPostProcessIO io{};
-            io.SceneColor = sceneColorHDR;
-            io.Depth      = sceneDepth;
+            FPostProcessIO    io{};
+            io.SceneColor = mGraphOutputs.mSceneColorHdr;
+            io.Depth      = mGraphOutputs.mSceneDepth;
 
             FPostProcessBuildContext buildCtx{};
             buildCtx.ViewKey              = mViewContext.ViewKey;

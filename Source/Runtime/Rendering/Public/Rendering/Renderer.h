@@ -2,6 +2,9 @@
 
 #include "Rendering/RenderingAPI.h"
 
+#include "Container/Function.h"
+#include "Container/String.h"
+#include "Container/Vector.h"
 #include "FrameGraph/FrameGraph.h"
 #include "Rhi/RhiBuffer.h"
 #include "Rhi/RhiRefs.h"
@@ -20,6 +23,10 @@ namespace AltinaEngine::RenderCore::Render {
 }
 
 namespace AltinaEngine::Rendering {
+    using Core::Container::FString;
+    using Core::Container::TFunction;
+    using Core::Container::TVector;
+
     struct AE_RENDERING_API FRenderViewContext {
         // Stable per-view key (e.g. ViewTarget + CameraId), used for persistent temporal state.
         u64                                  ViewKey          = 0ULL;
@@ -74,6 +81,81 @@ namespace AltinaEngine::Rendering {
 
     protected:
         FRenderViewContext mViewContext{};
+    };
+
+    enum class ERendererPassSet : u8 {
+        Prepass      = 0U,
+        Shadow       = 1U,
+        DeferredBase = 2U,
+        PostProcess  = 3U
+    };
+
+    enum class ERendererPassAnchorOrder : u8 {
+        None   = 0U,
+        Before = 1U,
+        After  = 2U
+    };
+
+    using FRendererPassCallback = TFunction<void(RenderCore::FFrameGraph& graph)>;
+
+    struct AE_RENDERING_API FRendererPassRegistration {
+        FString                  mPassId{};
+        ERendererPassSet         mPassSet     = ERendererPassSet::DeferredBase;
+        ERendererPassAnchorOrder mAnchorOrder = ERendererPassAnchorOrder::None;
+        FString                  mAnchorPassId{};
+        FRendererPassCallback    mExecute{};
+    };
+
+    class AE_RENDERING_API FBaseRenderer : public IRenderer {
+    public:
+        void Render(RenderCore::FFrameGraph& graph) final;
+
+        void SetPluginPassRegistrations(const TVector<FRendererPassRegistration>& registrations);
+        void ClearPluginPassRegistrations();
+
+        [[nodiscard]] auto GetResolvedPassIds() -> TVector<FString>;
+
+    protected:
+        auto         RegisterPassToSet(const FRendererPassRegistration& registration) -> bool;
+        void         MarkPassPlanDirty();
+        virtual void RegisterBuiltinPasses() = 0;
+
+    private:
+        struct FRegisteredPass {
+            FRendererPassRegistration mRegistration{};
+            bool                      mFromPlugin        = false;
+            u32                       mRegistrationOrder = 0U;
+        };
+
+        void                     EnsureBuiltinPassesRegistered();
+        void                     BuildResolvedPassPlan();
+
+        TVector<FRegisteredPass> mBuiltinPasses{};
+        TVector<FRegisteredPass> mPluginPasses{};
+        TVector<FRegisteredPass> mResolvedPasses{};
+        bool                     mBuiltinPassesRegistered = false;
+        bool                     mPassPlanDirty           = true;
+        u32                      mRegistrationOrderCursor = 0U;
+    };
+
+    class FRendererBuilder;
+
+    class AE_RENDERING_API IRendererPassProvider {
+    public:
+        virtual ~IRendererPassProvider()                       = default;
+        virtual void RegisterPasses(FRendererBuilder& builder) = 0;
+    };
+
+    class AE_RENDERING_API FRendererBuilder {
+    public:
+        void ClearPassProviders();
+        void AddPassProvider(IRendererPassProvider* provider);
+        auto RegisterPluginPass(const FRendererPassRegistration& registration) -> bool;
+        void ApplyToRenderer(FBaseRenderer& renderer);
+
+    private:
+        TVector<IRendererPassProvider*>    mPassProviders{};
+        TVector<FRendererPassRegistration> mCollectedPluginPasses{};
     };
 
     class AE_RENDERING_API FBasicForwardRenderer;

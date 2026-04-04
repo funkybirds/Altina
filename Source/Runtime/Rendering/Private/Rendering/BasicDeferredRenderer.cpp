@@ -2,6 +2,7 @@
 #include "Rendering/BasicDeferredRenderer.h"
 
 #include "Rendering/DrawListExecutor.h"
+#include "Rendering/GraphicsPipelinePreset.h"
 #include "Rendering/AmbientOcclusion/DeferredSsaoPassSet.h"
 #include "Rendering/Shadowing/DeferredCsmPassSet.h"
 #include "Deferred/DeferredTypes.h"
@@ -363,176 +364,172 @@ namespace AltinaEngine::Rendering {
             UpdateDefaultPassDesc(resources);
         }
 
-        auto EnsureLightingPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)
-            -> bool {
-            if (resources.LightingPipeline) {
+        auto EnsureFullscreenPipelineFromKeys(Rhi::FRhiDevice& device,
+            FDeferredSharedResources&                          resources,
+            const RenderCore::FShaderRegistry::FShaderKey&     vsKey,
+            const RenderCore::FShaderRegistry::FShaderKey&     psKey,
+            Rhi::FRhiPipelineLayoutRef& pipelineLayout, Rhi::FRhiPipelineRef& outPipeline,
+            const TChar* passLabel, const TChar* pipelineDebugName,
+            bool bOptionalWhenShaderNotConfigured) -> bool {
+            if (outPipeline) {
                 return true;
             }
 
-            if (!resources.LightingVSKey.IsValid() || !resources.LightingPSKey.IsValid()) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred lighting shaders are not configured."));
+            if (!vsKey.IsValid() || !psKey.IsValid()) {
+                if (!bOptionalWhenShaderNotConfigured) {
+                    LogErrorCat(TEXT("Rendering.BasicDeferred"),
+                        TEXT("{} shaders are not configured."), passLabel);
+                }
                 return false;
             }
 
-            auto vs = resources.Registry.FindShader(resources.LightingVSKey);
-            auto ps = resources.Registry.FindShader(resources.LightingPSKey);
+            auto vs = resources.Registry.FindShader(vsKey);
+            auto ps = resources.Registry.FindShader(psKey);
             if (!vs || !ps) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred lighting shaders are not registered."));
+                LogErrorCat(TEXT("Rendering.BasicDeferred"), TEXT("{} shaders are not registered."),
+                    passLabel);
                 return false;
             }
 
-            if (!resources.LightingPipelineLayout) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred lighting pipeline layout is missing."));
+            if (!pipelineLayout) {
+                LogErrorCat(TEXT("Rendering.BasicDeferred"), TEXT("{} pipeline layout is missing."),
+                    passLabel);
                 return false;
             }
+
+            FRendererGraphicsPipelineBuildInputs buildInputs{};
+            buildInputs.mPreset         = ERendererGraphicsPipelinePreset::Fullscreen;
+            buildInputs.mDebugName      = pipelineDebugName;
+            buildInputs.mPipelineLayout = pipelineLayout.Get();
+            buildInputs.mVertexShader   = vs.Get();
+            buildInputs.mPixelShader    = ps.Get();
 
             Rhi::FRhiGraphicsPipelineDesc desc{};
-            desc.mDebugName.Assign(TEXT("BasicDeferred.DeferredLightingPipeline"));
-            desc.mVertexShader   = vs.Get();
-            desc.mPixelShader    = ps.Get();
-            desc.mPipelineLayout = resources.LightingPipelineLayout.Get();
-            desc.mVertexLayout   = {};
-            desc.mRasterState    = {};
-            desc.mDepthState     = {};
-            desc.mBlendState     = {};
-            // Full-screen triangle; avoid culling.
-            desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
-            desc.mDepthState.mDepthEnable = false;
-            desc.mDepthState.mDepthWrite  = false;
-            resources.LightingPipeline    = device.CreateGraphicsPipeline(desc);
+            if (!BuildGraphicsPipelineDesc(buildInputs, desc)) {
+                return false;
+            }
 
-            return resources.LightingPipeline.Get() != nullptr;
+            outPipeline = device.CreateGraphicsPipeline(desc);
+            return outPipeline.Get() != nullptr;
         }
 
-        auto EnsureSsaoPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)
-            -> bool {
-            if (resources.SsaoPipeline) {
-                return true;
+        auto BuildShaderKeys(const RenderCore::FShaderRegistry::FShaderKey& vsKey,
+            const RenderCore::FShaderRegistry::FShaderKey&                  psKey)
+            -> TVector<RenderCore::FShaderRegistry::FShaderKey> {
+            TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys{};
+            if (vsKey.IsValid()) {
+                shaderKeys.PushBack(vsKey);
             }
-
-            if (!resources.SsaoVSKey.IsValid() || !resources.SsaoPSKey.IsValid()) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred SSAO shaders are not configured."));
-                return false;
+            if (psKey.IsValid()) {
+                shaderKeys.PushBack(psKey);
             }
-
-            auto vs = resources.Registry.FindShader(resources.SsaoVSKey);
-            auto ps = resources.Registry.FindShader(resources.SsaoPSKey);
-            if (!vs || !ps) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred SSAO shaders are not registered."));
-                return false;
-            }
-
-            if (!resources.SsaoPipelineLayout) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred SSAO pipeline layout is missing."));
-                return false;
-            }
-
-            Rhi::FRhiGraphicsPipelineDesc desc{};
-            desc.mDebugName.Assign(TEXT("BasicDeferred.SsaoPipeline"));
-            desc.mVertexShader            = vs.Get();
-            desc.mPixelShader             = ps.Get();
-            desc.mPipelineLayout          = resources.SsaoPipelineLayout.Get();
-            desc.mVertexLayout            = {};
-            desc.mRasterState             = {};
-            desc.mDepthState              = {};
-            desc.mBlendState              = {};
-            desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
-            desc.mDepthState.mDepthEnable = false;
-            desc.mDepthState.mDepthWrite  = false;
-            resources.SsaoPipeline        = device.CreateGraphicsPipeline(desc);
-
-            return resources.SsaoPipeline.Get() != nullptr;
+            return shaderKeys;
         }
 
-        auto EnsureSkyBoxPipeline(Rhi::FRhiDevice& device, FDeferredSharedResources& resources)
-            -> bool {
-            if (resources.SkyBoxPipeline) {
+        auto EnsureReflectedBindGroupLayout(Rhi::FRhiDevice&        device,
+            FDeferredSharedResources&                               resources,
+            const TVector<RenderCore::FShaderRegistry::FShaderKey>& shaderKeys, u32 setIndex,
+            Rhi::FRhiBindGroupLayoutRef&                    outLayout,
+            RenderCore::ShaderBinding::FBindingLookupTable* outLookup,
+            const TChar* layoutErrorMessage, const TChar* lookupErrorMessage,
+            bool bAllowEmptyShaderKeys = false) -> bool {
+            if (outLayout) {
                 return true;
             }
-
-            if (!resources.SkyBoxVSKey.IsValid() || !resources.SkyBoxPSKey.IsValid()) {
-                // Skybox is optional; missing shader keys is not an error.
+            if (shaderKeys.IsEmpty()) {
+                if (!bAllowEmptyShaderKeys) {
+                    DebugAssert(false, TEXT("BasicDeferredRenderer"), "{}", layoutErrorMessage);
+                }
                 return false;
             }
 
-            auto vs = resources.Registry.FindShader(resources.SkyBoxVSKey);
-            auto ps = resources.Registry.FindShader(resources.SkyBoxPSKey);
-            if (!vs || !ps) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred skybox shaders are not registered."));
+            Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+            const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
+                resources.Registry, shaderKeys, setIndex, layoutDesc);
+            DebugAssert(built, TEXT("BasicDeferredRenderer"), "{}", layoutErrorMessage);
+            if (!built) {
                 return false;
             }
 
-            if (!resources.SkyBoxPipelineLayout) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred skybox pipeline layout is missing."));
+            outLayout = device.CreateBindGroupLayout(layoutDesc);
+            if (!outLayout) {
                 return false;
             }
 
-            Rhi::FRhiGraphicsPipelineDesc desc{};
-            desc.mDebugName.Assign(TEXT("BasicDeferred.SkyBoxPipeline"));
-            desc.mVertexShader   = vs.Get();
-            desc.mPixelShader    = ps.Get();
-            desc.mPipelineLayout = resources.SkyBoxPipelineLayout.Get();
-            desc.mVertexLayout   = {};
-            desc.mRasterState    = {};
-            desc.mDepthState     = {};
-            desc.mBlendState     = {};
-            // Full-screen triangle; avoid culling.
-            desc.mRasterState.mCullMode   = Rhi::ERhiRasterCullMode::None;
-            desc.mDepthState.mDepthEnable = false;
-            desc.mDepthState.mDepthWrite  = false;
-            resources.SkyBoxPipeline      = device.CreateGraphicsPipeline(desc);
-
-            return resources.SkyBoxPipeline.Get() != nullptr;
+            if (outLookup != nullptr) {
+                const bool builtLookup = RenderCore::ShaderBinding::BuildBindingLookupTable(
+                    resources.Registry, shaderKeys, setIndex, outLayout.Get(), *outLookup);
+                DebugAssert(builtLookup, TEXT("BasicDeferredRenderer"), "{}", lookupErrorMessage);
+                return builtLookup;
+            }
+            return true;
         }
 
-        auto EnsureAtmosphereSkyPipeline(
-            Rhi::FRhiDevice& device, FDeferredSharedResources& resources) -> bool {
-            if (resources.AtmosphereSkyPipeline) {
+        auto EnsureSingleReflectedBindingLayout(Rhi::FRhiDevice&    device,
+            FDeferredSharedResources&                               resources,
+            const TVector<RenderCore::FShaderRegistry::FShaderKey>& shaderKeys,
+            FStringView bindingName, Rhi::ERhiBindingType bindingType, bool bConstantBuffer,
+            Rhi::FRhiBindGroupLayoutRef& outLayout, u32& outBinding, const TChar* errorMessage,
+            FStringView fallbackBindingName = {}) -> bool {
+            if (outLayout) {
                 return true;
             }
-
-            if (!resources.AtmosphereSkyVSKey.IsValid()
-                || !resources.AtmosphereSkyPSKey.IsValid()) {
+            if (shaderKeys.IsEmpty()) {
+                DebugAssert(false, TEXT("BasicDeferredRenderer"), "{}", errorMessage);
                 return false;
             }
 
-            auto vs = resources.Registry.FindShader(resources.AtmosphereSkyVSKey);
-            auto ps = resources.Registry.FindShader(resources.AtmosphereSkyPSKey);
-            if (!vs || !ps) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred atmosphere sky shaders are not registered."));
+            u32                       setIndex   = 0U;
+            u32                       binding    = 0U;
+            Rhi::ERhiShaderStageFlags visibility = Rhi::ERhiShaderStageFlags::All;
+            bool                      found      = bConstantBuffer
+                                          ? RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
+                      resources.Registry, shaderKeys, bindingName, setIndex, binding, visibility)
+                                          : RenderCore::ShaderBinding::ResolveResourceBindingByName(resources.Registry,
+                                                shaderKeys, bindingName, bindingType, setIndex, binding, visibility);
+            if (!found && !fallbackBindingName.IsEmpty()) {
+                found = bConstantBuffer
+                    ? RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
+                          resources.Registry, shaderKeys, fallbackBindingName, setIndex, binding,
+                          visibility)
+                    : RenderCore::ShaderBinding::ResolveResourceBindingByName(resources.Registry,
+                          shaderKeys, fallbackBindingName, bindingType, setIndex, binding,
+                          visibility);
+            }
+
+            DebugAssert(found, TEXT("BasicDeferredRenderer"), "{}", errorMessage);
+            if (!found) {
                 return false;
             }
 
-            if (!resources.AtmosphereSkyPipelineLayout) {
-                LogErrorCat(TEXT("Rendering.BasicDeferred"),
-                    TEXT("Deferred atmosphere sky pipeline layout is missing."));
+            Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+            layoutDesc.mSetIndex = setIndex;
+            Rhi::FRhiBindGroupLayoutEntry entry{};
+            entry.mBinding    = binding;
+            entry.mType       = bindingType;
+            entry.mVisibility = visibility;
+            layoutDesc.mEntries.PushBack(entry);
+            layoutDesc.mLayoutHash = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
+            outLayout              = device.CreateBindGroupLayout(layoutDesc);
+            if (!outLayout) {
                 return false;
             }
 
-            Rhi::FRhiGraphicsPipelineDesc desc{};
-            desc.mDebugName.Assign(TEXT("BasicDeferred.AtmosphereSkyPipeline"));
-            desc.mVertexShader              = vs.Get();
-            desc.mPixelShader               = ps.Get();
-            desc.mPipelineLayout            = resources.AtmosphereSkyPipelineLayout.Get();
-            desc.mVertexLayout              = {};
-            desc.mRasterState               = {};
-            desc.mDepthState                = {};
-            desc.mBlendState                = {};
-            desc.mRasterState.mCullMode     = Rhi::ERhiRasterCullMode::None;
-            desc.mDepthState.mDepthEnable   = false;
-            desc.mDepthState.mDepthWrite    = false;
-            resources.AtmosphereSkyPipeline = device.CreateGraphicsPipeline(desc);
+            outBinding = binding;
+            return true;
+        }
 
-            return resources.AtmosphereSkyPipeline.Get() != nullptr;
+        void EnsurePipelineLayoutFromSingleBindGroup(Rhi::FRhiDevice& device,
+            Rhi::FRhiBindGroupLayoutRef&                              bindGroupLayout,
+            Rhi::FRhiPipelineLayoutRef&                               outPipelineLayout) {
+            if (outPipelineLayout) {
+                return;
+            }
+            Rhi::FRhiPipelineLayoutDesc layoutDesc{};
+            if (bindGroupLayout) {
+                layoutDesc.mBindGroupLayouts.PushBack(bindGroupLayout.Get());
+            }
+            outPipelineLayout = device.CreatePipelineLayout(layoutDesc);
         }
 
         void EnsureLayouts(Rhi::FRhiDevice& device, FDeferredSharedResources& resources) {
@@ -551,79 +548,28 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.PerFrameLayout) {
-                u32                       setIndex   = 0U;
-                u32                       binding    = 0U;
-                Rhi::ERhiShaderStageFlags visibility = Rhi::ERhiShaderStageFlags::All;
-                bool found = RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
-                    resources.Registry, basePassShaderKeys, TEXT("ViewConstants"), setIndex,
-                    binding, visibility);
-                if (!found) {
-                    found = RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
-                        resources.Registry, basePassShaderKeys, TEXT("DeferredView"), setIndex,
-                        binding, visibility);
-                }
-
-                DebugAssert(found, TEXT("BasicDeferredRenderer"),
-                    "Failed to resolve per-frame cbuffer binding from shader reflection.");
-                if (found) {
-                    Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                    layoutDesc.mSetIndex = setIndex;
-
-                    Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding    = binding;
-                    entry.mType       = Rhi::ERhiBindingType::ConstantBuffer;
-                    entry.mVisibility = visibility;
-                    layoutDesc.mEntries.PushBack(entry);
-                    layoutDesc.mLayoutHash =
-                        BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                    resources.PerFrameLayout  = device.CreateBindGroupLayout(layoutDesc);
-                    resources.PerFrameBinding = binding;
-                }
+                (void)EnsureSingleReflectedBindingLayout(device, resources, basePassShaderKeys,
+                    TEXT("ViewConstants"), Rhi::ERhiBindingType::ConstantBuffer, true,
+                    resources.PerFrameLayout, resources.PerFrameBinding,
+                    TEXT("Failed to resolve per-frame cbuffer binding from shader reflection."),
+                    TEXT("DeferredView"));
             }
 
             if (!resources.PerDrawLayout) {
-                u32                       setIndex   = 0U;
-                u32                       binding    = 0U;
-                Rhi::ERhiShaderStageFlags visibility = Rhi::ERhiShaderStageFlags::All;
-                const bool found = RenderCore::ShaderBinding::ResolveResourceBindingByName(
-                    resources.Registry, basePassShaderKeys, TEXT("InstanceDataBuffer"),
-                    Rhi::ERhiBindingType::SampledBuffer, setIndex, binding, visibility);
-                DebugAssert(found, TEXT("BasicDeferredRenderer"),
-                    "Failed to resolve per-draw instance buffer binding from shader reflection.");
-                if (found) {
-                    Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
-                    layoutDesc.mSetIndex = setIndex;
-
-                    Rhi::FRhiBindGroupLayoutEntry entry{};
-                    entry.mBinding    = binding;
-                    entry.mType       = Rhi::ERhiBindingType::SampledBuffer;
-                    entry.mVisibility = visibility;
-                    layoutDesc.mEntries.PushBack(entry);
-                    layoutDesc.mLayoutHash =
-                        BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-                    resources.PerDrawLayout  = device.CreateBindGroupLayout(layoutDesc);
-                    resources.PerDrawBinding = binding;
-                }
+                (void)EnsureSingleReflectedBindingLayout(device, resources, basePassShaderKeys,
+                    TEXT("InstanceDataBuffer"), Rhi::ERhiBindingType::SampledBuffer, false,
+                    resources.PerDrawLayout, resources.PerDrawBinding,
+                    TEXT(
+                        "Failed to resolve per-draw instance buffer binding from shader reflection."));
             }
 
             if (!resources.OutputLayout) {
-                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
-                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
-                if (resources.OutputVSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.OutputVSKey);
-                }
-                if (resources.OutputPSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.OutputPSKey);
-                }
-                if (!shaderKeys.IsEmpty()) {
-                    const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
-                        resources.Registry, shaderKeys, 0U, layoutDesc);
-                    DebugAssert(built, TEXT("BasicDeferredRenderer"),
-                        "Failed to build output bind group layout from shader reflection.");
-                    if (built) {
-                        resources.OutputLayout = device.CreateBindGroupLayout(layoutDesc);
-                    }
-                }
+                const auto shaderKeys =
+                    BuildShaderKeys(resources.OutputVSKey, resources.OutputPSKey);
+                (void)EnsureReflectedBindGroupLayout(device, resources, shaderKeys, 0U,
+                    resources.OutputLayout, nullptr,
+                    TEXT("Failed to build output bind group layout from shader reflection."),
+                    TEXT(""), true);
             }
 
             if (!resources.OutputSampler) {
@@ -632,180 +578,40 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.OutputPipelineLayout) {
-                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
-                if (resources.OutputLayout) {
-                    layoutDesc.mBindGroupLayouts.PushBack(resources.OutputLayout.Get());
-                }
-                resources.OutputPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+                EnsurePipelineLayoutFromSingleBindGroup(
+                    device, resources.OutputLayout, resources.OutputPipelineLayout);
             }
 
             if (!resources.LightingLayout) {
-                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
-                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
-                if (resources.LightingVSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.LightingVSKey);
-                }
-                if (resources.LightingPSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.LightingPSKey);
-                }
-                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
-                    resources.Registry, shaderKeys, 0U, layoutDesc);
-                DebugAssert(built, TEXT("BasicDeferredRenderer"),
-                    "Failed to build lighting bind group layout from shader reflection.");
-                if (built) {
-                    resources.LightingLayout = device.CreateBindGroupLayout(layoutDesc);
-                    DebugAssert(RenderCore::ShaderBinding::BuildBindingLookupTable(
-                                    resources.Registry, shaderKeys, 0U,
-                                    resources.LightingLayout.Get(), resources.LightingBindings),
-                        TEXT("BasicDeferredRenderer"),
-                        "Failed to build lighting binding lookup table from shader reflection.");
-                }
+                const auto shaderKeys =
+                    BuildShaderKeys(resources.LightingVSKey, resources.LightingPSKey);
+                (void)EnsureReflectedBindGroupLayout(device, resources, shaderKeys, 0U,
+                    resources.LightingLayout, &resources.LightingBindings,
+                    TEXT("Failed to build lighting bind group layout from shader reflection."),
+                    TEXT("Failed to build lighting binding lookup table from shader reflection."));
             }
 
             if (!resources.SsaoLayout) {
-                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
-                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
-                if (resources.SsaoVSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.SsaoVSKey);
-                }
-                if (resources.SsaoPSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.SsaoPSKey);
-                }
-
+                const auto shaderKeys = BuildShaderKeys(resources.SsaoVSKey, resources.SsaoPSKey);
                 if (!shaderKeys.IsEmpty()) {
-                    struct FSsaoBindingSpec {
-                        const TChar*         Name            = nullptr;
-                        Rhi::ERhiBindingType Type            = Rhi::ERhiBindingType::SampledTexture;
-                        bool                 bConstantBuffer = false;
-                    };
-
-                    struct FSsaoResolvedBinding {
-                        const TChar*              Name       = nullptr;
-                        Rhi::ERhiBindingType      Type       = Rhi::ERhiBindingType::SampledTexture;
-                        u32                       Binding    = 0U;
-                        Rhi::ERhiShaderStageFlags Visibility = Rhi::ERhiShaderStageFlags::All;
-                    };
-
-                    constexpr FSsaoBindingSpec kSsaoSpecs[] = {
-                        { TEXT("DeferredView"), Rhi::ERhiBindingType::ConstantBuffer, true },
-                        { TEXT("SsaoConstants"), Rhi::ERhiBindingType::ConstantBuffer, true },
-                        { TEXT("GBufferB"), Rhi::ERhiBindingType::SampledTexture, false },
-                        { TEXT("SceneDepth"), Rhi::ERhiBindingType::SampledTexture, false },
-                        { TEXT("LinearSampler"), Rhi::ERhiBindingType::Sampler, false },
-                    };
-
-                    TVector<FSsaoResolvedBinding> resolvedBindings{};
-                    bool                          allResolved  = true;
-                    bool                          setResolved  = false;
-                    u32                           ssaoSetIndex = 0U;
-
-                    auto ResolveSsaoBinding = [&](const FSsaoBindingSpec& spec) -> void {
-                        u32                       setIndex   = 0U;
-                        u32                       binding    = 0U;
-                        Rhi::ERhiShaderStageFlags visibility = Rhi::ERhiShaderStageFlags::None;
-
-                        const bool                found = spec.bConstantBuffer
-                                           ? RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
-                                  resources.Registry, shaderKeys, FStringView(spec.Name), setIndex,
-                                  binding, visibility)
-                                           : RenderCore::ShaderBinding::ResolveResourceBindingByName(
-                                  resources.Registry, shaderKeys, FStringView(spec.Name), spec.Type,
-                                  setIndex, binding, visibility);
-                        DebugAssert(found, TEXT("BasicDeferredRenderer"),
-                            "Failed to resolve SSAO binding '{}' from shader reflection.",
-                            spec.Name);
-                        if (!found) {
-                            allResolved = false;
-                            return;
-                        }
-
-                        if (!setResolved) {
-                            setResolved  = true;
-                            ssaoSetIndex = setIndex;
-                        } else {
-                            const bool sameSet = (ssaoSetIndex == setIndex);
-                            DebugAssert(sameSet, TEXT("BasicDeferredRenderer"),
-                                "SSAO binding '{}' set mismatch: expected set={}, actual set={}.",
-                                spec.Name, ssaoSetIndex, setIndex);
-                            if (!sameSet) {
-                                allResolved = false;
-                                return;
-                            }
-                        }
-
-                        FSsaoResolvedBinding resolved{};
-                        resolved.Name       = spec.Name;
-                        resolved.Type       = spec.Type;
-                        resolved.Binding    = binding;
-                        resolved.Visibility = visibility;
-                        resolvedBindings.PushBack(resolved);
-                    };
-
-                    for (const auto& spec : kSsaoSpecs) {
-                        ResolveSsaoBinding(spec);
-                    }
-
-                    if (allResolved && setResolved && !resolvedBindings.IsEmpty()) {
-                        layoutDesc.mSetIndex = ssaoSetIndex;
-                        for (const auto& resolved : resolvedBindings) {
-                            Rhi::FRhiBindGroupLayoutEntry entry{};
-                            entry.mBinding    = resolved.Binding;
-                            entry.mType       = resolved.Type;
-                            entry.mVisibility = resolved.Visibility;
-                            layoutDesc.mEntries.PushBack(entry);
-                        }
-
-                        Core::Algorithm::Sort(layoutDesc.mEntries.begin(),
-                            layoutDesc.mEntries.end(), [](const auto& lhs, const auto& rhs) {
-                                if (lhs.mBinding != rhs.mBinding) {
-                                    return lhs.mBinding < rhs.mBinding;
-                                }
-                                return lhs.mType < rhs.mType;
-                            });
-
-                        TVector<Rhi::FRhiBindGroupLayoutEntry> mergedEntries{};
-                        for (const auto& entry : layoutDesc.mEntries) {
-                            if (!mergedEntries.IsEmpty()) {
-                                auto& last = mergedEntries.Back();
-                                if (last.mBinding == entry.mBinding && last.mType == entry.mType) {
-                                    last.mVisibility =
-                                        RenderCore::ShaderBinding::OrShaderStageFlags(
-                                            last.mVisibility, entry.mVisibility);
-                                    continue;
-                                }
-                            }
-                            mergedEntries.PushBack(entry);
-                        }
-                        layoutDesc.mEntries = Move(mergedEntries);
-                        layoutDesc.mLayoutHash =
-                            BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
-
-                        resources.SsaoLayout = device.CreateBindGroupLayout(layoutDesc);
-                        if (resources.SsaoLayout) {
-                            bool builtLookup = RenderCore::ShaderBinding::BuildBindingLookupTable(
-                                resources.Registry, shaderKeys, ssaoSetIndex,
-                                resources.SsaoLayout.Get(), resources.SsaoBindings);
-
-                            if (!builtLookup) {
-                                resources.SsaoBindings.Reset();
-                                resources.SsaoBindings.mSetIndex = ssaoSetIndex;
-                                resources.SsaoBindings.mLayout   = resources.SsaoLayout.Get();
-                                for (const auto& resolved : resolvedBindings) {
-                                    const u32 nameHash = RenderCore::ShaderBinding::HashBindingName(
-                                        FStringView(resolved.Name));
-                                    const u64 key = (static_cast<u64>(nameHash) << 32U)
-                                        | static_cast<u64>(static_cast<u8>(resolved.Type));
-                                    resources.SsaoBindings.mBindingByKey[key] = resolved.Binding;
-                                }
-                                builtLookup = !resources.SsaoBindings.mBindingByKey.IsEmpty();
-                            }
-
-                            DebugAssert(builtLookup, TEXT("BasicDeferredRenderer"),
-                                "Failed to build SSAO binding lookup table from shader reflection.");
-                        }
-                    } else {
-                        DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                            "Failed to build SSAO bind group layout from shader reflection.");
+                    u32                       ssaoSetIndex        = 0U;
+                    u32                       deferredViewBinding = 0U;
+                    Rhi::ERhiShaderStageFlags deferredViewVisibility =
+                        Rhi::ERhiShaderStageFlags::None;
+                    const bool foundDeferredView =
+                        RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(
+                            resources.Registry, shaderKeys, TEXT("DeferredView"), ssaoSetIndex,
+                            deferredViewBinding, deferredViewVisibility);
+                    (void)deferredViewBinding;
+                    (void)deferredViewVisibility;
+                    DebugAssert(foundDeferredView, TEXT("BasicDeferredRenderer"),
+                        "Failed to resolve SSAO binding set from DeferredView.");
+                    if (foundDeferredView) {
+                        (void)EnsureReflectedBindGroupLayout(device, resources, shaderKeys,
+                            ssaoSetIndex, resources.SsaoLayout, &resources.SsaoBindings,
+                            TEXT("Failed to build SSAO bind group layout from shader reflection."),
+                            TEXT(
+                                "Failed to build SSAO binding lookup table from shader reflection."));
                     }
                 }
             }
@@ -855,82 +661,43 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.LightingPipelineLayout) {
-                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
-                if (resources.LightingLayout) {
-                    layoutDesc.mBindGroupLayouts.PushBack(resources.LightingLayout.Get());
-                }
-                resources.LightingPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+                EnsurePipelineLayoutFromSingleBindGroup(
+                    device, resources.LightingLayout, resources.LightingPipelineLayout);
             }
 
             if (!resources.SsaoPipelineLayout) {
-                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
-                if (resources.SsaoLayout) {
-                    layoutDesc.mBindGroupLayouts.PushBack(resources.SsaoLayout.Get());
-                }
-                resources.SsaoPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+                EnsurePipelineLayoutFromSingleBindGroup(
+                    device, resources.SsaoLayout, resources.SsaoPipelineLayout);
             }
 
             if (!resources.SkyBoxLayout) {
-                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
-                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
-                if (resources.SkyBoxVSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.SkyBoxVSKey);
-                }
-                if (resources.SkyBoxPSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.SkyBoxPSKey);
-                }
-                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
-                    resources.Registry, shaderKeys, 0U, layoutDesc);
-                DebugAssert(built, TEXT("BasicDeferredRenderer"),
-                    "Failed to build skybox bind group layout from shader reflection.");
-                if (built) {
-                    resources.SkyBoxLayout = device.CreateBindGroupLayout(layoutDesc);
-                    DebugAssert(
-                        RenderCore::ShaderBinding::BuildBindingLookupTable(resources.Registry,
-                            shaderKeys, 0U, resources.SkyBoxLayout.Get(), resources.SkyBoxBindings),
-                        TEXT("BasicDeferredRenderer"),
-                        "Failed to build skybox binding lookup table from shader reflection.");
-                }
+                const auto shaderKeys =
+                    BuildShaderKeys(resources.SkyBoxVSKey, resources.SkyBoxPSKey);
+                (void)EnsureReflectedBindGroupLayout(device, resources, shaderKeys, 0U,
+                    resources.SkyBoxLayout, &resources.SkyBoxBindings,
+                    TEXT("Failed to build skybox bind group layout from shader reflection."),
+                    TEXT("Failed to build skybox binding lookup table from shader reflection."));
             }
 
             if (!resources.SkyBoxPipelineLayout) {
-                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
-                if (resources.SkyBoxLayout) {
-                    layoutDesc.mBindGroupLayouts.PushBack(resources.SkyBoxLayout.Get());
-                }
-                resources.SkyBoxPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+                EnsurePipelineLayoutFromSingleBindGroup(
+                    device, resources.SkyBoxLayout, resources.SkyBoxPipelineLayout);
             }
 
             if (!resources.AtmosphereSkyLayout) {
-                Rhi::FRhiBindGroupLayoutDesc                     layoutDesc{};
-                TVector<RenderCore::FShaderRegistry::FShaderKey> shaderKeys;
-                if (resources.AtmosphereSkyVSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.AtmosphereSkyVSKey);
-                }
-                if (resources.AtmosphereSkyPSKey.IsValid()) {
-                    shaderKeys.PushBack(resources.AtmosphereSkyPSKey);
-                }
-                const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
-                    resources.Registry, shaderKeys, 0U, layoutDesc);
-                DebugAssert(built, TEXT("BasicDeferredRenderer"),
-                    "Failed to build atmosphere sky bind group layout from shader reflection.");
-                if (built) {
-                    resources.AtmosphereSkyLayout = device.CreateBindGroupLayout(layoutDesc);
-                    DebugAssert(
-                        RenderCore::ShaderBinding::BuildBindingLookupTable(resources.Registry,
-                            shaderKeys, 0U, resources.AtmosphereSkyLayout.Get(),
-                            resources.AtmosphereSkyBindings),
-                        TEXT("BasicDeferredRenderer"),
-                        "Failed to build atmosphere sky binding lookup table from shader reflection.");
-                }
+                const auto shaderKeys =
+                    BuildShaderKeys(resources.AtmosphereSkyVSKey, resources.AtmosphereSkyPSKey);
+                (void)EnsureReflectedBindGroupLayout(device, resources, shaderKeys, 0U,
+                    resources.AtmosphereSkyLayout, &resources.AtmosphereSkyBindings,
+                    TEXT(
+                        "Failed to build atmosphere sky bind group layout from shader reflection."),
+                    TEXT(
+                        "Failed to build atmosphere sky binding lookup table from shader reflection."));
             }
 
             if (!resources.AtmosphereSkyPipelineLayout) {
-                Rhi::FRhiPipelineLayoutDesc layoutDesc{};
-                if (resources.AtmosphereSkyLayout) {
-                    layoutDesc.mBindGroupLayouts.PushBack(resources.AtmosphereSkyLayout.Get());
-                }
-                resources.AtmosphereSkyPipelineLayout = device.CreatePipelineLayout(layoutDesc);
+                EnsurePipelineLayoutFromSingleBindGroup(
+                    device, resources.AtmosphereSkyLayout, resources.AtmosphereSkyPipelineLayout);
             }
         }
 
@@ -1026,7 +793,7 @@ namespace AltinaEngine::Rendering {
             if (buffer == nullptr || data == nullptr || sizeBytes == 0ULL) {
                 return;
             }
-
+            // TODO: Refactor, consider sync problems
             auto lock = buffer->Lock(0ULL, sizeBytes, Rhi::ERhiBufferLockMode::WriteDiscard);
             if (!lock.IsValid()) {
                 return;
@@ -1133,15 +900,21 @@ namespace AltinaEngine::Rendering {
                 return nullptr;
             }
 
+            FRendererGraphicsPipelineBuildInputs buildInputs{};
+            buildInputs.mPreset            = (data->PipelineCache == &resources.ShadowPipelines)
+                           ? ERendererGraphicsPipelinePreset::ShadowDepth
+                           : ERendererGraphicsPipelinePreset::MeshMaterial;
+            buildInputs.mDebugName         = TEXT("BasicDeferred.BasePassPipeline");
+            buildInputs.mPipelineLayout    = pipelineLayout.Get();
+            buildInputs.mVertexShader      = vs.Get();
+            buildInputs.mPixelShader       = ps ? ps.Get() : nullptr;
+            buildInputs.mVertexLayout      = &data->VertexLayout;
+            buildInputs.mMaterialPassState = &resolvedPass->mState;
+
             Rhi::FRhiGraphicsPipelineDesc desc{};
-            desc.mDebugName.Assign(TEXT("BasicDeferred.BasePassPipeline"));
-            desc.mVertexShader   = vs.Get();
-            desc.mPixelShader    = ps ? ps.Get() : nullptr;
-            desc.mPipelineLayout = pipelineLayout.Get();
-            desc.mVertexLayout   = data->VertexLayout;
-            desc.mRasterState    = resolvedPass->mState.mRaster;
-            desc.mDepthState     = resolvedPass->mState.mDepth;
-            desc.mBlendState     = resolvedPass->mState.mBlend;
+            if (!BuildGraphicsPipelineDesc(buildInputs, desc)) {
+                return nullptr;
+            }
 
             auto pipeline = data->Device->CreateGraphicsPipeline(desc);
             if (!pipeline) {
@@ -1260,9 +1033,13 @@ namespace AltinaEngine::Rendering {
             RenderCore::FFrameGraphTextureRef ssaoTexture,
             RenderCore::FFrameGraphTextureRef shadowMap, u32 width, u32 height,
             Deferred::FDeferredLightingPassInputs& outInputs) -> bool {
-            if (device == nullptr || !EnsureLightingPipeline(*device, resources)
-                || !resources.LightingLayout || !resources.LightingPipeline
-                || !resources.OutputSampler) {
+            const bool bHasLightingPipeline = (device != nullptr)
+                && EnsureFullscreenPipelineFromKeys(*device, resources, resources.LightingVSKey,
+                    resources.LightingPSKey, resources.LightingPipelineLayout,
+                    resources.LightingPipeline, TEXT("Deferred lighting"),
+                    TEXT("BasicDeferred.DeferredLightingPipeline"), false);
+            if (device == nullptr || !bHasLightingPipeline || !resources.LightingLayout
+                || !resources.LightingPipeline || !resources.OutputSampler) {
                 return false;
             }
 
@@ -1304,12 +1081,18 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiBuffer* perFrameBuffer, RenderCore::FFrameGraphTextureRef sceneDepth,
             RenderCore::FFrameGraphTextureRef           sceneColorHDR,
             Deferred::FDeferredAtmosphereSkyPassInputs& outInputs) -> bool {
+            const bool bHasAtmosphereSkyPipeline = (device != nullptr)
+                && EnsureFullscreenPipelineFromKeys(*device, resources,
+                    resources.AtmosphereSkyVSKey, resources.AtmosphereSkyPSKey,
+                    resources.AtmosphereSkyPipelineLayout, resources.AtmosphereSkyPipeline,
+                    TEXT("Deferred atmosphere sky"), TEXT("BasicDeferred.AtmosphereSkyPipeline"),
+                    true);
             if (!viewContext.bHasAtmosphereSky || (viewContext.AtmosphereParamsBuffer == nullptr)
                 || !viewContext.AtmosphereTransmittanceLut || !viewContext.AtmosphereScatteringLut
                 || !viewContext.AtmosphereSingleMieScatteringLut || !sceneColorHDR.IsValid()
                 || !sceneDepth.IsValid() || device == nullptr || !resources.AtmosphereSkyLayout
-                || !EnsureAtmosphereSkyPipeline(*device, resources)
-                || !resources.AtmosphereSkyPipeline || !resources.OutputSampler) {
+                || !bHasAtmosphereSkyPipeline || !resources.AtmosphereSkyPipeline
+                || !resources.OutputSampler) {
                 return false;
             }
 
@@ -1335,10 +1118,13 @@ namespace AltinaEngine::Rendering {
             Rhi::FRhiBuffer* perFrameBuffer, RenderCore::FFrameGraphTextureRef sceneDepth,
             RenderCore::FFrameGraphTextureRef    sceneColorHDR,
             Deferred::FDeferredSkyBoxPassInputs& outInputs) -> bool {
+            const bool bHasSkyBoxPipeline = (device != nullptr)
+                && EnsureFullscreenPipelineFromKeys(*device, resources, resources.SkyBoxVSKey,
+                    resources.SkyBoxPSKey, resources.SkyBoxPipelineLayout, resources.SkyBoxPipeline,
+                    TEXT("Deferred skybox"), TEXT("BasicDeferred.SkyBoxPipeline"), true);
             if (!viewContext.bHasSkyCube || !viewContext.SkyCubeTexture || !sceneColorHDR.IsValid()
                 || !sceneDepth.IsValid() || device == nullptr || !resources.SkyBoxLayout
-                || !EnsureSkyBoxPipeline(*device, resources) || !resources.SkyBoxPipeline
-                || !resources.OutputSampler) {
+                || !bHasSkyBoxPipeline || !resources.SkyBoxPipeline || !resources.OutputSampler) {
                 return false;
             }
 
@@ -1677,12 +1463,20 @@ namespace AltinaEngine::Rendering {
         EnsureDefaultTemplate(resources);
         EnsureVertexLayout(resources);
         EnsureLayouts(device, resources);
-        if (!EnsureLightingPipeline(device, resources)) {
+        const bool bHasLightingPipeline = EnsureFullscreenPipelineFromKeys(device, resources,
+            resources.LightingVSKey, resources.LightingPSKey, resources.LightingPipelineLayout,
+            resources.LightingPipeline, TEXT("Deferred lighting"),
+            TEXT("BasicDeferred.DeferredLightingPipeline"), false);
+        if (!bHasLightingPipeline) {
             Assert(false, TEXT("BasicDeferredRenderer"),
                 "PrepareForRendering failed: lighting pipeline is unavailable.");
             return;
         }
-        if (!EnsureSsaoPipeline(device, resources)) {
+        const bool bHasSsaoPipeline =
+            EnsureFullscreenPipelineFromKeys(device, resources, resources.SsaoVSKey,
+                resources.SsaoPSKey, resources.SsaoPipelineLayout, resources.SsaoPipeline,
+                TEXT("Deferred SSAO"), TEXT("BasicDeferred.SsaoPipeline"), false);
+        if (!bHasSsaoPipeline) {
             Assert(false, TEXT("BasicDeferredRenderer"),
                 "PrepareForRendering failed: SSAO pipeline is unavailable.");
             return;
@@ -2268,7 +2062,10 @@ namespace AltinaEngine::Rendering {
         }
 
         EnsureLayouts(*device, resources);
-        const bool bHasSsaoPipeline = EnsureSsaoPipeline(*device, resources);
+        const bool bHasSsaoPipeline =
+            EnsureFullscreenPipelineFromKeys(*device, resources, resources.SsaoVSKey,
+                resources.SsaoPSKey, resources.SsaoPipelineLayout, resources.SsaoPipeline,
+                TEXT("Deferred SSAO"), TEXT("BasicDeferred.SsaoPipeline"), false);
         if (!bHasSsaoPipeline || !resources.SsaoLayout || !resources.OutputSampler) {
             DebugAssert(false, TEXT("BasicDeferredRenderer"),
                 "DeferredSsao skipped: shared pipeline/layout/sampler missing.");

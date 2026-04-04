@@ -1,5 +1,6 @@
 #include "TestHarness.h"
 
+#include "Rendering/GraphicsPipelinePreset.h"
 #include "Rendering/BasicDeferredRenderer.h"
 #include "Rendering/Renderer.h"
 
@@ -7,11 +8,15 @@ namespace {
     using AltinaEngine::TChar;
     using AltinaEngine::Core::Container::FString;
     using AltinaEngine::Core::Container::TVector;
+    using AltinaEngine::RenderCore::FMaterialPassState;
+    using AltinaEngine::Rendering::BuildGraphicsPipelineDesc;
+    using AltinaEngine::Rendering::ERendererGraphicsPipelinePreset;
     using AltinaEngine::Rendering::ERendererPassAnchorOrder;
     using AltinaEngine::Rendering::ERendererPassSet;
     using AltinaEngine::Rendering::FBaseRenderer;
     using AltinaEngine::Rendering::FBasicDeferredRenderer;
     using AltinaEngine::Rendering::FRendererBuilder;
+    using AltinaEngine::Rendering::FRendererGraphicsPipelineBuildInputs;
     using AltinaEngine::Rendering::FRendererPassRegistration;
     using AltinaEngine::Rendering::IRendererPassProvider;
 
@@ -179,4 +184,45 @@ TEST_CASE("Rendering.BasicDeferredRenderer.PassRegistrationSnapshot") {
     REQUIRE(resolvedPasses[3] == FString(TEXT("Deferred.Lighting")));
     REQUIRE(resolvedPasses[4] == FString(TEXT("Deferred.Sky")));
     REQUIRE(resolvedPasses[5] == FString(TEXT("Deferred.PostProcess")));
+}
+
+TEST_CASE("Rendering.GraphicsPipelinePreset.FullscreenDefaults") {
+    FRendererGraphicsPipelineBuildInputs inputs{};
+    inputs.mPreset    = ERendererGraphicsPipelinePreset::Fullscreen;
+    inputs.mDebugName = TEXT("Tests.FullscreenPreset");
+
+    AltinaEngine::Rhi::FRhiGraphicsPipelineDesc desc{};
+    REQUIRE(BuildGraphicsPipelineDesc(inputs, desc));
+    REQUIRE(desc.mRasterState.mCullMode == AltinaEngine::Rhi::ERhiRasterCullMode::None);
+    REQUIRE(desc.mDepthState.mDepthEnable == false);
+    REQUIRE(desc.mDepthState.mDepthWrite == false);
+    REQUIRE(desc.mBlendState.mBlendEnable == false);
+}
+
+TEST_CASE("Rendering.GraphicsPipelinePreset.ShadowDepthUsesMaterialState") {
+    FMaterialPassState materialState{};
+    materialState.mRaster.mCullMode    = AltinaEngine::Rhi::ERhiRasterCullMode::Front;
+    materialState.mDepth.mDepthEnable  = true;
+    materialState.mDepth.mDepthWrite   = true;
+    materialState.mDepth.mDepthCompare = AltinaEngine::Rhi::ERhiCompareOp::LessEqual;
+    materialState.mBlend.mBlendEnable  = true;
+    materialState.mBlend.mSrcColor     = AltinaEngine::Rhi::ERhiBlendFactor::One;
+    materialState.mBlend.mDstColor     = AltinaEngine::Rhi::ERhiBlendFactor::One;
+    materialState.mBlend.mColorOp      = AltinaEngine::Rhi::ERhiBlendOp::Add;
+    materialState.mBlend.mSrcAlpha     = AltinaEngine::Rhi::ERhiBlendFactor::One;
+    materialState.mBlend.mDstAlpha     = AltinaEngine::Rhi::ERhiBlendFactor::One;
+    materialState.mBlend.mAlphaOp      = AltinaEngine::Rhi::ERhiBlendOp::Add;
+
+    FRendererGraphicsPipelineBuildInputs inputs{};
+    inputs.mPreset            = ERendererGraphicsPipelinePreset::ShadowDepth;
+    inputs.mDebugName         = TEXT("Tests.ShadowDepthPreset");
+    inputs.mMaterialPassState = &materialState;
+
+    AltinaEngine::Rhi::FRhiGraphicsPipelineDesc desc{};
+    REQUIRE(BuildGraphicsPipelineDesc(inputs, desc));
+    REQUIRE(desc.mRasterState.mCullMode == AltinaEngine::Rhi::ERhiRasterCullMode::Front);
+    REQUIRE(desc.mDepthState.mDepthEnable == true);
+    REQUIRE(desc.mDepthState.mDepthWrite == true);
+    REQUIRE(desc.mDepthState.mDepthCompare == AltinaEngine::Rhi::ERhiCompareOp::LessEqual);
+    REQUIRE(desc.mBlendState.mBlendEnable == true);
 }

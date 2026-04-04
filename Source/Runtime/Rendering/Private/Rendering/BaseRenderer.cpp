@@ -2,6 +2,7 @@
 
 #include "Container/HashMap.h"
 #include "Logging/Log.h"
+#include "Utility/ContainerUtils/ContainerUtils.h"
 #include "Utility/Assert.h"
 
 namespace AltinaEngine::Rendering {
@@ -11,23 +12,6 @@ namespace AltinaEngine::Rendering {
 
     namespace {
         constexpr auto kRendererPassCategory = TEXT("Rendering.BaseRenderer");
-
-        auto InsertU32At(Core::Container::TVector<u32>& values, u32 index, u32 value) -> void {
-            Core::Container::TVector<u32> reordered{};
-            const u32                     oldSize = static_cast<u32>(values.Size());
-            if (index > oldSize) {
-                index = oldSize;
-            }
-            reordered.Reserve(oldSize + 1U);
-            for (u32 i = 0U; i < index; ++i) {
-                reordered.PushBack(values[i]);
-            }
-            reordered.PushBack(value);
-            for (u32 i = index; i < oldSize; ++i) {
-                reordered.PushBack(values[i]);
-            }
-            values = AltinaEngine::Move(reordered);
-        }
     } // namespace
 
     auto FBaseRenderer::RegisterPassToSet(const FRendererPassRegistration& registration) -> bool {
@@ -270,7 +254,8 @@ namespace AltinaEngine::Rendering {
                         }
                     }
 
-                    InsertU32At(orderedGlobals, insertIndex, globalIndex);
+                    Core::Utility::ContainerUtils::InsertAt(
+                        orderedGlobals, insertIndex, globalIndex);
                     inserted[localIndex] = 1U;
                     ++insertedCount;
                     bProgress = true;

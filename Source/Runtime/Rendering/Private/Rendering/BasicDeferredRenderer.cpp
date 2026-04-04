@@ -2,9 +2,10 @@
 #include "Rendering/BasicDeferredRenderer.h"
 
 #include "Rendering/DrawListExecutor.h"
+#include "Rendering/AmbientOcclusion/DeferredSsaoPassSet.h"
+#include "Rendering/Shadowing/DeferredCsmPassSet.h"
 #include "Deferred/DeferredTypes.h"
 #include "Deferred/DeferredScenePasses.h"
-#include "Deferred/DeferredSsaoPass.h"
 #include "Deferred/DeferredCsm.h"
 
 #include "FrameGraph/FrameGraph.h"
@@ -21,7 +22,6 @@
 #include "Rendering/RenderingSettings.h"
 
 #include "Container/HashMap.h"
-#include "Container/Deque.h"
 #include "Container/SmartPtr.h"
 #include "Container/Vector.h"
 #include "Logging/Log.h"
@@ -57,7 +57,6 @@ namespace AltinaEngine::Rendering {
     namespace {
         namespace Container = Core::Container;
         using Container::FStringView;
-        using Container::TDeque;
         using Container::THashMap;
         using Container::TVector;
         using RenderCore::EMaterialPass;
@@ -1250,42 +1249,6 @@ namespace AltinaEngine::Rendering {
             }
         }
 
-        [[nodiscard]] auto BuildDeferredSsaoPassInputs(RenderCore::FFrameGraph& graph,
-            Rhi::FRhiDevice* device, FDeferredSharedResources& resources,
-            const RenderCore::View::FViewRect& viewRect,
-            const FPerFrameConstants& perFrameConstants, Rhi::FRhiBuffer* perFrameBuffer,
-            Rhi::FRhiBuffer* ssaoConstantsBuffer, RenderCore::FFrameGraphTextureRef gbufferB,
-            RenderCore::FFrameGraphTextureRef sceneDepth, u32 width, u32 height,
-            Deferred::FDeferredSsaoPassInputs& outInputs) -> bool {
-            if (device == nullptr || !EnsureSsaoPipeline(*device, resources)
-                || !resources.SsaoLayout || !resources.SsaoPipeline || !resources.OutputSampler) {
-                return false;
-            }
-
-            outInputs.Graph               = &graph;
-            outInputs.ViewRect            = &viewRect;
-            outInputs.PerFrameConstants   = &perFrameConstants;
-            outInputs.Pipeline            = resources.SsaoPipeline.Get();
-            outInputs.Layout              = resources.SsaoLayout.Get();
-            outInputs.Sampler             = resources.OutputSampler.Get();
-            outInputs.Bindings            = &resources.SsaoBindings;
-            outInputs.PerFrameBuffer      = perFrameBuffer;
-            outInputs.SsaoConstantsBuffer = ssaoConstantsBuffer;
-            outInputs.GBufferB            = gbufferB;
-            outInputs.SceneDepth          = sceneDepth;
-            outInputs.Width               = width;
-            outInputs.Height              = height;
-
-            outInputs.RuntimeSettings.Enable = (rSsaoEnable.GetRenderValue() != 0) ? 1U : 0U;
-            outInputs.RuntimeSettings.SampleCount =
-                static_cast<u32>(Core::Math::Max(0, rSsaoSampleCount.GetRenderValue()));
-            outInputs.RuntimeSettings.RadiusVS  = rSsaoRadiusVS.GetRenderValue();
-            outInputs.RuntimeSettings.BiasNdc   = rSsaoBiasNdc.GetRenderValue();
-            outInputs.RuntimeSettings.Power     = rSsaoPower.GetRenderValue();
-            outInputs.RuntimeSettings.Intensity = rSsaoIntensity.GetRenderValue();
-            return true;
-        }
-
         [[nodiscard]] auto BuildDeferredLightingPassInputs(RenderCore::FFrameGraph& graph,
             Rhi::FRhiDevice* device, FDeferredSharedResources& resources,
             const RenderCore::View::FViewRect& viewRect,
@@ -1514,17 +1477,6 @@ namespace AltinaEngine::Rendering {
             Deferred::FillPerFrameCsmConstants(csm, outPerFrameConstants);
         }
 
-        struct FShadowCascadeExecuteContext {
-            const RenderCore::Render::FDrawList* ShadowDrawLists[4] = {};
-            FDrawListBindings                    DrawBindings{};
-            FBasePassPipelineData                ShadowPipelineData{};
-            FBasePassBindingData                 BindingDataPerCascade[4]{};
-            FBasePassBindingData                 FallbackBindingData{};
-            Rhi::FRhiBuffer*                     CascadePerFrameBuffers[4] = {};
-            Rhi::FRhiBindGroup*                  CascadePerFrameGroups[4]  = {};
-            Rhi::FRhiBuffer*                     FallbackPerFrameBuffer    = nullptr;
-            Rhi::FRhiBindGroup*                  FallbackPerFrameGroup     = nullptr;
-        };
     } // namespace
 
     auto FBasicDeferredRenderer::GetDefaultMaterialTemplate()
@@ -2265,105 +2217,34 @@ namespace AltinaEngine::Rendering {
         bindingData.PerDrawCursorInstances = 0U;
         bindingData.bUseInstanceCursor     = IsVulkanBackend();
 
-        // TODO: Refactor: realtime shadow rendering should be disentangled from a specific
-        // renderer. For the logic is shared for forwarded and deferred renderers.
-        {
-            // FrameGraph executes after this function scope; keep one stable context per Render()
-            // call in the current frame to avoid dangling/overwritten user-data pointers.
-            static thread_local TDeque<FShadowCascadeExecuteContext> sShadowContexts;
-            sShadowContexts.PushBack(FShadowCascadeExecuteContext{});
-            auto& executeCtx                              = sShadowContexts.Back();
-            executeCtx.DrawBindings                       = drawBindings;
-            executeCtx.ShadowPipelineData                 = pipelineData;
-            executeCtx.ShadowPipelineData.DefaultPassDesc = &resources.DefaultShadowPassDesc;
-            executeCtx.FallbackBindingData                = bindingData;
-            executeCtx.FallbackPerFrameBuffer             = mPerFrameBuffer.Get();
-            executeCtx.FallbackPerFrameGroup              = mPerFrameGroup.Get();
-            for (u32 i = 0U; i < 4U; ++i) {
-                executeCtx.ShadowDrawLists[i]       = mViewContext.ShadowDrawLists[i];
-                executeCtx.BindingDataPerCascade[i] = bindingData;
-                executeCtx.BindingDataPerCascade[i].PerDrawCursorInstances =
-                    bindingData.bUseInstanceCursor ? shadowPassFirstInstance[i] : 0U;
-                executeCtx.CascadePerFrameBuffers[i] = mShadowPerFrameBuffers[i].Get();
-                executeCtx.CascadePerFrameGroups[i]  = mShadowPerFrameGroups[i].Get();
-            }
+        FBasePassPipelineData shadowPipelineData = pipelineData;
+        shadowPipelineData.DefaultPassDesc       = &resources.DefaultShadowPassDesc;
 
-            Deferred::FCsmShadowPassInputs shadowInputs{};
-            shadowInputs.Graph                     = &graph;
-            shadowInputs.View                      = view;
-            shadowInputs.Csm                       = &csm;
-            shadowInputs.PersistentShadowMap       = &resources.ShadowMapCSM;
-            shadowInputs.PersistentShadowMapSize   = &resources.ShadowMapCSMSize;
-            shadowInputs.PersistentShadowMapLayers = &resources.ShadowMapCSMLayers;
-            for (u32 i = 0U; i < 4U; ++i) {
-                shadowInputs.ShadowDrawLists[i] = mViewContext.ShadowDrawLists[i];
-            }
-            shadowInputs.ExecuteCascadeFn = [](Rhi::FRhiCmdContext& ctx, u32 cascadeIndex,
-                                                const FMatrix4x4f& lightViewProj, u32 shadowMapSize,
-                                                void* userData) -> void {
-                auto* executeData = static_cast<FShadowCascadeExecuteContext*>(userData);
-                if (executeData == nullptr) {
-                    return;
-                }
-
-                Rhi::FRhiBuffer*    perFrameBuffer = (cascadeIndex < 4U)
-                       ? executeData->CascadePerFrameBuffers[cascadeIndex]
-                       : executeData->FallbackPerFrameBuffer;
-                Rhi::FRhiBindGroup* perFrameGroup  = (cascadeIndex < 4U)
-                     ? executeData->CascadePerFrameGroups[cascadeIndex]
-                     : executeData->FallbackPerFrameGroup;
-                if (reinterpret_cast<usize>(perFrameBuffer) == static_cast<usize>(~0ULL)
-                    || reinterpret_cast<usize>(perFrameGroup) == static_cast<usize>(~0ULL)) {
-                    DebugAssert(false, TEXT("BasicDeferredRenderer"),
-                        "Shadow cascade execute has poisoned pointers (cascade={}, perFrameBuffer={}, perFrameGroup={}).",
-                        cascadeIndex, reinterpret_cast<usize>(perFrameBuffer),
-                        reinterpret_cast<usize>(perFrameGroup));
-                    return;
-                }
-
-                if (perFrameBuffer != nullptr) {
-                    FPerFrameConstants constants{};
-                    constants.ViewProjection = lightViewProj;
-                    ctx.RHIUpdateDynamicBufferDiscard(
-                        perFrameBuffer, &constants, sizeof(constants), 0ULL);
-                }
-                if (perFrameBuffer == nullptr || perFrameGroup == nullptr) {
-                    return;
-                }
-
-                Rhi::FRhiViewportRect viewport{};
-                viewport.mX        = 0.0f;
-                viewport.mY        = 0.0f;
-                viewport.mWidth    = static_cast<f32>(shadowMapSize);
-                viewport.mHeight   = static_cast<f32>(shadowMapSize);
-                viewport.mMinDepth = 0.0f;
-                viewport.mMaxDepth = 1.0f;
-                ctx.RHISetViewport(viewport);
-
-                Rhi::FRhiScissorRect scissor{};
-                scissor.mX      = 0;
-                scissor.mY      = 0;
-                scissor.mWidth  = shadowMapSize;
-                scissor.mHeight = shadowMapSize;
-                ctx.RHISetScissor(scissor);
-
-                const auto* shadowDrawList =
-                    (cascadeIndex < 4U) ? executeData->ShadowDrawLists[cascadeIndex] : nullptr;
-                if (shadowDrawList != nullptr) {
-                    auto bindings     = executeData->DrawBindings;
-                    bindings.PerFrame = perFrameGroup;
-                    auto* bindingData = (cascadeIndex < 4U)
-                        ? &executeData->BindingDataPerCascade[cascadeIndex]
-                        : &executeData->FallbackBindingData;
-                    FDrawListExecutor::ExecuteBasePass(ctx, *shadowDrawList, bindings,
-                        ResolveShadowPassPipeline, &executeData->ShadowPipelineData, BindPerDraw,
-                        bindingData);
-                }
-            };
-            shadowInputs.ExecuteCascadeUserData = &executeCtx;
-
-            Deferred::AddCsmShadowPasses(shadowInputs, mGraphOutputs.mShadowMap);
+        Shadowing::FDeferredCsmPassSetInputs<FBasePassPipelineData, FBasePassBindingData>
+            shadowInputs{};
+        shadowInputs.mGraph                     = &graph;
+        shadowInputs.mView                      = view;
+        shadowInputs.mCsm                       = &csm;
+        shadowInputs.mDrawBindings              = drawBindings;
+        shadowInputs.mShadowPipelineData        = shadowPipelineData;
+        shadowInputs.mFallbackBindingData       = bindingData;
+        shadowInputs.mFallbackPerFrameBuffer    = mPerFrameBuffer.Get();
+        shadowInputs.mFallbackPerFrameGroup     = mPerFrameGroup.Get();
+        shadowInputs.mPersistentShadowMap       = &resources.ShadowMapCSM;
+        shadowInputs.mPersistentShadowMapSize   = &resources.ShadowMapCSMSize;
+        shadowInputs.mPersistentShadowMapLayers = &resources.ShadowMapCSMLayers;
+        shadowInputs.mResolveShadowPipeline     = ResolveShadowPassPipeline;
+        shadowInputs.mBindPerDraw               = BindPerDraw;
+        for (u32 i = 0U; i < 4U; ++i) {
+            shadowInputs.mShadowDrawLists[i]       = mViewContext.ShadowDrawLists[i];
+            shadowInputs.mBindingDataPerCascade[i] = bindingData;
+            shadowInputs.mBindingDataPerCascade[i].PerDrawCursorInstances =
+                bindingData.bUseInstanceCursor ? shadowPassFirstInstance[i] : 0U;
+            shadowInputs.mCascadePerFrameBuffers[i] = mShadowPerFrameBuffers[i].Get();
+            shadowInputs.mCascadePerFrameGroups[i]  = mShadowPerFrameGroups[i].Get();
         }
+
+        Shadowing::AddDeferredCsmPassSet(shadowInputs, mGraphOutputs.mShadowMap);
     }
 
     void FBasicDeferredRenderer::RegisterDeferredSsaoPass(RenderCore::FFrameGraph& graph) {
@@ -2386,23 +2267,28 @@ namespace AltinaEngine::Rendering {
             return;
         }
 
-        Deferred::FCsmBuildInputs csmInputs{};
-        csmInputs.View                      = view;
-        csmInputs.Lights                    = lights;
-        const Deferred::FCsmBuildResult csm = Deferred::BuildCsm(csmInputs);
-
-        FPerFrameConstants              perFrameConstants{};
-        BuildDeferredPerFrameConstants(*view, lights, csm, perFrameConstants);
-
-        Deferred::FDeferredSsaoPassInputs ssaoInputs{};
-        const auto                        viewRect = view->ViewRect;
-        const u32                         width    = view->RenderTargetExtent.Width;
-        const u32                         height   = view->RenderTargetExtent.Height;
-        if (BuildDeferredSsaoPassInputs(graph, device, resources, viewRect, perFrameConstants,
-                mPerFrameBuffer.Get(), mSsaoConstantsBuffer.Get(), mGraphOutputs.mGBufferB,
-                mGraphOutputs.mSceneDepth, width, height, ssaoInputs)) {
-            Deferred::AddDeferredSsaoPass(ssaoInputs, mGraphOutputs.mSsaoTexture);
+        EnsureLayouts(*device, resources);
+        const bool bHasSsaoPipeline = EnsureSsaoPipeline(*device, resources);
+        if (!bHasSsaoPipeline || !resources.SsaoLayout || !resources.OutputSampler) {
+            DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                "DeferredSsao skipped: shared pipeline/layout/sampler missing.");
+            return;
         }
+
+        AmbientOcclusion::FDeferredSsaoPassSetInputs ssaoInputs{};
+        ssaoInputs.mGraph               = &graph;
+        ssaoInputs.mView                = view;
+        ssaoInputs.mLights              = lights;
+        ssaoInputs.mPipeline            = resources.SsaoPipeline.Get();
+        ssaoInputs.mLayout              = resources.SsaoLayout.Get();
+        ssaoInputs.mSampler             = resources.OutputSampler.Get();
+        ssaoInputs.mBindings            = &resources.SsaoBindings;
+        ssaoInputs.mPerFrameBuffer      = mPerFrameBuffer.Get();
+        ssaoInputs.mSsaoConstantsBuffer = mSsaoConstantsBuffer.Get();
+        ssaoInputs.mGBufferB            = mGraphOutputs.mGBufferB;
+        ssaoInputs.mSceneDepth          = mGraphOutputs.mSceneDepth;
+        ssaoInputs.mDebugShadingMode    = gDeferredLightingDebugShadingMode;
+        AmbientOcclusion::AddDeferredSsaoPassSet(ssaoInputs, mGraphOutputs.mSsaoTexture);
     }
 
     void FBasicDeferredRenderer::RegisterDeferredLightingPass(RenderCore::FFrameGraph& graph) {

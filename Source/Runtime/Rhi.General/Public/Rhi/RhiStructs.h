@@ -24,14 +24,16 @@ namespace AltinaEngine::Rhi {
 
     struct FRhiInitDesc {
         FString           mAppName;
-        u32               mAppVersion          = 1U;
-        u32               mEngineVersion       = 1U;
-        ERhiBackend       mBackend             = ERhiBackend::Unknown;
-        ERhiGpuPreference mAdapterPreference   = ERhiGpuPreference::Auto;
-        bool              mEnableValidation    = false;
+        u32               mAppVersion        = 1U;
+        u32               mEngineVersion     = 1U;
+        ERhiBackend       mBackend           = ERhiBackend::Unknown;
+        ERhiGpuPreference mAdapterPreference = ERhiGpuPreference::Auto;
+        // Enable backend validation and debug diagnostics that catch incorrect API usage.
+        bool              mEnableValidation = false;
+        // Enable heavier GPU-side validation. Implies mEnableValidation during normalization.
         bool              mEnableGpuValidation = false;
-        bool              mEnableDebugLayer    = false;
-        bool              mEnableDebugNames    = true;
+        // Enable debug object names and markers when the backend supports them.
+        bool              mEnableDebugNames = true;
     };
 
     struct FRhiAdapterDesc {
@@ -128,7 +130,9 @@ namespace AltinaEngine::Rhi {
 
     struct FRhiDeviceDesc {
         FString mDebugName;
-        bool    mEnableDebugLayer       = false;
+        // Enable device-level validation and debug diagnostics when supported by the backend.
+        bool    mEnableValidation = false;
+        // Enable heavier GPU-side validation. Expected to imply mEnableValidation.
         bool    mEnableGpuValidation    = false;
         bool    mEnableStablePowerState = false;
     };

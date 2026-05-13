@@ -107,12 +107,12 @@ TEST_CASE("Rhi.Vulkan.UploadBufferManager.BasicAllocation") {
     FRhiInitDesc      init{};
     init.mAppName.Assign(TEXT("AltinaEngineTestsRhiVulkan"));
     init.mBackend             = ERhiBackend::Vulkan;
-    init.mEnableDebugLayer    = false;
+    init.mEnableValidation    = false;
     init.mEnableGpuValidation = false;
     init.mEnableDebugNames    = false;
 
     FRhiDeviceDesc deviceDesc{};
-    deviceDesc.mEnableDebugLayer    = false;
+    deviceDesc.mEnableValidation    = false;
     deviceDesc.mEnableGpuValidation = false;
 
     auto deviceShared = RHIInit(context, init, deviceDesc);
@@ -164,12 +164,12 @@ TEST_CASE("Rhi.Vulkan.StagingBufferManager.PoolReuseAndMap") {
     FRhiInitDesc      init{};
     init.mAppName.Assign(TEXT("AltinaEngineTestsRhiVulkan"));
     init.mBackend             = ERhiBackend::Vulkan;
-    init.mEnableDebugLayer    = false;
+    init.mEnableValidation    = false;
     init.mEnableGpuValidation = false;
     init.mEnableDebugNames    = false;
 
     FRhiDeviceDesc deviceDesc{};
-    deviceDesc.mEnableDebugLayer    = false;
+    deviceDesc.mEnableValidation    = false;
     deviceDesc.mEnableGpuValidation = false;
 
     auto deviceShared = RHIInit(context, init, deviceDesc);
@@ -217,12 +217,12 @@ TEST_CASE("Rhi.Vulkan.UpdateTextureSubresource.DispatchReadsCorrectTexel") {
     FRhiInitDesc      init{};
     init.mAppName.Assign(TEXT("AltinaEngineTestsRhiVulkan"));
     init.mBackend             = ERhiBackend::Vulkan;
-    init.mEnableDebugLayer    = false;
+    init.mEnableValidation    = false;
     init.mEnableGpuValidation = false;
     init.mEnableDebugNames    = false;
 
     FRhiDeviceDesc deviceDesc{};
-    deviceDesc.mEnableDebugLayer    = false;
+    deviceDesc.mEnableValidation    = false;
     deviceDesc.mEnableGpuValidation = false;
 
     auto deviceShared = RHIInit(context, init, deviceDesc);

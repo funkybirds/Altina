@@ -14,10 +14,6 @@ namespace AltinaEngine::Rhi {
                 desc.mEnableValidation = true;
             }
 
-            if (desc.mEnableValidation) {
-                desc.mEnableDebugLayer = true;
-            }
-
             return desc;
         }
     } // namespace

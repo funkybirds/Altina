@@ -109,7 +109,7 @@ namespace AltinaEngine::Rhi {
             state.mFactory1.Reset();
 
             UINT flags = 0U;
-            if (desc.mEnableDebugLayer) {
+            if (desc.mEnableValidation) {
                 flags |= DXGI_CREATE_FACTORY_DEBUG;
             }
 
@@ -209,8 +209,8 @@ namespace AltinaEngine::Rhi {
         if (!mState) {
             mState = MakeUnique<FRhiD3D11ContextState>();
         }
-        LogInfoCat(TEXT("RHI.D3D11"), TEXT("Initializing (DebugLayer={}, GPUValidation={})."),
-            desc.mEnableDebugLayer, desc.mEnableGpuValidation);
+        LogInfoCat(TEXT("RHI.D3D11"), TEXT("Initializing (Validation={}, GPUValidation={})."),
+            desc.mEnableValidation, desc.mEnableGpuValidation);
 
         // GUI demos often have no console; emit a temp file stamp so we can verify the backend
         // runs.
@@ -234,8 +234,8 @@ namespace AltinaEngine::Rhi {
 
             std::ofstream file(path.c_str(), std::ios::out | std::ios::app);
             if (file.good()) {
-                file << "InitializeBackend DebugLayer="
-                     << (desc.mEnableDebugLayer ? "true" : "false")
+                file << "InitializeBackend Validation="
+                     << (desc.mEnableValidation ? "true" : "false")
                      << " GPUValidation=" << (desc.mEnableGpuValidation ? "true" : "false") << "\n";
                 file.flush();
             }
@@ -326,7 +326,7 @@ namespace AltinaEngine::Rhi {
         ComPtr<ID3D11DeviceContext> context;
         D3D_FEATURE_LEVEL           featureLevel = D3D_FEATURE_LEVEL_11_0;
 
-        const bool wantsDebug = desc.mEnableDebugLayer || desc.mEnableGpuValidation;
+        const bool                  wantsDebug = desc.mEnableValidation;
 
         HRESULT hr = TryCreateD3D11Device(nativeAdapter, wantsDebug, device, context, featureLevel);
         if (FAILED(hr) && wantsDebug) {

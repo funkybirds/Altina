@@ -139,7 +139,7 @@ TEST_CASE("RhiD3D11.DeviceCreation") {
 
     FRhiD3D11Context context;
     FRhiInitDesc     initDesc;
-    initDesc.mEnableDebugLayer = false;
+    initDesc.mEnableValidation = false;
 
     REQUIRE(context.Init(initDesc));
 
@@ -212,7 +212,7 @@ TEST_CASE("RhiD3D11.DeferredContextSubmitExecutes") {
 
     FRhiD3D11Context context;
     FRhiInitDesc     initDesc;
-    initDesc.mEnableDebugLayer = false;
+    initDesc.mEnableValidation = false;
 
     REQUIRE(context.Init(initDesc));
 
@@ -290,7 +290,7 @@ TEST_CASE("RhiD3D11.CmdListAdapterDispatchWrites") {
 
     FRhiD3D11Context context;
     FRhiInitDesc     initDesc;
-    initDesc.mEnableDebugLayer = false;
+    initDesc.mEnableValidation = false;
 
     REQUIRE(context.Init(initDesc));
 
@@ -444,7 +444,7 @@ TEST_CASE("RhiD3D11.GraphicsUavBindingRespectsRtvSlots") {
 
     FRhiD3D11Context context;
     FRhiInitDesc     initDesc;
-    initDesc.mEnableDebugLayer = false;
+    initDesc.mEnableValidation = false;
 
     REQUIRE(context.Init(initDesc));
 
@@ -602,7 +602,7 @@ TEST_CASE("RhiD3D11.BufferLockCpuGpu") {
 
     FRhiD3D11Context context;
     FRhiInitDesc     initDesc;
-    initDesc.mEnableDebugLayer = false;
+    initDesc.mEnableValidation = false;
 
     const auto device = RHIInit(context, initDesc, FRhiDeviceDesc{}, kRhiInvalidAdapterIndex);
     if (!device) {

@@ -54,12 +54,12 @@ TEST_CASE("Rhi.Vulkan.Smoke.InitDeviceAndDispatch") {
     FRhiInitDesc      init{};
     init.mAppName.Assign(TEXT("AltinaEngineTestsRhiVulkan"));
     init.mBackend             = ERhiBackend::Vulkan;
-    init.mEnableDebugLayer    = false;
+    init.mEnableValidation    = false;
     init.mEnableGpuValidation = false;
     init.mEnableDebugNames    = false;
 
     FRhiDeviceDesc deviceDesc{};
-    deviceDesc.mEnableDebugLayer    = false;
+    deviceDesc.mEnableValidation    = false;
     deviceDesc.mEnableGpuValidation = false;
 
     auto deviceShared = RHIInit(context, init, deviceDesc);

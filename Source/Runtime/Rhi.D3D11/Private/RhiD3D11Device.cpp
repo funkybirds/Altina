@@ -2790,15 +2790,14 @@ namespace AltinaEngine::Rhi {
         }
 
         if (mState && mState->mDevice) {
-            if (desc.mEnableDebugLayer || desc.mEnableGpuValidation) {
+            if (desc.mEnableValidation) {
                 mState->mInfoQueue.Reset();
                 mState->mDevice.As(&mState->mInfoQueue);
                 ConfigureInfoQueue(mState->mInfoQueue.Get());
             }
         }
 
-        if (mState && mState->mImmediateContext
-            && (desc.mEnableDebugLayer || desc.mEnableGpuValidation)) {
+        if (mState && mState->mImmediateContext && desc.mEnableValidation) {
     #if defined(__ID3D11Multithread_INTERFACE_DEFINED__)
             ComPtr<ID3D11Multithread> multithread;
             if (SUCCEEDED(mState->mImmediateContext.As(&multithread)) && multithread) {

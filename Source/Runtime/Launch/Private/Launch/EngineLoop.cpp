@@ -1224,11 +1224,12 @@ namespace AltinaEngine::Launch {
 
             Rhi::FRhiInitDesc initDesc{};
             initDesc.mAppName.Assign(TEXT("AltinaEngine"));
-            initDesc.mBackend          = backend;
-            initDesc.mEnableDebugLayer = true;
+            initDesc.mBackend             = backend;
+            initDesc.mEnableValidation    = true;
+            initDesc.mEnableGpuValidation = true;
 
             Rhi::FRhiDeviceDesc deviceDesc{};
-            deviceDesc.mEnableDebugLayer    = initDesc.mEnableDebugLayer;
+            deviceDesc.mEnableValidation    = initDesc.mEnableValidation;
             deviceDesc.mEnableGpuValidation = initDesc.mEnableGpuValidation;
 
             mRhiDevice = Rhi::RHIInit(*mRhiContext, initDesc, deviceDesc);
@@ -1260,7 +1261,7 @@ namespace AltinaEngine::Launch {
         initDesc.mAppName.Assign(TEXT("AltinaEngine"));
 
         Rhi::FRhiDeviceDesc deviceDesc{};
-        deviceDesc.mEnableDebugLayer    = initDesc.mEnableDebugLayer;
+        deviceDesc.mEnableValidation    = initDesc.mEnableValidation;
         deviceDesc.mEnableGpuValidation = initDesc.mEnableGpuValidation;
 
         mRhiDevice = Rhi::RHIInit(*mRhiContext, initDesc, deviceDesc);

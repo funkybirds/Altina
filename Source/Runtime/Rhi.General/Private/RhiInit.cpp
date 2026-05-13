@@ -11,6 +11,13 @@ namespace AltinaEngine::Rhi {
         FRhiInitDesc        gRhiInitDesc;
         bool                gHasRhiInitDesc = false;
         FRhiFrameStats      gRhiFrameStats;
+
+        auto                NormalizeDeviceDesc(FRhiDeviceDesc desc) -> FRhiDeviceDesc {
+            if (desc.mEnableGpuValidation) {
+                desc.mEnableValidation = true;
+            }
+            return desc;
+        }
     } // namespace
 
     auto RHIInit(FRhiContext& context, const FRhiInitDesc& initDesc,
@@ -19,14 +26,15 @@ namespace AltinaEngine::Rhi {
             return {};
         }
 
-        TShared<FRhiDevice> device = context.CreateDevice(adapterIndex, deviceDesc);
+        const FRhiDeviceDesc normalizedDeviceDesc = NormalizeDeviceDesc(deviceDesc);
+        TShared<FRhiDevice>  device = context.CreateDevice(adapterIndex, normalizedDeviceDesc);
         if (!device) {
             context.Shutdown();
             return {};
         }
 
         gRhiDevice      = device;
-        gRhiInitDesc    = initDesc;
+        gRhiInitDesc    = context.GetInitDesc();
         gHasRhiInitDesc = true;
         return device;
     }

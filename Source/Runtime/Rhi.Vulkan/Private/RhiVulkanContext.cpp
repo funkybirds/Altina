@@ -213,8 +213,8 @@ namespace AltinaEngine::Rhi {
             mState = MakeUnique<FRhiVulkanContextState>();
         }
 
-        LogInfoCat(TEXT("RHI.Vulkan"), TEXT("Initializing (DebugLayer={}, GPUValidation={})."),
-            desc.mEnableDebugLayer, desc.mEnableGpuValidation);
+        LogInfoCat(TEXT("RHI.Vulkan"), TEXT("Initializing (Validation={}, GPUValidation={})."),
+            desc.mEnableValidation, desc.mEnableGpuValidation);
 
         const u32 loaderVersion  = GetVulkanVersion();
         mState->mInstanceVersion = PickApiVersion(loaderVersion);
@@ -237,7 +237,7 @@ namespace AltinaEngine::Rhi {
             vkEnumerateInstanceLayerProperties(&layerCount, layers.Data());
         }
 
-        if (desc.mEnableDebugLayer || desc.mEnableGpuValidation) {
+        if (desc.mEnableValidation) {
             const char* validationLayer = "VK_LAYER_KHRONOS_validation";
             if (HasLayer(layers, validationLayer)) {
                 mState->mEnabledLayers.PushBack(validationLayer);
@@ -277,7 +277,7 @@ namespace AltinaEngine::Rhi {
             return false;
         }
 
-        if (mState->mDebugUtilsEnabled && (desc.mEnableDebugLayer || desc.mEnableGpuValidation)) {
+        if (mState->mDebugUtilsEnabled && desc.mEnableValidation) {
             mState->mDebugMessenger = CreateDebugMessenger(mState->mInstance);
         }
 

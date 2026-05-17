@@ -64,10 +64,12 @@ namespace AltinaEngine::Rendering {
         Rhi::FRhiBufferRef                                mPerFrameBuffer;
         Rhi::FRhiBindGroupRef                             mPerFrameGroup;
         Rhi::FRhiBufferRef                                mPerDrawBuffer;
+        Rhi::FRhiBufferRef                                mPerDrawConstantsBuffer;
         TArray<Rhi::FRhiBindGroupRef, kInstanceFrameRing> mPerDrawGroups{};
-        u32                                               mPerDrawStrideBytes = 0U;
-        u32                                               mPerDrawCapacity    = 0U;
-        u32                                               mPerDrawFrameSlot   = 0U;
+        u32                                               mPerDrawStrideBytes          = 0U;
+        u32                                               mPerDrawConstantsStrideBytes = 0U;
+        u32                                               mPerDrawCapacity             = 0U;
+        u32                                               mPerDrawFrameSlot            = 0U;
         Rhi::FRhiBufferRef                                mIblConstantsBuffer;
         Rhi::FRhiBufferRef                                mSsaoConstantsBuffer;
 

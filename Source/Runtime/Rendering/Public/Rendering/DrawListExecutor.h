@@ -8,7 +8,9 @@
 
 namespace AltinaEngine::Rendering {
     struct FDrawBatchExecutionParams {
-        u32 mFirstInstance = 0U;
+        u32 mFirstInstance             = 0U;
+        u32 mPerDrawDynamicOffsets[4]  = {};
+        u32 mPerDrawDynamicOffsetCount = 0U;
     };
 
     struct FDrawListBindings {

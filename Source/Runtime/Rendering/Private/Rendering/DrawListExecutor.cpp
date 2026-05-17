@@ -209,7 +209,9 @@ namespace AltinaEngine::Rendering {
                     // Per-draw buffer content can change for every batch; rebind to avoid backend
                     // state aliasing/stale SRV reads when updating and drawing from the same
                     // buffer.
-                    ctx.RHISetBindGroup(bindings.PerDrawSetIndex, bindings.PerDraw, nullptr, 0U);
+                    ctx.RHISetBindGroup(bindings.PerDrawSetIndex, bindings.PerDraw,
+                        executionParams.mPerDrawDynamicOffsets,
+                        executionParams.mPerDrawDynamicOffsetCount);
                 }
 
                 ctx.RHIDrawIndexed(section->IndexCount, instanceCount, section->FirstIndex,

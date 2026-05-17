@@ -760,3 +760,78 @@ TEST_CASE("ShaderCompiler.DXC.BuiltinDeferredShaders") {
     REQUIRE(CompileShaderFromRepoFile(ssaoPath, TEXT("PSSsao"), EShaderStage::Pixel,
         EShaderSourceLanguage::Hlsl, ERhiBackend::DirectX12, "DXC-SSAO-PS"));
 }
+
+TEST_CASE("ShaderCompiler.DXC.BuiltinDeferredPerDrawBindings") {
+    const auto includeDir        = GetShaderIncludeDir();
+    const auto basicDeferredPath = includeDir / "Shader" / "Deferred" / "BasicDeferred.hlsl";
+    const auto shadowDepthPath   = includeDir / "Shader" / "Shadow" / "ShadowDepth.hlsl";
+
+    auto       CompileAndCheckPerDrawBindings = [&](const std::filesystem::path& shaderPath,
+                                              const AltinaEngine::TChar*   entryPoint,
+                                              const char*                  label) {
+        FShaderCompileRequest request;
+        request.mSource.mPath           = ToFString(shaderPath);
+        request.mSource.mEntryPoint     = FString(entryPoint);
+        request.mSource.mStage          = EShaderStage::Vertex;
+        request.mSource.mLanguage       = EShaderSourceLanguage::Hlsl;
+        request.mOptions.mTargetBackend = ERhiBackend::DirectX12;
+        AddShaderIncludeDir(request);
+
+        const auto result = GetShaderCompiler().Compile(request);
+        if (!result.mSucceeded && IsCompilerUnavailable(result)) {
+            std::cout << "[ SKIP ] " << label << " compiler unavailable\n";
+            return false;
+        }
+
+        if (!result.mSucceeded) {
+            std::cerr << "[FAIL] " << label << " compile diagnostics:\n"
+                      << ToAsciiString(result.mDiagnostics) << "\n";
+        }
+
+        REQUIRE(result.mSucceeded);
+        REQUIRE(!result.mBytecode.IsEmpty());
+        if (!result.mSucceeded) {
+            return false;
+        }
+
+        const auto* perDrawConstants =
+            static_cast<const AltinaEngine::Shader::FShaderConstantBuffer*>(nullptr);
+        for (const auto& cbuffer : result.mReflection.mConstantBuffers) {
+            if (ToAsciiString(cbuffer.mName) == "PerDrawConstants") {
+                perDrawConstants = &cbuffer;
+                break;
+            }
+        }
+
+        const auto* instanceDataBuffer =
+            static_cast<const AltinaEngine::ShaderCompiler::FShaderResourceBinding*>(nullptr);
+        for (const auto& resource : result.mReflection.mResources) {
+            if (ToAsciiString(resource.mName) == "InstanceDataBuffer") {
+                instanceDataBuffer = &resource;
+                break;
+            }
+        }
+
+        REQUIRE(perDrawConstants != nullptr);
+        REQUIRE(instanceDataBuffer != nullptr);
+        if (perDrawConstants == nullptr || instanceDataBuffer == nullptr) {
+            return false;
+        }
+
+        REQUIRE(perDrawConstants->mSet == 1U);
+        REQUIRE(instanceDataBuffer->mSet == 1U);
+        REQUIRE(perDrawConstants->mBinding == 0U);
+        REQUIRE(instanceDataBuffer->mBinding == 0U);
+        REQUIRE(perDrawConstants->mSizeBytes >= 16U);
+        return true;
+    };
+
+    const bool basePassOk = CompileAndCheckPerDrawBindings(
+        basicDeferredPath, TEXT("VSBase"), "DXC-BasicDeferred-PerDraw");
+    if (!basePassOk) {
+        return;
+    }
+
+    REQUIRE(CompileAndCheckPerDrawBindings(
+        shadowDepthPath, TEXT("VSShadowDepth"), "DXC-ShadowDepth-PerDraw"));
+}

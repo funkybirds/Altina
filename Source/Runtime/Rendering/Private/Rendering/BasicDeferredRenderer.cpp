@@ -68,6 +68,7 @@ namespace AltinaEngine::Rendering {
         using Deferred::FIblConstants;
         using Deferred::FInstanceDrawData;
         using Deferred::FPerFrameConstants;
+        constexpr u32 kPerDrawConstantsStrideBytes = 256U;
 
         struct FBasePassPipelineStats {
             u32 mBaseHits             = 0U;
@@ -76,6 +77,13 @@ namespace AltinaEngine::Rendering {
             u32 mShadowMisses         = 0U;
             u32 mMaterialLayoutMisses = 0U;
             u32 mPipelineLayoutMisses = 0U;
+        };
+
+        struct FPerDrawConstants {
+            u32 mInstanceBaseIndex = 0U;
+            u32 mPad0              = 0U;
+            u32 mPad1              = 0U;
+            u32 mPad2              = 0U;
         };
 
         thread_local FBasePassPipelineStats gBasePassPipelineStats{};
@@ -163,8 +171,9 @@ namespace AltinaEngine::Rendering {
 
             Rhi::FRhiBindGroupLayoutRef                       PerFrameLayout;
             Rhi::FRhiBindGroupLayoutRef                       PerDrawLayout;
-            u32                                               PerFrameBinding = 0U;
-            u32                                               PerDrawBinding  = 0U;
+            u32                                               PerFrameBinding         = 0U;
+            u32                                               PerDrawBinding          = 0U;
+            u32                                               PerDrawConstantsBinding = 0U;
             Rhi::FRhiBindGroupLayoutRef                       OutputLayout;
             Rhi::FRhiSamplerRef                               OutputSampler;
             Rhi::FRhiPipelineLayoutRef                        OutputPipelineLayout;
@@ -259,29 +268,44 @@ namespace AltinaEngine::Rendering {
 
         void RebuildPerDrawBindGroups(Rhi::FRhiDevice& device,
             const FDeferredSharedResources& resources, Rhi::FRhiBuffer* perDrawBuffer,
-            u32 perDrawStrideBytes, u32 perDrawCapacity,
+            Rhi::FRhiBuffer* perDrawConstantsBuffer, u32 perDrawStrideBytes,
+            u32 perDrawConstantsStrideBytes, u32 perDrawCapacity,
             TArray<Rhi::FRhiBindGroupRef, 4U>& outGroups) {
             for (auto& group : outGroups) {
                 group.Reset();
             }
 
-            if (perDrawBuffer == nullptr || resources.PerDrawLayout.Get() == nullptr) {
+            if (perDrawBuffer == nullptr || perDrawConstantsBuffer == nullptr
+                || resources.PerDrawLayout.Get() == nullptr) {
                 return;
             }
 
             constexpr u32 kPerDrawFrameRing = 4U;
             const u32     slotCount         = IsVulkanBackend() ? kPerDrawFrameRing : 1U;
-            const u64     slotSizeBytes =
+            const u64     instanceSlotSizeBytes =
                 static_cast<u64>(perDrawStrideBytes) * static_cast<u64>(perDrawCapacity);
+            const u64 constantsSlotSizeBytes =
+                static_cast<u64>(perDrawConstantsStrideBytes) * static_cast<u64>(perDrawCapacity);
             for (u32 slotIndex = 0U; slotIndex < slotCount; ++slotIndex) {
-                const u64 slotOffsetBytes = slotSizeBytes * static_cast<u64>(slotIndex);
+                const u64 instanceSlotOffsetBytes =
+                    instanceSlotSizeBytes * static_cast<u64>(slotIndex);
+                const u64 constantsSlotOffsetBytes =
+                    constantsSlotSizeBytes * static_cast<u64>(slotIndex);
 
                 RenderCore::ShaderBinding::FBindGroupBuilder builder(resources.PerDrawLayout.Get());
                 DebugAssert(builder.AddSampledBuffer(resources.PerDrawBinding, perDrawBuffer,
-                                slotOffsetBytes, slotSizeBytes),
+                                instanceSlotOffsetBytes, instanceSlotSizeBytes),
                     TEXT("BasicDeferredRenderer"),
                     "Failed to add per-draw instance buffer binding (binding={}, slot={}, offset={}, size={}).",
-                    resources.PerDrawBinding, slotIndex, slotOffsetBytes, slotSizeBytes);
+                    resources.PerDrawBinding, slotIndex, instanceSlotOffsetBytes,
+                    instanceSlotSizeBytes);
+                DebugAssert(
+                    builder.AddBuffer(resources.PerDrawConstantsBinding, perDrawConstantsBuffer,
+                        constantsSlotOffsetBytes, static_cast<u64>(perDrawConstantsStrideBytes)),
+                    TEXT("BasicDeferredRenderer"),
+                    "Failed to add per-draw constants binding (binding={}, slot={}, offset={}, size={}).",
+                    resources.PerDrawConstantsBinding, slotIndex, constantsSlotOffsetBytes,
+                    perDrawConstantsStrideBytes);
                 Rhi::FRhiBindGroupDesc groupDesc{};
                 DebugAssert(builder.Build(groupDesc), TEXT("BasicDeferredRenderer"),
                     "Failed to build per-draw bind group desc from layout (slot={}).", slotIndex);
@@ -519,6 +543,87 @@ namespace AltinaEngine::Rendering {
             return true;
         }
 
+        auto EnsurePerDrawLayout(Rhi::FRhiDevice& device, FDeferredSharedResources& resources,
+            const TVector<RenderCore::FShaderRegistry::FShaderKey>& shaderKeys) -> bool {
+            if (resources.PerDrawLayout) {
+                return true;
+            }
+            if (shaderKeys.IsEmpty()) {
+                DebugAssert(false, TEXT("BasicDeferredRenderer"),
+                    "Failed to resolve per-draw bind group layout from shader reflection.");
+                return false;
+            }
+
+            u32                       bufferSetIndex   = 0U;
+            u32                       bufferBinding    = 0U;
+            Rhi::ERhiShaderStageFlags bufferVisibility = Rhi::ERhiShaderStageFlags::All;
+            const bool                foundBuffer =
+                RenderCore::ShaderBinding::ResolveResourceBindingByName(resources.Registry,
+                    shaderKeys, TEXT("InstanceDataBuffer"), Rhi::ERhiBindingType::SampledBuffer,
+                    bufferSetIndex, bufferBinding, bufferVisibility);
+            DebugAssert(foundBuffer, TEXT("BasicDeferredRenderer"),
+                "Failed to resolve per-draw instance buffer binding from shader reflection.");
+            if (!foundBuffer) {
+                return false;
+            }
+
+            u32                       constantsSetIndex   = 0U;
+            u32                       constantsBinding    = 0U;
+            Rhi::ERhiShaderStageFlags constantsVisibility = Rhi::ERhiShaderStageFlags::All;
+            const bool                foundConstants =
+                RenderCore::ShaderBinding::ResolveConstantBufferBindingByName(resources.Registry,
+                    shaderKeys, TEXT("PerDrawConstants"), constantsSetIndex, constantsBinding,
+                    constantsVisibility);
+            DebugAssert(foundConstants, TEXT("BasicDeferredRenderer"),
+                "Failed to resolve per-draw constants binding from shader reflection.");
+            if (!foundConstants) {
+                return false;
+            }
+
+            DebugAssert(bufferSetIndex == constantsSetIndex, TEXT("BasicDeferredRenderer"),
+                "Per-draw resources must be in the same bind group set (bufferSet={}, constantsSet={}).",
+                bufferSetIndex, constantsSetIndex);
+            if (bufferSetIndex != constantsSetIndex) {
+                return false;
+            }
+
+            Rhi::FRhiBindGroupLayoutDesc layoutDesc{};
+            const bool built = RenderCore::ShaderBinding::BuildBindGroupLayoutFromShaderSet(
+                resources.Registry, shaderKeys, bufferSetIndex, layoutDesc);
+            DebugAssert(built, TEXT("BasicDeferredRenderer"),
+                "Failed to build per-draw bind group layout from shader reflection.");
+            if (!built) {
+                return false;
+            }
+
+            bool foundDynamicEntry = false;
+            for (auto& entry : layoutDesc.mEntries) {
+                if (entry.mBinding != constantsBinding
+                    || entry.mType != Rhi::ERhiBindingType::ConstantBuffer) {
+                    continue;
+                }
+                entry.mHasDynamicOffset = true;
+                foundDynamicEntry       = true;
+                break;
+            }
+            DebugAssert(foundDynamicEntry, TEXT("BasicDeferredRenderer"),
+                "Failed to mark per-draw constants binding as dynamic (binding={}).",
+                constantsBinding);
+            if (!foundDynamicEntry) {
+                return false;
+            }
+
+            layoutDesc.mLayoutHash  = BuildLayoutHash(layoutDesc.mEntries, layoutDesc.mSetIndex);
+            resources.PerDrawLayout = device.CreateBindGroupLayout(layoutDesc);
+            if (!resources.PerDrawLayout) {
+                return false;
+            }
+
+            resources.PerDrawBinding          = bufferBinding;
+            resources.PerDrawConstantsBinding = constantsBinding;
+            return true;
+        }
+
         void EnsurePipelineLayoutFromSingleBindGroup(Rhi::FRhiDevice& device,
             Rhi::FRhiBindGroupLayoutRef&                              bindGroupLayout,
             Rhi::FRhiPipelineLayoutRef&                               outPipelineLayout) {
@@ -556,11 +661,7 @@ namespace AltinaEngine::Rendering {
             }
 
             if (!resources.PerDrawLayout) {
-                (void)EnsureSingleReflectedBindingLayout(device, resources, basePassShaderKeys,
-                    TEXT("InstanceDataBuffer"), Rhi::ERhiBindingType::SampledBuffer, false,
-                    resources.PerDrawLayout, resources.PerDrawBinding,
-                    TEXT(
-                        "Failed to resolve per-draw instance buffer binding from shader reflection."));
+                (void)EnsurePerDrawLayout(device, resources, basePassShaderKeys);
             }
 
             if (!resources.OutputLayout) {
@@ -954,18 +1055,22 @@ namespace AltinaEngine::Rendering {
         }
 
         struct FBasePassBindingData {
-            Rhi::FRhiBuffer* PerDrawBuffer          = nullptr;
-            u32              PerDrawStrideBytes     = 0U;
-            u32              PerDrawCapacity        = 0U;
-            u64              PerDrawBaseOffsetBytes = 0ULL;
-            u32              PerDrawCursorInstances = 0U;
-            bool             bUseInstanceCursor     = false;
+            Rhi::FRhiBuffer* PerDrawBuffer                   = nullptr;
+            Rhi::FRhiBuffer* PerDrawConstantsBuffer          = nullptr;
+            u32              PerDrawStrideBytes              = 0U;
+            u32              PerDrawConstantsStrideBytes     = 0U;
+            u32              PerDrawCapacity                 = 0U;
+            u64              PerDrawBaseOffsetBytes          = 0ULL;
+            u64              PerDrawConstantsBaseOffsetBytes = 0ULL;
+            u32              PerDrawCursorInstances          = 0U;
+            u32              PerDrawConstantsCursor          = 0U;
         };
 
         void BindPerDraw(Rhi::FRhiCmdContext& ctx, const RenderCore::Render::FDrawBatch& batch,
             FDrawBatchExecutionParams& outParams, void* userData) {
             auto* data = static_cast<FBasePassBindingData*>(userData);
-            if (!data || data->PerDrawBuffer == nullptr) {
+            if (!data || data->PerDrawBuffer == nullptr
+                || data->PerDrawConstantsBuffer == nullptr) {
                 return;
             }
 
@@ -977,25 +1082,27 @@ namespace AltinaEngine::Rendering {
                 TEXT("BasicDeferredRenderer"),
                 "PerDraw instance stride invalid (stride={}, expected={}).",
                 data->PerDrawStrideBytes, static_cast<u32>(sizeof(FInstanceDrawData)));
+            DebugAssert(
+                data->PerDrawConstantsStrideBytes >= static_cast<u32>(sizeof(FPerDrawConstants)),
+                TEXT("BasicDeferredRenderer"),
+                "PerDraw constants stride invalid (stride={}, expectedAtLeast={}).",
+                data->PerDrawConstantsStrideBytes, static_cast<u32>(sizeof(FPerDrawConstants)));
 
             const u32 instanceCount = static_cast<u32>(batch.mInstances.Size());
-            u32       firstInstance = 0U;
-            if (data->bUseInstanceCursor) {
-                firstInstance = data->PerDrawCursorInstances;
-                DebugAssert(firstInstance <= data->PerDrawCapacity, TEXT("BasicDeferredRenderer"),
-                    "PerDraw first-instance out of range (firstInstance={}, capacity={}).",
-                    firstInstance, data->PerDrawCapacity);
-                const u32 remainingCapacity = (firstInstance <= data->PerDrawCapacity)
-                    ? (data->PerDrawCapacity - firstInstance)
-                    : 0U;
-                DebugAssert(instanceCount <= remainingCapacity, TEXT("BasicDeferredRenderer"),
-                    "PerDraw instance buffer overflow (firstInstance={}, instanceCount={}, capacity={}).",
-                    firstInstance, instanceCount, data->PerDrawCapacity);
-            } else {
-                DebugAssert(instanceCount <= data->PerDrawCapacity, TEXT("BasicDeferredRenderer"),
-                    "PerDraw instance buffer overflow (instanceCount={}, capacity={}).",
-                    instanceCount, data->PerDrawCapacity);
-            }
+            const u32 firstInstance = data->PerDrawCursorInstances;
+            DebugAssert(firstInstance <= data->PerDrawCapacity, TEXT("BasicDeferredRenderer"),
+                "PerDraw first-instance out of range (firstInstance={}, capacity={}).",
+                firstInstance, data->PerDrawCapacity);
+            const u32 remainingCapacity = (firstInstance <= data->PerDrawCapacity)
+                ? (data->PerDrawCapacity - firstInstance)
+                : 0U;
+            DebugAssert(instanceCount <= remainingCapacity, TEXT("BasicDeferredRenderer"),
+                "PerDraw instance buffer overflow (firstInstance={}, instanceCount={}, capacity={}).",
+                firstInstance, instanceCount, data->PerDrawCapacity);
+            DebugAssert(data->PerDrawConstantsCursor < data->PerDrawCapacity,
+                TEXT("BasicDeferredRenderer"),
+                "PerDraw constants buffer overflow (cursor={}, capacity={}).",
+                data->PerDrawConstantsCursor, data->PerDrawCapacity);
 
             static thread_local TVector<FInstanceDrawData> uploadData{};
             uploadData.Clear();
@@ -1007,19 +1114,29 @@ namespace AltinaEngine::Rendering {
                 uploadData.PushBack(Move(gpuData));
             }
 
-            const u64 byteOffset = data->bUseInstanceCursor
-                ? (data->PerDrawBaseOffsetBytes
-                      + static_cast<u64>(firstInstance)
-                          * static_cast<u64>(sizeof(FInstanceDrawData)))
-                : data->PerDrawBaseOffsetBytes;
+            const u64 byteOffset = data->PerDrawBaseOffsetBytes
+                + static_cast<u64>(firstInstance) * static_cast<u64>(sizeof(FInstanceDrawData));
             const u64 byteSize =
                 static_cast<u64>(instanceCount) * static_cast<u64>(sizeof(FInstanceDrawData));
             ctx.RHIUpdateDynamicBufferDiscard(
                 data->PerDrawBuffer, uploadData.Data(), byteSize, byteOffset);
-            outParams.mFirstInstance = data->bUseInstanceCursor ? firstInstance : 0U;
-            if (data->bUseInstanceCursor) {
-                data->PerDrawCursorInstances += instanceCount;
-            }
+
+            FPerDrawConstants constants{};
+            constants.mInstanceBaseIndex = firstInstance;
+
+            const u64 constantsOffset = data->PerDrawConstantsBaseOffsetBytes
+                + static_cast<u64>(data->PerDrawConstantsCursor)
+                    * static_cast<u64>(data->PerDrawConstantsStrideBytes);
+            ctx.RHIUpdateDynamicBufferDiscard(
+                data->PerDrawConstantsBuffer, &constants, sizeof(constants), constantsOffset);
+
+            outParams.mFirstInstance = 0U;
+            outParams.mPerDrawDynamicOffsets[0] =
+                data->PerDrawConstantsCursor * data->PerDrawConstantsStrideBytes;
+            outParams.mPerDrawDynamicOffsetCount = 1U;
+
+            data->PerDrawCursorInstances += instanceCount;
+            data->PerDrawConstantsCursor += 1U;
         }
 
         [[nodiscard]] auto BuildDeferredLightingPassInputs(RenderCore::FFrameGraph& graph,
@@ -1369,8 +1486,9 @@ namespace AltinaEngine::Rendering {
 
         resources.PerFrameLayout.Reset();
         resources.PerDrawLayout.Reset();
-        resources.PerFrameBinding = 0U;
-        resources.PerDrawBinding  = 0U;
+        resources.PerFrameBinding         = 0U;
+        resources.PerDrawBinding          = 0U;
+        resources.PerDrawConstantsBinding = 0U;
 
         resources.BasePipelines.Clear();
         resources.ShadowPipelines.Clear();
@@ -1565,32 +1683,51 @@ namespace AltinaEngine::Rendering {
             }
         }
 
-        mPerDrawStrideBytes = static_cast<u32>(sizeof(FInstanceDrawData));
-        mPerDrawCapacity    = GetPerDrawInstanceCapacity();
+        mPerDrawStrideBytes          = static_cast<u32>(sizeof(FInstanceDrawData));
+        mPerDrawConstantsStrideBytes = kPerDrawConstantsStrideBytes;
+        mPerDrawCapacity             = GetPerDrawInstanceCapacity();
 
         const u64 perDrawBufferSize = static_cast<u64>(mPerDrawStrideBytes)
             * static_cast<u64>(mPerDrawCapacity)
             * static_cast<u64>(IsVulkanBackend() ? FBasicDeferredRenderer::kInstanceFrameRing : 1U);
+        const u64 perDrawConstantsBufferSize = static_cast<u64>(mPerDrawConstantsStrideBytes)
+            * static_cast<u64>(mPerDrawCapacity)
+            * static_cast<u64>(IsVulkanBackend() ? FBasicDeferredRenderer::kInstanceFrameRing : 1U);
 
-        if (!mPerDrawBuffer || mPerDrawBuffer->GetDesc().mSizeBytes != perDrawBufferSize) {
+        if (!mPerDrawBuffer || !mPerDrawConstantsBuffer
+            || mPerDrawBuffer->GetDesc().mSizeBytes != perDrawBufferSize
+            || mPerDrawConstantsBuffer->GetDesc().mSizeBytes != perDrawConstantsBufferSize) {
             for (auto& group : mPerDrawGroups) {
                 group.Reset();
             }
             mPerDrawBuffer.Reset();
+            mPerDrawConstantsBuffer.Reset();
 
-            Rhi::FRhiBufferDesc desc{};
-            desc.mDebugName.Assign(TEXT("Deferred.PerDraw"));
-            desc.mSizeBytes = perDrawBufferSize;
-            desc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
-                                                : Rhi::ERhiResourceUsage::Default;
-            desc.mBindFlags = Rhi::ERhiBufferBindFlags::ShaderResource;
-            desc.mCpuAccess =
+            Rhi::FRhiBufferDesc instanceDesc{};
+            instanceDesc.mDebugName.Assign(TEXT("Deferred.PerDraw"));
+            instanceDesc.mSizeBytes = perDrawBufferSize;
+            instanceDesc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
+                                                        : Rhi::ERhiResourceUsage::Default;
+            instanceDesc.mBindFlags = Rhi::ERhiBufferBindFlags::ShaderResource;
+            instanceDesc.mCpuAccess =
                 IsVulkanBackend() ? Rhi::ERhiCpuAccess::Write : Rhi::ERhiCpuAccess::None;
-            mPerDrawBuffer = device.CreateBuffer(desc);
+            mPerDrawBuffer = device.CreateBuffer(instanceDesc);
+
+            Rhi::FRhiBufferDesc constantsDesc{};
+            constantsDesc.mDebugName.Assign(TEXT("Deferred.PerDrawConstants"));
+            constantsDesc.mSizeBytes = perDrawConstantsBufferSize;
+            constantsDesc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
+                                                         : Rhi::ERhiResourceUsage::Default;
+            constantsDesc.mBindFlags = Rhi::ERhiBufferBindFlags::Constant;
+            constantsDesc.mCpuAccess =
+                IsVulkanBackend() ? Rhi::ERhiCpuAccess::Write : Rhi::ERhiCpuAccess::None;
+            mPerDrawConstantsBuffer = device.CreateBuffer(constantsDesc);
         }
 
-        if (!mPerDrawGroups[0] && mPerDrawBuffer && resources.PerDrawLayout) {
-            RebuildPerDrawBindGroups(device, resources, mPerDrawBuffer.Get(), mPerDrawStrideBytes,
+        if (!mPerDrawGroups[0] && mPerDrawBuffer && mPerDrawConstantsBuffer
+            && resources.PerDrawLayout) {
+            RebuildPerDrawBindGroups(device, resources, mPerDrawBuffer.Get(),
+                mPerDrawConstantsBuffer.Get(), mPerDrawStrideBytes, mPerDrawConstantsStrideBytes,
                 mPerDrawCapacity, mPerDrawGroups);
         }
     }
@@ -1620,6 +1757,10 @@ namespace AltinaEngine::Rendering {
             TEXT("BasicDeferredRenderer"),
             "PerDraw instance stride invalid (stride={}, expected={}).", mPerDrawStrideBytes,
             static_cast<u32>(sizeof(FInstanceDrawData)));
+        DebugAssert(mPerDrawConstantsStrideBytes >= static_cast<u32>(sizeof(FPerDrawConstants)),
+            TEXT("BasicDeferredRenderer"),
+            "PerDraw constants stride invalid (stride={}, expectedAtLeast={}).",
+            mPerDrawConstantsStrideBytes, static_cast<u32>(sizeof(FPerDrawConstants)));
         DebugAssert(mPerDrawCapacity > 0U, TEXT("BasicDeferredRenderer"),
             "PerDraw instance capacity invalid (capacity={}).", mPerDrawCapacity);
 
@@ -1692,21 +1833,34 @@ namespace AltinaEngine::Rendering {
             }
             mPerDrawBuffer.Reset();
 
-            Rhi::FRhiBufferDesc desc{};
-            desc.mDebugName.Assign(TEXT("Deferred.PerDraw"));
-            desc.mSizeBytes = static_cast<u64>(mPerDrawStrideBytes)
+            Rhi::FRhiBufferDesc instanceDesc{};
+            instanceDesc.mDebugName.Assign(TEXT("Deferred.PerDraw"));
+            instanceDesc.mSizeBytes = static_cast<u64>(mPerDrawStrideBytes)
                 * static_cast<u64>(mPerDrawCapacity)
                 * static_cast<u64>(IsVulkanBackend() ? kInstanceFrameRing : 1U);
-            desc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
-                                                : Rhi::ERhiResourceUsage::Default;
-            desc.mBindFlags = Rhi::ERhiBufferBindFlags::ShaderResource;
-            desc.mCpuAccess =
+            instanceDesc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
+                                                        : Rhi::ERhiResourceUsage::Default;
+            instanceDesc.mBindFlags = Rhi::ERhiBufferBindFlags::ShaderResource;
+            instanceDesc.mCpuAccess =
                 IsVulkanBackend() ? Rhi::ERhiCpuAccess::Write : Rhi::ERhiCpuAccess::None;
-            mPerDrawBuffer = device->CreateBuffer(desc);
+            mPerDrawBuffer = device->CreateBuffer(instanceDesc);
 
-            if (mPerDrawBuffer && resources.PerDrawLayout) {
+            Rhi::FRhiBufferDesc constantsDesc{};
+            constantsDesc.mDebugName.Assign(TEXT("Deferred.PerDrawConstants"));
+            constantsDesc.mSizeBytes = static_cast<u64>(mPerDrawConstantsStrideBytes)
+                * static_cast<u64>(mPerDrawCapacity)
+                * static_cast<u64>(IsVulkanBackend() ? kInstanceFrameRing : 1U);
+            constantsDesc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
+                                                         : Rhi::ERhiResourceUsage::Default;
+            constantsDesc.mBindFlags = Rhi::ERhiBufferBindFlags::Constant;
+            constantsDesc.mCpuAccess =
+                IsVulkanBackend() ? Rhi::ERhiCpuAccess::Write : Rhi::ERhiCpuAccess::None;
+            mPerDrawConstantsBuffer = device->CreateBuffer(constantsDesc);
+
+            if (mPerDrawBuffer && mPerDrawConstantsBuffer && resources.PerDrawLayout) {
                 RebuildPerDrawBindGroups(*device, resources, mPerDrawBuffer.Get(),
-                    mPerDrawStrideBytes, mPerDrawCapacity, mPerDrawGroups);
+                    mPerDrawConstantsBuffer.Get(), mPerDrawStrideBytes,
+                    mPerDrawConstantsStrideBytes, mPerDrawCapacity, mPerDrawGroups);
             }
         }
         DebugAssert(requiredPerDrawInstances <= mPerDrawCapacity, TEXT("BasicDeferredRenderer"),
@@ -1735,13 +1889,17 @@ namespace AltinaEngine::Rendering {
         pipelineData.VertexLayout    = resources.BaseVertexLayout;
 
         FBasePassBindingData bindingData{};
-        bindingData.PerDrawBuffer          = mPerDrawBuffer.Get();
-        bindingData.PerDrawStrideBytes     = mPerDrawStrideBytes;
-        bindingData.PerDrawCapacity        = mPerDrawCapacity;
-        bindingData.PerDrawBaseOffsetBytes = static_cast<u64>(mPerDrawFrameSlot)
+        bindingData.PerDrawBuffer               = mPerDrawBuffer.Get();
+        bindingData.PerDrawConstantsBuffer      = mPerDrawConstantsBuffer.Get();
+        bindingData.PerDrawStrideBytes          = mPerDrawStrideBytes;
+        bindingData.PerDrawConstantsStrideBytes = mPerDrawConstantsStrideBytes;
+        bindingData.PerDrawCapacity             = mPerDrawCapacity;
+        bindingData.PerDrawBaseOffsetBytes      = static_cast<u64>(mPerDrawFrameSlot)
             * static_cast<u64>(mPerDrawCapacity) * static_cast<u64>(mPerDrawStrideBytes);
+        bindingData.PerDrawConstantsBaseOffsetBytes = static_cast<u64>(mPerDrawFrameSlot)
+            * static_cast<u64>(mPerDrawCapacity) * static_cast<u64>(mPerDrawConstantsStrideBytes);
         bindingData.PerDrawCursorInstances = 0U;
-        bindingData.bUseInstanceCursor     = IsVulkanBackend();
+        bindingData.PerDrawConstantsCursor = 0U;
         if (bindingData.PerDrawBuffer != nullptr) {
             const u64 requiredBytes = bindingData.PerDrawBaseOffsetBytes
                 + static_cast<u64>(bindingData.PerDrawCapacity)
@@ -1749,6 +1907,15 @@ namespace AltinaEngine::Rendering {
             DebugAssert(requiredBytes <= bindingData.PerDrawBuffer->GetDesc().mSizeBytes,
                 TEXT("BasicDeferredRenderer"), "PerDraw buffer too small (required={}, actual={}).",
                 requiredBytes, bindingData.PerDrawBuffer->GetDesc().mSizeBytes);
+        }
+        if (bindingData.PerDrawConstantsBuffer != nullptr) {
+            const u64 requiredBytes = bindingData.PerDrawConstantsBaseOffsetBytes
+                + static_cast<u64>(bindingData.PerDrawCapacity)
+                    * static_cast<u64>(bindingData.PerDrawConstantsStrideBytes);
+            DebugAssert(requiredBytes <= bindingData.PerDrawConstantsBuffer->GetDesc().mSizeBytes,
+                TEXT("BasicDeferredRenderer"),
+                "PerDraw constants buffer too small (required={}, actual={}).", requiredBytes,
+                bindingData.PerDrawConstantsBuffer->GetDesc().mSizeBytes);
         }
 
         const RenderCore::View::FViewRect viewRect = view->ViewRect;
@@ -1931,6 +2098,14 @@ namespace AltinaEngine::Rendering {
         Assert(width > 0U && height > 0U, TEXT("BasicDeferredRenderer"),
             "Render skipped: render extent is invalid {}x{}.", static_cast<u32>(width),
             static_cast<u32>(height));
+        DebugAssert(mPerDrawConstantsStrideBytes >= static_cast<u32>(sizeof(FPerDrawConstants)),
+            TEXT("BasicDeferredRenderer"),
+            "PerDraw constants stride invalid (stride={}, expectedAtLeast={}).",
+            mPerDrawConstantsStrideBytes, static_cast<u32>(sizeof(FPerDrawConstants)));
+
+        // Shadow pass is registered before base pass, so it must also advance the frame-ring slot.
+        mPerDrawFrameSlot =
+            IsVulkanBackend() ? static_cast<u32>(view->FrameIndex % kInstanceFrameRing) : 0U;
 
         auto&       resources = GetSharedResources();
         auto*       device    = Rhi::RHIGetDevice();
@@ -1967,21 +2142,36 @@ namespace AltinaEngine::Rendering {
                 group.Reset();
             }
             mPerDrawBuffer.Reset();
+            mPerDrawConstantsBuffer.Reset();
 
-            Rhi::FRhiBufferDesc desc{};
-            desc.mDebugName.Assign(TEXT("Deferred.PerDraw"));
-            desc.mSizeBytes = static_cast<u64>(mPerDrawStrideBytes)
+            Rhi::FRhiBufferDesc instanceDesc{};
+            instanceDesc.mDebugName.Assign(TEXT("Deferred.PerDraw"));
+            instanceDesc.mSizeBytes = static_cast<u64>(mPerDrawStrideBytes)
                 * static_cast<u64>(mPerDrawCapacity)
                 * static_cast<u64>(IsVulkanBackend() ? kInstanceFrameRing : 1U);
-            desc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
-                                                : Rhi::ERhiResourceUsage::Default;
-            desc.mBindFlags = Rhi::ERhiBufferBindFlags::ShaderResource;
-            desc.mCpuAccess =
+            instanceDesc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
+                                                        : Rhi::ERhiResourceUsage::Default;
+            instanceDesc.mBindFlags = Rhi::ERhiBufferBindFlags::ShaderResource;
+            instanceDesc.mCpuAccess =
                 IsVulkanBackend() ? Rhi::ERhiCpuAccess::Write : Rhi::ERhiCpuAccess::None;
-            mPerDrawBuffer = device->CreateBuffer(desc);
-            if (mPerDrawBuffer && resources.PerDrawLayout) {
+            mPerDrawBuffer = device->CreateBuffer(instanceDesc);
+
+            Rhi::FRhiBufferDesc constantsDesc{};
+            constantsDesc.mDebugName.Assign(TEXT("Deferred.PerDrawConstants"));
+            constantsDesc.mSizeBytes = static_cast<u64>(mPerDrawConstantsStrideBytes)
+                * static_cast<u64>(mPerDrawCapacity)
+                * static_cast<u64>(IsVulkanBackend() ? kInstanceFrameRing : 1U);
+            constantsDesc.mUsage     = IsVulkanBackend() ? Rhi::ERhiResourceUsage::Dynamic
+                                                         : Rhi::ERhiResourceUsage::Default;
+            constantsDesc.mBindFlags = Rhi::ERhiBufferBindFlags::Constant;
+            constantsDesc.mCpuAccess =
+                IsVulkanBackend() ? Rhi::ERhiCpuAccess::Write : Rhi::ERhiCpuAccess::None;
+            mPerDrawConstantsBuffer = device->CreateBuffer(constantsDesc);
+
+            if (mPerDrawBuffer && mPerDrawConstantsBuffer && resources.PerDrawLayout) {
                 RebuildPerDrawBindGroups(*device, resources, mPerDrawBuffer.Get(),
-                    mPerDrawStrideBytes, mPerDrawCapacity, mPerDrawGroups);
+                    mPerDrawConstantsBuffer.Get(), mPerDrawStrideBytes,
+                    mPerDrawConstantsStrideBytes, mPerDrawCapacity, mPerDrawGroups);
             }
         }
 
@@ -2003,13 +2193,17 @@ namespace AltinaEngine::Rendering {
         pipelineData.VertexLayout    = resources.BaseVertexLayout;
 
         FBasePassBindingData bindingData{};
-        bindingData.PerDrawBuffer          = mPerDrawBuffer.Get();
-        bindingData.PerDrawStrideBytes     = mPerDrawStrideBytes;
-        bindingData.PerDrawCapacity        = mPerDrawCapacity;
-        bindingData.PerDrawBaseOffsetBytes = static_cast<u64>(mPerDrawFrameSlot)
+        bindingData.PerDrawBuffer               = mPerDrawBuffer.Get();
+        bindingData.PerDrawConstantsBuffer      = mPerDrawConstantsBuffer.Get();
+        bindingData.PerDrawStrideBytes          = mPerDrawStrideBytes;
+        bindingData.PerDrawConstantsStrideBytes = mPerDrawConstantsStrideBytes;
+        bindingData.PerDrawCapacity             = mPerDrawCapacity;
+        bindingData.PerDrawBaseOffsetBytes      = static_cast<u64>(mPerDrawFrameSlot)
             * static_cast<u64>(mPerDrawCapacity) * static_cast<u64>(mPerDrawStrideBytes);
+        bindingData.PerDrawConstantsBaseOffsetBytes = static_cast<u64>(mPerDrawFrameSlot)
+            * static_cast<u64>(mPerDrawCapacity) * static_cast<u64>(mPerDrawConstantsStrideBytes);
         bindingData.PerDrawCursorInstances = 0U;
-        bindingData.bUseInstanceCursor     = IsVulkanBackend();
+        bindingData.PerDrawConstantsCursor = 0U;
 
         FBasePassPipelineData shadowPipelineData = pipelineData;
         shadowPipelineData.DefaultPassDesc       = &resources.DefaultShadowPassDesc;
@@ -2033,7 +2227,7 @@ namespace AltinaEngine::Rendering {
             shadowInputs.mShadowDrawLists[i]       = mViewContext.ShadowDrawLists[i];
             shadowInputs.mBindingDataPerCascade[i] = bindingData;
             shadowInputs.mBindingDataPerCascade[i].PerDrawCursorInstances =
-                bindingData.bUseInstanceCursor ? shadowPassFirstInstance[i] : 0U;
+                shadowPassFirstInstance[i];
             shadowInputs.mCascadePerFrameBuffers[i] = mShadowPerFrameBuffers[i].Get();
             shadowInputs.mCascadePerFrameGroups[i]  = mShadowPerFrameGroups[i].Get();
         }

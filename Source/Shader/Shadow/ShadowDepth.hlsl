@@ -9,6 +9,12 @@ AE_PER_FRAME_CBUFFER(ViewConstants)
     row_major float4x4 ViewProjection;
 };
 
+AE_PER_DRAW_CBUFFER(PerDrawConstants)
+{
+    uint InstanceBaseIndex;
+    float3 _PerDrawPadding;
+};
+
 AE_PER_DRAW_SRV(ByteAddressBuffer, InstanceDataBuffer);
 
 struct VSInput
@@ -32,7 +38,7 @@ float4 LoadInstanceFloat4(uint byteOffset)
 
 void LoadWorldMatrix(uint instanceId, out row_major float4x4 world)
 {
-    const uint baseOffset = instanceId * AE_INSTANCE_STRIDE_BYTES;
+    const uint baseOffset = (InstanceBaseIndex + instanceId) * AE_INSTANCE_STRIDE_BYTES;
     world[0] = LoadInstanceFloat4(baseOffset + 0u);
     world[1] = LoadInstanceFloat4(baseOffset + 16u);
     world[2] = LoadInstanceFloat4(baseOffset + 32u);

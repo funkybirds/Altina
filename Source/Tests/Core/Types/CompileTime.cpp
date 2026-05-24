@@ -5,6 +5,14 @@
 
 using namespace AltinaEngine;
 
+namespace {
+    template <typename T> struct TDependentTypeProbe {
+        using TWithoutCv  = typename TRemoveCV<T>::TType;
+        using TNormalized = typename TDecay<T>::TType;
+        using TMoved      = TValueOrReferenceReturn<TNormalized>;
+    };
+} // namespace
+
 static_assert(CIntegral<int>);
 static_assert(CIntegral<unsigned long long>);
 static_assert(!CIntegral<float>);
@@ -17,3 +25,7 @@ static_assert(CMoveConstructible<int>);
 static_assert(CLessComparable<int>);
 static_assert(CEqualComparable<int>);
 static_assert(CGreaterComparable<int>);
+
+static_assert(CSameAs<typename TDependentTypeProbe<const int&>::TWithoutCv, const int&>);
+static_assert(CSameAs<typename TDependentTypeProbe<const int&>::TNormalized, int>);
+static_assert(CSameAs<TDependentTypeProbe<const int&>::TMoved, int>);

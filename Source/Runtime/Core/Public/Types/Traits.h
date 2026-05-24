@@ -71,7 +71,7 @@ namespace AltinaEngine {
     };
 
     template <typename T> struct TRemoveCV {
-        using TType = TRemoveConst<typename TRemoveVolatile<T>::TType>::TType;
+        using TType = typename TRemoveConst<typename TRemoveVolatile<T>::TType>::TType;
     };
 
     // Reference
@@ -91,8 +91,9 @@ namespace AltinaEngine {
 
     // NOLINTBEGIN(cppcoreguidelines-missing-std-forward)
     // NOLINTBEGIN(cppcoreguidelines-rvalue-reference-param-not-moved)
-    template <typename T> constexpr auto Move(T&& Arg) noexcept -> TRemoveReference<T>::TType&& {
-        return static_cast<TRemoveReference<T>::TType&&>(Arg);
+    template <typename T>
+    constexpr auto Move(T&& Arg) noexcept -> typename TRemoveReference<T>::TType&& {
+        return static_cast<typename TRemoveReference<T>::TType&&>(Arg);
     }
     template <typename T>
     constexpr auto Forward(typename TRemoveReference<T>::TType& Arg) noexcept -> T&& {
@@ -103,7 +104,7 @@ namespace AltinaEngine {
         return static_cast<T&&>(Arg);
     }
     template <typename T> struct TDecay {
-        using TType = TRemoveCV<typename TRemoveReference<T>::TType>::TType;
+        using TType = typename TRemoveCV<typename TRemoveReference<T>::TType>::TType;
     };
     // NOLINTEND(cppcoreguidelines-rvalue-reference-param-not-moved)
     // NOLINTEND(cppcoreguidelines-missing-std-forward)
@@ -241,20 +242,16 @@ namespace AltinaEngine {
 
     namespace Detail::Construction {
         template <typename T, typename... Args>
-        auto TestConstructParen(int) -> decltype(T(Declval<Args>()...), TTrueType{}); // NOLINT
-
-        template <typename T, typename... Args> TFalseType TestConstructParen(...); // NOLINT
+        concept CParenConstructible = requires { T(Declval<Args>()...); };
 
         template <typename T, typename... Args>
-        auto TestConstructBrace(int) -> decltype(T{ Declval<Args>()... }, TTrueType{}); // NOLINT
-
-        template <typename T, typename... Args> TFalseType TestConstructBrace(...); // NOLINT
+        concept CBraceConstructible = requires { T{ Declval<Args>()... }; };
     } // namespace Detail::Construction
 
     template <typename T, typename... Args>
     struct TTypeIsConstructible :
-        TBoolConstant<decltype(Detail::Construction::TestConstructParen<T, Args...>(0))::Value
-            || decltype(Detail::Construction::TestConstructBrace<T, Args...>(0))::Value> {};
+        TBoolConstant<Detail::Construction::CParenConstructible<T, Args...>
+            || Detail::Construction::CBraceConstructible<T, Args...>> {};
 
     template <typename T> struct TTypeIsDefaultConstructible : TTypeIsConstructible<T> {};
     template <typename T>
@@ -505,10 +502,11 @@ namespace AltinaEngine {
 
     // GSL: F.16
     template <typename T>
-    using TValueOrReferenceReturn = TTypeSelect<sizeof(T) <= 2 * sizeof(void*), T, T&>::Type;
+    using TValueOrReferenceReturn =
+        typename TTypeSelect<sizeof(T) <= 2 * sizeof(void*), T, T&>::Type;
 
     template <typename T>
     using TConstValueOrReferenceReturn =
-        TTypeSelect<sizeof(T) <= 2 * sizeof(void*), const T, const T&>::Type;
+        typename TTypeSelect<sizeof(T) <= 2 * sizeof(void*), const T, const T&>::Type;
 
 } // namespace AltinaEngine

@@ -32,6 +32,7 @@ namespace AltinaEngine::GameScene {
             return out;
         }
 
+        // TODO: (Refactor,Manual) Repetitive string conversion
         auto ResolveAssemblyPath(FNativeStringView assemblyPath) -> Core::Container::FNativeString {
             using Core::Utility::Filesystem::FPath;
 

@@ -1,22 +1,14 @@
 #pragma once
 
-#include <format>
-#include <string>
-#include "../Types/Traits.h"
-
 #include "../Base/CoreAPI.h"
-#include "../Types/Aliases.h"
-#include "../Types/Traits.h"
 #include "../Container/StringView.h"
+#include "../Utility/String/FmtString.h"
 
 using AltinaEngine::Forward;
 namespace AltinaEngine::Core::Logging {
 
     using Container::FStringView;
-
-    template <typename... Args>
-    using TFormatString = TTypeSelect<CSameAs<TChar, wchar_t>, std::wformat_string<Args...>,
-        std::format_string<Args...>>::Type;
+    using Utility::String::TFormatString;
 
     enum class ELogLevel : u8 {
         Trace = 0,
@@ -57,10 +49,8 @@ namespace AltinaEngine::Core::Logging {
                 return;
             }
 
-            const std::basic_string<AltinaEngine::TChar> buffer =
-                std::format(Format, Forward<Args>(args)...);
-            Dispatch(
-                Level, Category, FStringView(buffer.data(), static_cast<usize>(buffer.size())));
+            const auto buffer = Utility::String::FmtString(Format, Forward<Args>(args)...);
+            Dispatch(Level, Category, buffer.ToView());
         }
 
     private:
@@ -128,16 +118,3 @@ namespace AltinaEngine {
     using Logging::LogWarningCategory;
     using Logging::TFormatString;
 } // namespace AltinaEngine
-
-namespace std {
-    template <typename CharT>
-    struct formatter<AltinaEngine::Core::Container::TBasicStringView<CharT>, CharT> :
-        formatter<std::basic_string<CharT>, CharT> {
-        template <typename FormatContext>
-        auto format(const AltinaEngine::Core::Container::TBasicStringView<CharT>& value,
-            FormatContext&                                                        ctx) const {
-            const std::basic_string<CharT> temp(value.Data(), value.Data() + value.Length());
-            return formatter<std::basic_string<CharT>, CharT>::format(temp, ctx);
-        }
-    };
-} // namespace std

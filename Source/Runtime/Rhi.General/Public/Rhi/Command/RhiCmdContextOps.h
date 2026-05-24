@@ -25,9 +25,11 @@ namespace AltinaEngine::Rhi {
         virtual void RHISetComputePipeline(FRhiPipeline* pipeline)                  = 0;
         virtual void RHISetPrimitiveTopology(ERhiPrimitiveTopology topology)        = 0;
         virtual void RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) = 0;
-        virtual void RHISetIndexBuffer(const FRhiIndexBufferView& view)             = 0;
-        virtual void RHISetViewport(const FRhiViewportRect& viewport)               = 0;
-        virtual void RHISetScissor(const FRhiScissorRect& scissor)                  = 0;
+        virtual void RHISetVertexBuffers(
+            u32 firstSlot, const FRhiVertexBufferView* views, u32 viewCount);
+        virtual void RHISetIndexBuffer(const FRhiIndexBufferView& view) = 0;
+        virtual void RHISetViewport(const FRhiViewportRect& viewport)   = 0;
+        virtual void RHISetScissor(const FRhiScissorRect& scissor)      = 0;
         virtual void RHISetRenderTargets(
             u32 colorTargetCount, FRhiTexture* const* colorTargets, FRhiTexture* depthTarget) = 0;
         virtual void RHIBeginRenderPass(const FRhiRenderPassDesc& desc)                       = 0;

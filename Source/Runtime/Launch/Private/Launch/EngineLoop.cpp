@@ -2,6 +2,7 @@
 
 #include "Input/InputMessageHandler.h"
 #include "Input/InputSystem.h"
+#include "Launch/RhiLaunchConfig.h"
 #include "Engine/EngineReflection.h"
 #include "Engine/GameScene/CameraComponent.h"
 #include "Engine/GameScene/ScriptComponent.h"
@@ -1223,16 +1224,10 @@ namespace AltinaEngine::Launch {
             }
 
             Rhi::FRhiInitDesc initDesc{};
-            initDesc.mAppName.Assign(TEXT("AltinaEngine"));
-            initDesc.mBackend             = backend;
-            initDesc.mEnableValidation    = true;
-            initDesc.mEnableGpuValidation = true;
+            initDesc = ResolveRhiInitDesc(config, backend);
 
-            Rhi::FRhiDeviceDesc deviceDesc{};
-            deviceDesc.mEnableValidation    = initDesc.mEnableValidation;
-            deviceDesc.mEnableGpuValidation = initDesc.mEnableGpuValidation;
-
-            mRhiDevice = Rhi::RHIInit(*mRhiContext, initDesc, deviceDesc);
+            Rhi::FRhiDeviceDesc deviceDesc = ResolveRhiDeviceDesc(initDesc);
+            mRhiDevice                     = Rhi::RHIInit(*mRhiContext, initDesc, deviceDesc);
             return mRhiDevice != nullptr;
         };
 
@@ -1260,9 +1255,7 @@ namespace AltinaEngine::Launch {
         Rhi::FRhiInitDesc initDesc{};
         initDesc.mAppName.Assign(TEXT("AltinaEngine"));
 
-        Rhi::FRhiDeviceDesc deviceDesc{};
-        deviceDesc.mEnableValidation    = initDesc.mEnableValidation;
-        deviceDesc.mEnableGpuValidation = initDesc.mEnableGpuValidation;
+        Rhi::FRhiDeviceDesc deviceDesc = ResolveRhiDeviceDesc(initDesc);
 
         mRhiDevice = Rhi::RHIInit(*mRhiContext, initDesc, deviceDesc);
         if (!mRhiDevice) {

@@ -3,9 +3,13 @@
 #include "RhiGeneralAPI.h"
 #include "Rhi/Command/RhiCmd.h"
 #include "Rhi/RhiStructs.h"
+#include "Container/Vector.h"
 #include "Types/Aliases.h"
 
 namespace AltinaEngine::Rhi {
+    namespace Container = Core::Container;
+    using Container::TVector;
+
     class FRhiCmdDrawIndexed final : public FRhiCmd {
     public:
         FRhiCmdDrawIndexed(
@@ -68,6 +72,29 @@ namespace AltinaEngine::Rhi {
     private:
         u32                  mSlot = 0U;
         FRhiVertexBufferView mView{};
+    };
+
+    class FRhiCmdSetVertexBuffers final : public FRhiCmd {
+    public:
+        FRhiCmdSetVertexBuffers(u32 firstSlot, const FRhiVertexBufferView* views, u32 viewCount)
+            : mFirstSlot(firstSlot) {
+            if (views == nullptr || viewCount == 0U) {
+                return;
+            }
+
+            mViews.Reserve(viewCount);
+            for (u32 index = 0U; index < viewCount; ++index) {
+                mViews.PushBack(views[index]);
+            }
+        }
+
+        void Execute(FRhiCmdContext& context) override {
+            context.RHISetVertexBuffers(mFirstSlot, mViews.Data(), static_cast<u32>(mViews.Size()));
+        }
+
+    private:
+        u32                           mFirstSlot = 0U;
+        TVector<FRhiVertexBufferView> mViews;
     };
 
     class FRhiCmdSetPrimitiveTopology final : public FRhiCmd {

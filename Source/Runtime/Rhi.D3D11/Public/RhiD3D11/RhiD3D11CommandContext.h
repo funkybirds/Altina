@@ -35,6 +35,8 @@ namespace AltinaEngine::Rhi {
         void RHISetComputePipeline(FRhiPipeline* pipeline) override;
         void RHISetPrimitiveTopology(ERhiPrimitiveTopology topology) override;
         void RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) override;
+        void RHISetVertexBuffers(
+            u32 firstSlot, const FRhiVertexBufferView* views, u32 viewCount) override;
         void RHISetIndexBuffer(const FRhiIndexBufferView& view) override;
         void RHISetViewport(const FRhiViewportRect& viewport) override;
         void RHISetScissor(const FRhiScissorRect& scissor) override;

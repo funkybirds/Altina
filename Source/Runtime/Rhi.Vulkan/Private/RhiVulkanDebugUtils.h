@@ -9,6 +9,9 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
     using Container::FString;
     using Container::FStringView;
 
+    void               SetDebugUtilsAvailable(bool available) noexcept;
+    [[nodiscard]] auto AreDebugUtilsAvailable() noexcept -> bool;
+
     template <typename THandle>
     [[nodiscard]] inline auto ToVkObjectHandle(THandle handle) noexcept -> u64 {
         if constexpr (requires { reinterpret_cast<u64>(handle); }) {
@@ -39,6 +42,9 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
     template <typename THandle>
     inline void SetVkObjectDebugName(VkDevice device, THandle handle, VkObjectType objectType,
         FStringView baseName, FStringView fallbackBaseName, FStringView suffix) noexcept {
+        if (!AreDebugUtilsAvailable()) {
+            return;
+        }
         SetVkObjectDebugNameRaw(
             device, ToVkObjectHandle(handle), objectType, baseName, fallbackBaseName, suffix);
     }

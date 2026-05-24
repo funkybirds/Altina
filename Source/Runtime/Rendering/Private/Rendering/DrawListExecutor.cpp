@@ -13,15 +13,57 @@
 
 namespace AltinaEngine::Rendering {
     namespace {
-        void BindVertexBufferTracked(Rhi::FRhiCmdContext& ctx, u32 slot,
-            const Rhi::FRhiVertexBufferView& view, u32& outBindCount) {
-            if (view.mBuffer == nullptr) {
-                return;
+        constexpr u32 kMaxResolvedVertexBufferSlotCount = 16U;
+
+        struct FResolvedVertexBufferBinding {
+            Rhi::FRhiVertexBufferView mViews[kMaxResolvedVertexBufferSlotCount]   = {};
+            bool                      mHasView[kMaxResolvedVertexBufferSlotCount] = {};
+            u32                       mMaxSlotPlusOne                             = 0U;
+
+            auto Add(u32 slot, const Rhi::FRhiVertexBufferView& view, bool& outWasNew) -> bool {
+                outWasNew = false;
+                if (slot >= kMaxResolvedVertexBufferSlotCount || view.mBuffer == nullptr) {
+                    return false;
+                }
+
+                outWasNew      = !mHasView[slot];
+                mViews[slot]   = view;
+                mHasView[slot] = true;
+                if (mMaxSlotPlusOne < slot + 1U) {
+                    mMaxSlotPlusOne = slot + 1U;
+                }
+                return true;
             }
 
-            ctx.RHISetVertexBuffer(slot, view);
-            ++outBindCount;
-        }
+            [[nodiscard]] auto IsEmpty() const noexcept -> bool {
+                for (u32 slot = 0U; slot < mMaxSlotPlusOne; ++slot) {
+                    if (mHasView[slot]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            void Submit(Rhi::FRhiCmdContext& ctx) const {
+                u32 runStart = 0U;
+                while (runStart < mMaxSlotPlusOne) {
+                    while (runStart < mMaxSlotPlusOne && !mHasView[runStart]) {
+                        ++runStart;
+                    }
+                    if (runStart >= mMaxSlotPlusOne) {
+                        return;
+                    }
+
+                    u32 runEnd = runStart + 1U;
+                    while (runEnd < mMaxSlotPlusOne && mHasView[runEnd]) {
+                        ++runEnd;
+                    }
+
+                    ctx.RHISetVertexBuffers(runStart, &mViews[runStart], runEnd - runStart);
+                    runStart = runEnd;
+                }
+            }
+        };
 
         auto GetSection(const RenderCore::Geometry::FStaticMeshLodData& lod, u32 sectionIndex)
             -> const RenderCore::Geometry::FStaticMeshSection* {
@@ -33,17 +75,23 @@ namespace AltinaEngine::Rendering {
 
         void BindVertexBuffersLegacy(Rhi::FRhiCmdContext&   ctx,
             const RenderCore::Geometry::FStaticMeshLodData& lod, u32& outBindCount) {
-            const auto positionView = lod.mPositionBuffer.GetView();
-            BindVertexBufferTracked(ctx, 0U, positionView, outBindCount);
+            FResolvedVertexBufferBinding bindings{};
 
-            const auto normalView = lod.mTangentBuffer.GetView();
-            BindVertexBufferTracked(ctx, 1U, normalView, outBindCount);
+            bool                         wasNew = false;
+            if (bindings.Add(0U, lod.mPositionBuffer.GetView(), wasNew) && wasNew) {
+                ++outBindCount;
+            }
+            if (bindings.Add(1U, lod.mTangentBuffer.GetView(), wasNew) && wasNew) {
+                ++outBindCount;
+            }
+            if (bindings.Add(2U, lod.mUV0Buffer.GetView(), wasNew) && wasNew) {
+                ++outBindCount;
+            }
+            if (bindings.Add(3U, lod.mUV1Buffer.GetView(), wasNew) && wasNew) {
+                ++outBindCount;
+            }
 
-            const auto uv0View = lod.mUV0Buffer.GetView();
-            BindVertexBufferTracked(ctx, 2U, uv0View, outBindCount);
-
-            const auto uv1View = lod.mUV1Buffer.GetView();
-            BindVertexBufferTracked(ctx, 3U, uv1View, outBindCount);
+            bindings.Submit(ctx);
         }
 
         auto ResolveVertexStreamView(const RenderCore::Geometry::FStaticMeshLodData& lod,
@@ -72,6 +120,43 @@ namespace AltinaEngine::Rendering {
             return false;
         }
 
+        void BindVertexBuffersFromLayout(Rhi::FRhiCmdContext& ctx,
+            const RenderCore::Geometry::FStaticMeshLodData&   lod,
+            const Rhi::FRhiVertexLayoutDesc& layout, u32& outBindCount) {
+            FResolvedVertexBufferBinding bindings{};
+            u32                          missCount = 0U;
+            for (const auto& attr : layout.mAttributes) {
+                Rhi::FRhiVertexBufferView view{};
+                if (!ResolveVertexStreamView(lod, attr, view)) {
+                    ++missCount;
+                    continue;
+                }
+                bool wasNew = false;
+                if (bindings.Add(attr.mInputSlot, view, wasNew)) {
+                    if (!wasNew) {
+                        continue;
+                    }
+                    ++outBindCount;
+                } else {
+                    ++missCount;
+                }
+            }
+
+            if (bindings.IsEmpty()) {
+                BindVertexBuffersLegacy(ctx, lod, outBindCount);
+                LogWarningCat(TEXT("Rendering.DrawList"),
+                    "BindVertexBuffersResolved: no streams matched resolved layout, fallback to legacy binding.");
+                return;
+            }
+
+            bindings.Submit(ctx);
+            if (missCount > 0U) {
+                LogWarningCat(TEXT("Rendering.DrawList"),
+                    "BindVertexBuffersResolved: {} attributes not bound from resolved layout.",
+                    missCount);
+            }
+        }
+
         void BindVertexBuffersResolved(Rhi::FRhiCmdContext& ctx,
             const RenderCore::Geometry::FStaticMeshLodData& lod,
             const Rhi::FRhiVertexLayoutDesc* layout, u32& outBindCount) {
@@ -80,29 +165,7 @@ namespace AltinaEngine::Rendering {
                 return;
             }
 
-            u32 boundCount = 0U;
-            u32 missCount  = 0U;
-            for (const auto& attr : layout->mAttributes) {
-                Rhi::FRhiVertexBufferView view{};
-                if (!ResolveVertexStreamView(lod, attr, view)) {
-                    ++missCount;
-                    continue;
-                }
-                BindVertexBufferTracked(ctx, attr.mInputSlot, view, outBindCount);
-                ++boundCount;
-            }
-
-            if (boundCount == 0U) {
-                BindVertexBuffersLegacy(ctx, lod, outBindCount);
-                LogWarningCat(TEXT("Rendering.DrawList"),
-                    "BindVertexBuffersResolved: no streams matched resolved layout, fallback to legacy binding.");
-                return;
-            }
-            if (missCount > 0U) {
-                LogWarningCat(TEXT("Rendering.DrawList"),
-                    "BindVertexBuffersResolved: {} attributes not bound from resolved layout.",
-                    missCount);
-            }
+            BindVertexBuffersFromLayout(ctx, lod, *layout, outBindCount);
         }
     } // namespace
 

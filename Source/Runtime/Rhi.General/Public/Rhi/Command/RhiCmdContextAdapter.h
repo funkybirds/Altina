@@ -38,6 +38,11 @@ namespace AltinaEngine::Rhi {
             mOps->RHISetVertexBuffer(slot, view);
         }
 
+        void RHISetVertexBuffers(
+            u32 firstSlot, const FRhiVertexBufferView* views, u32 viewCount) override {
+            mOps->RHISetVertexBuffers(firstSlot, views, viewCount);
+        }
+
         void RHISetIndexBuffer(const FRhiIndexBufferView& view) override {
             mOps->RHISetIndexBuffer(view);
         }

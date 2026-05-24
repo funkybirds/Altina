@@ -39,6 +39,7 @@ namespace AltinaEngine::Rhi {
     class FRhiCmdDrawIndexed;
     class FRhiCmdSetIndexBuffer;
     class FRhiCmdSetVertexBuffer;
+    class FRhiCmdSetVertexBuffers;
     class FRhiCmdSetPrimitiveTopology;
     class FRhiCmdSetViewport;
     class FRhiCmdSetScissor;

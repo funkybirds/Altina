@@ -9,6 +9,7 @@
 
 #include "RhiVulkanInternal.h"
 #include "RhiVulkanDeviceCaps.h"
+#include "RhiVulkanDebugUtils.h"
 #include "CoreMinimal.h"
 #include "RhiVulkanCommon.h"
 #include "Utility/Assert.h"
@@ -212,9 +213,14 @@ namespace AltinaEngine::Rhi {
         if (!mState) {
             mState = MakeUnique<FRhiVulkanContextState>();
         }
+        mState->mDebugUtilsEnabled = false;
+        mState->mEnabledLayers.Clear();
+        mState->mEnabledExtensions.Clear();
+        Vulkan::Detail::SetDebugUtilsAvailable(false);
 
-        LogInfoCat(TEXT("RHI.Vulkan"), TEXT("Initializing (Validation={}, GPUValidation={})."),
-            desc.mEnableValidation, desc.mEnableGpuValidation);
+        LogInfoCat(TEXT("RHI.Vulkan"),
+            TEXT("Initializing (Validation={}, GPUValidation={}, DebugNames={})."),
+            desc.mEnableValidation, desc.mEnableGpuValidation, desc.mEnableDebugNames);
 
         const u32 loaderVersion  = GetVulkanVersion();
         mState->mInstanceVersion = PickApiVersion(loaderVersion);
@@ -256,13 +262,15 @@ namespace AltinaEngine::Rhi {
 #if AE_PLATFORM_WIN
         mState->mEnabledExtensions.PushBack(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #endif
-        if (HasExtension(exts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
+        const bool wantsDebugUtils = desc.mEnableValidation || desc.mEnableDebugNames;
+        if (wantsDebugUtils && HasExtension(exts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
             mState->mEnabledExtensions.PushBack(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
             mState->mDebugUtilsEnabled = true;
-        } else {
+        } else if (wantsDebugUtils) {
             LogWarningCat(TEXT("RHI.Vulkan"),
                 TEXT("VK_EXT_debug_utils is unavailable. Debug names/markers will be disabled."));
         }
+        const bool enableDebugNames = mState->mDebugUtilsEnabled && desc.mEnableDebugNames;
 
         VkInstanceCreateInfo createInfo{};
         createInfo.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -274,8 +282,10 @@ namespace AltinaEngine::Rhi {
 
         if (vkCreateInstance(&createInfo, nullptr, &mState->mInstance) != VK_SUCCESS) {
             LogErrorCat(TEXT("RHI.Vulkan"), TEXT("Failed to create VkInstance."));
+            Vulkan::Detail::SetDebugUtilsAvailable(false);
             return false;
         }
+        Vulkan::Detail::SetDebugUtilsAvailable(enableDebugNames);
 
         if (mState->mDebugUtilsEnabled && desc.mEnableValidation) {
             mState->mDebugMessenger = CreateDebugMessenger(mState->mInstance);
@@ -299,6 +309,8 @@ namespace AltinaEngine::Rhi {
             vkDestroyInstance(mState->mInstance, nullptr);
             mState->mInstance = VK_NULL_HANDLE;
         }
+        mState->mDebugUtilsEnabled = false;
+        Vulkan::Detail::SetDebugUtilsAvailable(false);
         mState->mEnabledExtensions.Clear();
         mState->mEnabledLayers.Clear();
     }

@@ -1351,24 +1351,56 @@ namespace AltinaEngine::Rhi {
 
     void FRhiD3D11CommandContext::RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) {
 #if AE_PLATFORM_WIN
-        ID3D11DeviceContext* context = GetDeferredContext();
-        if (!context) {
-            return;
-        }
-
-        ID3D11Buffer* buffer = nullptr;
-        if (view.mBuffer) {
-            auto* d3dBuffer = static_cast<FRhiD3D11Buffer*>(view.mBuffer);
-            buffer          = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
-        }
-
-        const UINT stride = static_cast<UINT>(view.mStrideBytes);
-        const UINT offset = static_cast<UINT>(view.mOffsetBytes);
-        context->IASetVertexBuffers(static_cast<UINT>(slot), 1, &buffer, &stride, &offset);
-        RHIRecordSetVertexBufferCall();
+        RHISetVertexBuffers(slot, &view, 1U);
 #else
         (void)slot;
         (void)view;
+#endif
+    }
+
+    void FRhiD3D11CommandContext::RHISetVertexBuffers(
+        u32 firstSlot, const FRhiVertexBufferView* views, u32 viewCount) {
+#if AE_PLATFORM_WIN
+        ID3D11DeviceContext* context = GetDeferredContext();
+        if (!context || views == nullptr || viewCount == 0U) {
+            return;
+        }
+
+        constexpr u32 kMaxVertexBufferBatchCount = D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT;
+        u32           processed                  = 0U;
+        while (processed < viewCount) {
+            const u32 startSlot = firstSlot + processed;
+            if (startSlot >= kMaxVertexBufferBatchCount) {
+                return;
+            }
+
+            const u32     slotsLeft  = kMaxVertexBufferBatchCount - startSlot;
+            const u32     remaining  = viewCount - processed;
+            const u32     chunkCount = remaining < slotsLeft ? remaining : slotsLeft;
+
+            ID3D11Buffer* buffers[kMaxVertexBufferBatchCount] = {};
+            UINT          strides[kMaxVertexBufferBatchCount] = {};
+            UINT          offsets[kMaxVertexBufferBatchCount] = {};
+
+            for (u32 index = 0U; index < chunkCount; ++index) {
+                const auto& view = views[processed + index];
+                if (view.mBuffer) {
+                    auto* d3dBuffer = static_cast<FRhiD3D11Buffer*>(view.mBuffer);
+                    buffers[index]  = d3dBuffer ? d3dBuffer->GetNativeBuffer() : nullptr;
+                }
+                strides[index] = static_cast<UINT>(view.mStrideBytes);
+                offsets[index] = static_cast<UINT>(view.mOffsetBytes);
+            }
+
+            context->IASetVertexBuffers(static_cast<UINT>(startSlot), static_cast<UINT>(chunkCount),
+                buffers, strides, offsets);
+            RHIRecordSetVertexBufferCall();
+            processed += chunkCount;
+        }
+#else
+        (void)firstSlot;
+        (void)views;
+        (void)viewCount;
 #endif
     }
 

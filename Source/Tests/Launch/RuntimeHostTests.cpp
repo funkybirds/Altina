@@ -3,6 +3,9 @@
 #include "Launch/DemoRuntime.h"
 #include "Launch/EditorRuntimeController.h"
 #include "Launch/HostApplicationLoop.h"
+#include "Launch/RhiLaunchConfig.h"
+#include "CoreMinimal.h"
+#include "Utility/EngineConfig/EngineConfig.h"
 
 namespace {
     class FStubSession final : public AltinaEngine::Launch::IRuntimeSession {
@@ -224,4 +227,54 @@ TEST_CASE("RenderTick defaults to swapchain present path") {
     REQUIRE(!tick.bRedirectPrimaryViewToOffscreen);
     REQUIRE_EQ(tick.PrimaryViewImageId, 0ULL);
     REQUIRE(!tick.bUseExternalPrimaryCamera);
+}
+
+TEST_CASE("RHI launch config keeps validation off by default") {
+    AltinaEngine::Core::Utility::EngineConfig::FConfigCollection config{};
+    REQUIRE(config.ParseJsonConfig(AltinaEngine::Core::Container::FNativeStringView("{}")));
+
+    const auto initDesc =
+        AltinaEngine::Launch::ResolveRhiInitDesc(config, AltinaEngine::Rhi::ERhiBackend::Vulkan);
+    const auto deviceDesc = AltinaEngine::Launch::ResolveRhiDeviceDesc(initDesc);
+
+    REQUIRE_EQ(initDesc.mBackend, AltinaEngine::Rhi::ERhiBackend::Vulkan);
+    REQUIRE(!initDesc.mEnableValidation);
+    REQUIRE(!initDesc.mEnableGpuValidation);
+    REQUIRE(!initDesc.mEnableDebugNames);
+    REQUIRE(!deviceDesc.mEnableValidation);
+    REQUIRE(!deviceDesc.mEnableGpuValidation);
+}
+
+TEST_CASE("RHI launch config GPU validation implies validation") {
+    AltinaEngine::Core::Utility::EngineConfig::FConfigCollection config{};
+    REQUIRE(config.ParseJsonConfig(AltinaEngine::Core::Container::FNativeStringView(
+        "{\"Rhi\":{\"EnableValidation\":false,\"EnableGpuValidation\":true}}")));
+
+    const auto initDesc =
+        AltinaEngine::Launch::ResolveRhiInitDesc(config, AltinaEngine::Rhi::ERhiBackend::Vulkan);
+    const auto deviceDesc = AltinaEngine::Launch::ResolveRhiDeviceDesc(initDesc);
+
+    REQUIRE(initDesc.mEnableValidation);
+    REQUIRE(initDesc.mEnableGpuValidation);
+    REQUIRE(deviceDesc.mEnableValidation);
+    REQUIRE(deviceDesc.mEnableGpuValidation);
+}
+
+TEST_CASE("RHI launch config honors startup overrides") {
+    AltinaEngine::Core::Utility::EngineConfig::FConfigCollection config{};
+    REQUIRE(config.ParseJsonConfig(AltinaEngine::Core::Container::FNativeStringView(
+        "{\"Rhi\":{\"EnableValidation\":true,\"EnableGpuValidation\":true,\"EnableDebugNames\":true}}")));
+
+    AltinaEngine::FStartupParameters startup{};
+    startup.mCommandLine.Assign("-Config:Rhi/EnableValidation=false "
+                                "-Config:Rhi/EnableGpuValidation=false "
+                                "-Config:Rhi/EnableDebugNames=false");
+    config.ApplyStartupParamOverrides(startup);
+
+    const auto initDesc =
+        AltinaEngine::Launch::ResolveRhiInitDesc(config, AltinaEngine::Rhi::ERhiBackend::Vulkan);
+
+    REQUIRE(!initDesc.mEnableValidation);
+    REQUIRE(!initDesc.mEnableGpuValidation);
+    REQUIRE(!initDesc.mEnableDebugNames);
 }

@@ -398,6 +398,10 @@ namespace AltinaEngine::Rhi {
         return mState && mState->mSupportsExtDyn;
     }
 
+    auto FRhiVulkanDevice::SupportsDebugNames() const noexcept -> bool {
+        return Vulkan::Detail::AreDebugUtilsAvailable();
+    }
+
     auto FRhiVulkanDevice::GetInternalAllocatorHandle() const noexcept -> void* {
         return mState ? static_cast<void*>(&mState->mAllocator) : nullptr;
     }

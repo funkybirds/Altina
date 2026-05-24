@@ -6,9 +6,17 @@
 namespace AltinaEngine::Rhi::Vulkan::Detail {
     using Core::Container::FNativeString;
 
+    namespace {
+        bool gDebugUtilsAvailable = false;
+    } // namespace
+
+    void SetDebugUtilsAvailable(bool available) noexcept { gDebugUtilsAvailable = available; }
+
+    auto AreDebugUtilsAvailable() noexcept -> bool { return gDebugUtilsAvailable; }
+
     void SetVkObjectDebugNameRaw(VkDevice device, u64 objectHandle, VkObjectType objectType,
         FStringView baseName, FStringView fallbackBaseName, FStringView suffix) noexcept {
-        if (device == VK_NULL_HANDLE || objectHandle == 0ULL) {
+        if (!gDebugUtilsAvailable || device == VK_NULL_HANDLE || objectHandle == 0ULL) {
             return;
         }
 
@@ -36,6 +44,9 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
         VkDevice device, VkCommandBuffer commandBuffer, FStringView label) noexcept {
         static bool sLoggedInvalidInputs = false;
         static bool sLoggedMissingProc   = false;
+        if (!gDebugUtilsAvailable) {
+            return;
+        }
         if (device == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE || label.IsEmpty()) {
             if (!sLoggedInvalidInputs) {
                 sLoggedInvalidInputs = true;
@@ -71,7 +82,7 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
     }
 
     void CmdEndDebugLabel(VkDevice device, VkCommandBuffer commandBuffer) noexcept {
-        if (device == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE) {
+        if (!gDebugUtilsAvailable || device == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE) {
             return;
         }
         auto endLabel = reinterpret_cast<PFN_vkCmdEndDebugUtilsLabelEXT>(
@@ -84,7 +95,8 @@ namespace AltinaEngine::Rhi::Vulkan::Detail {
 
     void CmdInsertDebugLabel(
         VkDevice device, VkCommandBuffer commandBuffer, FStringView label) noexcept {
-        if (device == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE || label.IsEmpty()) {
+        if (!gDebugUtilsAvailable || device == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE
+            || label.IsEmpty()) {
             return;
         }
         auto insertLabel = reinterpret_cast<PFN_vkCmdInsertDebugUtilsLabelEXT>(

@@ -46,6 +46,7 @@ namespace AltinaEngine::Rhi {
         [[nodiscard]] auto SupportsDynamicRendering() const noexcept -> bool;
         [[nodiscard]] auto SupportsSynchronization2() const noexcept -> bool;
         [[nodiscard]] auto SupportsExtendedDynamicState() const noexcept -> bool;
+        [[nodiscard]] auto SupportsDebugNames() const noexcept -> bool;
         [[nodiscard]] auto GetInternalAllocatorHandle() const noexcept -> void*;
 
         void               NotifyViewportAcquired(VkSemaphore acquire, VkSemaphore renderComplete);

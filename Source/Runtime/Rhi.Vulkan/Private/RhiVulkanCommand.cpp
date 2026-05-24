@@ -462,6 +462,7 @@ namespace AltinaEngine::Rhi {
         bool                               mSupportsDynamicRendering     = false;
         bool                               mSupportsSync2                = false;
         bool                               mSupportsExtendedDynamicState = false;
+        bool                               mDebugUtilsEnabled            = false;
         ERhiPrimitiveTopology              mTopology         = ERhiPrimitiveTopology::TriangleList;
         u32                                mQueueFamilyIndex = 0U;
         u64                                mAttachmentHash   = 0ULL;
@@ -494,6 +495,7 @@ namespace AltinaEngine::Rhi {
                 mState->mSupportsDynamicRendering     = owner->SupportsDynamicRendering();
                 mState->mSupportsSync2                = owner->SupportsSynchronization2();
                 mState->mSupportsExtendedDynamicState = owner->SupportsExtendedDynamicState();
+                mState->mDebugUtilsEnabled            = owner->SupportsDebugNames();
                 mState->mQueueFamilyIndex             = owner->GetQueueFamilyIndex(desc.mQueueType);
 
                 FRhiCommandPoolDesc poolDesc{};
@@ -675,15 +677,28 @@ namespace AltinaEngine::Rhi {
     void FRhiVulkanCommandContext::RHIPushDebugMarkerNative(FStringView text) {
         static bool sLoggedMissingStateOrCmd = false;
         static bool sLoggedEmptyLabel        = false;
-        if (!mState || mState->mDevice == VK_NULL_HANDLE || mState->mCmd == VK_NULL_HANDLE) {
+        if (!mState) {
             if (!sLoggedMissingStateOrCmd) {
                 sLoggedMissingStateOrCmd = true;
                 Core::Logging::LogWarningCat(TEXT("RHI.Vulkan.DebugMarker"),
                     TEXT(
                         "Skip RHIPushDebugMarkerNative: invalid state/device/cmd (state={}, device={}, cmd={})."),
-                    static_cast<const void*>(mState),
-                    static_cast<const void*>(mState ? mState->mDevice : VK_NULL_HANDLE),
-                    static_cast<const void*>(mState ? mState->mCmd : VK_NULL_HANDLE));
+                    static_cast<const void*>(mState), static_cast<const void*>(VK_NULL_HANDLE),
+                    static_cast<const void*>(VK_NULL_HANDLE));
+            }
+            return;
+        }
+        if (!mState->mDebugUtilsEnabled) {
+            return;
+        }
+        if (mState->mDevice == VK_NULL_HANDLE || mState->mCmd == VK_NULL_HANDLE) {
+            if (!sLoggedMissingStateOrCmd) {
+                sLoggedMissingStateOrCmd = true;
+                Core::Logging::LogWarningCat(TEXT("RHI.Vulkan.DebugMarker"),
+                    TEXT(
+                        "Skip RHIPushDebugMarkerNative: invalid state/device/cmd (state={}, device={}, cmd={})."),
+                    static_cast<const void*>(mState), static_cast<const void*>(mState->mDevice),
+                    static_cast<const void*>(mState->mCmd));
             }
             return;
         }
@@ -699,15 +714,16 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHIPopDebugMarkerNative() {
-        if (!mState || mState->mDevice == VK_NULL_HANDLE || mState->mCmd == VK_NULL_HANDLE) {
+        if (!mState || !mState->mDebugUtilsEnabled || mState->mDevice == VK_NULL_HANDLE
+            || mState->mCmd == VK_NULL_HANDLE) {
             return;
         }
         Vulkan::Detail::CmdEndDebugLabel(mState->mDevice, mState->mCmd);
     }
 
     void FRhiVulkanCommandContext::RHIInsertDebugMarkerNative(FStringView text) {
-        if (!mState || mState->mDevice == VK_NULL_HANDLE || mState->mCmd == VK_NULL_HANDLE
-            || text.IsEmpty()) {
+        if (!mState || !mState->mDebugUtilsEnabled || mState->mDevice == VK_NULL_HANDLE
+            || mState->mCmd == VK_NULL_HANDLE || text.IsEmpty()) {
             return;
         }
         Vulkan::Detail::CmdInsertDebugLabel(mState->mDevice, mState->mCmd, text);
@@ -794,27 +810,62 @@ namespace AltinaEngine::Rhi {
     }
 
     void FRhiVulkanCommandContext::RHISetVertexBuffer(u32 slot, const FRhiVertexBufferView& view) {
+        RHISetVertexBuffers(slot, &view, 1U);
+    }
+
+    void FRhiVulkanCommandContext::RHISetVertexBuffers(
+        u32 firstSlot, const FRhiVertexBufferView* views, u32 viewCount) {
         EnsureRecording();
-        if (!mState || !mState->mCmd) {
-            return;
-        }
-        VkBuffer     buffer = VK_NULL_HANDLE;
-        VkDeviceSize offset = static_cast<VkDeviceSize>(view.mOffsetBytes);
-        if (view.mBuffer) {
-            auto* vkBuffer = static_cast<FRhiVulkanBuffer*>(view.mBuffer);
-            buffer         = vkBuffer ? vkBuffer->GetNativeBuffer() : VK_NULL_HANDLE;
-        }
-
-        if (slot < kTrackedVertexBufferSlotCount && mState->mBoundVertexBuffers[slot] == buffer
-            && mState->mBoundVertexBufferOffsets[slot] == offset) {
+        if (!mState || !mState->mCmd || views == nullptr || viewCount == 0U) {
             return;
         }
 
-        vkCmdBindVertexBuffers(mState->mCmd, slot, 1, &buffer, &offset);
-        RHIRecordSetVertexBufferCall();
-        if (slot < kTrackedVertexBufferSlotCount) {
-            mState->mBoundVertexBuffers[slot]       = buffer;
-            mState->mBoundVertexBufferOffsets[slot] = offset;
+        u32 processed = 0U;
+        while (processed < viewCount) {
+            const u32    remaining  = viewCount - processed;
+            const u32    chunkCount = remaining < kTrackedVertexBufferSlotCount
+                   ? remaining
+                   : kTrackedVertexBufferSlotCount;
+
+            VkBuffer     buffers[kTrackedVertexBufferSlotCount] = {};
+            VkDeviceSize offsets[kTrackedVertexBufferSlotCount] = {};
+            bool         anyChanged                             = false;
+
+            for (u32 index = 0U; index < chunkCount; ++index) {
+                const auto& view   = views[processed + index];
+                VkBuffer    buffer = VK_NULL_HANDLE;
+                if (view.mBuffer) {
+                    auto* vkBuffer = static_cast<FRhiVulkanBuffer*>(view.mBuffer);
+                    buffer         = vkBuffer ? vkBuffer->GetNativeBuffer() : VK_NULL_HANDLE;
+                }
+
+                const VkDeviceSize offset = static_cast<VkDeviceSize>(view.mOffsetBytes);
+                buffers[index]            = buffer;
+                offsets[index]            = offset;
+
+                const u32 slot = firstSlot + processed + index;
+                if (slot >= kTrackedVertexBufferSlotCount
+                    || mState->mBoundVertexBuffers[slot] != buffer
+                    || mState->mBoundVertexBufferOffsets[slot] != offset) {
+                    anyChanged = true;
+                }
+            }
+
+            if (anyChanged) {
+                vkCmdBindVertexBuffers(
+                    mState->mCmd, firstSlot + processed, chunkCount, buffers, offsets);
+                RHIRecordSetVertexBufferCall();
+
+                for (u32 index = 0U; index < chunkCount; ++index) {
+                    const u32 slot = firstSlot + processed + index;
+                    if (slot < kTrackedVertexBufferSlotCount) {
+                        mState->mBoundVertexBuffers[slot]       = buffers[index];
+                        mState->mBoundVertexBufferOffsets[slot] = offsets[index];
+                    }
+                }
+            }
+
+            processed += chunkCount;
         }
     }
 
